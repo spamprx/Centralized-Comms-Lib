@@ -1,0 +1,11 @@
+{
+  "name": "swe-backend",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "node src/index.js",
+    "build": "echo 'No build step for API'",
+    "lint": "echo 'No lint configured'",
+    "test": "echo 'No tests configured'"
+  }
+}
