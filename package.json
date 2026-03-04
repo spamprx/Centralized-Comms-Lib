@@ -1,0 +1,32 @@
+{
+    "name": "centralized-comms-lib",
+    "private": true,
+    "version": "0.0.0",
+    "description": "Centralized Communications Library - Monorepo",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "turbo run dev",
+        "build": "turbo run build",
+        "lint": "turbo run lint",
+        "preview": "turbo run preview",
+        "test": "turbo run test",
+        "clean": "turbo run clean && rm -rf node_modules",
+        "dev:web": "npm run dev --workspace=apps/web",
+        "dev:api": "npm run dev --workspace=apps/api",
+        "build:web": "npm run build --workspace=apps/web",
+        "build:api": "npm run build --workspace=apps/api"
+    },
+    "devDependencies": {
+        "autoprefixer": "^10.4.27",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^4.2.1",
+        "turbo": "^2.5.4"
+    },
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=9.0.0"
+    }
+}
