@@ -1,0 +1,58 @@
+# ── Version control ─────────────────────────────────────────
+.git
+.gitignore
+
+# ── Node modules (installed fresh in each stage) ───────────
+node_modules
+**/node_modules
+
+# ── Build outputs (produced fresh in build stage) ──────────
+**/dist
+**/build
+**/.turbo
+**/*.tsbuildinfo
+
+# ── Environment files (injected at runtime, never baked) ───
+.env
+.env.*
+!.env.example
+
+# ── Logs ───────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── Tests & coverage ──────────────────────────────────────
+**/test
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+**/coverage
+**/.nyc_output
+
+# ── CI/CD, tooling & git hooks ────────────────────────────
+.github
+.husky
+.eslintrc*
+.prettierrc*
+
+# ── IDE / editor ──────────────────────────────────────────
+.vscode
+.idea
+*.swp
+*.swo
+
+# ── OS files ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Infrastructure not needed inside images ───────────────
+infra/k8s
+infra/scripts
+infra/docker/api/README*
+infra/docker/web/README*
+
+# ── Misc ──────────────────────────────────────────────────
+turbo.json
+.turbo
+.cache
+.temp
