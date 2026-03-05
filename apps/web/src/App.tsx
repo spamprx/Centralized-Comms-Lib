@@ -1,35 +1,49 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Routes, Route } from "react-router-dom";
 
-function App() {
-  const [count, setCount] = useState(0)
+import HomePage from "../pages/Home/HomePage";
+import LoginPage from "../pages/Auth/LoginPage";
+import DashboardPage from "../pages/Dashboard/DashboardPage";
+import ContentLibraryPage from "../pages/Library/ContentLibraryPage";
+import ContentReadingPage from "../pages/Library/ContentReadingPage";
+import ContentEditorPage from "../pages/Editor/ContentEditorPage";
+import ContentPreviewPage from "../pages/Editor/ContentPreviewPage";
+import ReviewPage from "../pages/Review/ReviewPage";
+import VersionHistoryPage from "../pages/Review/VersionHistoryPage";
+import MyContentPage from "../pages/MyContent/MyContentPage";
+import AssetManagementPage from "../pages/Assets/AssetManagementPage";
+import AITutorPage from "../pages/AI/AITutorPage";
+import AdminPanelPage from "../pages/Admin/AdminPanelPage";
+import AnalyticsPage from "../pages/Analytics/AnalyticsPage";
+import ProfilePage from "../pages/Profile/ProfilePage";
 
+export default function AppRoutes() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage />} />
 
-export default App
+      <Route path="/dashboard" element={<DashboardPage />} />
+
+      <Route path="/library" element={<ContentLibraryPage />} />
+      <Route path="/library/:contentId" element={<ContentReadingPage />} />
+
+      <Route path="/editor/:contentId" element={<ContentEditorPage />} />
+      <Route path="/preview/:contentId" element={<ContentPreviewPage />} />
+
+      <Route path="/review/:contentId" element={<ReviewPage />} />
+      <Route path="/history/:contentId" element={<VersionHistoryPage />} />
+
+      <Route path="/my-content" element={<MyContentPage />} />
+
+      <Route path="/assets" element={<AssetManagementPage />} />
+
+      <Route path="/ai-tutor" element={<AITutorPage />} />
+
+      <Route path="/admin" element={<AdminPanelPage />} />
+
+      <Route path="/analytics" element={<AnalyticsPage />} />
+
+      <Route path="/profile" element={<ProfilePage />} />
+    </Routes>
+  );
+}
