@@ -1,0 +1,56 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - Frontend
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/web/**'
+      - 'infra/docker/web/**'
+
+jobs:
+  build-and-test:
+    name: Build & Test Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build frontend image
+        run: docker compose build frontend
+
+      - name: Start frontend container
+        run: docker compose up -d frontend
+
+      - name: Wait for frontend to be ready
+        run: |
+          echo "Waiting for frontend..."
+          for i in {1..10}; do
+            if curl -sf http://localhost:3000 > /dev/null; then
+              echo "Frontend is up!"
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 5
+          done
+
+      - name: Health check
+        run: curl -f http://localhost:3000 || exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down
+
+  approve:
+    name: Manual Approval
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Approved
+        run: echo "Frontend approved, ready to merge to main"
