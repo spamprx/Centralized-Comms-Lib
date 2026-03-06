@@ -1,0 +1,71 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - Backend
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'infra/docker/api/**'
+
+jobs:
+  build-and-test:
+    name: Build & Test Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start postgres (backend depends on it)
+        run: docker compose up -d postgres
+
+      - name: Wait for postgres to be healthy
+        run: |
+          echo "Waiting for postgres..."
+          for i in {1..10}; do
+            if docker compose exec -T postgres pg_isready -U comms -d comms; then
+              echo "Postgres is ready!"
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 5
+          done
+
+      - name: Build backend image
+        run: docker compose build backend
+
+      - name: Start backend container
+        run: docker compose up -d backend
+
+      - name: Wait for backend to be ready
+        run: |
+          echo "Waiting for backend..."
+          for i in {1..10}; do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Backend is up!"
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 5
+          done
+
+      - name: Health check
+        run: curl -f http://localhost:8000/health || exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down
+
+  approve:
+    name: Manual Approval
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Approved
+        run: echo "Backend approved, ready to merge to main"
