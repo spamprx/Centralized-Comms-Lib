@@ -13,9 +13,8 @@ RUN npm ci
 COPY apps/api/tsconfig.json ./apps/api/
 COPY apps/api/src/ ./apps/api/src/
 
-# FUTURE: Uncomment when Prisma is added
-# COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
-# RUN npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
+COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
+RUN npm install -D prisma@6 && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
 
 RUN npm run build --workspace=apps/api
 
@@ -34,9 +33,8 @@ COPY apps/web/package.json ./apps/web/
 
 RUN npm ci --omit=dev
 
-# FUTURE: Uncomment when Prisma is added
-# COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
-# RUN npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
+COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
+RUN npm install prisma@6 && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
