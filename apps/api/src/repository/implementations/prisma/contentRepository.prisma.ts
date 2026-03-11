@@ -6,6 +6,7 @@ import type {
   CreateContentVersionInput,
   CreateDraftInput,
   LifecycleState,
+  TipTapDocument,
   VersionChangeType,
   Visibility,
 } from "../../types";
@@ -42,7 +43,8 @@ function toVersion(row: {
   versionNumber: number;
   changeType: string;
   title: string;
-  metadataSnapshot: unknown | null;
+  body: unknown;
+  metadataSnapshot: unknown;
   contentId: string;
   authorId: string;
   createdAt: Date;
@@ -52,7 +54,10 @@ function toVersion(row: {
     versionNumber: row.versionNumber,
     changeType: row.changeType as VersionChangeType,
     title: row.title,
-    metadataSnapshot: row.metadataSnapshot,
+    body: row.body != null && typeof row.body === "object" && !Array.isArray(row.body)
+      ? (row.body as TipTapDocument)
+      : null,
+    metadataSnapshot: row.metadataSnapshot ?? null,
     contentId: row.contentId,
     authorId: row.authorId,
     createdAt: row.createdAt,
@@ -148,7 +153,8 @@ export class PrismaContentRepository implements ContentRepository {
         authorId: input.authorId,
         changeType: input.changeType,
         title: input.title,
-        metadataSnapshot: input.metadataSnapshot as any ?? null,
+        ...(input.body != null && { body: input.body as object }),
+        ...(input.metadataSnapshot != null && { metadataSnapshot: input.metadataSnapshot as object }),
         versionNumber: nextVersion,
       },
     });
