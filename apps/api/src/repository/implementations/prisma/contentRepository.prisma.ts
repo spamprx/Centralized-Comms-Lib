@@ -43,7 +43,7 @@ function toVersion(row: {
   versionNumber: number;
   changeType: string;
   title: string;
-  body: unknown;
+  body?: unknown;
   metadataSnapshot: unknown;
   contentId: string;
   authorId: string;
