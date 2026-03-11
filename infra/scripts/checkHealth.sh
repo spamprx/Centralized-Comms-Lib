@@ -7,24 +7,59 @@
 #
 # You can override BASE_URL and API_TOKEN when running:
 #   BASE_URL="http://localhost:8000" API_TOKEN="your.jwt.token" ./check_api_health.sh
+#
+# If API_TOKEN is not set, the script auto-generates a short-lived JWT from
+# the .env file (JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE) using Node.js.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ENV_FILE="${ENV_FILE:-${REPO_ROOT}/apps/api/.env}"
 
 BASE_URL="${BASE_URL:-http://localhost:8000}"
 API_PREFIX="/api/v1"
 TIMEOUT="${TIMEOUT:-5}"
 
-# Resolve curl binary explicitly so PATH/alias differences don't break the script
 CURL_BIN="$(command -v curl || true)"
 if [[ -z "$CURL_BIN" ]]; then
   echo "Error: curl is not installed or not available in PATH." >&2
   exit 1
 fi
 
-# If you have a JWT, set API_TOKEN env and it will be sent to protected routes.
+# Auto-generate a JWT from .env when API_TOKEN is not already provided.
+if [[ -z "$API_TOKEN" && -f "$ENV_FILE" ]]; then
+  _jwt_secret="$(grep -E '^JWT_SECRET=' "$ENV_FILE" | head -1 | cut -d'=' -f2-)"
+  _jwt_issuer="$(grep -E '^JWT_ISSUER=' "$ENV_FILE" | head -1 | cut -d'=' -f2-)"
+  _jwt_audience="$(grep -E '^JWT_AUDIENCE=' "$ENV_FILE" | head -1 | cut -d'=' -f2-)"
+
+  if [[ -n "$_jwt_secret" ]]; then
+    API_TOKEN="$(NODE_PATH="${REPO_ROOT}/node_modules" node -e "
+      const jwt = require('jsonwebtoken');
+      const opts = { algorithm: 'HS256', expiresIn: '1h' };
+      if ('${_jwt_issuer}') opts.issuer = '${_jwt_issuer}';
+      if ('${_jwt_audience}') opts.audience = '${_jwt_audience}';
+      const token = jwt.sign(
+        { id: 'health-check', email: 'healthcheck@system', role: 'ADMIN' },
+        '${_jwt_secret}',
+        opts
+      );
+      process.stdout.write(token);
+    " 2>/dev/null)"
+
+    if [[ -n "$API_TOKEN" ]]; then
+      echo "Auto-generated JWT from ${ENV_FILE} for health-check." >&2
+    else
+      echo "Warning: Failed to generate JWT via Node.js – protected routes will return 401." >&2
+    fi
+  else
+    echo "Warning: JWT_SECRET not found in ${ENV_FILE} – protected routes will return 401." >&2
+  fi
+fi
+
 AUTH_HEADER=()
 if [[ -n "$API_TOKEN" ]]; then
   AUTH_HEADER=(-H "Authorization: Bearer ${API_TOKEN}")
 else
-  echo "Note: API_TOKEN is not set – protected API routes under ${API_PREFIX} will likely return 401 (\"No token provided\")." >&2
+  echo "Note: API_TOKEN is not set and could not be auto-generated – protected routes under ${API_PREFIX} will likely return 401." >&2
 fi
 
 # One entry per endpoint: "METHOD PATH"
