@@ -9,6 +9,7 @@ import contentRouter from "./routes/content.routes";
 import tagRouter from "./routes/tag.routes";
 import reviewRouter from "./routes/review.routes";
 import adminRouter from "./routes/admin.routes";
+import analyticsRouter from "./routes/analytics.routes";
 
 const router = Router();
 
@@ -45,5 +46,6 @@ router.use("/content", contentRouter);
 router.use("/tags", tagRouter);
 router.use("/reviews", reviewRouter);
 router.use("/admin", adminRouter);
+router.use("/analytics", analyticsRouter);
 
 export default router;

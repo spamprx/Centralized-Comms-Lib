@@ -37,9 +37,8 @@ COPY packages/database/transactional/prisma/ ./packages/database/transactional/p
 RUN npm install prisma@6 && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY infra/docker/api/entrypoint.sh /app/entrypoint.sh
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && chmod +x /app/entrypoint.sh
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 8000
@@ -47,4 +46,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -qO- http://localhost:8000/health || exit 1
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["node", "apps/api/dist/main.js"]
