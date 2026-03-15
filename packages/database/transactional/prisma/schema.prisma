@@ -4,5 +4,357 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  //url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
+}
+
+
+// ── User ────────────────────────────────────────────────────────────────────
+// Core identity for every authenticated actor.
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  displayName  String
+  passwordHash String
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userRoles        UserRole[]            @relation("UserRoles")
+  assignedRoles    UserRole[]            @relation("RoleAssigner")
+  groupMemberships UserGroupMembership[]
+
+  authoredContent Content[]        @relation("ContentAuthor")
+  contentVersions ContentVersion[] @relation("VersionAuthor")
+
+  reviewRequests      ReviewRequest[]    @relation("ReviewRequester")
+  reviewAssignments   ReviewAssignment[] @relation("AssignedReviewer")
+  reviewAssignmentsBy ReviewAssignment[] @relation("AssignmentAssigner")
+
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+// ── Role ────────────────────────────────────────────────────────────────────
+// Named permission bundle (Admin, Author, Reviewer, Audience, ...).
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions Permission[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+// ── Permission ──────────────────────────────────────────────────────────────
+// Single (action × resource) permission attached to a role.
+
+model Permission {
+  id       String @id @default(uuid())
+  action   String // CREATE | READ | UPDATE | DELETE
+  resource String // CONTENT | TEMPLATE | USER | ROLE | REVIEW | TAG | GROUP | LOG
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, action, resource])
+  @@map("permissions")
+}
+
+// ── UserRole ────────────────────────────────────────────────────────────────
+// Assignment of a role to a user, with audit details.
+
+model UserRole {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  assignedById String?
+  assignedBy   User?   @relation("RoleAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// ── UserGroup ───────────────────────────────────────────────────────────────
+// Logical group of users for targeting and access control.
+
+model UserGroup {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships UserGroupMembership[]
+  contents    Content[]             @relation("VisibilityGroup")
+
+  @@map("user_groups")
+}
+
+// ── UserGroupMembership ─────────────────────────────────────────────────────
+// Membership of a user in a group (many-to-many).
+
+model UserGroupMembership {
+  id       String   @id @default(uuid())
+  joinedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  groupId String
+  group   UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@map("user_group_memberships")
+}
+
+// ── AuditLog ────────────────────────────────────────────────────────────────
+// Immutable audit entry for important actions.
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  resource   String
+  resourceId String
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([resource, resourceId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ── OutboxEvent ─────────────────────────────────────────────────────────────
+// Transactional outbox entry for reliable event delivery.
+
+model OutboxEvent {
+  id            String    @id @default(uuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+  retryCount    Int       @default(0)
+
+  @@index([processedAt])
+  @@index([aggregateType, aggregateId])
+  @@index([createdAt])
+  @@map("outbox_events")
+}
+
+// ── Enums ───────────────────────────────────────────────────────────────────
+
+enum LifecycleState {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+  HIDDEN
+  ARCHIVED
+  PRIVATE_TO_GROUP
+}
+
+enum VersionChangeType {
+  MANUAL_SAVE
+  STATE_TRANSITION
+  RESTORE
+  AI_GENERATED
+}
+
+enum ReviewRequestStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum ReviewAssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ReviewDecisionVerdict {
+  APPROVED
+  DENIED
+  ROLLBACK
+}
+
+// ── Content ─────────────────────────────────────────────────────────────────
+// Main content record with lifecycle and visibility metadata.
+
+model Content {
+  id             String         @id @default(uuid())
+  title          String
+  slug           String         @unique
+  lifecycleState LifecycleState @default(DRAFT)
+  visibility     Visibility     @default(PRIVATE)
+  aiGenerated    Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  authorId String
+  author   User   @relation("ContentAuthor", fields: [authorId], references: [id])
+
+  visibilityGroupId String?
+  visibilityGroup   UserGroup? @relation("VisibilityGroup", fields: [visibilityGroupId], references: [id], onDelete: SetNull)
+
+  versions       ContentVersion[]
+  tags           ContentTag[]
+  reviewRequests ReviewRequest[]
+
+  @@index([authorId])
+  @@index([lifecycleState])
+  @@index([visibility])
+  @@index([createdAt])
+  @@map("contents")
+}
+
+// ── ContentVersion ──────────────────────────────────────────────────────────
+// Immutable snapshot of a content item at a point in time.
+
+model ContentVersion {
+  id               String            @id @default(uuid())
+  versionNumber    Int
+  changeType       VersionChangeType
+  title            String
+  metadataSnapshot Json?
+  createdAt        DateTime          @default(now())
+
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("VersionAuthor", fields: [authorId], references: [id])
+
+  reviewRequests ReviewRequest[]
+
+  @@unique([contentId, versionNumber])
+  @@index([contentId])
+  @@map("content_versions")
+}
+
+// ── Tag / ContentTag ────────────────────────────────────────────────────────
+// Tags and their links to content, for search and organisation.
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  parentId  String?
+  parent    Tag?     @relation("TagHierarchy", fields: [parentId], references: [id])
+  children  Tag[]    @relation("TagHierarchy")
+  createdAt DateTime @default(now())
+
+  contents ContentTag[]
+
+  @@map("tags")
+}
+
+model ContentTag {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, tagId])
+  @@map("content_tags")
+}
+
+// ── ReviewRequest ───────────────────────────────────────────────────────────
+// Review request for a specific content version and quorum.
+
+model ReviewRequest {
+  id             String              @id @default(uuid())
+  status         ReviewRequestStatus @default(OPEN)
+  quorumRequired Int                 @default(1)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id])
+
+  contentVersionId String
+  contentVersion   ContentVersion @relation(fields: [contentVersionId], references: [id])
+
+  requestedById String
+  requestedBy   User   @relation("ReviewRequester", fields: [requestedById], references: [id])
+
+  assignments ReviewAssignment[]
+
+  @@index([contentId])
+  @@index([status])
+  @@map("review_requests")
+}
+
+// ── ReviewAssignment ────────────────────────────────────────────────────────
+// Single reviewer assignment for a review request.
+
+model ReviewAssignment {
+  id          String                 @id @default(uuid())
+  status      ReviewAssignmentStatus @default(PENDING)
+  assignedAt  DateTime               @default(now())
+  completedAt DateTime?
+
+  reviewRequestId String
+  reviewRequest   ReviewRequest @relation(fields: [reviewRequestId], references: [id], onDelete: Cascade)
+
+  reviewerId String
+  reviewer   User   @relation("AssignedReviewer", fields: [reviewerId], references: [id])
+
+  assignedById String
+  assignedBy   User   @relation("AssignmentAssigner", fields: [assignedById], references: [id])
+
+  decision ReviewDecision?
+
+  @@unique([reviewRequestId, reviewerId])
+  @@index([reviewerId])
+  @@index([status])
+  @@map("review_assignments")
+}
+
+// ── ReviewDecision ──────────────────────────────────────────────────────────
+// Final verdict for a review assignment, human or automated.
+
+model ReviewDecision {
+  id             String                @id @default(uuid())
+  verdict        ReviewDecisionVerdict
+  comment        String
+  isAutoApproval Boolean               @default(false)
+  decidedAt      DateTime              @default(now())
+
+  reviewAssignmentId String           @unique
+  reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Cascade)
+
+  @@map("review_decisions")
 }

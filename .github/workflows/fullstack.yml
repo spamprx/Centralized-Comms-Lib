@@ -1,0 +1,77 @@
+name: Full Stack CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build & Test All Services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build all images
+        run: docker compose build
+
+      - name: Start all containers
+        run: docker compose up -d
+
+      - name: Wait for postgres
+        run: |
+          echo "Waiting for postgres..."
+          for i in {1..10}; do
+            if docker compose exec -T postgres pg_isready -U comms -d comms; then
+              echo "Postgres is ready!"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Wait for backend
+        run: |
+          echo "Waiting for backend..."
+          for i in {1..10}; do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Backend is up!"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Wait for frontend
+        run: |
+          echo "Waiting for frontend..."
+          for i in {1..10}; do
+            if curl -sf http://localhost:3000 > /dev/null; then
+              echo "Frontend is up!"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Health checks
+        run: |
+          curl -f http://localhost:3000 || exit 1
+          curl -f http://localhost:8000/health || exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down
+
+  deploy:
+    name: Deploy to Production
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy all services
+        run: |
+          echo "Deploying all services to production..."
+          # Future: Update with actual production deployment steps

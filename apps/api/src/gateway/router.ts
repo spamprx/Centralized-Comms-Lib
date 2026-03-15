@@ -1,11 +1,14 @@
 import { Router } from "express";
 
 import { sanitize } from "./middleware/sanitize.middleware";
-import { rateLimiter } from "./middleware/rateLimit.middleware";
+import { rateLimiter, authRateLimiter } from "./middleware/rateLimit.middleware";
 import { authenticate } from "./middleware/auth.middleware";
-import { aiQuotaEnforcer } from "./middleware/aiQuota.middleware";
 
-// FUTURE: Import module routers as they are built
+import authRouter from "./routes/auth.routes";
+import contentRouter from "./routes/content.routes";
+import tagRouter from "./routes/tag.routes";
+import reviewRouter from "./routes/review.routes";
+import adminRouter from "./routes/admin.routes";
 
 const router = Router();
 
@@ -28,8 +31,7 @@ router.use(rateLimiter);
  * No authentication required.
  * Auth routes get their own stricter rate limiter (10 req / 15 min).
  ***/
-
-// FUTURE: router.use("/auth", authRateLimiter, authRouter);
+router.use("/auth", authRateLimiter, authRouter);
 
 /***
  * Layer 3 — Authentication
@@ -39,19 +41,9 @@ router.use(rateLimiter);
 router.use(authenticate);
 
 /*** Protected Routes ***/
-
-// FUTURE: router.use("/content",  contentRouter);
-// FUTURE: router.use("/workflow", workflowRouter);
-// FUTURE: router.use("/assets",   assetRouter);
-// FUTURE: router.use("/collab",   collabRouter);
-
-/***
- * Layer 4 — AI Layer (Rate Limit + Daily Quota)
- * Burst cap (10 req / min per IP) via aiRateLimiter.
- * Daily per-user quota (default 50 req / 24 h) via aiQuotaEnforcer.
- * Both run after authenticate so req.user is available for quota tracking.
- ***/
-
-// FUTURE: router.use("/ai", aiRateLimiter, aiQuotaEnforcer, aiRouter);
+router.use("/content", contentRouter);
+router.use("/tags", tagRouter);
+router.use("/reviews", reviewRouter);
+router.use("/admin", adminRouter);
 
 export default router;
