@@ -10,13 +10,6 @@ export interface NavCategory {
 
 export const navCategories: NavCategory[] = [
   {
-    label: "Public",
-    items: [
-      { path: "/", label: "Home" },
-      { path: "/login", label: "Login" },
-    ],
-  },
-  {
     label: "App",
     items: [
       { path: "/dashboard", label: "Dashboard" },
