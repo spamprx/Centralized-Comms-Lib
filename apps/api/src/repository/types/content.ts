@@ -34,21 +34,17 @@ export interface ContentVersion {
   versionNumber: number;
   changeType: VersionChangeType;
   title: string;
-  body: TipTapDocument | null;
   metadataSnapshot: unknown | null;
   contentId: string;
   authorId: string;
   createdAt: Date;
 }
 
-export type TipTapDocument = Record<string, unknown>;
-
 export interface CreateContentVersionInput {
   contentId: string;
   authorId: string;
   changeType: VersionChangeType;
   title: string;
-  body?: TipTapDocument | null;
   metadataSnapshot?: unknown;
 }
 
