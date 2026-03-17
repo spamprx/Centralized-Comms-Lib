@@ -1,5 +1,6 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import gatewayRouter from "./gateway/router";
 import { getPrismaClient, PrismaUnitOfWork } from "./repository";
 
@@ -9,9 +10,16 @@ const app: Application = express();
 // address when running behind a proxy or load balancer.
 app.set("trust proxy", 1);
 
-app.use(cors());
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+app.use(
+  cors({
+    origin: corsOrigin,
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });

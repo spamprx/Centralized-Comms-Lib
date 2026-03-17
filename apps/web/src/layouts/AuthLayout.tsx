@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, Github, Chrome, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/authService';
 
 export default function AuthLayout() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,7 +21,12 @@ export default function AuthLayout() {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
+      if (isSignup) {
+        await authService.register(email, displayName || email, password);
+        await login(email, password);
+      } else {
+        await login(email, password);
+      }
       navigate('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -62,7 +70,7 @@ export default function AuthLayout() {
           <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>Sign in to your account to continue</p>
         </div>
 
-        {/* Login Form */}
+        {/* Login / Signup Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {error && (
             <div
@@ -78,6 +86,33 @@ export default function AuthLayout() {
               {error}
             </div>
           )}
+          {/* Name Input (signup only) */}
+          {isSignup && (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="John Doe"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 12px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8,
+                  color: '#e2e4f0',
+                  fontSize: 14,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          )}
+
           {/* Email Input */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
@@ -163,23 +198,25 @@ export default function AuthLayout() {
             </div>
           </div>
 
-          {/* Remember Me & Forgot Password */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: '#8b5cf6' }}
-              />
-              <span style={{ fontSize: 12, color: '#8b8fa8' }}>Remember me</span>
-            </label>
-            <a href="#" style={{ fontSize: 12, color: '#a78bfa', textDecoration: 'none' }}>
-              Forgot password?
-            </a>
-          </div>
+          {/* Remember Me & Forgot Password (login only) */}
+          {!isSignup && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#8b5cf6' }}
+                />
+                <span style={{ fontSize: 12, color: '#8b8fa8' }}>Remember me</span>
+              </label>
+              <a href="#" style={{ fontSize: 12, color: '#a78bfa', textDecoration: 'none' }}>
+                Forgot password?
+              </a>
+            </div>
+          )}
 
-          {/* Login Button */}
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
@@ -199,7 +236,7 @@ export default function AuthLayout() {
               transition: 'all 0.2s',
             }}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? (isSignup ? 'Creating account...' : 'Signing in...') : isSignup ? 'Sign Up' : 'Sign In'}
             {!loading && <ArrowRight size={16} />}
           </button>
         </form>
@@ -254,10 +291,28 @@ export default function AuthLayout() {
           </button>
         </div>
 
-        {/* Sign Up Link */}
+        {/* Sign Up / Sign In Link */}
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: '#555870' }}>
-          Don't have an account?{' '}
-          <a href="#" style={{ color: '#a78bfa', textDecoration: 'none', fontWeight: 500 }}>Sign up</a>
+          {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignup((v) => !v);
+              setError(null);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              margin: 0,
+              color: '#a78bfa',
+              textDecoration: 'none',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            {isSignup ? 'Sign in' : 'Sign up'}
+          </button>
         </p>
       </div>
     </div>

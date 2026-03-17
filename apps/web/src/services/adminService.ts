@@ -6,13 +6,12 @@ import type {
   const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
   
   async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = localStorage.getItem('auth_token');
     const res = await fetch(`${API_BASE}${endpoint}`, {
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
+      credentials: 'include',
       ...options,
     });
   

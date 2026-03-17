@@ -19,9 +19,32 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 
 export default function EditorLayout() {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('<p></p>');
+  const [title, setTitle] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('editor-title') || '';
+    }
+    return '';
+  });
+  const [content, setContent] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('editor-content') || '<p></p>';
+    }
+    return '<p></p>';
+  });
   const [showPreview, setShowPreview] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('editor-title', title);
+    }
+  }, [title]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('editor-content', content);
+    }
+  }, [content]);
+
 
   const editor = useEditor({
     extensions: [

@@ -19,7 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem("auth_token")));
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem("auth_user")));
   const [isAuthReady] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(() => {
     const rawUser = localStorage.getItem("auth_user");
@@ -33,14 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const res = await authService.login(email, password);
-    localStorage.setItem("auth_token", res.token);
     localStorage.setItem("auth_user", JSON.stringify(res.user));
     setUser(res.user);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem("auth_token");
+    void authService.logout();
     localStorage.removeItem("auth_user");
     setUser(null);
     setIsAuthenticated(false);

@@ -8,7 +8,6 @@ export type LoginResponse = {
     createdAt?: string;
     updatedAt?: string;
   };
-  token: string;
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -17,6 +16,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    credentials: 'include',
     ...options,
   });
 
@@ -34,6 +34,18 @@ export const authService = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+  },
+  register: async (email: string, displayName: string, password: string): Promise<LoginResponse> => {
+    return request<LoginResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, displayName, password }),
+    });
+  },
+  logout: async (): Promise<void> => {
+    await request('/auth/logout', { method: 'POST' });
+  },
+  me: async (): Promise<LoginResponse> => {
+    return request<LoginResponse>('/auth/me');
   },
 };
 

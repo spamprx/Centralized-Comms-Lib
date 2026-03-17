@@ -20,6 +20,20 @@ export default function Sidebar() {
     navigate("/");
   };
 
+  const iconSlotBase =
+    "flex h-12 w-full items-center justify-center rounded-md transition-colors";
+  // Keep icon color consistent (brand blue) across all icons.
+  const iconSlotIdle = "bg-transparent text-indigo-400";
+  const iconSlotHover = "hover:bg-gray-800/70 hover:text-indigo-300";
+  const iconSlotActive = "bg-gray-800 text-indigo-300";
+
+  const iconClass =
+    "[&>svg]:text-indigo-400 [&>.MuiSvgIcon-root]:text-indigo-400 [&>svg]:transition-colors [&>.MuiSvgIcon-root]:transition-colors";
+  const iconClassHover =
+    "group-hover:[&>svg]:text-indigo-300 group-hover:[&>.MuiSvgIcon-root]:text-indigo-300";
+  const iconClassActive =
+    "[&>svg]:text-indigo-300 [&>.MuiSvgIcon-root]:text-indigo-300";
+
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-14 flex-col border-r border-gray-700 bg-gray-900 text-gray-300">
       <div className="flex flex-1 flex-col gap-1 py-3">
@@ -36,11 +50,13 @@ export default function Sidebar() {
                 key={cat.label}
                 to={item.path}
                 title={item.label}
-                className={`flex h-12 w-full items-center justify-center transition-colors hover:bg-gray-800 hover:text-white ${
-                  active ? "bg-gray-800 text-white" : ""
-                }`}
+                className={`${iconSlotBase} ${iconSlotIdle} ${iconSlotHover} ${active ? iconSlotActive : ""}`}
               >
-                <span className="[&>.MuiSvgIcon-root]:text-2xl">{icon}</span>
+                <span
+                  className={`group ${iconClass} ${iconClassHover} ${active ? iconClassActive : ""} [&_.MuiSvgIcon-root]:text-2xl [&_svg]:text-2xl`}
+                >
+                  {icon}
+                </span>
               </Link>
             );
           }
@@ -51,11 +67,13 @@ export default function Sidebar() {
                 type="button"
                 onClick={() => setOpenDropdown(isOpen ? null : cat.label)}
                 title={cat.label}
-                className={`flex h-12 w-full items-center justify-center transition-colors hover:bg-gray-800 hover:text-white ${
-                  isOpen ? "bg-gray-800 text-white" : ""
-                }`}
+                className={`${iconSlotBase} ${iconSlotIdle} ${iconSlotHover} ${isOpen ? iconSlotActive : ""}`}
               >
-                <span className="[&>.MuiSvgIcon-root]:text-2xl">{icon}</span>
+                <span
+                  className={`group ${iconClass} ${iconClassHover} ${isOpen ? iconClassActive : ""} [&_.MuiSvgIcon-root]:text-2xl [&_svg]:text-2xl`}
+                >
+                  {icon}
+                </span>
               </button>
               {isOpen && (
                 <>
@@ -91,9 +109,9 @@ export default function Sidebar() {
         <button
           onClick={handleLogout}
           title="Logout"
-          className="flex h-12 w-full items-center justify-center transition-colors hover:bg-gray-800 hover:text-white"
+          className={`${iconSlotBase} ${iconSlotIdle} ${iconSlotHover}`}
         >
-          <span className="[&>.MuiSvgIcon-root]:text-2xl">
+          <span className={`group ${iconClass} ${iconClassHover} [&_.MuiSvgIcon-root]:text-2xl [&_svg]:text-2xl`}>
             <LogOut />
           </span>
         </button>
