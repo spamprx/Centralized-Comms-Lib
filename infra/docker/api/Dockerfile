@@ -7,14 +7,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
+COPY packages/database/transactional/package.json ./packages/database/transactional/
 
 RUN npm ci
 
 COPY apps/api/tsconfig.json ./apps/api/
 COPY apps/api/src/ ./apps/api/src/
 
-# COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
-# RUN npm install -D prisma@6 && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
+COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
+RUN npm install -D prisma@6 && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
 
 RUN npm run build --workspace=apps/api
 
@@ -30,13 +31,15 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
+COPY packages/database/transactional/package.json ./packages/database/transactional/
 
 RUN npm ci --omit=dev
 
-# COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
-# RUN npm install prisma@6 && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
+COPY packages/database/transactional/prisma/ ./packages/database/transactional/prisma/
+RUN npm install prisma@6 ts-node typescript && npx prisma generate --schema=packages/database/transactional/prisma/schema.prisma
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY infra/docker/api/entrypoint.sh ./infra/docker/api/entrypoint.sh
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
@@ -46,4 +49,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -qO- http://localhost:8000/health || exit 1
 
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["sh", "infra/docker/api/entrypoint.sh"]

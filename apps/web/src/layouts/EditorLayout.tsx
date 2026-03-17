@@ -1,0 +1,313 @@
+import { useState } from 'react';
+import { Save, Eye, Settings, Type, Image, Link, Bold, Italic, List, ListOrdered } from 'lucide-react';
+
+export default function EditorLayout() {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+
+  const insertBlocks = [
+    { icon: Type, label: 'Text', color: '#8b5cf6' },
+    { icon: Image, label: 'Image', color: '#06b6d4' },
+    { icon: Link, label: 'Link', color: '#f59e0b' },
+    { icon: Bold, label: 'Bold', color: '#10b981' },
+    { icon: Italic, label: 'Italic', color: '#ec4899' },
+    { icon: List, label: 'Bullet List', color: '#6366f1' },
+    { icon: ListOrdered, label: 'Numbered List', color: '#14b8a6' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Topbar */}
+      <div style={{
+        padding: '12px 24px',
+        background: 'rgba(255,255,255,0.03)',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: showPreview ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+              border: 'none',
+              borderRadius: 6,
+              color: showPreview ? '#a78bfa' : '#8b8fa8',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            <Eye size={16} /> {showPreview ? 'Edit' : 'Preview'}
+          </button>
+          <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+          <span style={{ fontSize: 13, color: '#555870' }}>Last saved: Just now</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 16px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 6,
+            color: '#8b8fa8',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}>
+            <Settings size={16} /> Settings
+          </button>
+          <button style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 16px',
+            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
+            border: 'none',
+            borderRadius: 6,
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}>
+            <Save size={16} /> Save Draft
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Insert Panel */}
+        <div style={{
+          width: 200,
+          background: 'rgba(255,255,255,0.02)',
+          borderRight: '1px solid rgba(255,255,255,0.05)',
+          padding: 16,
+          overflowY: 'auto',
+        }}>
+          <h3 style={{ fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase', marginBottom: 12 }}>
+            Insert Blocks
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {insertBlocks.map((block) => (
+              <button
+                key={block.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 6,
+                  color: '#8b8fa8',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `${block.color}11`;
+                  e.currentTarget.style.borderColor = `${block.color}33`;
+                  e.currentTarget.style.color = block.color;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = '#8b8fa8';
+                }}
+              >
+                <block.icon size={16} />
+                {block.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Editor */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Title Input */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter title..."
+            style={{
+              padding: '16px 24px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(255,255,255,0.05)',
+              color: '#e2e4f0',
+              fontSize: 24,
+              fontWeight: 700,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+
+          {/* Editor/Preview Area */}
+          <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+            {showPreview ? (
+              <div style={{
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: 12,
+                padding: 32,
+                minHeight: '100%',
+                boxSizing: 'border-box',
+              }}>
+                <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e2e4f0', margin: '0 0 16px' }}>
+                  {title || 'Untitled'}
+                </h1>
+                <div style={{ fontSize: 15, color: '#8b8fa8', lineHeight: 1.8 }}>
+                  {content || 'Start writing to see preview...'}
+                </div>
+              </div>
+            ) : (
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Start writing your content here..."
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  minHeight: 400,
+                  padding: 24,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 12,
+                  color: '#e2e4f0',
+                  fontSize: 15,
+                  lineHeight: 1.8,
+                  outline: 'none',
+                  resize: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Properties Panel */}
+        <div style={{
+          width: 280,
+          background: 'rgba(255,255,255,0.02)',
+          borderLeft: '1px solid rgba(255,255,255,0.05)',
+          padding: 20,
+          overflowY: 'auto',
+        }}>
+          <h3 style={{ fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase', marginBottom: 16 }}>
+            Properties
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+                Content Type
+              </label>
+              <select style={{
+                width: '100%',
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6,
+                color: '#e2e4f0',
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}>
+                <option>Article</option>
+                <option>Guide</option>
+                <option>Documentation</option>
+                <option>Blog Post</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+                Tags
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {['tutorial', 'guide', '2025'].map(tag => (
+                  <span key={tag} style={{
+                    padding: '4px 10px',
+                    background: 'rgba(139, 92, 246, 0.15)',
+                    borderRadius: 12,
+                    fontSize: 11,
+                    color: '#a78bfa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}>
+                    {tag}
+                    <button style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#a78bfa',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                    }}>×</button>
+                  </span>
+                ))}
+                <button style={{
+                  padding: '4px 10px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px dashed rgba(255,255,255,0.2)',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  color: '#555870',
+                  cursor: 'pointer',
+                }}>+ Add</button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+                Visibility
+              </label>
+              <select style={{
+                width: '100%',
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6,
+                color: '#e2e4f0',
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}>
+                <option>Public</option>
+                <option>Team Only</option>
+                <option>Private</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+                Featured Image
+              </label>
+              <div style={{
+                height: 120,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px dashed rgba(255,255,255,0.2)',
+                borderRadius: 6,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#555870',
+                fontSize: 12,
+                cursor: 'pointer',
+              }}>
+                Click to upload
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
