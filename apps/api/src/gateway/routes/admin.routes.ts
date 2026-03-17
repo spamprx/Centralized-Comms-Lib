@@ -97,6 +97,103 @@ router.post("/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response
 
 /**
  * @openapi
+ * /api/v1/admin/roles/{id}:
+ *   patch:
+ *     summary: Update an existing role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *               isSystem:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Role updated
+ *       404:
+ *         description: Role not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, isSystem } = req.body as {
+      name?: string;
+      description?: string | null;
+      isSystem?: boolean;
+    };
+    const result = await adminService.updateRole(auditContext(req), req.params.id, {
+      name,
+      description,
+      isSystem,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+    res.status(200).json(result.role);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/roles/{id}:
+ *   delete:
+ *     summary: Delete a role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Role deleted
+ *       404:
+ *         description: Role not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deleteRole(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+    res.status(200).json({ message: "Role deleted" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
  * /api/v1/admin/roles/{id}/permissions:
  *   get:
  *     summary: List permissions for a role
@@ -181,6 +278,95 @@ router.post("/roles/:id/permissions", authorize("ADMIN"), async (req: AuthReques
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/permissions/{id}:
+ *   patch:
+ *     summary: Update a permission
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               action:
+ *                 type: string
+ *               resource:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Permission updated
+ *       404:
+ *         description: Permission not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { action, resource } = req.body as { action?: string; resource?: string };
+    const result = await adminService.updatePermission(auditContext(req), req.params.id, {
+      action,
+      resource,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Permission not found" });
+      return;
+    }
+    res.status(200).json(result.permission);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/permissions/{id}:
+ *   delete:
+ *     summary: Delete a permission
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Permission deleted
+ *       404:
+ *         description: Permission not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deletePermission(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Permission not found" });
+      return;
+    }
+    res.status(200).json({ message: "Permission deleted" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 // ── User-Role Assignment ────────────────────────────────────────────────────
 
 /**
@@ -226,6 +412,61 @@ router.post("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest,
     }
     await adminService.assignRoleToUser(auditContext(req), req.params.userId, roleId);
     res.status(200).json({ message: "Role assigned" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/users/{userId}/roles:
+ *   patch:
+ *     summary: Update a user's role (replace one role with another)
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fromRoleId
+ *               - toRoleId
+ *             properties:
+ *               fromRoleId:
+ *                 type: string
+ *               toRoleId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User role updated
+ *       400:
+ *         description: Invalid payload
+ *       500:
+ *         description: Server error
+ */
+router.patch("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { fromRoleId, toRoleId } = req.body as {
+      fromRoleId?: string;
+      toRoleId?: string;
+    };
+    if (!fromRoleId || !toRoleId) {
+      res.status(400).json({ error: "fromRoleId and toRoleId are required" });
+      return;
+    }
+    await adminService.updateUserRole(auditContext(req), req.params.userId, fromRoleId, toRoleId);
+    res.status(200).json({ message: "User role updated" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -443,6 +684,96 @@ router.get("/groups/:id", async (req: AuthRequest, res: Response) => {
       return;
     }
     res.status(200).json(group);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}:
+ *   patch:
+ *     summary: Update a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Group updated
+ *       404:
+ *         description: Group not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description } = req.body as { name?: string; description?: string | null };
+    const result = await adminService.updateGroup(auditContext(req), req.params.id, {
+      name,
+      description,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Group not found" });
+      return;
+    }
+    res.status(200).json(result.group);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}:
+ *   delete:
+ *     summary: Delete a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Group deleted
+ *       404:
+ *         description: Group not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deleteGroup(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Group not found" });
+      return;
+    }
+    res.status(200).json({ message: "Group deleted" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

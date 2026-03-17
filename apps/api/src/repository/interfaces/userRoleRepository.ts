@@ -22,12 +22,22 @@ export interface UserRoleRepository {
   getRoleByName(name: string): Promise<Role | null>;
   listRoles(): Promise<Role[]>;
   listRolesForUser(userId: string): Promise<Role[]>;
+  updateRole(
+    id: string,
+    input: { name?: string; description?: string | null; isSystem?: boolean },
+  ): Promise<Role>;
+  deleteRole(id: string): Promise<void>;
   assignRole(userId: string, roleId: string, assignedById?: string): Promise<void>;
   removeRole(userId: string, roleId: string): Promise<void>;
 
   createPermission(input: CreatePermissionInput): Promise<Permission>;
   listPermissionsForRole(roleId: string): Promise<Permission[]>;
   listPermissionsForUser(userId: string): Promise<Permission[]>;
+  updatePermission(
+    id: string,
+    input: { action?: string; resource?: string },
+  ): Promise<Permission>;
+  deletePermission(id: string): Promise<void>;
 
   createGroup(input: CreateUserGroupInput): Promise<UserGroup>;
   listGroups(): Promise<UserGroup[]>;

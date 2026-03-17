@@ -34,6 +34,63 @@ export const adminService = {
     });
   },
 
+  async updateRole(
+    ctx: AuditContext,
+    id: string,
+    input: { name?: string; description?: string | null; isSystem?: boolean },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getRoleById(id);
+      if (!existing) return { notFound: true } as const;
+      const updated = await repos.userRole.updateRole(id, input);
+      await repos.audit.append({
+        action: "UPDATE",
+        resource: "ROLE",
+        resourceId: id,
+        oldValue: {
+          name: existing.name,
+          description: existing.description,
+          isSystem: existing.isSystem,
+        },
+        newValue: {
+          name: input.name ?? existing.name,
+          description: input.description ?? existing.description,
+          isSystem: input.isSystem ?? existing.isSystem,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { role: updated } as const;
+    });
+  },
+
+  async deleteRole(ctx: AuditContext, id: string) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getRoleById(id);
+      if (!existing) return { notFound: true } as const;
+      await repos.userRole.deleteRole(id);
+      await repos.audit.append({
+        action: "DELETE",
+        resource: "ROLE",
+        resourceId: id,
+        oldValue: {
+          name: existing.name,
+          description: existing.description,
+          isSystem: existing.isSystem,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { deleted: true } as const;
+    });
+  },
+
   async listPermissionsForRole(roleId: string) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     return repos.userRole.listPermissionsForRole(roleId);
@@ -65,6 +122,61 @@ export const adminService = {
     });
   },
 
+  async updatePermission(
+    ctx: AuditContext,
+    id: string,
+    input: { action?: string; resource?: string },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await prisma.permission.findUnique({ where: { id } });
+      if (!existing) return { notFound: true } as const;
+      const updated = await repos.userRole.updatePermission(id, input);
+      await repos.audit.append({
+        action: "UPDATE",
+        resource: "PERMISSION",
+        resourceId: id,
+        oldValue: {
+          action: existing.action,
+          resource: existing.resource,
+        },
+        newValue: {
+          action: input.action ?? existing.action,
+          resource: input.resource ?? existing.resource,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { permission: updated } as const;
+    });
+  },
+
+  async deletePermission(ctx: AuditContext, id: string) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await prisma.permission.findUnique({ where: { id } });
+      if (!existing) return { notFound: true } as const;
+      await repos.userRole.deletePermission(id);
+      await repos.audit.append({
+        action: "DELETE",
+        resource: "PERMISSION",
+        resourceId: id,
+        oldValue: {
+          action: existing.action,
+          resource: existing.resource,
+          roleId: existing.roleId,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { deleted: true } as const;
+    });
+  },
+
   async assignRoleToUser(ctx: AuditContext, userId: string, roleId: string): Promise<void> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -92,6 +204,30 @@ export const adminService = {
         resource: "USER",
         resourceId: userId,
         oldValue: { roleId },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+    });
+  },
+
+  async updateUserRole(
+    ctx: AuditContext,
+    userId: string,
+    fromRoleId: string,
+    toRoleId: string,
+  ): Promise<void> {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    await uow.withTransaction(async (repos) => {
+      await repos.userRole.removeRole(userId, fromRoleId);
+      await repos.userRole.assignRole(userId, toRoleId, ctx.actorId);
+      await repos.audit.append({
+        action: "ROLE_UPDATE",
+        resource: "USER",
+        resourceId: userId,
+        oldValue: { roleId: fromRoleId },
+        newValue: { roleId: toRoleId },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
@@ -150,6 +286,66 @@ export const adminService = {
     if (!group) return null;
     const members = await repos.userRole.listGroupMembers(group.id);
     return { ...group, members };
+  },
+
+  async updateGroup(
+    ctx: AuditContext,
+    id: string,
+    input: { name?: string; description?: string | null },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getGroupById(id);
+      if (!existing) return { notFound: true } as const;
+      const updated = await prisma.userGroup.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.description !== undefined && { description: input.description }),
+        },
+      });
+      await repos.audit.append({
+        action: "UPDATE",
+        resource: "GROUP",
+        resourceId: id,
+        oldValue: {
+          name: existing.name,
+          description: existing.description,
+        },
+        newValue: {
+          name: input.name ?? existing.name,
+          description: input.description ?? existing.description,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { group: updated } as const;
+    });
+  },
+
+  async deleteGroup(ctx: AuditContext, id: string) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getGroupById(id);
+      if (!existing) return { notFound: true } as const;
+      await prisma.userGroup.delete({ where: { id } });
+      await repos.audit.append({
+        action: "DELETE",
+        resource: "GROUP",
+        resourceId: id,
+        oldValue: {
+          name: existing.name,
+          description: existing.description,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { deleted: true } as const;
+    });
   },
 
   async addGroupMember(ctx: AuditContext, groupId: string, userId: string): Promise<void> {
