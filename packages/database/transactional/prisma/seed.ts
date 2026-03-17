@@ -25,6 +25,7 @@ let contentIds: Record<string, string> = {};
 let versionIds: Record<string, string> = {};
 let reviewRequestIds: Record<string, string> = {};
 let reviewAssignmentIds: Record<string, string> = {};
+let coAuthorIds: Record<string, string> = {};
 
 // ── Permission matrix ───────────────────────────────────────────────────────
 
@@ -339,6 +340,53 @@ async function seedContentTags() {
   console.log(`  ✔ ${links.length} content-tag links`);
 }
 
+async function seedContentCoAuthors() {
+  const entries: {
+    key: string;
+    contentKey: string;
+    userKey: string;
+    requestedByKey: string;
+    status: "PENDING" | "ACCEPTED" | "REJECTED";
+  }[] = [
+    // Alice (author) adds Bob as co-author on Q1 Engineering Update (accepted)
+    {
+      key: "engBob",
+      contentKey: "engineeringUpdate",
+      userKey: "bob",
+      requestedByKey: "alice",
+      status: "ACCEPTED",
+    },
+    // Alice adds Carol as co-author on Hiring Policy (pending)
+    {
+      key: "hiringCarol",
+      contentKey: "hiringPolicy",
+      userKey: "carol",
+      requestedByKey: "alice",
+      status: "PENDING",
+    },
+  ];
+
+  for (const e of entries) {
+    const contentId = contentIds[e.contentKey];
+    const userId = userIds[e.userKey];
+    const requestedById = userIds[e.requestedByKey];
+
+    const row = await prisma.contentCoAuthor.upsert({
+      where: { contentId_userId: { contentId, userId } },
+      update: { status: e.status },
+      create: {
+        id: randomUUID(),
+        contentId,
+        userId,
+        requestedById,
+        status: e.status,
+      },
+    });
+    coAuthorIds[e.key] = row.id;
+  }
+  console.log(`  ✔ ${entries.length} content co-author entries`);
+}
+
 async function seedReviewRequests() {
   const requests: {
     key: string;
@@ -526,6 +574,7 @@ async function main() {
   await seedContent();
   await seedContentVersions();
   await seedContentTags();
+  await seedContentCoAuthors();
   await seedReviewRequests();
   await seedReviewAssignments();
   await seedReviewDecisions();

@@ -146,7 +146,7 @@ router.get("/top-content", authorize("ADMIN"), async (req: AuthRequest, res: Res
       include: { author: { select: { displayName: true } } },
     });
 
-    const data = content.map((c) => ({
+    const data = content.map((c: any) => ({
       id: c.id,
       title: c.title,
       author: c.author?.displayName ?? "Unknown",
