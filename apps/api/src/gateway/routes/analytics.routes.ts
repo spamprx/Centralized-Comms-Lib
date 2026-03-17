@@ -17,21 +17,22 @@ router.get("/kpis", authorize("ADMIN"), async (req: AuthRequest, res: Response) 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Get counts from database
-    const [userCount, contentCount, totalViews] = await Promise.all([
+    // Get counts from database. Views are currently mocked since there is
+    // no dedicated analytics table in the schema yet.
+    const [userCount, contentCount] = await Promise.all([
       repos.userRole.listUsers().then((u: any[]) => u.length),
       prisma.content.count({ where: { createdAt: { gte: startDate } } }),
-      prisma.analytics.aggregate({ _sum: { views: true } }).then((r: any) => r._sum.views || 0),
     ]);
+    const totalViews = Math.floor(5000 + Math.random() * 5000);
 
     // Calculate engagement rate (mock calculation)
     const engagementRate = 68.3 + (Math.random() * 5 - 2.5);
 
     res.status(200).json([
-      { label: 'Total Views', value: totalViews.toLocaleString(), change: 12.5, trend: 'up' as const },
-      { label: 'Avg. Engagement', value: `${engagementRate.toFixed(1)}%`, change: 5.2, trend: 'up' as const },
-      { label: 'Active Users', value: userCount.toLocaleString(), change: -2.1, trend: 'down' as const },
-      { label: 'Content Published', value: contentCount.toLocaleString(), change: 8.7, trend: 'up' as const },
+      { label: "Total Views", value: totalViews.toLocaleString(), change: 12.5, trend: "up" as const },
+      { label: "Avg. Engagement", value: `${engagementRate.toFixed(1)}%`, change: 5.2, trend: "up" as const },
+      { label: "Active Users", value: userCount.toLocaleString(), change: -2.1, trend: "down" as const },
+      { label: "Content Published", value: contentCount.toLocaleString(), change: 8.7, trend: "up" as const },
     ]);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -43,7 +44,7 @@ router.get("/kpis", authorize("ADMIN"), async (req: AuthRequest, res: Response) 
 router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
-    const range = req.query.range as string || '30d';
+    const range = (req.query.range as string) || "30d";
     const days = parseInt(range) || 30;
 
     // In production, query actual analytics data grouped by date
@@ -54,7 +55,7 @@ router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response)
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       data.push({
-        date: d.toISOString().split('T')[0],
+        date: d.toISOString().split("T")[0],
         value: Math.floor(3000 + Math.random() * 2000),
       });
     }
@@ -69,7 +70,7 @@ router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response)
 
 router.get("/engagement", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
-    const range = req.query.range as string || '7d';
+    const range = (req.query.range as string) || "7d";
     const days = parseInt(range) || 7;
 
     // In production, query actual engagement data
@@ -99,12 +100,12 @@ router.get("/reading-time", authorize("ADMIN"), async (req: AuthRequest, res: Re
   try {
     // In production, calculate from actual reading analytics
     res.status(200).json([
-      { range: '0-1 min', count: 1250 },
-      { range: '1-3 min', count: 3420 },
-      { range: '3-5 min', count: 2890 },
-      { range: '5-10 min', count: 1560 },
-      { range: '10-15 min', count: 780 },
-      { range: '15+ min', count: 340 },
+      { range: "0-1 min", count: 1250 },
+      { range: "1-3 min", count: 3420 },
+      { range: "3-5 min", count: 2890 },
+      { range: "5-10 min", count: 1560 },
+      { range: "10-15 min", count: 780 },
+      { range: "15+ min", count: 340 },
     ]);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -119,11 +120,11 @@ router.get("/content-types", authorize("ADMIN"), async (req: AuthRequest, res: R
 
     // In production, group content by type
     res.status(200).json([
-      { type: 'Articles', value: 45, color: '#8b5cf6' },
-      { type: 'Videos', value: 25, color: '#06b6d4' },
-      { type: 'Podcasts', value: 15, color: '#f59e0b' },
-      { type: 'Infographics', value: 10, color: '#10b981' },
-      { type: 'Documents', value: 5, color: '#6b7280' },
+      { type: "Articles", value: 45, color: "#8b5cf6" },
+      { type: "Videos", value: 25, color: "#06b6d4" },
+      { type: "Podcasts", value: 15, color: "#f59e0b" },
+      { type: "Infographics", value: 10, color: "#10b981" },
+      { type: "Documents", value: 5, color: "#6b7280" },
     ]);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -137,20 +138,23 @@ router.get("/top-content", authorize("ADMIN"), async (req: AuthRequest, res: Res
     const prisma = getPrismaClient();
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // In production, query content ordered by views/engagement
+    // In production, query content ordered by an analytics metric. For now,
+    // use most recent content and mock the views/engagement numbers.
     const content = await prisma.content.findMany({
       take: limit,
-      orderBy: { views: 'desc' },
-      include: { author: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      include: { author: { select: { displayName: true } } },
     });
 
-    const data = content.map((c: any, i: number) => ({
+    const data = content.map((c) => ({
       id: c.id,
       title: c.title,
-      author: c.author?.name || 'Unknown',
-      views: c.views || 0,
+      author: c.author?.displayName ?? "Unknown",
+      views: Math.floor(500 + Math.random() * 4500),
       engagement: Math.floor(60 + Math.random() * 35),
-      avgReadTime: `${Math.floor(3 + Math.random() * 10)}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
+      avgReadTime: `${Math.floor(3 + Math.random() * 10)}:${String(
+        Math.floor(Math.random() * 60),
+      ).padStart(2, "0")}`,
       publishedAt: c.createdAt.toISOString(),
     }));
 
@@ -167,28 +171,31 @@ router.get("/ai-insights", authorize("ADMIN"), async (req: AuthRequest, res: Res
     // In production, generate insights using AI/ML based on analytics data
     res.status(200).json([
       {
-        title: 'Engagement Peak Identified',
-        description: 'Content published between 9-11 AM receives 34% more engagement. Consider scheduling posts during this window.',
-        sentiment: 'positive' as const,
-        impact: 'high' as const,
+        title: "Engagement Peak Identified",
+        description:
+          "Content published between 9-11 AM receives 34% more engagement. Consider scheduling posts during this window.",
+        sentiment: "positive" as const,
+        impact: "high" as const,
       },
       {
-        title: 'Video Content Trending',
-        description: 'Video content shows 2.5x higher engagement rate compared to articles this month.',
-        sentiment: 'positive' as const,
-        impact: 'high' as const,
+        title: "Video Content Trending",
+        description: "Video content shows 2.5x higher engagement rate compared to articles this month.",
+        sentiment: "positive" as const,
+        impact: "high" as const,
       },
       {
-        title: 'Drop in Weekend Activity',
-        description: 'User activity drops 45% on weekends. Consider automated posting or weekend-specific content.',
-        sentiment: 'neutral' as const,
-        impact: 'medium' as const,
+        title: "Drop in Weekend Activity",
+        description:
+          "User activity drops 45% on weekends. Consider automated posting or weekend-specific content.",
+        sentiment: "neutral" as const,
+        impact: "medium" as const,
       },
       {
-        title: 'Long-form Content Decline',
-        description: 'Articles over 1500 words show 20% lower completion rates. Consider breaking into series.',
-        sentiment: 'negative' as const,
-        impact: 'medium' as const,
+        title: "Long-form Content Decline",
+        description:
+          "Articles over 1500 words show 20% lower completion rates. Consider breaking into series.",
+        sentiment: "negative" as const,
+        impact: "medium" as const,
       },
     ]);
   } catch (err) {

@@ -36,6 +36,10 @@ services:
       NODE_ENV: development
       PORT: "8000"
       DATABASE_URL: postgresql://comms:comms-dev@postgres:5432/comms
+      REMOTE_URL: ${REMOTE_URL}
+      RUN_DB_PUSH: "true"
+      RUN_DB_SEED: "true"
+      PRISMA_SCHEMA_PATH: packages/database/transactional/prisma/schema.prisma
       JWT_SECRET: your-super-secret-key-change-in-production
       JWT_ISSUER: your-app-name
       JWT_AUDIENCE: your-app-client
