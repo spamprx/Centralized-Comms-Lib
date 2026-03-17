@@ -286,6 +286,55 @@ router.post("/assignments/:id/decide", async (req: AuthRequest, res: Response) =
 
 /**
  * @openapi
+ * /api/v1/reviews/assignments/{id}/rollback:
+ *   post:
+ *     summary: Roll back a completed review decision to pending
+ *     description: Allows the assigned reviewer to revert their own decision, setting the assignment back to PENDING.
+ *     tags:
+ *       - Reviews
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Assignment rolled back to pending (or already pending)
+ *       403:
+ *         description: Forbidden – only the assigned reviewer can roll back
+ *       404:
+ *         description: Assignment not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/assignments/:id/rollback", async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await reviewService.rollbackToPending(
+      auditContext(req),
+      req.params.id,
+    );
+
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Review assignment not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the assigned reviewer can roll back this decision" });
+      return;
+    }
+
+    res.status(200).json({ message: "Assignment rolled back to pending" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
  * /api/v1/reviews/my-assignments:
  *   get:
  *     summary: List review assignments for the current user

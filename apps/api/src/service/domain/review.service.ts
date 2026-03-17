@@ -185,6 +185,43 @@ export const reviewService = {
     return result;
   },
 
+  async rollbackToPending(
+    ctx: AuditContext,
+    assignmentId: string,
+  ): Promise<{ ok: true } | { notFound: true } | { forbidden: true }> {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    const result = await uow.withTransaction(async (repos) => {
+      const assignment = await repos.review.getAssignmentById(assignmentId);
+      if (!assignment) return { notFound: true } as const;
+
+      // Only the assigned reviewer can rollback their own decision
+      if (assignment.reviewerId !== ctx.actorId) {
+        return { forbidden: true } as const;
+      }
+
+      if (assignment.status !== "COMPLETED") {
+        return { ok: true } as const; // nothing to do
+      }
+
+      await repos.review.rollbackDecision(assignmentId);
+
+      await repos.audit.append({
+        action: "REVIEW_ROLLBACK",
+        resource: "REVIEW_ASSIGNMENT",
+        resourceId: assignment.id,
+        oldValue: { status: "COMPLETED" },
+        newValue: { status: "PENDING" },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+
+      return { ok: true } as const;
+    });
+    return result;
+  },
+
   async listAssignmentsForReviewer(reviewerId: string) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     return repos.review.listAssignmentsForReviewer(reviewerId);

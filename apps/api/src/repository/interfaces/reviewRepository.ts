@@ -28,5 +28,7 @@ export interface ReviewRepository {
   listAssignmentsForReviewer(reviewerId: string): Promise<ReviewAssignment[]>;
 
   recordDecision(input: ReviewDecisionInput): Promise<void>;
+
+  rollbackDecision(assignmentId: string): Promise<void>;
 }
 
