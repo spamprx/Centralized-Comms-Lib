@@ -5,10 +5,11 @@ import {
   type ContentListFilters,
   type ContentVersion,
   type LifecycleState,
-  type TipTapDocument,
   type Visibility,
 } from "../../repository";
 import type { AuditContext } from "../context";
+
+type TipTapDocument = unknown;
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
@@ -48,7 +49,7 @@ export const contentService = {
         authorId: ctx.actorId,
         changeType: input.aiGenerated ? "AI_GENERATED" : "MANUAL_SAVE",
         title: input.title,
-        body: input.body ?? null,
+        metadataSnapshot: { body: input.body ?? null },
       });
       await repos.audit.append({
         action: "CREATE",
@@ -142,7 +143,7 @@ export const contentService = {
         authorId: ctx.actorId,
         changeType: "MANUAL_SAVE",
         title: currentTitle,
-        body: input.body ?? null,
+        metadataSnapshot: { body: input.body ?? null },
       });
       await repos.audit.append({
         action: "BODY_SAVE",

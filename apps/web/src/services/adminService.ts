@@ -44,7 +44,8 @@ import type {
       if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
       if (pagination?.page) params.set('page', String(pagination.page));
       if (pagination?.limit) params.set('limit', String(pagination.limit));
-      const data = await request<User[]>(`/admin/users?${params}`);
+      const query = params.toString();
+      const data = await request<User[]>(query ? `/admin/users?${query}` : '/admin/users');
       return wrap(data);
     },
   

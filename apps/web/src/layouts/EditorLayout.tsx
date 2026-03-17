@@ -1,20 +1,110 @@
-import { useState } from 'react';
-import { Save, Eye, Settings, Type, Image, Link, Bold, Italic, List, ListOrdered } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Save,
+  Eye,
+  Settings,
+  Type,
+  Image,
+  Link as LinkIcon,
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
+} from 'lucide-react';
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
 
 export default function EditorLayout() {
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState('<p></p>');
   const [showPreview, setShowPreview] = useState(false);
 
-  const insertBlocks = [
-    { icon: Type, label: 'Text', color: '#8b5cf6' },
-    { icon: Image, label: 'Image', color: '#06b6d4' },
-    { icon: Link, label: 'Link', color: '#f59e0b' },
-    { icon: Bold, label: 'Bold', color: '#10b981' },
-    { icon: Italic, label: 'Italic', color: '#ec4899' },
-    { icon: List, label: 'Bullet List', color: '#6366f1' },
-    { icon: ListOrdered, label: 'Numbered List', color: '#14b8a6' },
-  ];
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: {
+          rel: 'noopener noreferrer nofollow',
+          target: '_blank',
+        },
+      }),
+      Placeholder.configure({
+        placeholder: 'Start writing your content here...',
+      }),
+    ],
+    content,
+    onUpdate: ({ editor }) => setContent(editor.getHTML()),
+    editorProps: {
+      attributes: {
+        style: [
+          'min-height:400px',
+          'padding:24px',
+          'background:rgba(255,255,255,0.02)',
+          'border:1px solid rgba(255,255,255,0.05)',
+          'border-radius:12px',
+          'color:#e2e4f0',
+          'font-size:15px',
+          'line-height:1.8',
+          'outline:none',
+          'box-sizing:border-box',
+        ].join(';'),
+      },
+    },
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.getHTML() !== content) {
+      editor.commands.setContent(content, false);
+    }
+  }, [content, editor]);
+
+  const insertBlocks = useMemo(
+    () => [
+      {
+        icon: Heading1,
+        label: 'Heading 1',
+        color: '#8b5cf6',
+        onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
+      },
+      {
+        icon: Heading2,
+        label: 'Heading 2',
+        color: '#06b6d4',
+        onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+      },
+      { icon: Type, label: 'Paragraph', color: '#f59e0b', onClick: () => editor?.chain().focus().setParagraph().run() },
+      { icon: Bold, label: 'Bold', color: '#10b981', onClick: () => editor?.chain().focus().toggleBold().run() },
+      { icon: Italic, label: 'Italic', color: '#ec4899', onClick: () => editor?.chain().focus().toggleItalic().run() },
+      { icon: List, label: 'Bullet List', color: '#6366f1', onClick: () => editor?.chain().focus().toggleBulletList().run() },
+      { icon: ListOrdered, label: 'Numbered List', color: '#14b8a6', onClick: () => editor?.chain().focus().toggleOrderedList().run() },
+      {
+        icon: LinkIcon,
+        label: 'Link',
+        color: '#a78bfa',
+        onClick: () => {
+          const previousUrl = editor?.getAttributes('link')?.href as string | undefined;
+          const url = window.prompt('Enter URL', previousUrl ?? '');
+          if (!editor) return;
+          if (url === null) return;
+          if (url === '') {
+            editor.chain().focus().extendMarkRange('link').unsetLink().run();
+            return;
+          }
+          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+        },
+      },
+      { icon: Image, label: 'Image (soon)', color: '#555870', onClick: () => {} },
+    ],
+    [editor],
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -110,6 +200,7 @@ export default function EditorLayout() {
                   cursor: 'pointer',
                   textAlign: 'left',
                 }}
+                onClick={() => block.onClick()}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = `${block.color}11`;
                   e.currentTarget.style.borderColor = `${block.color}33`;
@@ -162,31 +253,18 @@ export default function EditorLayout() {
                 <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e2e4f0', margin: '0 0 16px' }}>
                   {title || 'Untitled'}
                 </h1>
-                <div style={{ fontSize: 15, color: '#8b8fa8', lineHeight: 1.8 }}>
-                  {content || 'Start writing to see preview...'}
-                </div>
+                <div
+                  className="tiptap-content"
+                  style={{ fontSize: 15, color: '#8b8fa8', lineHeight: 1.8 }}
+                  dangerouslySetInnerHTML={{
+                    __html: content && content !== '<p></p>' ? content : '<p>Start writing to see preview...</p>',
+                  }}
+                />
               </div>
             ) : (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Start writing your content here..."
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  minHeight: 400,
-                  padding: 24,
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                  borderRadius: 12,
-                  color: '#e2e4f0',
-                  fontSize: 15,
-                  lineHeight: 1.8,
-                  outline: 'none',
-                  resize: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
+              <div className="tiptap-content">
+                <EditorContent editor={editor} />
+              </div>
             )}
           </div>
         </div>

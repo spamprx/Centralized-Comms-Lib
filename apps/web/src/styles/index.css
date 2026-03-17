@@ -27,6 +27,60 @@ body {
   min-height: 100vh;
 }
 
+/* Hide browser-native password reveal icons (Edge/IE) */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+/* TipTap / ProseMirror base styles (lists looked "not working" without these) */
+.tiptap-content .ProseMirror {
+  white-space: pre-wrap;
+}
+
+.tiptap-content .ProseMirror:focus {
+  outline: none;
+}
+
+.tiptap-content .ProseMirror p {
+  margin: 0 0 0.75rem;
+}
+
+.tiptap-content .ProseMirror h1 {
+  font-size: 1.8rem;
+  line-height: 1.2;
+  margin: 0.75rem 0;
+}
+
+.tiptap-content .ProseMirror h2 {
+  font-size: 1.4rem;
+  line-height: 1.25;
+  margin: 0.75rem 0;
+}
+
+.tiptap-content .ProseMirror ul,
+.tiptap-content .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.tiptap-content .ProseMirror ul {
+  list-style: disc;
+}
+
+.tiptap-content .ProseMirror ol {
+  list-style: decimal;
+}
+
+.tiptap-content .ProseMirror li > p {
+  margin: 0;
+}
+
+.tiptap-content a {
+  color: #a78bfa;
+  text-decoration: underline;
+}
+
 #root {
   min-height: 100vh;
   width: 100%;

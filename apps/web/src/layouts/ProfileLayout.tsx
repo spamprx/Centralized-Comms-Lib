@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { Mail, MapPin, Edit2, Save, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfileLayout() {
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
-  const [formData, setFormData] = useState({
+  const { user } = useAuth();
+  const [formData, setFormData] = useState(() => ({
     name: 'John Doe',
     email: 'john.doe@example.com',
     phone: '+1 (555) 123-4567',
     location: 'San Francisco, CA',
     role: 'Content Manager',
     bio: 'Passionate about creating engaging content and building communities.',
-  });
+    ...(user
+      ? {
+          name: user.displayName || user.email,
+          email: user.email,
+        }
+      : {}),
+  }));
 
   const bookmarks = [
     { id: '1', title: 'Getting Started Guide', type: 'Article' },
@@ -27,7 +35,6 @@ export default function ProfileLayout() {
 
   return (
     <div style={{ padding: 24, minHeight: '100vh' }}>
-      {/* Profile Header */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(6,182,212,0.2))',
         borderRadius: 16,

@@ -1,37 +1,53 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { authService } from "../services/authService";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  role?: string;
+};
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (email: string) => void;
+  isAuthReady: boolean;
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    // Check for existing session on mount
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      setIsAuthenticated(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem("auth_token")));
+  const [isAuthReady] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const rawUser = localStorage.getItem("auth_user");
+    if (!rawUser) return null;
+    try {
+      return JSON.parse(rawUser) as AuthUser;
+    } catch {
+      return null;
     }
-  }, []);
+  });
 
-  const login = (email: string) => {
-    // Store a mock token
-    localStorage.setItem("auth_token", "mock_token_" + email);
+  const login = async (email: string, password: string) => {
+    const res = await authService.login(email, password);
+    localStorage.setItem("auth_token", res.token);
+    localStorage.setItem("auth_user", JSON.stringify(res.user));
+    setUser(res.user);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    setUser(null);
     setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isAuthReady, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
