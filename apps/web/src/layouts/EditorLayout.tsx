@@ -85,7 +85,9 @@ export default function EditorLayout() {
   useEffect(() => {
     if (!editor) return;
     if (editor.getHTML() !== content) {
-      editor.commands.setContent(content, false);
+      // `setContent` expects an options object in this TipTap version.
+      // We only need to sync the editor when `content` changes, so rely on defaults.
+      editor.commands.setContent(content);
     }
   }, [content, editor]);
 

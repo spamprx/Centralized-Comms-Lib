@@ -18,6 +18,40 @@ const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   ARCHIVED: ["DRAFT"],
 };
 
+function canViewContent(
+  content: Content,
+  requester: { id: string; isAdmin?: boolean } | null,
+  requesterGroups: Array<{ id: string }> = [],
+  isCoAuthor = false,
+): boolean {
+  const visibility = content.visibility as Visibility;
+
+  // Unauthenticated: only PUBLIC content is visible
+  if (!requester) {
+    return visibility === "PUBLIC";
+  }
+
+  // Admins, authors and accepted co-authors can always see
+  if (requester.isAdmin || content.authorId === requester.id || isCoAuthor) {
+    return true;
+  }
+
+  switch (visibility) {
+    case "PUBLIC":
+      return true;
+    case "PRIVATE":
+    case "HIDDEN":
+    case "ARCHIVED":
+      return false;
+    case "PRIVATE_TO_GROUP": {
+      if (!content.visibilityGroupId) return false;
+      return requesterGroups.some((g) => g.id === content.visibilityGroupId);
+    }
+    default:
+      return false;
+  }
+}
+
 function slugify(title: string): string {
   return (
     title
@@ -64,22 +98,67 @@ export const contentService = {
     });
   },
 
-  async list(filters: ContentListFilters): Promise<Content[]> {
-    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    return repos.content.list(filters);
+  async list(
+    filters: ContentListFilters,
+    requester: { id: string; isAdmin?: boolean } | null = null,
+  ): Promise<Content[]> {
+    const uow = new PrismaUnitOfWork(getPrismaClient());
+    const repos = uow.repos();
+    const contents = await repos.content.list(filters);
+
+    if (!requester) {
+      return contents.filter((c) => canViewContent(c, null));
+    }
+
+    const groups = await repos.userRole.listGroupsForUser(requester.id);
+    // For listing we don't expand co-authors per content (costly); visibility
+    // rules here treat co-authors like regular viewers.
+    return contents.filter((c) => canViewContent(c, requester, groups));
   },
 
-  async getById(id: string): Promise<{
+  async getById(
+    id: string,
+    requester: { id: string; isAdmin?: boolean } | null = null,
+  ): Promise<{
     content: Content;
     tags: Array<{ id: string; name: string; slug: string }>;
     versions: ContentVersion[];
+    coAuthors: Array<{ id: string; displayName: string; email: string }>;
   } | null> {
-    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    const repos = uow.repos();
     const content = await repos.content.getById(id);
     if (!content) return null;
+
+    // Check if requester is an accepted co-author for this content
+    let isCoAuthor = false;
+    if (requester) {
+      const co = await prisma.contentCoAuthor.findUnique({
+        where: { contentId_userId: { contentId: id, userId: requester.id } },
+        select: { status: true },
+      });
+      isCoAuthor = !!co && co.status === "ACCEPTED";
+    }
+
+    const groups = requester ? await repos.userRole.listGroupsForUser(requester.id) : [];
+    if (!canViewContent(content, requester, groups, isCoAuthor)) {
+      return null;
+    }
+
     const tags = await repos.tag.listForContent(content.id);
     const versions = await repos.content.listVersions(content.id);
-    return { content, tags, versions };
+    const coAuthorsRows = await prisma.contentCoAuthor.findMany({
+      where: { contentId: id, status: "ACCEPTED" },
+      include: { user: true },
+    });
+    const coAuthors = coAuthorsRows.map((row: { user: { id: string; displayName: string; email: string } }) => ({
+      id: row.user.id,
+      displayName: row.user.displayName,
+      email: row.user.email,
+    }));
+
+    return { content, tags, versions, coAuthors };
   },
 
   async updateTitle(
@@ -280,5 +359,129 @@ export const contentService = {
   async listVersions(contentId: string): Promise<ContentVersion[]> {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     return repos.content.listVersions(contentId);
+  },
+
+  async requestCoAuthor(
+    ctx: AuditContext,
+    contentId: string,
+    userId: string,
+  ): Promise<
+    | { created: true }
+    | { notFound: true }
+    | { forbidden: true }
+    | { alreadyPending: true }
+    | { alreadyCoAuthor: true }
+  > {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+
+    return uow.withTransaction(async (repos) => {
+      const content = await repos.content.getById(contentId);
+      if (!content) return { notFound: true } as const;
+
+      // Only the main author can request co-authors
+      if (content.authorId !== ctx.actorId) {
+        return { forbidden: true } as const;
+      }
+
+      // Do not allow inviting self explicitly
+      if (userId === content.authorId) {
+        return { alreadyCoAuthor: true } as const;
+      }
+
+      const existing = await prisma.contentCoAuthor.findUnique({
+        where: { contentId_userId: { contentId, userId } },
+      });
+
+      if (existing) {
+        if (existing.status === "ACCEPTED") return { alreadyCoAuthor: true } as const;
+        if (existing.status === "PENDING") return { alreadyPending: true } as const;
+
+        // If previously rejected, reset to pending
+        await prisma.contentCoAuthor.update({
+          where: { contentId_userId: { contentId, userId } },
+          data: { status: "PENDING", decidedAt: null },
+        });
+        return { created: true } as const;
+      }
+
+      await prisma.contentCoAuthor.create({
+        data: {
+          contentId,
+          userId,
+          requestedById: ctx.actorId,
+          status: "PENDING",
+        },
+      });
+
+      await repos.audit.append({
+        action: "COAUTHOR_REQUEST",
+        resource: "CONTENT",
+        resourceId: contentId,
+        newValue: { userId },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+
+      await repos.outbox.add({
+        aggregateType: "CONTENT",
+        aggregateId: contentId,
+        eventType: "CONTENT.COAUTHOR_REQUESTED",
+        payload: { contentId, userId, requestedById: ctx.actorId },
+      });
+
+      return { created: true } as const;
+    });
+  },
+
+  async respondToCoAuthorRequest(
+    ctx: AuditContext,
+    contentId: string,
+    decision: "APPROVE" | "REJECT",
+  ): Promise<
+    | { updated: true; accepted: boolean }
+    | { notFound: true }
+  > {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+
+    return uow.withTransaction(async (repos) => {
+      const request = await prisma.contentCoAuthor.findUnique({
+        where: { contentId_userId: { contentId, userId: ctx.actorId } },
+      });
+
+      if (!request || request.status !== "PENDING") {
+        return { notFound: true } as const;
+      }
+
+      const accepted = decision === "APPROVE";
+      await prisma.contentCoAuthor.update({
+        where: { contentId_userId: { contentId, userId: ctx.actorId } },
+        data: {
+          status: accepted ? "ACCEPTED" : "REJECTED",
+          decidedAt: new Date(),
+        },
+      });
+
+      await repos.audit.append({
+        action: "COAUTHOR_RESPONSE",
+        resource: "CONTENT",
+        resourceId: contentId,
+        newValue: { userId: ctx.actorId, accepted },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+
+      await repos.outbox.add({
+        aggregateType: "CONTENT",
+        aggregateId: contentId,
+        eventType: accepted ? "CONTENT.COAUTHOR_ACCEPTED" : "CONTENT.COAUTHOR_REJECTED",
+        payload: { contentId, userId: ctx.actorId, requestedById: request.requestedById },
+      });
+
+      return { updated: true, accepted } as const;
+    });
   },
 };

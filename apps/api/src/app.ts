@@ -1,8 +1,10 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import swaggerUi from "swagger-ui-express";
 import gatewayRouter from "./gateway/router";
 import { getPrismaClient, PrismaUnitOfWork } from "./repository";
+import { openapiSpec } from "./docs/openapi";
 
 const app: Application = express();
 
@@ -21,11 +23,38 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Interactive OpenAPI documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
+
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: Health check for the API process
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Service is up
+ */
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });
 });
 
 // DB connectivity check (uses repository layer / Prisma). No auth required.
+/**
+ * @openapi
+ * /health/db:
+ *   get:
+ *     summary: Database connectivity check
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: DB reachable
+ *       503:
+ *         description: DB not reachable
+ */
 app.get("/health/db", async (req: Request, res: Response) => {
   try {
     const prisma = getPrismaClient();
@@ -38,6 +67,21 @@ app.get("/health/db", async (req: Request, res: Response) => {
 });
 
 // Dev-only: verify repository layer (ContentRepository read). No auth. Disabled in production.
+/**
+ * @openapi
+ * /dev/repo-check:
+ *   get:
+ *     summary: Dev-only repository layer check
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Repository layer working
+ *       404:
+ *         description: Not available in production
+ *       503:
+ *         description: Repository layer error
+ */
 app.get("/dev/repo-check", async (req: Request, res: Response) => {
   if (process.env.NODE_ENV === "production") {
     res.status(404).json({ error: "Not found" });

@@ -141,4 +141,14 @@ export class PrismaReviewRepository implements ReviewRepository {
       data: { status: "COMPLETED", completedAt: new Date() },
     });
   }
+
+  async rollbackDecision(assignmentId: string): Promise<void> {
+    await this.db.reviewDecision.deleteMany({
+      where: { reviewAssignmentId: assignmentId },
+    });
+    await this.db.reviewAssignment.update({
+      where: { id: assignmentId },
+      data: { status: "PENDING", completedAt: null },
+    });
+  }
 }

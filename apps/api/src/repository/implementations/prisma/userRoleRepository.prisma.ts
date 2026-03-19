@@ -165,6 +165,25 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
     return rows.map((r: any) => toRole(r.role));
   }
 
+  async updateRole(
+    id: string,
+    input: { name?: string; description?: string | null; isSystem?: boolean },
+  ): Promise<Role> {
+    const row = await this.db.role.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.description !== undefined && { description: input.description }),
+        ...(input.isSystem !== undefined && { isSystem: input.isSystem }),
+      },
+    });
+    return toRole(row);
+  }
+
+  async deleteRole(id: string): Promise<void> {
+    await this.db.role.delete({ where: { id } });
+  }
+
   async assignRole(userId: string, roleId: string, assignedById?: string): Promise<void> {
     await this.db.userRole.create({
       data: {
@@ -205,6 +224,24 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
     return rows.flatMap((ur: any) =>
       ur.role.permissions.map((p: any) => toPermission(p)),
     );
+  }
+
+  async updatePermission(
+    id: string,
+    input: { action?: string; resource?: string },
+  ): Promise<Permission> {
+    const row = await this.db.permission.update({
+      where: { id },
+      data: {
+        ...(input.action !== undefined && { action: input.action }),
+        ...(input.resource !== undefined && { resource: input.resource }),
+      },
+    });
+    return toPermission(row);
+  }
+
+  async deletePermission(id: string): Promise<void> {
+    await this.db.permission.delete({ where: { id } });
   }
 
   async createGroup(input: CreateUserGroupInput): Promise<UserGroup> {

@@ -1,18 +1,38 @@
 import { Router, Response } from "express";
-import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import { authorize, type AuthRequest } from "../middleware/auth.middleware";
+import { adminService } from "../../service";
+import type { AuditContext } from "../../service/context";
 
 const router = Router();
 
+function auditContext(req: AuthRequest): AuditContext {
+  return {
+    actorId: req.user!.id,
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  };
+}
+
 // ── Roles ──────────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/admin/roles:
+ *   get:
+ *     summary: List all roles
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of roles
+ *       500:
+ *         description: Server error
+ */
 router.get("/roles", async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
-    const roles = await repos.userRole.listRoles();
+    const roles = await adminService.listRoles();
     res.status(200).json(roles);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -20,6 +40,39 @@ router.get("/roles", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/roles:
+ *   post:
+ *     summary: Create a new role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       201:
+ *         description: Role created
+ *       400:
+ *         description: Invalid payload
+ *       409:
+ *         description: Role already exists
+ *       500:
+ *         description: Server error
+ */
 router.post("/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description } = req.body;
@@ -27,34 +80,14 @@ router.post("/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response
       res.status(400).json({ error: "name is required" });
       return;
     }
-
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    const result = await uow.withTransaction(async (repos) => {
-      const existing = await repos.userRole.getRoleByName(name);
-      if (existing) return { conflict: true } as const;
-
-      const role = await repos.userRole.createRole({ name, description: description ?? null });
-
-      await repos.audit.append({
-        action: "CREATE",
-        resource: "ROLE",
-        resourceId: role.id,
-        newValue: { name, description },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-
-      return { conflict: false, role } as const;
+    const result = await adminService.createRole(auditContext(req), {
+      name,
+      description: description ?? null,
     });
-
     if (result.conflict) {
       res.status(409).json({ error: "Role already exists" });
       return;
     }
-
     res.status(201).json(result.role);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -62,13 +95,127 @@ router.post("/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/roles/{id}:
+ *   patch:
+ *     summary: Update an existing role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *               isSystem:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Role updated
+ *       404:
+ *         description: Role not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, isSystem } = req.body as {
+      name?: string;
+      description?: string | null;
+      isSystem?: boolean;
+    };
+    const result = await adminService.updateRole(auditContext(req), req.params.id, {
+      name,
+      description,
+      isSystem,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+    res.status(200).json(result.role);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/roles/{id}:
+ *   delete:
+ *     summary: Delete a role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Role deleted
+ *       404:
+ *         description: Role not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deleteRole(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+    res.status(200).json({ message: "Role deleted" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/roles/{id}/permissions:
+ *   get:
+ *     summary: List permissions for a role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of permissions
+ *       500:
+ *         description: Server error
+ */
 router.get("/roles/:id/permissions", async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
-    const permissions = await repos.userRole.listPermissionsForRole(req.params.id);
+    const permissions = await adminService.listPermissionsForRole(req.params.id);
     res.status(200).json(permissions);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -76,6 +223,43 @@ router.get("/roles/:id/permissions", async (req: AuthRequest, res: Response) => 
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/roles/{id}/permissions:
+ *   post:
+ *     summary: Create a permission for a role
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - action
+ *               - resource
+ *             properties:
+ *               action:
+ *                 type: string
+ *               resource:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Permission created
+ *       400:
+ *         description: Invalid payload
+ *       500:
+ *         description: Server error
+ */
 router.post("/roles/:id/permissions", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const { action, resource } = req.body;
@@ -83,31 +267,100 @@ router.post("/roles/:id/permissions", authorize("ADMIN"), async (req: AuthReques
       res.status(400).json({ error: "action and resource are required" });
       return;
     }
-
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    const permission = await uow.withTransaction(async (repos) => {
-      const perm = await repos.userRole.createPermission({
-        action,
-        resource,
-        roleId: req.params.id,
-      });
-
-      await repos.audit.append({
-        action: "CREATE",
-        resource: "PERMISSION",
-        resourceId: perm.id,
-        newValue: { action, resource: resource, roleId: req.params.id },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-
-      return perm;
+    const permission = await adminService.createPermission(auditContext(req), req.params.id, {
+      action,
+      resource,
     });
-
     res.status(201).json(permission);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/permissions/{id}:
+ *   patch:
+ *     summary: Update a permission
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               action:
+ *                 type: string
+ *               resource:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Permission updated
+ *       404:
+ *         description: Permission not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { action, resource } = req.body as { action?: string; resource?: string };
+    const result = await adminService.updatePermission(auditContext(req), req.params.id, {
+      action,
+      resource,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Permission not found" });
+      return;
+    }
+    res.status(200).json(result.permission);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/permissions/{id}:
+ *   delete:
+ *     summary: Delete a permission
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Permission deleted
+ *       404:
+ *         description: Permission not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deletePermission(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Permission not found" });
+      return;
+    }
+    res.status(200).json({ message: "Permission deleted" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -116,6 +369,40 @@ router.post("/roles/:id/permissions", authorize("ADMIN"), async (req: AuthReques
 
 // ── User-Role Assignment ────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/admin/users/{userId}/roles:
+ *   post:
+ *     summary: Assign a role to a user
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - roleId
+ *             properties:
+ *               roleId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Role assigned
+ *       400:
+ *         description: Invalid payload
+ *       500:
+ *         description: Server error
+ */
 router.post("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const { roleId } = req.body;
@@ -123,24 +410,7 @@ router.post("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest,
       res.status(400).json({ error: "roleId is required" });
       return;
     }
-
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    await uow.withTransaction(async (repos) => {
-      await repos.userRole.assignRole(req.params.userId, roleId, req.user!.id);
-
-      await repos.audit.append({
-        action: "ROLE_ASSIGN",
-        resource: "USER",
-        resourceId: req.params.userId,
-        newValue: { roleId },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-    });
-
+    await adminService.assignRoleToUser(auditContext(req), req.params.userId, roleId);
     res.status(200).json({ message: "Role assigned" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -148,25 +418,94 @@ router.post("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest,
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/users/{userId}/roles:
+ *   patch:
+ *     summary: Update a user's role (replace one role with another)
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fromRoleId
+ *               - toRoleId
+ *             properties:
+ *               fromRoleId:
+ *                 type: string
+ *               toRoleId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User role updated
+ *       400:
+ *         description: Invalid payload
+ *       500:
+ *         description: Server error
+ */
+router.patch("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { fromRoleId, toRoleId } = req.body as {
+      fromRoleId?: string;
+      toRoleId?: string;
+    };
+    if (!fromRoleId || !toRoleId) {
+      res.status(400).json({ error: "fromRoleId and toRoleId are required" });
+      return;
+    }
+    await adminService.updateUserRole(auditContext(req), req.params.userId, fromRoleId, toRoleId);
+    res.status(200).json({ message: "User role updated" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/users/{userId}/roles/{roleId}:
+ *   delete:
+ *     summary: Remove a role from a user
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: roleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Role removed
+ *       500:
+ *         description: Server error
+ */
 router.delete("/users/:userId/roles/:roleId", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    await uow.withTransaction(async (repos) => {
-      await repos.userRole.removeRole(req.params.userId, req.params.roleId);
-
-      await repos.audit.append({
-        action: "ROLE_REMOVE",
-        resource: "USER",
-        resourceId: req.params.userId,
-        oldValue: { roleId: req.params.roleId },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-    });
-
+    await adminService.removeRoleFromUser(
+      auditContext(req),
+      req.params.userId,
+      req.params.roleId,
+    );
     res.status(200).json({ message: "Role removed" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -176,13 +515,24 @@ router.delete("/users/:userId/roles/:roleId", authorize("ADMIN"), async (req: Au
 
 // ── Users ─────────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/admin/users:
+ *   get:
+ *     summary: List users
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of users
+ *       500:
+ *         description: Server error
+ */
 router.get("/users", async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
-    const users = await repos.userRole.listUsers();
+    const users = await adminService.listUsers();
     res.status(200).json(users);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -190,22 +540,37 @@ router.get("/users", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/users/{id}:
+ *   get:
+ *     summary: Get a user by ID
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User details
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.get("/users/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
-    const user = await repos.userRole.getUserById(req.params.id);
+    const user = await adminService.getUserById(req.params.id);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
-
-    const roles = await repos.userRole.listRolesForUser(user.id);
-    const groups = await repos.userRole.listGroupsForUser(user.id);
-
-    res.status(200).json({ ...user, roles, groups });
+    res.status(200).json(user);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -214,13 +579,24 @@ router.get("/users/:id", async (req: AuthRequest, res: Response) => {
 
 // ── Groups ──────────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/admin/groups:
+ *   get:
+ *     summary: List groups
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of groups
+ *       500:
+ *         description: Server error
+ */
 router.get("/groups", async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
-    const groups = await repos.userRole.listGroups();
+    const groups = await adminService.listGroups();
     res.status(200).json(groups);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -228,6 +604,37 @@ router.get("/groups", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/groups:
+ *   post:
+ *     summary: Create a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       201:
+ *         description: Group created
+ *       400:
+ *         description: Invalid payload
+ *       500:
+ *         description: Server error
+ */
 router.post("/groups", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description } = req.body;
@@ -235,26 +642,10 @@ router.post("/groups", authorize("ADMIN"), async (req: AuthRequest, res: Respons
       res.status(400).json({ error: "name is required" });
       return;
     }
-
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    const group = await uow.withTransaction(async (repos) => {
-      const g = await repos.userRole.createGroup({ name, description: description ?? null });
-
-      await repos.audit.append({
-        action: "CREATE",
-        resource: "GROUP",
-        resourceId: g.id,
-        newValue: { name, description },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-
-      return g;
+    const group = await adminService.createGroup(auditContext(req), {
+      name,
+      description: description ?? null,
     });
-
     res.status(201).json(group);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -262,26 +653,167 @@ router.post("/groups", authorize("ADMIN"), async (req: AuthRequest, res: Respons
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}:
+ *   get:
+ *     summary: Get group details
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Group details
+ *       404:
+ *         description: Group not found
+ *       500:
+ *         description: Server error
+ */
 router.get("/groups/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
-    const group = await repos.userRole.getGroupById(req.params.id);
+    const group = await adminService.getGroupById(req.params.id);
     if (!group) {
       res.status(404).json({ error: "Group not found" });
       return;
     }
-
-    const members = await repos.userRole.listGroupMembers(group.id);
-    res.status(200).json({ ...group, members });
+    res.status(200).json(group);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}:
+ *   patch:
+ *     summary: Update a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Group updated
+ *       404:
+ *         description: Group not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description } = req.body as { name?: string; description?: string | null };
+    const result = await adminService.updateGroup(auditContext(req), req.params.id, {
+      name,
+      description,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Group not found" });
+      return;
+    }
+    res.status(200).json(result.group);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}:
+ *   delete:
+ *     summary: Delete a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Group deleted
+ *       404:
+ *         description: Group not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deleteGroup(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Group not found" });
+      return;
+    }
+    res.status(200).json({ message: "Group deleted" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}/members:
+ *   post:
+ *     summary: Add a user to a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User added to group
+ *       400:
+ *         description: Invalid payload
+ *       500:
+ *         description: Server error
+ */
 router.post("/groups/:id/members", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.body;
@@ -289,24 +821,7 @@ router.post("/groups/:id/members", authorize("ADMIN"), async (req: AuthRequest, 
       res.status(400).json({ error: "userId is required" });
       return;
     }
-
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    await uow.withTransaction(async (repos) => {
-      await repos.userRole.addUserToGroup(userId, req.params.id);
-
-      await repos.audit.append({
-        action: "GROUP_ADD_MEMBER",
-        resource: "GROUP",
-        resourceId: req.params.id,
-        newValue: { userId },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-    });
-
+    await adminService.addGroupMember(auditContext(req), req.params.id, userId);
     res.status(200).json({ message: "User added to group" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -314,25 +829,39 @@ router.post("/groups/:id/members", authorize("ADMIN"), async (req: AuthRequest, 
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/admin/groups/{id}/members/{userId}:
+ *   delete:
+ *     summary: Remove a user from a group
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User removed from group
+ *       500:
+ *         description: Server error
+ */
 router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-
-    await uow.withTransaction(async (repos) => {
-      await repos.userRole.removeUserFromGroup(req.params.userId, req.params.id);
-
-      await repos.audit.append({
-        action: "GROUP_REMOVE_MEMBER",
-        resource: "GROUP",
-        resourceId: req.params.id,
-        oldValue: { userId: req.params.userId },
-        actorId: req.user!.id,
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-      });
-    });
-
+    await adminService.removeGroupMember(
+      auditContext(req),
+      req.params.id,
+      req.params.userId,
+    );
     res.status(200).json({ message: "User removed from group" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -342,12 +871,48 @@ router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: Aut
 
 // ── Audit Logs ──────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/admin/logs:
+ *   get:
+ *     summary: List audit logs with optional filters
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: actorId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: resource
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: resourceId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of audit logs
+ *       500:
+ *         description: Server error
+ */
 router.get("/logs", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-
     const filters = {
       actorId: req.query.actorId as string | undefined,
       resource: req.query.resource as string | undefined,
@@ -356,8 +921,7 @@ router.get("/logs", authorize("ADMIN"), async (req: AuthRequest, res: Response) 
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
     };
-
-    const logs = await repos.audit.list(filters);
+    const logs = await adminService.listLogs(filters);
     res.status(200).json(logs);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

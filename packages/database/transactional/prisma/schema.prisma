@@ -32,6 +32,9 @@ model User {
   reviewAssignments   ReviewAssignment[] @relation("AssignedReviewer")
   reviewAssignmentsBy ReviewAssignment[] @relation("AssignmentAssigner")
 
+  coAuthorAssignments ContentCoAuthor[] @relation("CoAuthorUser")
+  coAuthorRequests    ContentCoAuthor[] @relation("CoAuthorRequester")
+
   auditLogs AuditLog[]
 
   @@map("users")
@@ -206,6 +209,12 @@ enum ReviewDecisionVerdict {
   ROLLBACK
 }
 
+enum CoAuthorRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 // ── Content ─────────────────────────────────────────────────────────────────
 // Main content record with lifecycle and visibility metadata.
 
@@ -228,6 +237,7 @@ model Content {
   versions       ContentVersion[]
   tags           ContentTag[]
   reviewRequests ReviewRequest[]
+  coAuthors      ContentCoAuthor[] @relation("ContentCoAuthors")
 
   @@index([authorId])
   @@index([lifecycleState])
@@ -244,6 +254,7 @@ model ContentVersion {
   versionNumber    Int
   changeType       VersionChangeType
   title            String
+  body             Json?
   metadataSnapshot Json?
   createdAt        DateTime          @default(now())
 
@@ -357,4 +368,23 @@ model ReviewDecision {
   reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Cascade)
 
   @@map("review_decisions")
+}
+
+model ContentCoAuthor {
+  id        String                @id @default(uuid())
+  status    CoAuthorRequestStatus @default(PENDING)
+  createdAt DateTime              @default(now())
+  decidedAt DateTime?
+
+  contentId String
+  content   Content @relation("ContentCoAuthors", fields: [contentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("CoAuthorUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  requestedById String
+  requestedBy   User   @relation("CoAuthorRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@map("content_coauthors")
 }

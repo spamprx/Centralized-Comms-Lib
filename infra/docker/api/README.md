@@ -100,6 +100,7 @@ curl http://localhost:8000/health
 | `JWT_AUDIENCE`        | No       | —             | JWT audience claim                     |
 | `DATABASE_URL`        | **Yes**  | —             | PostgreSQL connection string           |
 | `REDIS_URL`           | No       | —             | Redis connection string                |
+| `REMOTE_URL`          | **Yes**       | —             | Base URL of the web frontend (for CORS, links) |
 | `AI_DAILY_QUOTA`      | No       | `50`          | Max AI requests per day                |
 | `AI_QUOTA_WINDOW_MS`  | No       | `86400000`    | Quota window in milliseconds           |
 
