@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Save,
   Eye,
@@ -12,11 +12,14 @@ import {
   ListOrdered,
   Heading1,
   Heading2,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { contentService } from '../services/contentService';
 
 export default function EditorLayout() {
   const [title, setTitle] = useState(() => {
@@ -32,6 +35,43 @@ export default function EditorLayout() {
     return '<p></p>';
   });
   const [showPreview, setShowPreview] = useState(false);
+  const [contentId, setContentId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSaveDraft = useCallback(async () => {
+    if (!title.trim()) {
+      setSaveError('Title is required');
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      // Build TipTap JSON from HTML for API
+      const bodyDoc = {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: content.replace(/<[^>]*>/g, '') || '' }] }],
+      };
+
+      if (!contentId) {
+        // First save — create a new draft
+        const result = await contentService.createDraft(title.trim(), bodyDoc);
+        setContentId(result.content.id);
+      } else {
+        // Subsequent save — update existing draft
+        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
+      }
+      setLastSaved(new Date());
+      // Clear localStorage after successful save
+      localStorage.removeItem('editor-title');
+      localStorage.removeItem('editor-content');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
+    } finally {
+      setSaving(false);
+    }
+  }, [title, content, contentId]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -161,7 +201,13 @@ export default function EditorLayout() {
             <Eye size={16} /> {showPreview ? 'Edit' : 'Preview'}
           </button>
           <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-          <span style={{ fontSize: 13, color: '#555870' }}>Last saved: Just now</span>
+          <span style={{ fontSize: 13, color: saveError ? '#f87171' : '#555870' }}>
+            {saveError
+              ? saveError
+              : lastSaved
+                ? `Last saved: ${lastSaved.toLocaleTimeString()}`
+                : 'Not saved yet'}
+          </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={{
@@ -178,20 +224,37 @@ export default function EditorLayout() {
           }}>
             <Settings size={16} /> Settings
           </button>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            border: 'none',
-            borderRadius: 6,
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}>
-            <Save size={16} /> Save Draft
+          <button
+            onClick={handleSaveDraft}
+            disabled={saving}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 16px',
+              background: saving
+                ? 'rgba(139, 92, 246, 0.4)'
+                : lastSaved
+                  ? 'linear-gradient(135deg, #10b981, #06b6d4)'
+                  : 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
+              border: 'none',
+              borderRadius: 6,
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.7 : 1,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {saving ? (
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : lastSaved ? (
+              <Check size={16} />
+            ) : (
+              <Save size={16} />
+            )}
+            {saving ? 'Saving...' : lastSaved ? 'Saved' : 'Save Draft'}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMyContent } from '../hooks/useMyContent';
-import { FileText, Video, Mic, File, Edit2, Eye, Trash2 } from 'lucide-react';
+import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send } from 'lucide-react';
+import { contentService } from '../services/contentService';
 
 const typeIcons = {
   article: FileText,
@@ -24,8 +25,21 @@ const statusColors = {
 };
 
 export default function MyContentLayout() {
-  const { contentItems, stats, loading, searchQuery, setSearchQuery, statusFilter, setStatusFilter } = useMyContent();
+  const { contentItems, stats, loading, searchQuery, setSearchQuery, statusFilter, setStatusFilter, refreshContent } = useMyContent();
   const [sortBy, setSortBy] = useState('lastModified');
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  const handleSubmitForReview = async (itemId: string) => {
+    setSubmittingId(itemId);
+    try {
+      await contentService.transitionState(itemId, 'IN_REVIEW');
+      await refreshContent();
+    } catch (err) {
+      console.error('Failed to submit for review:', err);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -217,6 +231,33 @@ export default function MyContentLayout() {
                   <td style={{ padding: '16px', fontSize: 13, color: '#555870' }}>{new Date(item.lastModified).toLocaleDateString()}</td>
                   <td style={{ padding: '16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                      {item.status === 'draft' && (
+                        <button
+                          onClick={() => handleSubmitForReview(item.id)}
+                          disabled={submittingId === item.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '4px 10px',
+                            background: submittingId === item.id
+                              ? 'rgba(251, 191, 36, 0.1)'
+                              : 'rgba(251, 191, 36, 0.15)',
+                            border: '1px solid rgba(251, 191, 36, 0.3)',
+                            borderRadius: 6,
+                            color: '#fbbf24',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: submittingId === item.id ? 'not-allowed' : 'pointer',
+                            opacity: submittingId === item.id ? 0.6 : 1,
+                            transition: 'all 0.2s ease',
+                          }}
+                          title="Submit for Review"
+                        >
+                          <Send size={12} />
+                          {submittingId === item.id ? 'Submitting...' : 'Review'}
+                        </button>
+                      )}
                       <button style={{
                         padding: 6,
                         background: 'none',

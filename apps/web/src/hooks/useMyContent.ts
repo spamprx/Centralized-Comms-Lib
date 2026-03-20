@@ -38,6 +38,29 @@ export function useMyContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  const fetchContent = async () => {
+    try {
+      setLoading(true);
+      const contents = await contentService.list(user?.id ? { authorId: user.id } : {});
+
+      const mapped: MyContentItem[] = contents.map((c) => ({
+        id: c.id,
+        title: c.title,
+        type: 'document',
+        status: mapLifecycleToStatus(c.lifecycleState),
+        views: 0,
+        lastModified: c.updatedAt,
+        createdAt: c.createdAt,
+        collaborators: 0,
+      }));
+
+      setContentItems(mapped);
+      setStats(buildStats(mapped));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -84,5 +107,7 @@ export function useMyContent() {
     setSearchQuery,
     statusFilter,
     setStatusFilter,
+    refreshContent: fetchContent,
   };
 }
+

@@ -53,5 +53,26 @@ export const contentService = {
     const query = params.toString();
     return request<Content[]>(query ? `/content?${query}` : '/content');
   },
+
+  createDraft: async (title: string, body?: unknown): Promise<{ content: Content }> => {
+    return request<{ content: Content }>('/content', {
+      method: 'POST',
+      body: JSON.stringify({ title, body }),
+    });
+  },
+
+  saveDraft: async (id: string, data: { title?: string; body?: unknown }): Promise<unknown> => {
+    return request<unknown>(`/content/${id}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  transitionState: async (id: string, lifecycleState: LifecycleState): Promise<Content> => {
+    return request<Content>(`/content/${id}/STATE_TRANSITION`, {
+      method: 'POST',
+      body: JSON.stringify({ lifecycleState }),
+    });
+  },
 };
 
