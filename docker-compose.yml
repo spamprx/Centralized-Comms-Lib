@@ -19,7 +19,7 @@ services:
     volumes:
       - comms_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U comms -d comms"]
+      test: [ "CMD-SHELL", "pg_isready -U comms -d comms" ]
       interval: 5s
       timeout: 5s
       retries: 5

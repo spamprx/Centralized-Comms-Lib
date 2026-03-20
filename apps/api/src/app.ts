@@ -12,7 +12,7 @@ const app: Application = express();
 // address when running behind a proxy or load balancer.
 app.set("trust proxy", 1);
 
-const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3000";
 app.use(
   cors({
     origin: corsOrigin,
