@@ -1,6 +1,8 @@
 import type { ReviewRepository } from "../../interfaces";
 import type {
   ReviewAssignment,
+  ReviewComment,
+  ReviewCommentInput,
   ReviewDecisionInput,
   ReviewRequest,
   ReviewRequestStatus,
@@ -150,5 +152,38 @@ export class PrismaReviewRepository implements ReviewRepository {
       where: { id: assignmentId },
       data: { status: "PENDING", completedAt: null },
     });
+  }
+
+  async addComment(input: ReviewCommentInput): Promise<ReviewComment> {
+    const row = await this.db.reviewComment.create({
+      data: {
+        reviewAssignmentId: input.reviewAssignmentId,
+        authorId: input.authorId,
+        body: input.body,
+      },
+    });
+    return {
+      id: row.id,
+      body: row.body,
+      reviewAssignmentId: row.reviewAssignmentId,
+      authorId: row.authorId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async listComments(assignmentId: string): Promise<ReviewComment[]> {
+    const rows = await this.db.reviewComment.findMany({
+      where: { reviewAssignmentId: assignmentId },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((row: typeof rows[number]) => ({
+      id: row.id,
+      body: row.body,
+      reviewAssignmentId: row.reviewAssignmentId,
+      authorId: row.authorId,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }));
   }
 }

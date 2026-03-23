@@ -335,6 +335,62 @@ router.post("/assignments/:id/rollback", async (req: AuthRequest, res: Response)
 
 /**
  * @openapi
+ * /api/v1/reviews/assignments/{id}/comment:
+ *   post:
+ *     summary: Add a comment to an assignment without making a decision
+ *     description: Allows a reviewer to leave a comment on an assignment without recording a verdict.
+ *     tags:
+ *       - Reviews
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - body
+ *             properties:
+ *               body:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Comment added
+ *       400:
+ *         description: Missing body
+ *       404:
+ *         description: Assignment not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/assignments/:id/comment", async (req: AuthRequest, res: Response) => {
+  try {
+    const { body } = req.body;
+    if (!body || typeof body !== "string" || body.trim() === "") {
+      res.status(400).json({ error: "body is required" });
+      return;
+    }
+    const result = await reviewService.addComment(auditContext(req), req.params.id, body.trim());
+    if ("notFound" in result) {
+      res.status(404).json({ error: "Review assignment not found" });
+      return;
+    }
+    res.status(201).json(result.comment);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
  * /api/v1/reviews/my-assignments:
  *   get:
  *     summary: List review assignments for the current user

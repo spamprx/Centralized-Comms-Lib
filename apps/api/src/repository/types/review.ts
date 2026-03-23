@@ -30,3 +30,18 @@ export interface ReviewDecisionInput {
   isAutoApproval?: boolean;
 }
 
+export interface ReviewCommentInput {
+  reviewAssignmentId: string;
+  authorId: string;
+  body: string;
+}
+
+export interface ReviewComment {
+  id: string;
+  body: string;
+  reviewAssignmentId: string;
+  authorId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+

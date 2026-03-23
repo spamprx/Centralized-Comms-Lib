@@ -31,6 +31,7 @@ model User {
   reviewRequests      ReviewRequest[]    @relation("ReviewRequester")
   reviewAssignments   ReviewAssignment[] @relation("AssignedReviewer")
   reviewAssignmentsBy ReviewAssignment[] @relation("AssignmentAssigner")
+  reviewComments      ReviewComment[]    @relation("ReviewCommentAuthor")
 
   coAuthorAssignments ContentCoAuthor[] @relation("CoAuthorUser")
   coAuthorRequests    ContentCoAuthor[] @relation("CoAuthorRequester")
@@ -347,11 +348,32 @@ model ReviewAssignment {
   assignedBy   User   @relation("AssignmentAssigner", fields: [assignedById], references: [id])
 
   decision ReviewDecision?
+  comments ReviewComment[]
 
   @@unique([reviewRequestId, reviewerId])
   @@index([reviewerId])
   @@index([status])
   @@map("review_assignments")
+}
+
+// ── ReviewComment ────────────────────────────────────────────────────────────
+// Standalone comment on an assignment without a verdict.
+
+model ReviewComment {
+  id        String   @id @default(uuid())
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reviewAssignmentId String
+  reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("ReviewCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([reviewAssignmentId])
+  @@index([authorId])
+  @@map("review_comments")
 }
 
 // ── ReviewDecision ──────────────────────────────────────────────────────────

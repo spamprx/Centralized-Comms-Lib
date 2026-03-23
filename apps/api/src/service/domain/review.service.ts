@@ -1,4 +1,5 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
+import type { ReviewComment } from "../../repository/types";
 import type { AuditContext } from "../context";
 
 type Verdict = "APPROVED" | "DENIED" | "ROLLBACK";
@@ -225,5 +226,36 @@ export const reviewService = {
   async listAssignmentsForReviewer(reviewerId: string) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     return repos.review.listAssignmentsForReviewer(reviewerId);
+  },
+
+  async addComment(
+    ctx: AuditContext,
+    assignmentId: string,
+    body: string,
+  ): Promise<{ comment: ReviewComment } | { notFound: true }> {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const assignment = await repos.review.getAssignmentById(assignmentId);
+      if (!assignment) return { notFound: true } as const;
+
+      const comment = await repos.review.addComment({
+        reviewAssignmentId: assignmentId,
+        authorId: ctx.actorId,
+        body,
+      });
+
+      await repos.audit.append({
+        action: "COMMENT",
+        resource: "REVIEW_ASSIGNMENT",
+        resourceId: assignmentId,
+        newValue: { body },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+
+      return { comment };
+    });
   },
 };
