@@ -1,5 +1,7 @@
 import {
   ReviewAssignment,
+  ReviewComment,
+  ReviewCommentInput,
   ReviewDecisionInput,
   ReviewRequest,
   ReviewRequestStatus,
@@ -30,5 +32,9 @@ export interface ReviewRepository {
   recordDecision(input: ReviewDecisionInput): Promise<void>;
 
   rollbackDecision(assignmentId: string): Promise<void>;
+
+  addComment(input: ReviewCommentInput): Promise<ReviewComment>;
+
+  listComments(assignmentId: string): Promise<ReviewComment[]>;
 }
 
