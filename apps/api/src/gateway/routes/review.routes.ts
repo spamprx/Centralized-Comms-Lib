@@ -8,9 +8,14 @@ const router = Router();
 function auditContext(req: AuthRequest): AuditContext {
   return {
     actorId: req.user!.id,
+    isAdmin: req.user!.role === "ADMIN",
     ipAddress: req.ip,
     userAgent: req.headers["user-agent"],
   };
+}
+
+function requester(req: AuthRequest) {
+  return { id: req.user!.id, isAdmin: req.user!.role === "ADMIN" };
 }
 
 /**
@@ -67,6 +72,10 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "Content not found" });
       return;
     }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the content author or an admin can submit a review request" });
+      return;
+    }
     if ("invalidState" in result && result.invalidState) {
       res.status(422).json({
         error: `Content must be in DRAFT or IN_REVIEW state, currently ${result.state}`,
@@ -105,9 +114,13 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
  */
 router.get("/requests/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await reviewService.getRequestById(req.params.id);
+    const result = await reviewService.getRequestById(req.params.id, requester(req));
     if (!result) {
       res.status(404).json({ error: "Review request not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "You do not have access to this review request" });
       return;
     }
     res.status(200).json(result);
@@ -140,8 +153,16 @@ router.get("/requests/:id", async (req: AuthRequest, res: Response) => {
  */
 router.get("/content/:contentId", async (req: AuthRequest, res: Response) => {
   try {
-    const requests = await reviewService.listRequestsForContent(req.params.contentId);
-    res.status(200).json(requests);
+    const result = await reviewService.listRequestsForContent(req.params.contentId, requester(req));
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "You do not have access to review requests for this content" });
+      return;
+    }
+    res.status(200).json(result.requests);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -198,6 +219,10 @@ router.post("/requests/:id/assign", async (req: AuthRequest, res: Response) => {
     );
     if (!result) {
       res.status(404).json({ error: "Review request not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the review requester or an admin can assign reviewers" });
       return;
     }
     res.status(201).json(result);
@@ -271,6 +296,10 @@ router.post("/assignments/:id/decide", async (req: AuthRequest, res: Response) =
     );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Review assignment not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the assigned reviewer or an admin can record a decision" });
       return;
     }
     if ("alreadyCompleted" in result && result.alreadyCompleted) {
@@ -378,11 +407,15 @@ router.post("/assignments/:id/comment", async (req: AuthRequest, res: Response) 
       return;
     }
     const result = await reviewService.addComment(auditContext(req), req.params.id, body.trim());
-    if ("notFound" in result) {
+    if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Review assignment not found" });
       return;
     }
-    res.status(201).json(result.comment);
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the assigned reviewer or an admin can comment on this assignment" });
+      return;
+    }
+    if ("comment" in result) res.status(201).json(result.comment);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

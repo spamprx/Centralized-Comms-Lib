@@ -9,6 +9,7 @@ const router = Router();
 function auditContext(req: AuthRequest): AuditContext {
   return {
     actorId: req.user!.id,
+    isAdmin: req.user!.role === "ADMIN",
     ipAddress: req.ip,
     userAgent: req.headers["user-agent"],
   };
@@ -455,6 +456,10 @@ router.post("/:id/STATE_TRANSITION", async (req: AuthRequest, res: Response) => 
       res.status(404).json({ error: "Content not found" });
       return;
     }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the content author or an admin can transition state" });
+      return;
+    }
     if ("invalidTransition" in result && result.invalidTransition) {
       res.status(422).json({
         error: `Invalid state transition from ${result.current} to ${lifecycleState}`,
@@ -504,6 +509,10 @@ router.post("/:id/delete", async (req: AuthRequest, res: Response) => {
     );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the content author or an admin can delete content" });
       return;
     }
     if ("invalidTransition" in result && result.invalidTransition) {
@@ -573,11 +582,15 @@ router.patch("/:id/visibility", async (req: AuthRequest, res: Response) => {
       visibility,
       visibilityGroupId,
     );
-    if (!result) {
+    if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
-    res.status(200).json(result);
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the content author or an admin can change visibility" });
+      return;
+    }
+    if ("content" in result) res.status(200).json(result.content);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -625,7 +638,15 @@ router.post("/:id/tags", async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: "tagId is required" });
       return;
     }
-    await contentService.assignTag(auditContext(req), req.params.id, tagId);
+    const result = await contentService.assignTag(auditContext(req), req.params.id, tagId);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the content author or an admin can assign tags" });
+      return;
+    }
     res.status(200).json({ message: "Tag assigned" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -661,11 +682,19 @@ router.post("/:id/tags", async (req: AuthRequest, res: Response) => {
  */
 router.delete("/:id/tags/:tagId", async (req: AuthRequest, res: Response) => {
   try {
-    await contentService.removeTag(
+    const result = await contentService.removeTag(
       auditContext(req),
       req.params.id,
       req.params.tagId,
     );
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Only the content author or an admin can remove tags" });
+      return;
+    }
     res.status(200).json({ message: "Tag removed" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -696,8 +725,15 @@ router.delete("/:id/tags/:tagId", async (req: AuthRequest, res: Response) => {
  */
 router.get("/:id/versions", async (req: AuthRequest, res: Response) => {
   try {
-    const versions = await contentService.listVersions(req.params.id);
-    res.status(200).json(versions);
+    const result = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!result) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    res.status(200).json(result.versions);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

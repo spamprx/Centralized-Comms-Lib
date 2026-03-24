@@ -4,6 +4,7 @@
  */
 export interface AuditContext {
   actorId: string;
+  isAdmin?: boolean;
   ipAddress?: string;
   userAgent?: string;
 }
