@@ -14,6 +14,7 @@ export const reviewService = {
     return uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(input.contentId);
       if (!content) return { notFound: true } as const;
+      if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
       if (content.lifecycleState !== "DRAFT" && content.lifecycleState !== "IN_REVIEW") {
         return { invalidState: true, state: content.lifecycleState } as const;
       }
@@ -53,17 +54,44 @@ export const reviewService = {
     });
   },
 
-  async getRequestById(requestId: string) {
+  async getRequestById(
+    requestId: string,
+    requester: { id: string; isAdmin: boolean },
+  ) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     const request = await repos.review.getRequestById(requestId);
     if (!request) return null;
     const assignments = await repos.review.listAssignmentsForRequest(request.id);
+    const isAssignedReviewer = assignments.some((a) => a.reviewerId === requester.id);
+    if (
+      !requester.isAdmin &&
+      request.requestedById !== requester.id &&
+      !isAssignedReviewer
+    ) {
+      return { forbidden: true } as const;
+    }
     return { ...request, assignments };
   },
 
-  async listRequestsForContent(contentId: string) {
+  async listRequestsForContent(
+    contentId: string,
+    requester: { id: string; isAdmin: boolean },
+  ) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    return repos.review.listRequestsForContent(contentId);
+    if (!requester.isAdmin) {
+      // Check if the requester is the content author or an assigned reviewer for this content
+      const content = await repos.content.getById(contentId);
+      if (!content) return { notFound: true } as const;
+      if (content.authorId !== requester.id) {
+        const allRequests = await repos.review.listRequestsForContent(contentId);
+        const allAssignments = await Promise.all(
+          allRequests.map((r) => repos.review.listAssignmentsForRequest(r.id)),
+        );
+        const isReviewer = allAssignments.flat().some((a) => a.reviewerId === requester.id);
+        if (!isReviewer) return { forbidden: true } as const;
+      }
+    }
+    return { requests: await repos.review.listRequestsForContent(contentId) };
   },
 
   async assignReviewer(
@@ -76,6 +104,9 @@ export const reviewService = {
     const result = await uow.withTransaction(async (repos) => {
       const request = await repos.review.getRequestById(requestId);
       if (!request) return null;
+      if (request.requestedById !== ctx.actorId && !ctx.isAdmin) {
+        return { forbidden: true } as const;
+      }
       const assignment = await repos.review.assignReviewer({
         reviewRequestId: request.id,
         reviewerId,
@@ -113,6 +144,7 @@ export const reviewService = {
   ): Promise<
     | { ok: true }
     | { notFound: true }
+    | { forbidden: true }
     | { alreadyCompleted: true }
   > {
     const prisma = getPrismaClient();
@@ -120,6 +152,7 @@ export const reviewService = {
     const result = await uow.withTransaction(async (repos) => {
       const assignment = await repos.review.getAssignmentById(assignmentId);
       if (!assignment) return { notFound: true } as const;
+      if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
       if (assignment.status === "COMPLETED") return { alreadyCompleted: true } as const;
 
       await repos.review.recordDecision({
@@ -232,12 +265,13 @@ export const reviewService = {
     ctx: AuditContext,
     assignmentId: string,
     body: string,
-  ): Promise<{ comment: ReviewComment } | { notFound: true }> {
+  ): Promise<{ comment: ReviewComment } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
       const assignment = await repos.review.getAssignmentById(assignmentId);
       if (!assignment) return { notFound: true } as const;
+      if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
 
       const comment = await repos.review.addComment({
         reviewAssignmentId: assignmentId,

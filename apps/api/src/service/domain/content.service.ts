@@ -140,8 +140,20 @@ export const contentService = {
       isCoAuthor = !!co && co.status === "ACCEPTED";
     }
 
+    // Check if requester is an assigned reviewer on any review request for this content
+    let isReviewer = false;
+    if (requester) {
+      const reviewAssignment = await prisma.reviewAssignment.findFirst({
+        where: {
+          reviewerId: requester.id,
+          reviewRequest: { contentId: id },
+        },
+      });
+      isReviewer = !!reviewAssignment;
+    }
+
     const groups = requester ? await repos.userRole.listGroupsForUser(requester.id) : [];
-    if (!canViewContent(content, requester, groups, isCoAuthor)) {
+    if (!isReviewer && !canViewContent(content, requester, groups, isCoAuthor)) {
       return null;
     }
 
@@ -250,6 +262,7 @@ export const contentService = {
   ): Promise<
     | { content: Content }
     | { notFound: true }
+    | { forbidden: true }
     | { invalidTransition: true; current: LifecycleState }
   > {
     const prisma = getPrismaClient();
@@ -257,6 +270,7 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const existing = await repos.content.getById(contentId);
       if (!existing) return { notFound: true } as const;
+      if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
       const allowed = VALID_TRANSITIONS[existing.lifecycleState] ?? [];
       if (!allowed.includes(lifecycleState)) {
         return { invalidTransition: true, current: existing.lifecycleState } as const;
@@ -295,12 +309,13 @@ export const contentService = {
     contentId: string,
     visibility: Visibility,
     visibilityGroupId?: string | null,
-  ): Promise<Content | null> {
+  ): Promise<{ content: Content } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
       const existing = await repos.content.getById(contentId);
-      if (!existing) return null;
+      if (!existing) return { notFound: true } as const;
+      if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
       const updated = await repos.content.updateVisibility(contentId, visibility);
       if (visibility === "PRIVATE_TO_GROUP" && visibilityGroupId) {
         await repos.content.bindVisibilityGroup(contentId, visibilityGroupId);
@@ -317,14 +332,21 @@ export const contentService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      return updated;
+      return { content: updated };
     });
   },
 
-  async assignTag(ctx: AuditContext, contentId: string, tagId: string): Promise<void> {
+  async assignTag(
+    ctx: AuditContext,
+    contentId: string,
+    tagId: string,
+  ): Promise<{ ok: true } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
-    await uow.withTransaction(async (repos) => {
+    return uow.withTransaction(async (repos) => {
+      const content = await repos.content.getById(contentId);
+      if (!content) return { notFound: true } as const;
+      if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
       await repos.tag.assignToContent(contentId, tagId);
       await repos.audit.append({
         action: "TAG_ASSIGN",
@@ -335,13 +357,21 @@ export const contentService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
+      return { ok: true } as const;
     });
   },
 
-  async removeTag(ctx: AuditContext, contentId: string, tagId: string): Promise<void> {
+  async removeTag(
+    ctx: AuditContext,
+    contentId: string,
+    tagId: string,
+  ): Promise<{ ok: true } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
-    await uow.withTransaction(async (repos) => {
+    return uow.withTransaction(async (repos) => {
+      const content = await repos.content.getById(contentId);
+      if (!content) return { notFound: true } as const;
+      if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
       await repos.tag.removeFromContent(contentId, tagId);
       await repos.audit.append({
         action: "TAG_REMOVE",
@@ -352,6 +382,7 @@ export const contentService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
+      return { ok: true } as const;
     });
   },
 
