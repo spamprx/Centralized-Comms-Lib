@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useMyContent } from '../hooks/useMyContent';
-import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send } from 'lucide-react';
+import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send, MessageCircle } from 'lucide-react';
 import { contentService } from '../services/contentService';
+import ManageReviewersModal from '../components/ManageReviewersModal';
+import ReviewFeedbackModal from '../components/ReviewFeedbackModal';
 
 const typeIcons = {
   article: FileText,
@@ -28,6 +30,8 @@ export default function MyContentLayout() {
   const { contentItems, stats, loading, searchQuery, setSearchQuery, statusFilter, setStatusFilter, refreshContent } = useMyContent();
   const [sortBy, setSortBy] = useState('lastModified');
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [reviewModalItem, setReviewModalItem] = useState<{ id: string; title: string } | null>(null);
+  const [feedbackModalItem, setFeedbackModalItem] = useState<{ id: string; title: string } | null>(null);
 
   const handleSubmitForReview = async (itemId: string) => {
     setSubmittingId(itemId);
@@ -217,15 +221,42 @@ export default function MyContentLayout() {
                     }}>{item.type}</span>
                   </td>
                   <td style={{ padding: '16px' }}>
-                    <span style={{
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      background: `${statusColors[item.status]}22`,
-                      borderRadius: 12,
-                      color: statusColors[item.status],
-                      textTransform: 'uppercase',
-                      fontWeight: 600,
-                    }}>{item.status.replace('_', ' ')}</span>
+                    {item.status === 'in_review' ? (
+                      <button
+                        onClick={() => setReviewModalItem({ id: item.id, title: item.title })}
+                        style={{
+                          fontSize: 11,
+                          padding: '3px 8px',
+                          background: `${statusColors[item.status]}22`,
+                          borderRadius: 12,
+                          color: statusColors[item.status],
+                          textTransform: 'uppercase',
+                          fontWeight: 600,
+                          border: `1px solid ${statusColors[item.status]}44`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = `${statusColors[item.status]}33`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = `${statusColors[item.status]}22`;
+                        }}
+                        title="Click to manage reviewers"
+                      >
+                        {item.status.replace('_', ' ')} ▸
+                      </button>
+                    ) : (
+                      <span style={{
+                        fontSize: 11,
+                        padding: '3px 8px',
+                        background: `${statusColors[item.status]}22`,
+                        borderRadius: 12,
+                        color: statusColors[item.status],
+                        textTransform: 'uppercase',
+                        fontWeight: 600,
+                      }}>{item.status.replace('_', ' ')}</span>
+                    )}
                   </td>
                   <td style={{ padding: '16px', fontSize: 13, color: '#8b8fa8' }}>{item.views.toLocaleString()}</td>
                   <td style={{ padding: '16px', fontSize: 13, color: '#555870' }}>{new Date(item.lastModified).toLocaleDateString()}</td>
@@ -256,6 +287,29 @@ export default function MyContentLayout() {
                         >
                           <Send size={12} />
                           {submittingId === item.id ? 'Submitting...' : 'Review'}
+                        </button>
+                      )}
+                      {(item.status === 'in_review' || item.status === 'published') && (
+                        <button
+                          onClick={() => setFeedbackModalItem({ id: item.id, title: item.title })}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '4px 10px',
+                            background: 'rgba(167, 139, 250, 0.1)',
+                            border: '1px solid rgba(167, 139, 250, 0.3)',
+                            borderRadius: 6,
+                            color: '#a78bfa',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          title="View Review Feedback"
+                        >
+                          <MessageCircle size={12} />
+                          Feedback
                         </button>
                       )}
                       <button style={{
@@ -301,6 +355,25 @@ export default function MyContentLayout() {
           </div>
         )}
       </div>
+
+      {/* Manage Reviewers Modal */}
+      {reviewModalItem && (
+        <ManageReviewersModal
+          contentId={reviewModalItem.id}
+          contentTitle={reviewModalItem.title}
+          onClose={() => setReviewModalItem(null)}
+          onAssigned={() => refreshContent()}
+        />
+      )}
+
+      {/* Review Feedback Modal */}
+      {feedbackModalItem && (
+        <ReviewFeedbackModal
+          contentId={feedbackModalItem.id}
+          contentTitle={feedbackModalItem.title}
+          onClose={() => setFeedbackModalItem(null)}
+        />
+      )}
     </div>
   );
 }

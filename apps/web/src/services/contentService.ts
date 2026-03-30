@@ -74,5 +74,26 @@ export const contentService = {
       body: JSON.stringify({ lifecycleState }),
     });
   },
-};
 
+  getById: async (id: string): Promise<{
+    content: Content;
+    versions: Array<{ id: string; versionNumber: number; title: string; createdAt: string; changeType?: string; metadataSnapshot?: unknown }>;
+    tags: Array<{ id: string; name: string; slug: string }>;
+    coAuthors: Array<{ id: string; displayName: string; email: string }>;
+  }> => {
+    return request(`/content/${id}`);
+  },
+
+  listVersions: async (id: string): Promise<Array<{
+    id: string;
+    versionNumber: number;
+    title: string;
+    changeType: string;
+    metadataSnapshot: unknown;
+    createdAt: string;
+    contentId: string;
+    authorId: string;
+  }>> => {
+    return request(`/content/${id}/versions`);
+  },
+};
