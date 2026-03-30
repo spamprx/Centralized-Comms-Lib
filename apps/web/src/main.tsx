@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { ThemeProvider, CssBaseline } from '@mui/material'
 import { createTheme } from '@mui/material/styles'
 import { AuthProvider } from './context/AuthContext'
+import { ReviewProvider } from './context/ReviewContext'
+import { EditorProvider } from './context/EditorContext'
 import "./styles/index.css";
 import { App } from "./layouts";
 
@@ -17,7 +19,11 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
-          <App />
+          <ReviewProvider>
+            <EditorProvider>
+              <App />
+            </EditorProvider>
+          </ReviewProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

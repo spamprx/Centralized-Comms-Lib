@@ -20,20 +20,12 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { contentService } from '../services/contentService';
+import { useEditorDraft } from '../context/EditorContext';
 
 export default function EditorLayout() {
-  const [title, setTitle] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('editor-title') || '';
-    }
-    return '';
-  });
-  const [content, setContent] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('editor-content') || '<p></p>';
-    }
-    return '<p></p>';
-  });
+  const { draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft } = useEditorDraft();
+  const [title, setTitle] = useState(draftTitle);
+  const [content, setContent] = useState(draftContent || '<p></p>');
   const [showPreview, setShowPreview] = useState(false);
   const [contentId, setContentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -63,9 +55,8 @@ export default function EditorLayout() {
         await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
       }
       setLastSaved(new Date());
-      // Clear localStorage after successful save
-      localStorage.removeItem('editor-title');
-      localStorage.removeItem('editor-content');
+      // Clear draft from context after successful save
+      clearDraft();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
     } finally {
@@ -74,16 +65,12 @@ export default function EditorLayout() {
   }, [title, content, contentId]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('editor-title', title);
-    }
-  }, [title]);
+    setDraftTitle(title);
+  }, [title, setDraftTitle]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('editor-content', content);
-    }
-  }, [content]);
+    setDraftContent(content);
+  }, [content, setDraftContent]);
 
 
   const editor = useEditor({

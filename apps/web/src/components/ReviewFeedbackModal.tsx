@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Users, CheckCircle, Clock, Loader2, MessageCircle } from 'lucide-react';
 import { reviewService, type ReviewRequest } from '../services/reviewService';
 import { adminUserService } from '../services/adminService';
+import { useReview } from '../context/ReviewContext';
 
 type ReviewFeedbackInfo = {
   requestId: string;
@@ -33,6 +34,7 @@ export default function ReviewFeedbackModal({
   contentTitle,
   onClose,
 }: ReviewFeedbackModalProps) {
+  const { getDecision: ctxGetDecision, getComments: ctxGetComments } = useReview();
   const [feedbackList, setFeedbackList] = useState<ReviewFeedbackInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,33 +67,18 @@ export default function ReviewFeedbackModal({
             const assignments = await Promise.all((fullRequest.assignments || []).map(async (a) => {
               const reviewer = userMap[a.reviewerId];
               
-              // 1. Check for standalone independent comments
-              let standaloneComments = [];
-              try {
-                const rawComments = localStorage.getItem(`review_comments_${a.id}`);
-                if (rawComments) {
-                  standaloneComments = JSON.parse(rawComments);
-                }
-              } catch (err) {
-                // Ignore parse errors
-              }
+              // 1. Check for standalone independent comments from ReviewContext
+              const standaloneComments = ctxGetComments(a.id);
 
-              // 2. Check for final decision
+              // 2. Check for final decision from ReviewContext
               let decisionData = null;
               if (a.status === 'COMPLETED') {
-                try {
-                  // Fallback to local storage (Frontend-only persistence)
-                  // The ReviewLayout saves decisions to localStorage under "review_decision_{assignmentId}"
-                  const localDecisionRaw = localStorage.getItem(`review_decision_${a.id}`);
-                  if (localDecisionRaw) {
-                    const localDecision = JSON.parse(localDecisionRaw);
-                    decisionData = {
-                      verdict: localDecision.verdict,
-                      comment: localDecision.comment || '',
-                    };
-                  }
-                } catch (err) {
-                  console.error('Failed fetching decision for', a.id, err);
+                const ctxDecision = ctxGetDecision(a.id);
+                if (ctxDecision) {
+                  decisionData = {
+                    verdict: ctxDecision.verdict,
+                    comment: ctxDecision.comment || '',
+                  };
                 }
               }
               

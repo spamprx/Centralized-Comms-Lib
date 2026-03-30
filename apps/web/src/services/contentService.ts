@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_URL ;
+import { getAuthToken } from './tokenStore';
 
 export type LifecycleState = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
 export type Visibility = 'PUBLIC' | 'PRIVATE' | 'HIDDEN' | 'ARCHIVED' | 'PRIVATE_TO_GROUP';
@@ -25,9 +26,11 @@ type ListFilters = {
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
     credentials: 'include',
@@ -77,7 +80,7 @@ export const contentService = {
 
   getById: async (id: string): Promise<{
     content: Content;
-    versions: Array<{ id: string; versionNumber: number; title: string; createdAt: string; changeType?: string; metadataSnapshot?: unknown }>;
+    versions: Array<{ id: string; versionNumber: number; title: string; body?: unknown; createdAt: string; changeType?: string; metadataSnapshot?: unknown }>;
     tags: Array<{ id: string; name: string; slug: string }>;
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
   }> => {

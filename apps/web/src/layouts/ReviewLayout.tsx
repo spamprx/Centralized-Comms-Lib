@@ -3,6 +3,7 @@ import { CheckCircle, XCircle, MessageSquare, AlertCircle, Loader2, FileText, Se
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService } from '../services/contentService';
 import { adminUserService } from '../services/adminService';
+import { useReview } from '../context/ReviewContext';
 
 const screeningData = {
   score: 85,
@@ -30,6 +31,7 @@ type ReviewItem = {
 };
 
 export default function ReviewLayout() {
+  const { addDecision: ctxAddDecision, addComment: ctxAddComment, getComments: ctxGetComments } = useReview();
   const [decisionComment, setDecisionComment] = useState('');
   const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; time: string; resolved: boolean }>>([]);
   const [commentText, setCommentText] = useState('');
@@ -146,8 +148,9 @@ export default function ReviewLayout() {
             : null;
 
           if (versionWithBody) {
-            const metadata = (versionWithBody as unknown as { metadataSnapshot?: { body?: { type: string; content: unknown[] } } })?.metadataSnapshot;
-            const body = metadata?.body;
+            // The body is a top-level field on the version (TipTap JSON document),
+            // NOT inside metadataSnapshot
+            const body = (versionWithBody as unknown as { body?: { type: string; content: unknown[] } })?.body;
             if (body && typeof body === 'object' && 'content' in body) {
               const extractText = (node: unknown): string => {
                 if (!node || typeof node !== 'object') return '';
@@ -181,39 +184,29 @@ export default function ReviewLayout() {
 
   useEffect(() => {
     if (!selectedItem?.assignmentId) return;
-    // Restore comments (both standalone and decision) from localStorage anytime the selected item changes
-    try {
-      const storageKey = `review_comments_${selectedItem.assignmentId}`;
-      const rawComments = localStorage.getItem(storageKey);
-      let loadedComments: any[] = [];
-      
-      if (rawComments) {
-        const parsed = JSON.parse(rawComments);
-        loadedComments = parsed.map((c: any, index: number) => ({
-          id: `local_${index}_${Date.now()}`,
-          author: 'You',
-          text: c.text,
-          time: new Date(c.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          resolved: false,
-        }));
-      }
+    // Restore comments from ReviewContext anytime the selected item changes
+    const storedComments = ctxGetComments(selectedItem.assignmentId);
+    let loadedComments: any[] = storedComments.map((c, index) => ({
+      id: `ctx_${index}_${Date.now()}`,
+      author: 'You',
+      text: c.text,
+      time: new Date(c.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      resolved: false,
+    }));
 
-      // If they already made a decision in the past, inject that comment into the unified chat
-      if (selectedItem.verdict && selectedItem.savedComment) {
-        loadedComments.push({
-          id: `decision_local_${Date.now()}`,
-          author: 'You',
-          text: `[${selectedItem.verdict}] ${selectedItem.savedComment}`,
-          time: 'Previously',
-          resolved: false,
-        });
-      }
-
-      setComments(loadedComments);
-    } catch {
-      setComments([]);
+    // If they already made a decision in the past, inject that comment into the unified chat
+    if (selectedItem.verdict && selectedItem.savedComment) {
+      loadedComments.push({
+        id: `decision_ctx_${Date.now()}`,
+        author: 'You',
+        text: `[${selectedItem.verdict}] ${selectedItem.savedComment}`,
+        time: 'Previously',
+        resolved: false,
+      });
     }
-  }, [selectedItem?.assignmentId, selectedItem?.verdict, selectedItem?.savedComment]);
+
+    setComments(loadedComments);
+  }, [selectedItem?.assignmentId, selectedItem?.verdict, selectedItem?.savedComment, ctxGetComments]);
 
   const handleSelectItem = (item: ReviewItem) => {
     setSelectedItem(item);
@@ -283,13 +276,8 @@ export default function ReviewLayout() {
         reviewRequestStatus: requestStatus,
       };
       
-      // EXTREMELY IMPORTANT NO-BACKEND WORKAROUND:
-      // Persist the decision to localStorage so the author can read it on the MyContent page
-      // since the GET /decide endpoint does not exist.
-      localStorage.setItem(`review_decision_${selectedItem.assignmentId}`, JSON.stringify({
-        verdict: decision,
-        comment: decisionComment.trim(),
-      }));
+      // Persist the decision to ReviewContext so the author can read it on the MyContent page
+      ctxAddDecision(selectedItem.assignmentId, decision, decisionComment.trim());
 
       setReviewItems((prev) =>
         prev.map((item) =>
@@ -324,12 +312,8 @@ export default function ReviewLayout() {
       // 2. Update local state
       setComments([...comments, newComment]);
       
-      // 3. Persist to localStorage for the Author to view (Frontend-only GET workaround)
-      const storageKey = `review_comments_${selectedItem.assignmentId}`;
-      const existingRaw = localStorage.getItem(storageKey);
-      const existingComments = existingRaw ? JSON.parse(existingRaw) : [];
-      existingComments.push({ text: commentText.trim(), time: new Date().toISOString() });
-      localStorage.setItem(storageKey, JSON.stringify(existingComments));
+      // 3. Persist to ReviewContext for the Author to view
+      ctxAddComment(selectedItem.assignmentId, commentText.trim());
 
       setCommentText('');
     } catch (err) {

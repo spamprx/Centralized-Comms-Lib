@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { authService } from "../services/authService";
+import { setAuthToken, decodeTokenPayload } from "../services/tokenStore";
 
 type AuthUser = {
   id: string;
@@ -18,29 +19,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Derive an AuthUser from the JWT payload stored in the cookie */
+function getUserFromToken(): AuthUser | null {
+  const payload = decodeTokenPayload();
+  if (!payload) return null;
+  return { id: payload.id, email: payload.email, role: payload.role };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem("auth_user")));
+  // On mount: check cookie for an existing token and derive the user from it
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getUserFromToken());
   const [isAuthReady] = useState(true);
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    const rawUser = localStorage.getItem("auth_user");
-    if (!rawUser) return null;
-    try {
-      return JSON.parse(rawUser) as AuthUser;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<AuthUser | null>(() => getUserFromToken());
 
   const login = async (email: string, password: string) => {
     const res = await authService.login(email, password);
-    localStorage.setItem("auth_user", JSON.stringify(res.user));
+    // Store token in cookie via tokenStore (also kept in memory)
+    setAuthToken(res.token);
+    // Use the richer user object from the login response (includes displayName)
     setUser(res.user);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
     void authService.logout();
-    localStorage.removeItem("auth_user");
+    // Clear token from cookie and memory
+    setAuthToken(null);
     setUser(null);
     setIsAuthenticated(false);
   };

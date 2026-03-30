@@ -11,7 +11,8 @@ import type {
 const API_BASE = import.meta.env.VITE_API_URL ;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('auth_token');
+  const { getAuthToken } = await import('./tokenStore');
+  const token = getAuthToken();
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
