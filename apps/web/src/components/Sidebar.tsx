@@ -28,11 +28,11 @@ export default function Sidebar() {
   const iconSlotActive = "bg-gray-800 text-indigo-300";
 
   const iconClass =
-    "[&>svg]:text-indigo-400 [&>.MuiSvgIcon-root]:text-indigo-400 [&>svg]:transition-colors [&>.MuiSvgIcon-root]:transition-colors";
+    "[&>svg]:text-indigo-400 [&>svg]:transition-colors";
   const iconClassHover =
-    "group-hover:[&>svg]:text-indigo-300 group-hover:[&>.MuiSvgIcon-root]:text-indigo-300";
+    "group-hover:[&>svg]:text-indigo-300";
   const iconClassActive =
-    "[&>svg]:text-indigo-300 [&>.MuiSvgIcon-root]:text-indigo-300";
+    "[&>svg]:text-indigo-300";
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-14 flex-col border-r border-gray-700 bg-gray-900 text-gray-300">
@@ -53,7 +53,7 @@ export default function Sidebar() {
                 className={`${iconSlotBase} ${iconSlotIdle} ${iconSlotHover} ${active ? iconSlotActive : ""}`}
               >
                 <span
-                  className={`group ${iconClass} ${iconClassHover} ${active ? iconClassActive : ""} [&_.MuiSvgIcon-root]:text-2xl [&_svg]:text-2xl`}
+                  className={`group ${iconClass} ${iconClassHover} ${active ? iconClassActive : ""} [&_svg]:text-2xl`}
                 >
                   {icon}
                 </span>
@@ -70,7 +70,7 @@ export default function Sidebar() {
                 className={`${iconSlotBase} ${iconSlotIdle} ${iconSlotHover} ${isOpen ? iconSlotActive : ""}`}
               >
                 <span
-                  className={`group ${iconClass} ${iconClassHover} ${isOpen ? iconClassActive : ""} [&_.MuiSvgIcon-root]:text-2xl [&_svg]:text-2xl`}
+                  className={`group ${iconClass} ${iconClassHover} ${isOpen ? iconClassActive : ""} [&_svg]:text-2xl`}
                 >
                   {icon}
                 </span>
@@ -111,7 +111,7 @@ export default function Sidebar() {
           title="Logout"
           className={`${iconSlotBase} ${iconSlotIdle} ${iconSlotHover}`}
         >
-          <span className={`group ${iconClass} ${iconClassHover} [&_.MuiSvgIcon-root]:text-2xl [&_svg]:text-2xl`}>
+          <span className={`group ${iconClass} ${iconClassHover} [&_svg]:text-2xl`}>
             <LogOut />
           </span>
         </button>
