@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MoreHorizontal, Trash2, Edit2, Lock, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react';
-import type { User } from '../../../types/admin';
+import type { User } from '../../types/admin';
 
 interface UsersTableProps {
   users: User[];
