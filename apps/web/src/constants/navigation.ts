@@ -21,6 +21,7 @@ export const navCategories: NavCategory[] = [
     label: "Library",
     items: [
       { path: "/library", label: "Browse Library" },
+      { path: "/templates", label: "Templates" },
       { path: "/library/demo", label: "Reading" },
     ],
   },
