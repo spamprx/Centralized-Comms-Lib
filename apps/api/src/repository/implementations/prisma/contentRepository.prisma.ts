@@ -21,6 +21,7 @@ function toContent(row: {
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
+  templateId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): Content {
@@ -33,6 +34,7 @@ function toContent(row: {
     aiGenerated: row.aiGenerated,
     authorId: row.authorId,
     visibilityGroupId: row.visibilityGroupId,
+    templateId: row.templateId ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

@@ -2,18 +2,22 @@ import type { PrismaClient, Prisma } from "@prisma/client";
 
 import type {
   AuditLogRepository,
+  ChannelRepository,
   ContentRepository,
   OutboxRepository,
   ReviewRepository,
   TagRepository,
+  TemplateRepository,
   UserRoleRepository,
 } from "../../interfaces";
 
 import { PrismaAuditLogRepository } from "./auditLogRepository.prisma";
+import { PrismaChannelRepository } from "./channelRepository.prisma";
 import { PrismaContentRepository } from "./contentRepository.prisma";
 import { PrismaOutboxRepository } from "./outboxRepository.prisma";
 import { PrismaReviewRepository } from "./reviewRepository.prisma";
 import { PrismaTagRepository } from "./tagRepository.prisma";
+import { PrismaTemplateRepository } from "./templateRepository.prisma";
 import { PrismaUserRoleRepository } from "./userRoleRepository.prisma";
 import type { PrismaDb } from "./prismaTypes";
 
@@ -24,6 +28,8 @@ export interface Repositories {
   review: ReviewRepository;
   audit: AuditLogRepository;
   outbox: OutboxRepository;
+  channel: ChannelRepository;
+  template: TemplateRepository;
 }
 
 export function createPrismaRepositories(db: PrismaDb | Prisma.TransactionClient): Repositories {
@@ -34,6 +40,8 @@ export function createPrismaRepositories(db: PrismaDb | Prisma.TransactionClient
     review: new PrismaReviewRepository(db),
     audit: new PrismaAuditLogRepository(db),
     outbox: new PrismaOutboxRepository(db),
+    channel: new PrismaChannelRepository(db),
+    template: new PrismaTemplateRepository(db),
   };
 }
 

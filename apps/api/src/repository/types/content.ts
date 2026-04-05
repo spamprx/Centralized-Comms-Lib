@@ -18,6 +18,7 @@ export interface Content {
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
+  templateId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
