@@ -1,6 +1,7 @@
 import type { Template, TemplateBinding, TemplateStatus, TemplateWithBindings } from "../types";
 
 export interface CreateTemplateInput {
+  workspaceId: string;
   name: string;
   slug: string;
   description?: string | null;
@@ -25,8 +26,9 @@ export interface TemplateRepository {
   create(input: CreateTemplateInput): Promise<Template>;
   getById(id: string): Promise<Template | null>;
   getByIdWithBindings(id: string): Promise<TemplateWithBindings | null>;
-  getBySlug(slug: string): Promise<Template | null>;
-  list(): Promise<Template[]>;
+  getByWorkspaceAndSlug(workspaceId: string, slug: string): Promise<Template | null>;
+  findByWorkspaceAndName(workspaceId: string, name: string): Promise<Template | null>;
+  list(workspaceId?: string): Promise<Template[]>;
   update(id: string, input: UpdateTemplateInput): Promise<Template>;
   delete(id: string): Promise<void>;
   countContentsUsingTemplate(templateId: string): Promise<number>;

@@ -6,4 +6,10 @@ export * from "./outboxRepository";
 export * from "./reviewRepository";
 export * from "./channelRepository";
 export * from "./templateRepository";
+export * from "./workspaceRepository";
+export * from "./templateTranslationRepository";
+export * from "./componentRegistryRepository";
+export * from "./templateLayoutSectionRepository";
+export * from "./contentCitationRepository";
+export * from "./contentSnapshotRepository";
 

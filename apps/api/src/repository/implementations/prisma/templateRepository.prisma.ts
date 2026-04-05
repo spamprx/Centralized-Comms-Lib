@@ -23,6 +23,7 @@ function toBinding(row: {
 
 function toTemplate(row: {
   id: string;
+  workspaceId: string;
   name: string;
   slug: string;
   description: string | null;
@@ -36,6 +37,7 @@ function toTemplate(row: {
 }): Template {
   return {
     id: row.id,
+    workspaceId: row.workspaceId,
     name: row.name,
     slug: row.slug,
     description: row.description,
@@ -55,6 +57,7 @@ export class PrismaTemplateRepository implements TemplateRepository {
   async create(input: CreateTemplateInput): Promise<Template> {
     const row = await this.db.template.create({
       data: {
+        workspaceId: input.workspaceId,
         name: input.name,
         slug: input.slug,
         description: input.description ?? null,
@@ -85,13 +88,25 @@ export class PrismaTemplateRepository implements TemplateRepository {
     };
   }
 
-  async getBySlug(slug: string): Promise<Template | null> {
-    const row = await this.db.template.findUnique({ where: { slug } });
+  async getByWorkspaceAndSlug(workspaceId: string, slug: string): Promise<Template | null> {
+    const row = await this.db.template.findUnique({
+      where: { workspaceId_slug: { workspaceId, slug } },
+    });
     return row ? toTemplate(row) : null;
   }
 
-  async list(): Promise<Template[]> {
-    const rows = await this.db.template.findMany({ orderBy: { updatedAt: "desc" } });
+  async findByWorkspaceAndName(workspaceId: string, name: string): Promise<Template | null> {
+    const row = await this.db.template.findUnique({
+      where: { workspaceId_name: { workspaceId, name } },
+    });
+    return row ? toTemplate(row) : null;
+  }
+
+  async list(workspaceId?: string): Promise<Template[]> {
+    const rows = await this.db.template.findMany({
+      where: workspaceId ? { workspaceId } : undefined,
+      orderBy: { updatedAt: "desc" },
+    });
     return rows.map(toTemplate);
   }
 

@@ -9,6 +9,7 @@ export interface TemplateBinding {
 
 export interface Template {
   id: string;
+  workspaceId: string;
   name: string;
   slug: string;
   description: string | null;
