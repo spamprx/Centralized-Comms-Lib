@@ -200,6 +200,15 @@ async function seedGroupMemberships() {
   console.log(`  ✔ ${memberships.length} group memberships`);
 }
 
+async function seedWorkspace() {
+  await prisma.workspace.upsert({
+    where: { slug: "default" },
+    update: { name: "Default workspace" },
+    create: { id: randomUUID(), slug: "default", name: "Default workspace" },
+  });
+  console.log("  ✔ default workspace");
+}
+
 async function seedTags() {
   const parentTags = [
     { key: "announcements", name: "Announcements", slug: "announcements" },
@@ -586,6 +595,7 @@ async function main() {
   await seedUserRoles();
   await seedGroups();
   await seedGroupMemberships();
+  await seedWorkspace();
   await seedTags();
   await seedChannels();
   await seedContent();
