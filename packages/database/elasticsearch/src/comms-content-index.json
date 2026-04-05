@@ -1,0 +1,43 @@
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "comms_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "contentId": { "type": "keyword" },
+      "workspaceId": { "type": "keyword" },
+      "lifecycleState": { "type": "keyword" },
+      "visibility": { "type": "keyword" },
+      "authorId": { "type": "keyword" },
+      "templateId": { "type": "keyword" },
+      "title": {
+        "type": "text",
+        "analyzer": "comms_text",
+        "fields": { "raw": { "type": "keyword", "ignore_above": 512 } }
+      },
+      "summary": {
+        "type": "text",
+        "analyzer": "comms_text"
+      },
+      "body": {
+        "type": "text",
+        "analyzer": "comms_text"
+      },
+      "bodyPlain": {
+        "type": "text",
+        "analyzer": "comms_text"
+      },
+      "tags": { "type": "keyword" },
+      "updatedAt": { "type": "date" },
+      "indexedAt": { "type": "date" }
+    }
+  }
+}
