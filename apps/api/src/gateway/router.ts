@@ -10,6 +10,8 @@ import tagRouter from "./routes/tag.routes";
 import reviewRouter from "./routes/review.routes";
 import adminRouter from "./routes/admin.routes";
 import analyticsRouter from "./routes/analytics.routes";
+import channelRouter from "./routes/channel.routes";
+import templateRouter from "./routes/template.routes";
 
 const router = Router();
 
@@ -47,5 +49,7 @@ router.use("/tags", tagRouter);
 router.use("/reviews", reviewRouter);
 router.use("/admin", adminRouter);
 router.use("/analytics", analyticsRouter);
+router.use("/channels", channelRouter);
+router.use("/templates", templateRouter);
 
 export default router;
