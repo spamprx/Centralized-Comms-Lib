@@ -16,4 +16,5 @@ export {
   authService,
   channelService,
   templateService,
+  workspaceService,
 } from "./domain";

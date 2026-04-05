@@ -5,3 +5,4 @@ export { adminService } from "./admin.service";
 export { authService } from "./auth.service";
 export { channelService } from "./channel.service";
 export { templateService } from "./template.service";
+export { workspaceService } from "./workspace.service";

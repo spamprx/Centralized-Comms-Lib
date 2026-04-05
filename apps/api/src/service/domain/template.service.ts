@@ -1,10 +1,12 @@
 import { randomUUID } from "crypto";
 
-import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
+import { getPrismaClient, PrismaUnitOfWork, type Repositories } from "../../repository";
 import type { Template, TemplateBinding, TemplateStatus, TemplateWithBindings } from "../../repository/types";
+import type { LayoutPhase } from "../../repository/types";
 import type { AuditContext } from "../context";
 import { mergeI18n, parseI18nPatch, type I18nStrings } from "../validation/i18nPatch";
 import { parseAndValidateLayoutConfig } from "../validation/layoutConfig";
+import { workspaceService } from "./workspace.service";
 
 function slugify(name: string): string {
   return name
@@ -15,6 +17,16 @@ function slugify(name: string): string {
 
 function deepCloneJson<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
+}
+
+function flattenI18nForRows(strings: I18nStrings): Array<{ locale: string; key: string; value: string }> {
+  const rows: Array<{ locale: string; key: string; value: string }> = [];
+  for (const [locale, bundle] of Object.entries(strings)) {
+    for (const [key, value] of Object.entries(bundle)) {
+      rows.push({ locale, key, value });
+    }
+  }
+  return rows;
 }
 
 function regenerateRegionIds(layout: unknown): unknown {
@@ -31,17 +43,33 @@ function regenerateRegionIds(layout: unknown): unknown {
 }
 
 async function uniqueTemplateSlug(
-  repos: { template: { getBySlug: (s: string) => Promise<Template | null> } },
+  repos: Pick<Repositories, "template">,
+  workspaceId: string,
   baseName: string,
 ): Promise<string> {
   let candidate = slugify(baseName);
   if (!candidate) candidate = "template";
   for (let i = 0; i < 64; i++) {
-    const existing = await repos.template.getBySlug(candidate);
+    const existing = await repos.template.getByWorkspaceAndSlug(workspaceId, candidate);
     if (!existing) return candidate;
     candidate = `${slugify(baseName)}-${Date.now().toString(36)}${i}`;
   }
   throw new Error("Could not allocate a unique template slug");
+}
+
+/** Resolves a display name that does not violate @@unique([workspaceId, name]). */
+async function allocateUniqueCloneName(
+  repos: Pick<Repositories, "template">,
+  workspaceId: string,
+  sourceName: string,
+): Promise<string> {
+  let candidate = `${sourceName} (Copy)`;
+  let suffix = 1;
+  while (await repos.template.findByWorkspaceAndName(workspaceId, candidate)) {
+    suffix += 1;
+    candidate = `${sourceName} (Copy ${suffix})`;
+  }
+  return candidate;
 }
 
 function validateName(name: unknown): string {
@@ -54,6 +82,7 @@ function validateName(name: unknown): string {
 function templateToJSON(t: Template): Record<string, unknown> {
   return {
     id: t.id,
+    workspaceId: t.workspaceId,
     name: t.name,
     slug: t.slug,
     description: t.description,
@@ -67,6 +96,8 @@ function templateToJSON(t: Template): Record<string, unknown> {
   };
 }
 
+const LAYOUT_PHASES: LayoutPhase[] = ["DRAFT", "ACTIVE"];
+
 export const templateService = {
   templateToJSON,
 
@@ -75,15 +106,17 @@ export const templateService = {
     input: { name: string; description?: string | null; draftLayout?: unknown | null },
   ): Promise<Template> {
     const name = validateName(input.name);
+    const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
-      const slug = await uniqueTemplateSlug(repos, name);
+      const slug = await uniqueTemplateSlug(repos, workspaceId, name);
       if (input.draftLayout != null) {
         const parsed = parseAndValidateLayoutConfig(input.draftLayout);
         if (!parsed) throw new Error("Invalid draftLayout schema");
       }
       const template = await repos.template.create({
+        workspaceId,
         name,
         slug,
         description: input.description ?? null,
@@ -96,7 +129,7 @@ export const templateService = {
         action: "CREATE",
         resource: "TEMPLATE",
         resourceId: template.id,
-        newValue: { name, slug },
+        newValue: { workspaceId, name, slug },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
@@ -106,8 +139,9 @@ export const templateService = {
   },
 
   async list(): Promise<Template[]> {
+    const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    return repos.template.list();
+    return repos.template.list(workspaceId);
   },
 
   async getById(id: string): Promise<Template | null> {
@@ -145,6 +179,10 @@ export const templateService = {
 
       if (input.name !== undefined) {
         patch.name = validateName(input.name);
+        const taken = await repos.template.findByWorkspaceAndName(current.workspaceId, patch.name);
+        if (taken && taken.id !== id) {
+          return { conflict: true, message: "name already in use in this workspace" } as const;
+        }
       }
       if (input.description !== undefined) {
         patch.description = input.description;
@@ -155,9 +193,9 @@ export const templateService = {
         }
         const s = slugify(input.slug.trim());
         if (!s) return { invalid: true, message: "slug must contain alphanumeric characters" } as const;
-        const taken = await repos.template.getBySlug(s);
+        const taken = await repos.template.getByWorkspaceAndSlug(current.workspaceId, s);
         if (taken && taken.id !== id) {
-          return { conflict: true, message: "slug already in use" } as const;
+          return { conflict: true, message: "slug already in use in this workspace" } as const;
         }
         patch.slug = s;
       }
@@ -233,20 +271,22 @@ export const templateService = {
     | { ok: true; template: TemplateWithBindings }
     | { notFound: true }
   > {
+    const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
       const src = await repos.template.getByIdWithBindings(sourceId);
       if (!src) return { notFound: true } as const;
 
-      const name = `${src.name} (Copy)`;
-      const slug = await uniqueTemplateSlug(repos, name);
+      const name = await allocateUniqueCloneName(repos, workspaceId, src.name);
+      const slug = await uniqueTemplateSlug(repos, workspaceId, name);
       const draftLayout = src.draftLayout != null ? regenerateRegionIds(deepCloneJson(src.draftLayout)) : null;
       const activeLayout =
         src.activeLayout != null ? regenerateRegionIds(deepCloneJson(src.activeLayout)) : null;
       const i18n = deepCloneJson(src.i18n) as I18nStrings;
 
       const created = await repos.template.create({
+        workspaceId,
         name,
         slug,
         description: src.description,
@@ -261,6 +301,27 @@ export const templateService = {
         await repos.template.createBinding(created.id, b.channelId);
       }
 
+      const translationRows = await repos.templateTranslation.listAllForTemplate(src.id);
+      if (translationRows.length > 0) {
+        await repos.templateTranslation.upsertMany(
+          created.id,
+          translationRows.map((r) => ({ locale: r.locale, key: r.key, value: r.value })),
+        );
+      }
+
+      for (const phase of LAYOUT_PHASES) {
+        const secs = await repos.templateLayoutSection.listForTemplatePhase(src.id, phase);
+        for (const s of secs) {
+          await repos.templateLayoutSection.create({
+            templateId: created.id,
+            phase,
+            sortOrder: s.sortOrder,
+            componentVersionId: s.componentVersionId,
+            props: deepCloneJson(s.props),
+          });
+        }
+      }
+
       const withBindings = await repos.template.getByIdWithBindings(created.id);
       if (!withBindings) throw new Error("Clone failed: template missing after create");
 
@@ -268,7 +329,7 @@ export const templateService = {
         action: "CREATE",
         resource: "TEMPLATE",
         resourceId: created.id,
-        newValue: { clonedFrom: sourceId, name, slug },
+        newValue: { clonedFrom: sourceId, name, slug, workspaceId },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
@@ -325,6 +386,10 @@ export const templateService = {
       if (!current) return { notFound: true } as const;
       const merged = mergeI18n(current.i18n, patch);
       const template = await repos.template.update(id, { i18n: merged });
+      const rows = flattenI18nForRows(patch);
+      if (rows.length > 0) {
+        await repos.templateTranslation.upsertMany(id, rows);
+      }
       await repos.audit.append({
         action: "UPDATE",
         resource: "TEMPLATE",
