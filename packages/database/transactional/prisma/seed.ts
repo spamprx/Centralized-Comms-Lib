@@ -235,6 +235,22 @@ async function seedTags() {
   console.log(`  ✔ ${parentTags.length + childTags.length} tags`);
 }
 
+async function seedChannels() {
+  const channels = [
+    { name: "Web", key: "web", description: "Browser / responsive surfaces" },
+    { name: "Email", key: "email", description: "Email clients" },
+    { name: "Mobile", key: "mobile", description: "Native / in-app surfaces" },
+  ];
+  for (const c of channels) {
+    await prisma.channel.upsert({
+      where: { key: c.key },
+      update: { name: c.name, description: c.description },
+      create: { id: randomUUID(), name: c.name, key: c.key, description: c.description },
+    });
+  }
+  console.log(`  ✔ ${channels.length} channels`);
+}
+
 async function seedContent() {
   const contents: {
     key: string;
@@ -571,6 +587,7 @@ async function main() {
   await seedGroups();
   await seedGroupMemberships();
   await seedTags();
+  await seedChannels();
   await seedContent();
   await seedContentVersions();
   await seedContentTags();
