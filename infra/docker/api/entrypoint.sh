@@ -15,7 +15,7 @@ echo "Preparing database (schema: ${SCHEMA_PATH})..."
 
 if [ "${RUN_DB_PUSH}" = "true" ]; then
   i=0
-  until npx prisma db push --schema="${SCHEMA_PATH}" --skip-generate 2>&1; do
+  until npx prisma db push --schema="${SCHEMA_PATH}" --skip-generate --accept-data-loss 2>&1; do
     i=$((i + 1))
     if [ "$i" -ge 30 ]; then
       echo "ERROR: db push failed after ${i} attempts."
