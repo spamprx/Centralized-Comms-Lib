@@ -14,4 +14,6 @@ export {
   reviewService,
   adminService,
   authService,
+  channelService,
+  templateService,
 } from "./domain";
