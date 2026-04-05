@@ -5,7 +5,8 @@
     "description": "Centralized Communications Library - Monorepo",
     "workspaces": [
         "apps/*",
-        "packages/*"
+        "packages/*",
+        "packages/database/*"
     ],
     "scripts": {
         "dev": "turbo run dev",
@@ -17,7 +18,8 @@
         "dev:web": "npm run dev --workspace=apps/web",
         "dev:api": "npm run dev --workspace=apps/api",
         "build:web": "npm run build --workspace=apps/web",
-        "build:api": "npm run build --workspace=apps/api"
+        "build:api": "npm run build --workspace=apps/api",
+        "build:db-drivers": "npm run build -w @comms-lib/db-mongo -w @comms-lib/db-elasticsearch"
     },
     "devDependencies": {
         "autoprefixer": "^10.4.27",
