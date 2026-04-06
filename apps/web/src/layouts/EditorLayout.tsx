@@ -14,8 +14,6 @@ import {
   Heading2,
   Loader2,
   Check,
-  X,
-  Plus,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -24,98 +22,15 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { contentService } from '../services/contentService';
 import { useEditorDraft } from '../context/EditorContext';
 
-type TagItem = { id: string; name: string; slug: string };
-
 export default function EditorLayout() {
   const { draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft } = useEditorDraft();
   const [title, setTitle] = useState(draftTitle);
   const [content, setContent] = useState(draftContent || '<p></p>');
   const [showPreview, setShowPreview] = useState(false);
-  const [contentId, setContentId] = useState<string | null>(() => {
-    return sessionStorage.getItem('editor_content_id') || null;
-  });
+  const [contentId, setContentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  // ─── Content Type ──────────────────────────────────────────────────────
-  const [contentType, setContentType] = useState(() => {
-    return sessionStorage.getItem('editor_content_type') || 'Article';
-  });
-
-  useEffect(() => {
-    sessionStorage.setItem('editor_content_type', contentType);
-  }, [contentType]);
-
-  // ─── Tags ──────────────────────────────────────────────────────────────
-  const [selectedTags, setSelectedTags] = useState<TagItem[]>(() => {
-    try {
-      const cached = sessionStorage.getItem('editor_selected_tags');
-      return cached ? JSON.parse(cached) : [];
-    } catch { return []; }
-  });
-  const [availableTags, setAvailableTags] = useState<TagItem[]>([]);
-  const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const [tagSearch, setTagSearch] = useState('');
-  const [loadingTags, setLoadingTags] = useState(false);
-
-  // Persist selected tags to sessionStorage
-  useEffect(() => {
-    sessionStorage.setItem('editor_selected_tags', JSON.stringify(selectedTags));
-  }, [selectedTags]);
-
-  // Persist contentId to sessionStorage
-  useEffect(() => {
-    if (contentId) {
-      sessionStorage.setItem('editor_content_id', contentId);
-    } else {
-      sessionStorage.removeItem('editor_content_id');
-    }
-  }, [contentId]);
-
-  const fetchAvailableTags = useCallback(async () => {
-    setLoadingTags(true);
-    try {
-      const tags = await contentService.listTags();
-      setAvailableTags(tags);
-    } catch {
-      // Non-critical
-    } finally {
-      setLoadingTags(false);
-    }
-  }, []);
-
-  const handleAddTag = (tag: TagItem) => {
-    if (!selectedTags.find((t) => t.id === tag.id)) {
-      setSelectedTags((prev) => [...prev, tag]);
-    }
-    setShowTagDropdown(false);
-    setTagSearch('');
-  };
-
-  const handleRemoveTag = (tagId: string) => {
-    setSelectedTags((prev) => prev.filter((t) => t.id !== tagId));
-  };
-
-  const handleCreateTag = async () => {
-    const name = tagSearch.trim();
-    if (!name) return;
-    try {
-      const newTag = await contentService.createTag(name);
-      setSelectedTags((prev) => [...prev, newTag]);
-      setAvailableTags((prev) => [...prev, newTag]);
-      setShowTagDropdown(false);
-      setTagSearch('');
-    } catch (err) {
-      console.error('Failed to create tag:', err);
-    }
-  };
-
-  const filteredTags = availableTags.filter(
-    (t) =>
-      !selectedTags.find((s) => s.id === t.id) &&
-      t.name.toLowerCase().includes(tagSearch.toLowerCase())
-  );
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) {
@@ -125,54 +40,29 @@ export default function EditorLayout() {
     setSaving(true);
     setSaveError(null);
     try {
+      // Build TipTap JSON from HTML for API
       const bodyDoc = {
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text: content.replace(/<[^>]*>/g, '') || '' }] }],
       };
 
-      let savedContentId = contentId;
-
-      if (!savedContentId) {
+      if (!contentId) {
+        // First save — create a new draft
         const result = await contentService.createDraft(title.trim(), bodyDoc);
-        savedContentId = result.content.id;
-        setContentId(savedContentId);
+        setContentId(result.content.id);
       } else {
-        await contentService.saveDraft(savedContentId, { title: title.trim(), body: bodyDoc });
+        // Subsequent save — update existing draft
+        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
       }
-
-      // Assign / remove tags on the saved content
-      if (savedContentId) {
-        try {
-          const details = await contentService.getById(savedContentId);
-          const existingTagIds = details.tags.map((t) => t.id);
-          const selectedTagIds = selectedTags.map((t) => t.id);
-
-          // Assign new tags
-          for (const tag of selectedTags) {
-            if (!existingTagIds.includes(tag.id)) {
-              try { await contentService.assignTag(savedContentId, tag.id); } catch { /* may already be assigned */ }
-            }
-          }
-
-          // Remove deselected tags
-          for (const existingId of existingTagIds) {
-            if (!selectedTagIds.includes(existingId)) {
-              try { await contentService.removeTag(savedContentId, existingId); } catch { /* non-critical */ }
-            }
-          }
-        } catch {
-          // Non-critical — tags will be assigned on next save
-        }
-      }
-
       setLastSaved(new Date());
+      // Clear draft from context after successful save
       clearDraft();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
     } finally {
       setSaving(false);
     }
-  }, [title, content, contentId, selectedTags]);
+  }, [title, content, contentId]);
 
   useEffect(() => {
     setDraftTitle(title);
@@ -181,6 +71,7 @@ export default function EditorLayout() {
   useEffect(() => {
     setDraftContent(content);
   }, [content, setDraftContent]);
+
 
   const editor = useEditor({
     extensions: [
@@ -221,6 +112,8 @@ export default function EditorLayout() {
   useEffect(() => {
     if (!editor) return;
     if (editor.getHTML() !== content) {
+      // `setContent` expects an options object in this TipTap version.
+      // We only need to sync the editor when `content` changes, so rely on defaults.
       editor.commands.setContent(content);
     }
   }, [content, editor]);
@@ -464,41 +357,35 @@ export default function EditorLayout() {
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Content Type */}
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
                 Content Type
               </label>
-              <select
-                value={contentType}
-                onChange={(e) => setContentType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 6,
-                  color: '#e2e4f0',
-                  fontSize: 13,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <option value="Article">Article</option>
-                <option value="Guide">Guide</option>
-                <option value="Documentation">Documentation</option>
-                <option value="Blog Post">Blog Post</option>
+              <select style={{
+                width: '100%',
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6,
+                color: '#e2e4f0',
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}>
+                <option>Article</option>
+                <option>Guide</option>
+                <option>Documentation</option>
+                <option>Blog Post</option>
               </select>
             </div>
 
-            {/* Tags */}
-            <div style={{ position: 'relative' }}>
+            <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
                 Tags
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {selectedTags.map((tag) => (
-                  <span key={tag.id} style={{
+                {['tutorial', 'guide', '2025'].map(tag => (
+                  <span key={tag} style={{
                     padding: '4px 10px',
                     background: 'rgba(139, 92, 246, 0.15)',
                     borderRadius: 12,
@@ -508,154 +395,29 @@ export default function EditorLayout() {
                     alignItems: 'center',
                     gap: 4,
                   }}>
-                    {tag.name}
-                    <button
-                      onClick={() => handleRemoveTag(tag.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#a78bfa',
-                        cursor: 'pointer',
-                        padding: 0,
-                        display: 'flex',
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
+                    {tag}
+                    <button style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#a78bfa',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                    }}>×</button>
                   </span>
                 ))}
-                <button
-                  onClick={() => {
-                    setShowTagDropdown(!showTagDropdown);
-                    if (!showTagDropdown) fetchAvailableTags();
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px dashed rgba(255,255,255,0.2)',
-                    borderRadius: 12,
-                    fontSize: 11,
-                    color: '#555870',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <Plus size={10} /> Add
-                </button>
+                <button style={{
+                  padding: '4px 10px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px dashed rgba(255,255,255,0.2)',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  color: '#555870',
+                  cursor: 'pointer',
+                }}>+ Add</button>
               </div>
-
-              {/* Tag Dropdown */}
-              {showTagDropdown && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: 6,
-                  background: '#1a1b2e',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                  padding: 8,
-                  zIndex: 10,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                  maxHeight: 200,
-                  overflowY: 'auto',
-                }}>
-                  <input
-                    type="text"
-                    value={tagSearch}
-                    onChange={(e) => setTagSearch(e.target.value)}
-                    placeholder="Search or create tag..."
-                    autoFocus
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 6,
-                      color: '#e2e4f0',
-                      fontSize: 12,
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      marginBottom: 6,
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setShowTagDropdown(false);
-                        setTagSearch('');
-                      }
-                      if (e.key === 'Enter' && tagSearch.trim() && filteredTags.length === 0) {
-                        handleCreateTag();
-                      }
-                    }}
-                  />
-                  {loadingTags ? (
-                    <div style={{ padding: 8, color: '#555870', fontSize: 12, textAlign: 'center' }}>
-                      <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading...
-                    </div>
-                  ) : (
-                    <>
-                      {filteredTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          onClick={() => handleAddTag(tag)}
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            padding: '8px 10px',
-                            background: 'transparent',
-                            border: 'none',
-                            borderRadius: 4,
-                            color: '#e2e4f0',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          {tag.name}
-                        </button>
-                      ))}
-                      {tagSearch.trim() && filteredTags.length === 0 && (
-                        <button
-                          onClick={handleCreateTag}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            width: '100%',
-                            padding: '8px 10px',
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: 'none',
-                            borderRadius: 4,
-                            color: '#10b981',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                        >
-                          <Plus size={12} /> Create &quot;{tagSearch.trim()}&quot;
-                        </button>
-                      )}
-                      {!tagSearch.trim() && filteredTags.length === 0 && (
-                        <div style={{ padding: 8, color: '#555870', fontSize: 12, textAlign: 'center' }}>
-                          No tags available. Type to create one.
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Visibility */}
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
                 Visibility
@@ -677,7 +439,6 @@ export default function EditorLayout() {
               </select>
             </div>
 
-            {/* Featured Image */}
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
                 Featured Image

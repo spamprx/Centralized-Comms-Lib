@@ -99,30 +99,4 @@ export const contentService = {
   }>> => {
     return request(`/content/${id}/versions`);
   },
-
-  // ─── Tag Management ──────────────────────────────────────────────────
-
-  listTags: async (): Promise<Array<{ id: string; name: string; slug: string }>> => {
-    return request('/tags');
-  },
-
-  createTag: async (name: string): Promise<{ id: string; name: string; slug: string }> => {
-    return request('/tags', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    });
-  },
-
-  assignTag: async (contentId: string, tagId: string): Promise<{ message: string }> => {
-    return request(`/content/${contentId}/tags`, {
-      method: 'POST',
-      body: JSON.stringify({ tagId }),
-    });
-  },
-
-  removeTag: async (contentId: string, tagId: string): Promise<{ message: string }> => {
-    return request(`/content/${contentId}/tags/${tagId}`, {
-      method: 'DELETE',
-    });
-  },
 };

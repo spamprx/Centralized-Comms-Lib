@@ -44,7 +44,7 @@ const GENERAL_WINDOW_MS = 15 * 60 * 1000;
  ***/
 export const rateLimiter: RateLimitRequestHandler = rateLimit({
     windowMs:        GENERAL_WINDOW_MS,
-    max:             1000,
+    max:             100,
     standardHeaders: true,
     legacyHeaders:   false,
     keyGenerator:    makeKeyGenerator(),
