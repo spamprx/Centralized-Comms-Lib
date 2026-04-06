@@ -1,6 +1,6 @@
-import { useAdminMonitoring } from '../../../hooks/useAdmin';
+import { useAdminMonitoring } from '../../hooks/useAdmin';
 import { RefreshCw, TrendingUp, TrendingDown, Minus, CheckCircle2, XCircle } from 'lucide-react';
-import type { SystemMetric, ActivityLog } from '../../../types/admin';
+import type { SystemMetric, ActivityLog } from '../../types/admin';
 
 export default function MonitoringTab() {
   const { metrics, logs, loading, error, refetch } = useAdminMonitoring();
@@ -51,13 +51,13 @@ export default function MonitoringTab() {
         .mt-refresh-btn { display:flex; align-items:center; gap:6px; padding:7px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#9094ae; font-size:13px; cursor:pointer; }
         .mt-refresh-btn:disabled { opacity:.5; cursor:not-allowed; }
         .mt-spin { animation:spin 1s linear infinite; }
-        .mt-metrics { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; }
+        .mt-metrics { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }
         .mt-metric-skeleton { height:90px; background:rgba(255,255,255,0.04); border-radius:10px; animation:pulse 1.5s infinite; }
-        .mt-metric { padding:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:10px; display:flex; flex-direction:column; gap:6px; }
-        .mt-metric__label { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#555870; }
-        .mt-metric__value { font-size:24px; font-weight:700; color:#e2e4f0; line-height:1; }
-        .mt-metric__unit { font-size:13px; color:#6b7280; margin-left:4px; }
-        .mt-metric__trend { display:flex; align-items:center; gap:4px; font-size:12px; }
+        .mt-metric { padding:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:10px; display:flex; flex-direction:column; gap:6px; min-width: 0; }
+        .mt-metric__label { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#555870; white-space: nowrap; }
+        .mt-metric__value { font-size:22px; font-weight:700; color:#e2e4f0; line-height:1.2; word-break: break-word; }
+        .mt-metric__unit { font-size:12px; color:#6b7280; margin-left:6px; font-weight: 500; }
+        .mt-metric__trend { display:flex; align-items:center; gap:4px; font-size:12px; flex-wrap: wrap; }
         .mt-logs-section { display:flex; flex-direction:column; }
         .mt-section-title { font-size:14px; font-weight:600; color:#c4c7d9; margin:0 0 10px; }
         .mt-logs-table-wrap { border-radius:10px; border:1px solid rgba(255,255,255,0.07); overflow:auto; max-height:400px; }

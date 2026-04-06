@@ -6,6 +6,7 @@ import LoginPage from "../pages/Auth/LoginPage";
 import DashboardPage from "../pages/Dashboard/DashboardPage";
 import ContentLibraryPage from "../pages/Library/ContentLibraryPage";
 import ContentReadingPage from "../pages/Library/ContentReadingPage";
+import { TemplatesPage } from "../components/templates";
 import ContentEditorPage from "../pages/Editor/ContentEditorPage";
 import ContentPreviewPage from "../pages/Editor/ContentPreviewPage";
 import ReviewPage from "../pages/Review/ReviewPage";
@@ -41,6 +42,9 @@ export const routeGroups: RouteGroup[] = [
     label: "Library",
     routes: [
       { path: "/library", element: <ProtectedRoute><ContentLibraryPage /></ProtectedRoute> },
+      { path: "/templates", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
+      { path: "/templates/:templateId", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
+      { path: "/templates/:templateId/edit", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
       { path: "/library/:contentId", element: <ProtectedRoute><ContentReadingPage /></ProtectedRoute> },
     ],
   },

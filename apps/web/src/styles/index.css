@@ -1,124 +1,96 @@
 @import "tailwindcss";
 
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@layer base {
+  :root {
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: light dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  body {
+    @apply m-0 min-w-80 min-h-screen bg-gray-900 text-gray-100;
+  }
+
+  a {
+    @apply font-medium text-blue-400 no-underline transition-colors hover:text-blue-300;
+  }
+
+  h1 {
+    @apply text-5xl leading-tight;
+  }
+
+  button {
+    @apply rounded-lg border border-transparent px-5 py-2 text-base font-medium transition-colors;
+    @apply bg-gray-800 cursor-pointer hover:border-blue-400;
+    @apply focus-visible:outline-4 focus-visible:outline-blue-400;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      @apply bg-white text-gray-800;
+    }
+    
+    a:hover {
+      @apply text-blue-500;
+    }
+    
+    button {
+      @apply bg-gray-50;
+    }
+  }
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
+@layer utilities {
+  /* Hide browser-native password reveal icons (Edge/IE) */
+  .password-input-hide-reveal {
+    input[type="password"]::-ms-reveal,
+    input[type="password"]::-ms-clear {
+      display: none;
+    }
+  }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
+  /* TipTap / ProseMirror base styles */
+  .tiptap-content .ProseMirror {
+    @apply whitespace-pre-wrap outline-none;
+  }
 
-/* Hide browser-native password reveal icons (Edge/IE) */
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear {
-  display: none;
-}
+  .tiptap-content .ProseMirror p {
+    @apply my-0 mb-3;
+  }
 
-/* TipTap / ProseMirror base styles (lists looked "not working" without these) */
-.tiptap-content .ProseMirror {
-  white-space: pre-wrap;
-}
+  .tiptap-content .ProseMirror h1 {
+    @apply text-3xl leading-tight my-3;
+  }
 
-.tiptap-content .ProseMirror:focus {
-  outline: none;
-}
+  .tiptap-content .ProseMirror h2 {
+    @apply text-xl leading-snug my-3;
+  }
 
-.tiptap-content .ProseMirror p {
-  margin: 0 0 0.75rem;
-}
+  .tiptap-content .ProseMirror ul,
+  .tiptap-content .ProseMirror ol {
+    @apply pl-6 my-0 mb-3;
+  }
 
-.tiptap-content .ProseMirror h1 {
-  font-size: 1.8rem;
-  line-height: 1.2;
-  margin: 0.75rem 0;
-}
+  .tiptap-content .ProseMirror ul {
+    @apply list-disc;
+  }
 
-.tiptap-content .ProseMirror h2 {
-  font-size: 1.4rem;
-  line-height: 1.25;
-  margin: 0.75rem 0;
-}
+  .tiptap-content .ProseMirror ol {
+    @apply list-decimal;
+  }
 
-.tiptap-content .ProseMirror ul,
-.tiptap-content .ProseMirror ol {
-  padding-left: 1.5rem;
-  margin: 0 0 0.75rem;
-}
+  .tiptap-content .ProseMirror li > p {
+    @apply my-0;
+  }
 
-.tiptap-content .ProseMirror ul {
-  list-style: disc;
-}
-
-.tiptap-content .ProseMirror ol {
-  list-style: decimal;
-}
-
-.tiptap-content .ProseMirror li > p {
-  margin: 0;
-}
-
-.tiptap-content a {
-  color: #a78bfa;
-  text-decoration: underline;
+  .tiptap-content a {
+    @apply text-purple-400 underline;
+  }
 }
 
 #root {
-  min-height: 100vh;
-  width: 100%;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+  @apply min-h-screen w-full;
 }

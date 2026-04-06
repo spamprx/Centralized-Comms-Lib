@@ -1,6 +1,6 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useState } from 'react';
-import type { UserFilters } from '../../../types/admin';
+import type { UserFilters } from '../../types/admin';
 
 interface SearchAndFilterBarProps {
   filters: Partial<UserFilters>;

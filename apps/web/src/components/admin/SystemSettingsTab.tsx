@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Save, Globe, Lock, Bell, HardDrive } from 'lucide-react';
-import { useAdminSettings } from '../../../hooks/useAdmin';
-import type { SystemSettings } from '../../../types/admin';
+import { useAdminSettings } from '../../hooks/useAdmin';
+import type { SystemSettings } from '../../types/admin';
 
 type Section = keyof SystemSettings;
 
