@@ -18,6 +18,10 @@
       "visibility": { "type": "keyword" },
       "authorId": { "type": "keyword" },
       "templateId": { "type": "keyword" },
+      "channelIds": { "type": "keyword" },
+      "tagIds": { "type": "keyword" },
+      "tagSlugs": { "type": "keyword" },
+      "aiGenerated": { "type": "boolean" },
       "title": {
         "type": "text",
         "analyzer": "comms_text",
@@ -36,8 +40,18 @@
         "analyzer": "comms_text"
       },
       "tags": { "type": "keyword" },
+      "slug": { "type": "keyword" },
+      "publishedAt": { "type": "date" },
       "updatedAt": { "type": "date" },
-      "indexedAt": { "type": "date" }
+      "createdAt": { "type": "date" },
+      "indexedAt": { "type": "date" },
+      "engagementScore": { "type": "integer" },
+      "titleEmbedding": {
+        "type": "dense_vector",
+        "dims": 384,
+        "index": true,
+        "similarity": "cosine"
+      }
     }
   }
 }
