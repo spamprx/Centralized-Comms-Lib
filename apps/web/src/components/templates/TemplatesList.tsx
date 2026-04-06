@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, Copy } from 'lucide-react';
+import { type Tag } from '../../services';
 
 interface Template {
   id: string;
@@ -10,7 +11,7 @@ interface Template {
   createdAt: string;
   updatedAt: string;
   status: 'active' | 'draft' | 'archived';
-  tags?: string[];
+  tags?: Tag[];
   variables?: Record<string, string>;
   usage_count?: number;
   last_used?: string;
@@ -23,7 +24,9 @@ export default function TemplatesList({
   onViewTemplate, 
   onEditTemplate, 
   onDeleteTemplate,
-  onRestoreTemplate
+  onRestoreTemplate,
+  onCloneTemplate,
+  deletingId
 }: { 
   templates: Template[];
   deletedTemplates: Template[];
@@ -32,6 +35,8 @@ export default function TemplatesList({
   onEditTemplate?: (id: string) => void;
   onDeleteTemplate?: (id: string) => void;
   onRestoreTemplate?: (template: Template) => void;
+  onCloneTemplate?: (id: string) => void;
+  deletingId?: string | null;
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -82,7 +87,11 @@ Published by {{author}} on {{date}}
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: 'draft',
-      tags: ['blog', 'content', 'markdown'],
+      tags: [
+        { id: 'tag_1', name: 'blog', slug: 'blog' },
+        { id: 'tag_2', name: 'content', slug: 'content' },
+        { id: 'tag_3', name: 'markdown', slug: 'markdown' }
+      ],
       variables: {
         title: 'The main title or headline',
         author: 'Content author name',
@@ -158,10 +167,10 @@ Published by {{author}} on {{date}}
                 <div className="mb-3">
                   <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Tags</p>
                   <div className="flex flex-wrap gap-1">
-                    {template.tags.map((tag, index) => (
-                      <span key={index} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                    {template.tags?.map((tag, index) => (
+                      <span key={tag.id || index} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                         <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-1"></span>
-                        {tag}
+                        {tag.name}
                       </span>
                     ))}
                   </div>
@@ -233,11 +242,28 @@ Published by {{author}} on {{date}}
                     Edit
                   </button>
                   <button 
-                    onClick={() => onDeleteTemplate?.(template.id)}
-                    className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    onClick={() => onCloneTemplate?.(template.id)}
+                    className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
+                    <Copy className="w-4 h-4 mr-1" />
+                    Clone
+                  </button>
+                  <button 
+                    onClick={() => onDeleteTemplate?.(template.id)}
+                    disabled={deletingId === template.id}
+                    className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deletingId === template.id ? (
+                      <>
+                        <div className="w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

@@ -43,6 +43,8 @@ export const routeGroups: RouteGroup[] = [
     routes: [
       { path: "/library", element: <ProtectedRoute><ContentLibraryPage /></ProtectedRoute> },
       { path: "/templates", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
+      { path: "/templates/:templateId", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
+      { path: "/templates/:templateId/edit", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
       { path: "/library/:contentId", element: <ProtectedRoute><ContentReadingPage /></ProtectedRoute> },
     ],
   },

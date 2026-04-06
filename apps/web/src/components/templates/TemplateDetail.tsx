@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit, Trash2, Save, X, GitCompare } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Save, X, GitCompare, Copy } from 'lucide-react';
+import TagEditor from './TagEditor';
+import { type Tag } from '../../services';
 
 interface Template {
   id: string;
@@ -10,6 +12,7 @@ interface Template {
   createdAt: string;
   updatedAt: string;
   status: 'active' | 'draft' | 'archived';
+  tags?: Tag[];
 }
 
 interface TemplateDetailProps {
@@ -17,15 +20,20 @@ interface TemplateDetailProps {
   onBack: () => void;
   templates?: Template[];
   onUpdateTemplate?: (template: Template) => void;
+  onCloneTemplate?: (id: string) => void;
+  editMode?: boolean;
+  cloneInfo?: { originalName: string } | null;
 }
 
-export default function TemplateDetail({ templateId, onBack, templates, onUpdateTemplate }: TemplateDetailProps) {
+export default function TemplateDetail({ templateId, onBack, templates, onUpdateTemplate, onCloneTemplate, editMode, cloneInfo }: TemplateDetailProps) {
   const [template, setTemplate] = useState<Template | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(editMode || false);
   const [editedTemplate, setEditedTemplate] = useState<Template | null>(null);
   const [versionHistory, setVersionHistory] = useState<Template[]>([]);
   const [selectedVersions, setSelectedVersions] = useState<[Template, Template] | null>(null);
   const [lastClickedVersion, setLastClickedVersion] = useState<string | null>(null);
+  const [showCloneBanner, setShowCloneBanner] = useState(!!cloneInfo);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   const mockTemplate: Template = {
     id: `mock_${templateId}`,
@@ -50,7 +58,8 @@ Published by {{author}} on {{date}}
 *Published on {{date}} by {{author}}*`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    status: 'draft'
+    status: 'draft',
+    tags: []
   };
 
   useEffect(() => {
@@ -58,15 +67,46 @@ Published by {{author}} on {{date}}
     setTemplate(foundTemplate);
     setEditedTemplate(foundTemplate);
     
+    // Initialize tags from template
+    if (foundTemplate.tags) {
+      setTags(foundTemplate.tags);
+    } else {
+      setTags([]);
+    }
+    
     const savedHistory = localStorage.getItem(`versionHistory_${templateId}`);
     if (savedHistory) {
       setVersionHistory(JSON.parse(savedHistory));
     }
   }, [templateId, templates]);
 
+  // Update editedTemplate when tags change
+  useEffect(() => {
+    if (editedTemplate) {
+      setEditedTemplate(prev => prev ? {...prev, tags} : null);
+    }
+  }, [tags]);
+
+  // Auto-dismiss clone banner after 5 seconds
+  useEffect(() => {
+    if (showCloneBanner && cloneInfo) {
+      const timer = setTimeout(() => {
+        setShowCloneBanner(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showCloneBanner, cloneInfo]);
+
   const handleSave = () => {
     if (editedTemplate) {
-      if (template && JSON.stringify(template) !== JSON.stringify(editedTemplate)) {
+      // Include tags in the saved template
+      const templateToSave = {
+        ...editedTemplate,
+        tags: tags,
+      };
+      
+      if (template && JSON.stringify(template) !== JSON.stringify(templateToSave)) {
         const newHistory = [...versionHistory, { 
           ...template, 
           id: `${template.id}_${Date.now()}`, // Create unique ID
@@ -76,11 +116,11 @@ Published by {{author}} on {{date}}
         localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
       }
       
-      setTemplate(editedTemplate);
+      setTemplate(templateToSave);
       setIsEditing(false);
       
       if (onUpdateTemplate) {
-        onUpdateTemplate(editedTemplate);
+        onUpdateTemplate(templateToSave);
       }
     }
   };
@@ -109,6 +149,12 @@ Published by {{author}} on {{date}}
     if (template && confirm('Are you sure you want to delete this template?')) {
       console.log('Deleting template:', template.id);
       onBack();
+    }
+  };
+
+  const handleClone = () => {
+    if (template && onCloneTemplate) {
+      onCloneTemplate(template.id);
     }
   };
 
@@ -164,6 +210,24 @@ Published by {{author}} on {{date}}
 
   return (
     <div className="p-6">
+      {/* Clone Banner */}
+      {showCloneBanner && cloneInfo && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <Copy className="w-5 h-5 text-green-600 mr-3" />
+            <span className="text-green-800 font-medium">
+              Cloned from "{cloneInfo.originalName}"
+            </span>
+          </div>
+          <button
+            onClick={() => setShowCloneBanner(false)}
+            className="text-green-600 hover:text-green-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={onBack}
@@ -182,6 +246,13 @@ Published by {{author}} on {{date}}
               >
                 <Edit className="w-4 h-4" />
                 Edit Template
+              </button>
+              <button
+                onClick={handleClone}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+                Clone
               </button>
               <button
                 onClick={handleDelete}
@@ -411,6 +482,13 @@ Published by {{author}} on {{date}}
                 <p className="text-gray-600">{template?.description}</p>
               )}
             </div>
+
+            <TagEditor
+              templateId={templateId}
+              isEditing={isEditing}
+              tags={tags}
+              onTagsChange={setTags}
+            />
 
             <div className="text-sm text-gray-500">
               <p>Created: {template?.createdAt}</p>
