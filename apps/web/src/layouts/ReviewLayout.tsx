@@ -32,26 +32,86 @@ type ReviewItem = {
 
 export default function ReviewLayout() {
   const { addDecision: ctxAddDecision, addComment: ctxAddComment, getComments: ctxGetComments } = useReview();
-  const [decisionComment, setDecisionComment] = useState('');
+
+  // Helper to build per-assignment sessionStorage keys for form drafts
+  const draftKey = (assignmentId: string, field: string) => `review_draft_${assignmentId}_${field}`;
+
+  // Restore draft form state from sessionStorage on mount
+  const initialAssignmentId = (() => {
+    try {
+      const cached = sessionStorage.getItem('review_selected_item');
+      return cached ? JSON.parse(cached)?.assignmentId : null;
+    } catch { return null; }
+  })();
+
+  const [decisionComment, setDecisionComment] = useState(() => {
+    if (!initialAssignmentId) return '';
+    return sessionStorage.getItem(draftKey(initialAssignmentId, 'comment')) || '';
+  });
   const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; time: string; resolved: boolean }>>([]);
-  const [commentText, setCommentText] = useState('');
-  const [decision, setDecision] = useState<'APPROVED' | 'DENIED' | null>(null);
+  const [commentText, setCommentText] = useState(() => {
+    if (!initialAssignmentId) return '';
+    return sessionStorage.getItem(draftKey(initialAssignmentId, 'standalone')) || '';
+  });
+  const [decision, setDecision] = useState<'APPROVED' | 'DENIED' | null>(() => {
+    if (!initialAssignmentId) return null;
+    const saved = sessionStorage.getItem(draftKey(initialAssignmentId, 'decision'));
+    return (saved === 'APPROVED' || saved === 'DENIED') ? saved : null;
+  });
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionSuccess, setDecisionSuccess] = useState(false);
-  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('review_items_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('review_selected_item');
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => {
+    // Only show loading spinner if there's no cached data
+    try { return !sessionStorage.getItem('review_items_cache'); }
+    catch { return true; }
+  });
   const [loadingContent, setLoadingContent] = useState(false);
+
+  // Sync draft form state to sessionStorage whenever it changes
+  useEffect(() => {
+    const aid = selectedItem?.assignmentId;
+    if (!aid) return;
+    if (decision) {
+      sessionStorage.setItem(draftKey(aid, 'decision'), decision);
+    } else {
+      sessionStorage.removeItem(draftKey(aid, 'decision'));
+    }
+  }, [decision, selectedItem?.assignmentId]);
+
+  useEffect(() => {
+    const aid = selectedItem?.assignmentId;
+    if (!aid) return;
+    sessionStorage.setItem(draftKey(aid, 'comment'), decisionComment);
+  }, [decisionComment, selectedItem?.assignmentId]);
+
+  useEffect(() => {
+    const aid = selectedItem?.assignmentId;
+    if (!aid) return;
+    sessionStorage.setItem(draftKey(aid, 'standalone'), commentText);
+  }, [commentText, selectedItem?.assignmentId]);
 
   const fetchAssignments = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading((prev) => reviewItems.length === 0 ? true : prev);
 
       // Step 1: Get raw assignments (flat data — no nested relations)
       const assignments: ReviewAssignment[] = await reviewService.listMyAssignments();
       if (assignments.length === 0) {
         setReviewItems([]);
+        sessionStorage.setItem('review_items_cache', '[]');
         setLoading(false);
         return;
       }
@@ -113,11 +173,15 @@ export default function ReviewLayout() {
       }
 
       setReviewItems(items);
+      sessionStorage.setItem('review_items_cache', JSON.stringify(items));
       if (items.length > 0) {
-        setSelectedItem(items[0]);
+        const sel = items[0];
+        setSelectedItem(sel);
+        sessionStorage.setItem('review_selected_item', JSON.stringify(sel));
       }
     } catch (err) {
       console.error('Failed to load review assignments:', err);
+      // On failure, keep any previously cached items (don't wipe to empty)
     } finally {
       setLoading(false);
     }
@@ -210,18 +274,22 @@ export default function ReviewLayout() {
 
   const handleSelectItem = (item: ReviewItem) => {
     setSelectedItem(item);
+    sessionStorage.setItem('review_selected_item', JSON.stringify(item));
     // Restore saved decision info if item was already decided
     if (item.verdict) {
       setDecision(item.verdict);
       setDecisionComment(item.savedComment || '');
       setDecisionSuccess(true);
     } else {
-      setDecision(null);
-      setDecisionComment('');
+      // Restore unsaved draft from sessionStorage for this assignment
+      const savedDecision = sessionStorage.getItem(draftKey(item.assignmentId, 'decision'));
+      setDecision((savedDecision === 'APPROVED' || savedDecision === 'DENIED') ? savedDecision : null);
+      setDecisionComment(sessionStorage.getItem(draftKey(item.assignmentId, 'comment')) || '');
       setDecisionSuccess(false);
     }
     setDecisionError(null);
-    setCommentText('');
+    // Restore unsaved standalone comment draft
+    setCommentText(sessionStorage.getItem(draftKey(item.assignmentId, 'standalone')) || '');
   };
 
   const handleSubmitDecision = async () => {
@@ -287,6 +355,11 @@ export default function ReviewLayout() {
         )
       );
       setSelectedItem(updatedItem);
+
+      // Clear draft form state from sessionStorage after successful submit
+      sessionStorage.removeItem(draftKey(selectedItem.assignmentId, 'decision'));
+      sessionStorage.removeItem(draftKey(selectedItem.assignmentId, 'comment'));
+      sessionStorage.removeItem(draftKey(selectedItem.assignmentId, 'standalone'));
     } catch (err) {
       setDecisionError(err instanceof Error ? err.message : 'Failed to submit decision');
     } finally {

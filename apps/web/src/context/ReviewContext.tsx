@@ -1,4 +1,7 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+
+const DECISIONS_KEY = 'review_decisions';
+const COMMENTS_KEY = 'review_comments';
 
 type Decision = { verdict: 'APPROVED' | 'DENIED'; comment: string };
 type Comment = { text: string; time: string };
@@ -12,9 +15,30 @@ interface ReviewContextType {
 
 const ReviewContext = createContext<ReviewContextType | undefined>(undefined);
 
+function loadFromSession<T>(key: string, fallback: T): T {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as T;
+  } catch { /* ignore */ }
+  return fallback;
+}
+
 export function ReviewProvider({ children }: { children: ReactNode }) {
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
-  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [decisions, setDecisions] = useState<Record<string, Decision>>(
+    () => loadFromSession(DECISIONS_KEY, {})
+  );
+  const [comments, setComments] = useState<Record<string, Comment[]>>(
+    () => loadFromSession(COMMENTS_KEY, {})
+  );
+
+  // Sync to sessionStorage whenever state changes
+  useEffect(() => {
+    sessionStorage.setItem(DECISIONS_KEY, JSON.stringify(decisions));
+  }, [decisions]);
+
+  useEffect(() => {
+    sessionStorage.setItem(COMMENTS_KEY, JSON.stringify(comments));
+  }, [comments]);
 
   const addDecision = useCallback((assignmentId: string, verdict: 'APPROVED' | 'DENIED', comment: string) => {
     setDecisions((prev) => ({ ...prev, [assignmentId]: { verdict, comment } }));
