@@ -7,11 +7,12 @@ export interface RankBlendWeights {
   engagement: number;
 }
 
+/** Tuned for stemmed + synonym-expanded keyword retrieval with optional vector KNN. */
 const DEFAULT_WEIGHTS: RankBlendWeights = {
-  keyword: 0.45,
-  vector: 0.25,
-  recency: 0.2,
-  engagement: 0.1,
+  keyword: 0.52,
+  vector: 0.22,
+  recency: 0.18,
+  engagement: 0.08,
 };
 
 function parseFloatEnv(name: string, fallback: number): number {

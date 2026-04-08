@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import type { Client } from "@elastic/elasticsearch";
 import { estypes } from "@elastic/elasticsearch";
 import type { PrismaClient } from "@prisma/client";
@@ -6,6 +7,7 @@ import {
   buildContentFacetAggregations,
   getElasticsearchClient,
 } from "@comms-lib/db-elasticsearch";
+import { bumpSearchCacheEpoch, getSearchCacheEpoch, redisGet, redisSet } from "../shared/cache/redisClient";
 import { buildContentIndexDocument, type ContentIndexDocument } from "./contentIndex.document";
 import {
   assertValidQueryVector,
@@ -15,48 +17,24 @@ import {
   recencyScore,
   rrfScore,
 } from "./rankBlend";
+import { joinSnippet, sanitizeHighlightFragments } from "./searchSnippets";
+import type {
+  ContentCheckSearchRequest,
+  ContentSearchFilters,
+  ContentSearchHit,
+  ContentSearchRequest,
+  ContentSearchResponse,
+  FacetBucket,
+} from "./searchTypes";
 
-export interface ContentSearchFilters {
-  workspaceId?: string;
-  lifecycleState?: string;
-  visibility?: string;
-  authorId?: string;
-  templateId?: string;
-  channelIds?: string[];
-  tagIds?: string[];
-  tagSlugs?: string[];
-  aiGenerated?: boolean;
-}
-
-export interface ContentSearchRequest {
-  q?: string;
-  /** 384-dimensional embedding; must match TITLE_EMBEDDING_DIMS */
-  queryVector?: unknown;
-  filters?: ContentSearchFilters;
-  weights?: Partial<RankBlendWeights>;
-  from?: number;
-  size?: number;
-  /** Half-life in days for recency decay */
-  recencyHalfLifeDays?: number;
-  includeFacets?: boolean;
-}
-
-export interface FacetBucket {
-  key: string | number | boolean;
-  doc_count: number;
-}
-
-export interface ContentSearchHit {
-  contentId: string;
-  score: number;
-  source: Record<string, unknown>;
-}
-
-export interface ContentSearchResponse {
-  total: number;
-  hits: ContentSearchHit[];
-  facets?: Record<string, FacetBucket[]>;
-}
+export type {
+  ContentSearchFilters,
+  ContentSearchRequest,
+  ContentSearchResponse,
+  ContentSearchHit,
+  FacetBucket,
+  ContentCheckSearchRequest,
+} from "./searchTypes";
 
 function boolFilters(filters: ContentSearchFilters | undefined): estypes.QueryDslQueryContainer[] {
   const f: estypes.QueryDslQueryContainer[] = [];
@@ -94,6 +72,76 @@ function parseFacetAggregations(aggs: Record<string, unknown> | undefined): Reco
     if (Array.isArray(buckets)) out[key] = buckets;
   }
   return out;
+}
+
+function keywordHighlightConfig(): estypes.SearchRequest["highlight"] {
+  return {
+    pre_tags: ["<mark>"],
+    post_tags: ["</mark>"],
+    fragment_size: 180,
+    number_of_fragments: 2,
+    fields: {
+      title: {},
+      summary: {},
+      bodyPlain: {},
+      tags: {},
+    },
+  };
+}
+
+function keywordMustClause(q: string): estypes.QueryDslQueryContainer {
+  return {
+    bool: {
+      should: [
+        {
+          multi_match: {
+            query: q,
+            type: "best_fields",
+            fuzziness: "AUTO",
+            prefix_length: 1,
+            fields: ["title^4", "title.auto^2", "summary^2.5", "bodyPlain^1.2", "body^0.8", "tags^1.5"],
+          },
+        },
+        {
+          multi_match: {
+            query: q,
+            type: "phrase",
+            slop: 2,
+            boost: 0.55,
+            fields: ["title^3", "bodyPlain"],
+          },
+        },
+      ],
+      minimum_should_match: 1,
+    },
+  };
+}
+
+function mapHitWithHighlight(h: estypes.SearchHit, fallbackScore: number): ContentSearchHit {
+  const src = (h._source as Record<string, unknown>) ?? {};
+  const hl = h.highlight as Record<string, string[]> | undefined;
+  const highlight: Record<string, string[]> = {};
+  let snippetHtml: string | undefined;
+  if (hl) {
+    for (const [k, v] of Object.entries(hl)) {
+      highlight[k] = sanitizeHighlightFragments(v);
+    }
+    const order = ["title", "summary", "bodyPlain", "tags"];
+    for (const key of order) {
+      const fr = highlight[key];
+      if (fr?.length) {
+        snippetHtml = joinSnippet(fr);
+        break;
+      }
+    }
+  }
+  return {
+    contentId: String(h._id),
+    score: typeof h._score === "number" ? h._score : fallbackScore,
+    source: src,
+    highlight: Object.keys(highlight).length ? highlight : undefined,
+    snippetHtml,
+  };
 }
 
 async function fetchFacets(
@@ -162,9 +210,57 @@ export async function syncContentIndexFromDb(prisma: PrismaClient, contentId: st
   const doc = await buildContentIndexDocument(prisma, contentId);
   if (!doc) {
     await deleteContentFromIndex(client, contentId);
+    await bumpSearchCacheEpoch();
     return;
   }
   await indexContentDocument(client, doc);
+  await bumpSearchCacheEpoch();
+}
+
+function cacheKey(epoch: string, payload: string): string {
+  const h = createHash("sha256").update(payload).digest("hex").slice(0, 48);
+  return `comms:search:v2:${epoch}:${h}`;
+}
+
+export async function searchContentCached(req: ContentSearchRequest): Promise<ContentSearchResponse | null> {
+  const q = req.q?.trim() || "";
+  const hasVec = assertValidQueryVector(req.queryVector) != null;
+  const useFacets = req.includeFacets !== false;
+  const cacheable =
+    !q &&
+    !hasVec &&
+    !useFacets &&
+    (req.includeSnippets === undefined || req.includeSnippets === false);
+
+  if (cacheable) {
+    const epoch = await getSearchCacheEpoch();
+    const key = cacheKey(
+      epoch,
+      JSON.stringify({
+        f: req.filters ?? {},
+        from: req.from ?? 0,
+        size: req.size ?? 20,
+        w: normalizeRankBlendWeights(req.weights),
+        half: req.recencyHalfLifeDays ?? 30,
+      }),
+    );
+    const cached = await redisGet(key);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as ContentSearchResponse;
+      } catch {
+        /* fall through */
+      }
+    }
+    const fresh = await searchContent({ ...req, includeFacets: false });
+    if (fresh) {
+      const ttl = Math.min(300, Math.max(30, Number(process.env.SEARCH_CACHE_TTL_SEC) || 90));
+      await redisSet(key, JSON.stringify(fresh), ttl);
+    }
+    return fresh;
+  }
+
+  return searchContent(req);
 }
 
 export async function searchContent(req: ContentSearchRequest): Promise<ContentSearchResponse | null> {
@@ -181,6 +277,7 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
   const size = Math.min(100, Math.max(1, req.size ?? 20));
   const halfLife = req.recencyHalfLifeDays ?? 30;
   const nowMs = Date.now();
+  const withSnippets = req.includeSnippets === true;
 
   const facetsPromise =
     req.includeFacets !== false ? fetchFacets(client, filterClauses) : Promise.resolve(undefined);
@@ -218,19 +315,12 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
           query: {
             bool: {
               filter: filterClauses.length > 0 ? filterClauses : undefined,
-              must: [
-                {
-                  multi_match: {
-                    query: q,
-                    type: "best_fields",
-                    fields: ["title^3", "summary^2", "bodyPlain", "body", "tags"],
-                  },
-                },
-              ],
+              must: [keywordMustClause(q)],
             },
           },
           size: candidateSize,
           _source: true,
+          ...(withSnippets ? { highlight: keywordHighlightConfig() } : {}),
         })
       : Promise.resolve(null);
 
@@ -255,23 +345,37 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
 
   const [kwRes, knnRes, facets] = await Promise.all([keywordPromise, knnPromise, facetsPromise]);
 
-  type Hit = { _id?: string; _score?: number | null; _source?: Record<string, unknown> };
+  type Hit = { _id?: string; _score?: number | null; _source?: Record<string, unknown>; highlight?: unknown };
 
   const kwHits = (kwRes?.hits?.hits ?? []) as Hit[];
   const knnHits = (knnRes?.hits?.hits ?? []) as Hit[];
 
   const byId = new Map<
     string,
-    { source: Record<string, unknown>; kw?: number; kn?: number; kwRank?: number; knRank?: number }
+    {
+      source: Record<string, unknown>;
+      kw?: number;
+      kn?: number;
+      kwRank?: number;
+      knRank?: number;
+      highlight?: Record<string, string[]>;
+      snippetHtml?: string;
+    }
   >();
 
   kwHits.forEach((h, i) => {
     const id = String(h._id ?? "");
     if (!id) return;
+    const esScore = typeof h._score === "number" ? h._score : 0;
     const prev = byId.get(id) ?? { source: (h._source ?? {}) as Record<string, unknown> };
-    prev.kw = typeof h._score === "number" ? h._score : 0;
+    prev.kw = esScore;
     prev.kwRank = i;
     prev.source = { ...prev.source, ...(h._source ?? {}) };
+    if (withSnippets) {
+      const mapped = mapHitWithHighlight(h as estypes.SearchHit, esScore);
+      prev.highlight = mapped.highlight;
+      prev.snippetHtml = mapped.snippetHtml;
+    }
     byId.set(id, prev);
   });
 
@@ -306,7 +410,13 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
       weights.recency * recencyScore(updatedAt, nowMs, halfLife) +
       weights.engagement * engagementNorm(eng);
 
-    return { contentId, score: blend, source: src };
+    return {
+      contentId,
+      score: blend,
+      source: src,
+      highlight: v.highlight,
+      snippetHtml: v.snippetHtml,
+    };
   });
 
   scored.sort((a, b) => b.score - a.score);
@@ -316,6 +426,8 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
     contentId: s.contentId,
     score: s.score,
     source: s.source,
+    highlight: s.highlight,
+    snippetHtml: s.snippetHtml,
   }));
 
   let total = scored.length;
@@ -328,4 +440,55 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
   if (!kwRes && !knnRes) total = 0;
 
   return { total, hits, facets };
+}
+
+/** Similarity / duplicate-style check using `more_like_this` with tuned thresholds. */
+export async function searchContentCheck(
+  req: ContentCheckSearchRequest,
+): Promise<ContentSearchResponse | null> {
+  const client = getElasticsearchClient();
+  if (!client) return null;
+  await ensureContentSearchIndex(client);
+
+  const filterClauses = boolFilters(req.filters);
+  const size = Math.min(50, Math.max(1, req.size ?? 12));
+  const minScore =
+    req.minScore ??
+    Math.min(25, Math.max(4, Number(process.env.CONTENT_CHECK_MIN_SCORE) || 10.5));
+
+  const res = await client.search({
+    index: CONTENT_INDEX_NAME,
+    size,
+    min_score: minScore,
+    query: {
+      bool: {
+        filter: filterClauses.length > 0 ? filterClauses : undefined,
+        must_not: [{ term: { contentId: req.contentId } }],
+        should: [
+          {
+            more_like_this: {
+              fields: ["title", "summary", "bodyPlain"],
+              like: [{ _index: CONTENT_INDEX_NAME, _id: req.contentId }],
+              min_term_freq: 1,
+              max_query_terms: 28,
+              minimum_should_match: "38%",
+              stop_words: ["the", "a", "an", "and", "or", "of", "to", "in", "for", "on", "with"],
+            },
+          },
+        ],
+        minimum_should_match: 1,
+      },
+    },
+    _source: true,
+  });
+
+  const total =
+    typeof res.hits.total === "number" ? res.hits.total : res.hits.total?.value ?? 0;
+  const hits: ContentSearchHit[] = (res.hits.hits ?? []).map((h: estypes.SearchHit) => ({
+    contentId: String(h._id),
+    score: typeof h._score === "number" ? h._score : 0,
+    source: (h._source as Record<string, unknown>) ?? {},
+  }));
+
+  return { total, hits };
 }
