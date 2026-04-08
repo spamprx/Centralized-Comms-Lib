@@ -8,7 +8,7 @@ RUN_DB_SEED="${RUN_DB_SEED:-true}"
 
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "DATABASE_URL is not set; skipping DB setup."
-  exec node apps/api/dist/main.js
+  exec node apps/api/dist/server.js
 fi
 
 echo "Preparing database (schema: ${SCHEMA_PATH})..."
@@ -35,5 +35,5 @@ if [ "${RUN_DB_SEED}" = "true" ]; then
   echo "Seed complete."
 fi
 
-exec node apps/api/dist/main.js
+exec node apps/api/dist/server.js
 

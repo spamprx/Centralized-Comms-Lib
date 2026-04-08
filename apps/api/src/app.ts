@@ -1,9 +1,11 @@
-import express, { Application, Request, Response, NextFunction } from "express";
+import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
-import gatewayRouter from "./gateway/router";
+import apiRouter from "./routes";
 import { getPrismaClient, PrismaUnitOfWork } from "./repository";
 import { openapiSpec } from "./docs/openapi";
+import { API_V1_PREFIX } from "./config/constants";
+import { errorMiddleware } from "./middlewares/error.middleware";
 
 const app: Application = express();
 
@@ -11,7 +13,14 @@ const app: Application = express();
 // address when running behind a proxy or load balancer.
 app.set("trust proxy", 1);
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -92,15 +101,12 @@ app.get("/dev/repo-check", async (req: Request, res: Response) => {
   }
 });
 
-app.use("/api/v1", gatewayRouter);
+app.use(API_V1_PREFIX, apiRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message || "Internal Server Error" });
-});
+app.use(errorMiddleware);
 
 export default app;

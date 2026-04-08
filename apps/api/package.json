@@ -5,9 +5,9 @@
   "scripts": {
     "prebuild": "node ../../infra/scripts/prep-api-build.js",
     "predev": "node ../../infra/scripts/prep-api-build.js",
-    "dev": "nodemon --exec ts-node src/main.ts",
+    "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
-    "start": "node dist/main.js",
+    "start": "node dist/server.js",
     "lint": "echo 'No lint configured'",
     "test": "echo 'No tests configured'",
     "clean": "rm -rf dist"

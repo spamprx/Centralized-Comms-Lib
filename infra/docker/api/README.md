@@ -10,7 +10,7 @@ All commands are run from the **monorepo root** (`Centralized-Comms-Lib/`).
 | Stage     | Image             | Purpose                                                               |
 |-----------|-------------------|-----------------------------------------------------------------------|
 | `builder` | `node:20-alpine`  | Runs `npm ci` + `tsc`, outputs compiled JS to `dist/`                |
-| `runner`  | `node:20-alpine`  | Installs prod-only deps, runs `node dist/main.js` as a non-root user |
+| `runner`  | `node:20-alpine`  | Installs prod-only deps, runs `node dist/server.js` as a non-root user |
 
 ---
 

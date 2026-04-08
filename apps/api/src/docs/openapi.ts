@@ -39,8 +39,8 @@ const swaggerDefinition = {
 // __dirname will be:
 //   - src/docs           when running with ts-node
 //   - dist/docs          when running compiled JS
-const routesGlobTs = path.resolve(__dirname, "../gateway/routes/*.ts");
-const routesGlobJs = path.resolve(__dirname, "../gateway/routes/*.js");
+const routesGlobTs = path.resolve(__dirname, "../modules/*/*.routes.ts");
+const routesGlobJs = path.resolve(__dirname, "../modules/*/*.routes.js");
 const appGlobTs = path.resolve(__dirname, "../app.ts");
 const appGlobJs = path.resolve(__dirname, "../app.js");
 
