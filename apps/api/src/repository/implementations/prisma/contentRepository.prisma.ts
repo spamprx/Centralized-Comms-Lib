@@ -76,6 +76,7 @@ export class PrismaContentRepository implements ContentRepository {
         slug: input.slug,
         authorId: input.authorId,
         aiGenerated: input.aiGenerated ?? false,
+        templateId: input.templateId ?? undefined,
       },
     });
 

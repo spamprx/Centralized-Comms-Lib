@@ -28,6 +28,7 @@ export interface CreateDraftInput {
   slug: string;
   authorId: string;
   aiGenerated?: boolean;
+  templateId?: string | null;
 }
 
 export interface ContentVersion {
