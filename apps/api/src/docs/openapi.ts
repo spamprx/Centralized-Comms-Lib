@@ -33,6 +33,14 @@ const swaggerDefinition = {
       },
     },
   },
+  tags: [
+    { name: "Content", description: "Drafts, versions, lifecycle, tags" },
+    { name: "Templates", description: "Layouts, bindings, i18n, formatting rules" },
+    { name: "Search", description: "Full-text and similarity search" },
+    { name: "Components", description: "Reusable components and template sections" },
+    { name: "Citations", description: "Citation string rendering" },
+    { name: "Analytics", description: "Metrics and dashboards" },
+  ],
 };
 
 // Support both TypeScript (dev with ts-node) and compiled JavaScript (prod build).

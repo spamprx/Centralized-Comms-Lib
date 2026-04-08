@@ -4,8 +4,225 @@ import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
+function parseDateRange(
+  fromQ: unknown,
+  toQ: unknown,
+): { from: Date; to: Date } | { error: string } {
+  const now = new Date();
+  const to = toQ ? new Date(String(toQ)) : now;
+  const from = fromQ ? new Date(String(fromQ)) : new Date(now.getTime() - 30 * 86400000);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return { error: "Invalid from or to date" };
+  }
+  if (from > to) return { error: "`from` must be before `to`" };
+  return { from, to };
+}
+
+/**
+ * @openapi
+ * /api/v1/analytics/track:
+ *   post:
+ *     summary: Record an analytics event for a content item
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contentId
+ *               - eventType
+ *             properties:
+ *               contentId:
+ *                 type: string
+ *               eventType:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *     responses:
+ *       204:
+ *         description: Event stored
+ *       400:
+ *         description: Missing fields
+ *       404:
+ *         description: Content not found
+ */
+router.post("/track", async (req: AuthRequest, res: Response) => {
+  try {
+    const { contentId, eventType, metadata } = req.body as {
+      contentId?: string;
+      eventType?: string;
+      metadata?: unknown;
+    };
+    if (!contentId?.trim() || !eventType?.trim()) {
+      res.status(400).json({ error: "contentId and eventType are required" });
+      return;
+    }
+    const prisma = getPrismaClient();
+    const content = await prisma.content.findUnique({ where: { id: contentId }, select: { id: true } });
+    if (!content) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    await prisma.contentAnalyticsEvent.create({
+      data: {
+        contentId: content.id,
+        eventType: eventType.trim(),
+        metadata: metadata === undefined ? undefined : (metadata as object),
+      },
+    });
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/analytics/content/{contentId}/metrics:
+ *   get:
+ *     summary: Aggregated analytics events for one content in a date range
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Counts by event type
+ *       400:
+ *         description: Invalid date range
+ */
+router.get("/content/:contentId/metrics", async (req: AuthRequest, res: Response) => {
+  try {
+    const range = parseDateRange(req.query.from, req.query.to);
+    if ("error" in range) {
+      res.status(400).json({ error: range.error });
+      return;
+    }
+    const prisma = getPrismaClient();
+    const rows = await prisma.contentAnalyticsEvent.groupBy({
+      by: ["eventType"],
+      where: {
+        contentId: req.params.contentId,
+        createdAt: { gte: range.from, lte: range.to },
+      },
+      _count: { _all: true },
+    });
+    const total = rows.reduce((acc, r) => acc + r._count._all, 0);
+    res.status(200).json({
+      contentId: req.params.contentId,
+      from: range.from.toISOString(),
+      to: range.to.toISOString(),
+      totalEvents: total,
+      byEventType: rows.map((r) => ({ eventType: r.eventType, count: r._count._all })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/analytics/aggregate:
+ *   get:
+ *     summary: Workspace-wide analytics aggregates (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Totals and breakdown
+ *       400:
+ *         description: Invalid date range
+ *       403:
+ *         description: Not admin
+ */
+router.get("/aggregate", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const range = parseDateRange(req.query.from, req.query.to);
+    if ("error" in range) {
+      res.status(400).json({ error: range.error });
+      return;
+    }
+    const prisma = getPrismaClient();
+    const [byType, distinctContent] = await Promise.all([
+      prisma.contentAnalyticsEvent.groupBy({
+        by: ["eventType"],
+        where: { createdAt: { gte: range.from, lte: range.to } },
+        _count: { _all: true },
+      }),
+      prisma.contentAnalyticsEvent.findMany({
+        where: { createdAt: { gte: range.from, lte: range.to } },
+        distinct: ["contentId"],
+        select: { contentId: true },
+      }),
+    ]);
+    const totalEvents = byType.reduce((a, r) => a + r._count._all, 0);
+    res.status(200).json({
+      from: range.from.toISOString(),
+      to: range.to.toISOString(),
+      totalEvents,
+      distinctContentCount: distinctContent.length,
+      byEventType: byType.map((r) => ({ eventType: r.eventType, count: r._count._all })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ─── KPIs ──────────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/kpis:
+ *   get:
+ *     summary: Dashboard KPI cards (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: range
+ *         schema:
+ *           type: string
+ *           default: 30d
+ *     responses:
+ *       200:
+ *         description: KPI array
+ */
 router.get("/kpis", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
@@ -41,6 +258,24 @@ router.get("/kpis", authorize("ADMIN"), async (req: AuthRequest, res: Response) 
 
 // ─── Views Time Series ──────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/views:
+ *   get:
+ *     summary: Views time series (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: range
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Points over time
+ */
 router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
@@ -68,6 +303,24 @@ router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response)
 
 // ─── Engagement Metrics ─────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/engagement:
+ *   get:
+ *     summary: Engagement metrics by day (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: range
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Engagement rows
+ */
 router.get("/engagement", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const range = (req.query.range as string) || "7d";
@@ -96,6 +349,19 @@ router.get("/engagement", authorize("ADMIN"), async (req: AuthRequest, res: Resp
 
 // ─── Reading Time Distribution ──────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/reading-time:
+ *   get:
+ *     summary: Reading time histogram buckets (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Bucket counts
+ */
 router.get("/reading-time", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     // In production, calculate from actual reading analytics
@@ -114,6 +380,19 @@ router.get("/reading-time", authorize("ADMIN"), async (req: AuthRequest, res: Re
 
 // ─── Content Type Breakdown ─────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/content-types:
+ *   get:
+ *     summary: Content type breakdown (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Type segments
+ */
 router.get("/content-types", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
@@ -133,6 +412,24 @@ router.get("/content-types", authorize("ADMIN"), async (req: AuthRequest, res: R
 
 // ─── Top Content ────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/top-content:
+ *   get:
+ *     summary: Top content list (admin)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Ranked items
+ */
 router.get("/top-content", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
@@ -166,6 +463,19 @@ router.get("/top-content", authorize("ADMIN"), async (req: AuthRequest, res: Res
 
 // ─── AI Insights ────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/v1/analytics/ai-insights:
+ *   get:
+ *     summary: AI-style insight cards (admin, mock data)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Insights list
+ */
 router.get("/ai-insights", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     // In production, generate insights using AI/ML based on analytics data
