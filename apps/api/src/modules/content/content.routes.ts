@@ -195,17 +195,22 @@ router.post("/:id/co-authors/respond", async (req: AuthRequest, res: Response) =
  *                 type: object
  *               aiGenerated:
  *                 type: boolean
+ *               templateId:
+ *                 type: string
+ *                 description: Optional template for formatting rules
  *     responses:
  *       201:
  *         description: Content draft created
  *       400:
  *         description: Invalid payload
+ *       422:
+ *         description: Template formatting rule violations
  *       500:
  *         description: Server error
  */
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { title, body, aiGenerated } = req.body;
+    const { title, body, aiGenerated, templateId } = req.body;
     if (!title) {
       res.status(400).json({ error: "title is required" });
       return;
@@ -220,7 +225,12 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       title,
       body: body ?? undefined,
       aiGenerated,
+      templateId: templateId ?? undefined,
     });
+    if ("invalidFormatting" in result && result.invalidFormatting) {
+      res.status(422).json({ error: "Formatting rule violations", violations: result.violations });
+      return;
+    }
     res.status(201).json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -362,7 +372,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Content not found
  *       422:
- *         description: Invalid state for editing
+ *         description: Invalid state for editing or template formatting violations
  *       500:
  *         description: Server error
  */
@@ -391,6 +401,10 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       res.status(422).json({
         error: `Cannot save body when content is ${result.state}. Only DRAFT or IN_REVIEW can be edited.`,
       });
+      return;
+    }
+    if ("invalidFormatting" in result && result.invalidFormatting) {
+      res.status(422).json({ error: "Formatting rule violations", violations: result.violations });
       return;
     }
     if ("version" in result) res.status(200).json(result.version);

@@ -4,6 +4,7 @@ import type { TemplateBinding, TemplateStatus } from "../../repository/types";
 import { templateService } from "../../service";
 import type { AuditContext } from "../../shared/context";
 import type { AuthRequest } from "../../middlewares/auth.middleware";
+import { formattingRuleService } from "./formattingRule.service";
 
 const router = Router();
 
@@ -269,6 +270,128 @@ router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response
 
 /**
  * @openapi
+ * /api/v1/templates/{id}/formatting-rules:
+ *   get:
+ *     summary: Get TipTap formatting rules for a template
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Rules document (may be empty object if unset)
+ *   put:
+ *     summary: Create or replace formatting rules for a template
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rules
+ *             properties:
+ *               rules:
+ *                 type: object
+ *                 description: Fonts, colors, headings, and media constraints JSON
+ *     responses:
+ *       200:
+ *         description: Updated rules
+ *       400:
+ *         description: Invalid body
+ *       404:
+ *         description: Template not found
+ *   delete:
+ *     summary: Delete formatting rules for a template
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Deleted
+ *       404:
+ *         description: No rules row to delete
+ */
+router.get("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
+  try {
+    const row = await formattingRuleService.getForTemplate(req.params.id);
+    res.status(200).json({
+      id: row?.id ?? null,
+      templateId: req.params.id,
+      rules: row?.rules ?? {},
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
+  try {
+    const { rules } = req.body as { rules?: unknown };
+    if (rules === undefined) {
+      res.status(400).json({ error: "rules object is required" });
+      return;
+    }
+    const result = await formattingRuleService.upsert(auditContext(req), req.params.id, rules);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if ("invalid" in result && result.invalid) {
+      res.status(400).json({ error: result.message });
+      return;
+    }
+    const row = await formattingRuleService.getForTemplate(req.params.id);
+    res.status(200).json({
+      templateId: req.params.id,
+      rules: row?.rules ?? {},
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await formattingRuleService.delete(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Formatting rules not found" });
+      return;
+    }
+    res.status(204).send();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
  * /api/v1/templates/{id}:
  *   get:
  *     summary: Get template with channel bindings
@@ -276,6 +399,17 @@ router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Template with bindings
+ *       404:
+ *         description: Template not found
  */
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {

@@ -15,4 +15,5 @@ export { adminService } from "../modules/admin/admin.service";
 export { authService } from "../modules/auth/auth.service";
 export { channelService } from "../modules/channel/channel.service";
 export { templateService } from "../modules/template/template.service";
+export { formattingRuleService } from "../modules/template/formattingRule.service";
 export { workspaceService } from "../modules/workspace/workspace.service";

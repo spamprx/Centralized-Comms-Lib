@@ -9,6 +9,11 @@ import {
   type Visibility,
 } from "../../repository";
 import type { AuditContext } from "../../shared/context";
+import type { FormattingViolation } from "../template/formattingRules.types";
+import { enforceFormattingRules } from "../template/templateFormatting.enforcement";
+import { getFormattingRulesForTemplateId } from "../template/formattingRule.service";
+import { recordSnapshotForVersion } from "./content.snapshot";
+import { syncContentIndexFromDb } from "../../search/contentSearch.service";
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
@@ -65,17 +70,32 @@ function slugify(title: string): string {
 export const contentService = {
   async createDraft(
     ctx: AuditContext,
-    input: { title: string; body?: TipTapDocument | null; aiGenerated?: boolean },
-  ): Promise<{ content: Content; version: ContentVersion }> {
+    input: {
+      title: string;
+      body?: TipTapDocument | null;
+      aiGenerated?: boolean;
+      templateId?: string | null;
+    },
+  ): Promise<
+    | { content: Content; version: ContentVersion }
+    | { invalidFormatting: true; violations: FormattingViolation[] }
+  > {
+    const rules = await getFormattingRulesForTemplateId(input.templateId ?? undefined);
+    const violations = enforceFormattingRules(input.body ?? null, rules);
+    if (violations.length > 0) {
+      return { invalidFormatting: true, violations };
+    }
+
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
-    return uow.withTransaction(async (repos) => {
+    const result = await uow.withTransaction(async (repos) => {
       const slug = slugify(input.title);
       const content = await repos.content.createDraft({
         title: input.title,
         slug,
         authorId: ctx.actorId,
         aiGenerated: input.aiGenerated ?? false,
+        templateId: input.templateId ?? undefined,
       });
       const version = await repos.content.createVersion({
         contentId: content.id,
@@ -95,6 +115,8 @@ export const contentService = {
       });
       return { content, version };
     });
+    void syncContentIndexFromDb(prisma, result.content.id).catch(() => undefined);
+    return result;
   },
 
   async list(
@@ -201,6 +223,9 @@ export const contentService = {
       });
       return updated;
     });
+    if (result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
     return result;
   },
 
@@ -213,8 +238,22 @@ export const contentService = {
     | { notFound: true }
     | { forbidden: true }
     | { invalidState: true; state: LifecycleState }
+    | { invalidFormatting: true; violations: FormattingViolation[] }
   > {
     const prisma = getPrismaClient();
+    const existingForRules = await prisma.content.findUnique({
+      where: { id: contentId },
+      select: { templateId: true },
+    });
+    const rules = await getFormattingRulesForTemplateId(existingForRules?.templateId);
+    let violations: FormattingViolation[] = [];
+    if (input.body !== undefined) {
+      violations = enforceFormattingRules(input.body, rules);
+    }
+    if (violations.length > 0) {
+      return { invalidFormatting: true, violations };
+    }
+
     const uow = new PrismaUnitOfWork(prisma);
     const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
@@ -235,6 +274,9 @@ export const contentService = {
         title: currentTitle,
         body: input.body ?? null,
       });
+      await recordSnapshotForVersion(repos, ctx, contentId, version.versionNumber, "MANUAL_SAVE", {
+        versionId: version.id,
+      });
       await repos.audit.append({
         action: "BODY_SAVE",
         resource: "CONTENT_VERSION",
@@ -252,6 +294,9 @@ export const contentService = {
       });
       return { version };
     });
+    if ("version" in result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
     return result;
   },
 
@@ -276,12 +321,17 @@ export const contentService = {
         return { invalidTransition: true, current: existing.lifecycleState } as const;
       }
       const updated = await repos.content.updateLifecycleState(contentId, lifecycleState);
-      await repos.content.createVersion({
+      const transitionVersion = await repos.content.createVersion({
         contentId: updated.id,
         authorId: ctx.actorId,
         changeType: "STATE_TRANSITION",
         title: updated.title,
         metadataSnapshot: { from: existing.lifecycleState, to: lifecycleState },
+      });
+      await recordSnapshotForVersion(repos, ctx, updated.id, transitionVersion.versionNumber, "STATE_TRANSITION", {
+        versionId: transitionVersion.id,
+        from: existing.lifecycleState,
+        to: lifecycleState,
       });
       await repos.audit.append({
         action: "STATE_TRANSITION",
@@ -301,6 +351,9 @@ export const contentService = {
       });
       return { content: updated };
     });
+    if ("content" in result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
     return result;
   },
 
@@ -312,7 +365,7 @@ export const contentService = {
   ): Promise<{ content: Content } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
-    return uow.withTransaction(async (repos) => {
+    const result = await uow.withTransaction(async (repos) => {
       const existing = await repos.content.getById(contentId);
       if (!existing) return { notFound: true } as const;
       if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
@@ -334,6 +387,10 @@ export const contentService = {
       });
       return { content: updated };
     });
+    if ("content" in result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
+    return result;
   },
 
   async assignTag(
@@ -343,7 +400,7 @@ export const contentService = {
   ): Promise<{ ok: true } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
-    return uow.withTransaction(async (repos) => {
+    const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
       if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
@@ -359,6 +416,10 @@ export const contentService = {
       });
       return { ok: true } as const;
     });
+    if ("ok" in result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
+    return result;
   },
 
   async removeTag(
@@ -368,7 +429,7 @@ export const contentService = {
   ): Promise<{ ok: true } | { notFound: true } | { forbidden: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
-    return uow.withTransaction(async (repos) => {
+    const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
       if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
@@ -384,6 +445,10 @@ export const contentService = {
       });
       return { ok: true } as const;
     });
+    if ("ok" in result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
+    return result;
   },
 
   async listVersions(contentId: string): Promise<ContentVersion[]> {
