@@ -12,6 +12,9 @@ import adminRouter from "../modules/admin/admin.routes";
 import analyticsRouter from "../modules/analytics/analytics.routes";
 import channelRouter from "../modules/channel/channel.routes";
 import templateRouter from "../modules/template/template.routes";
+import searchRouter from "../modules/search/search.routes";
+import componentRouter from "../modules/component/component.routes";
+import citationRouter from "../modules/citation/citation.routes";
 
 const router = Router();
 
@@ -51,5 +54,8 @@ router.use("/admin", adminRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/channels", channelRouter);
 router.use("/templates", templateRouter);
+router.use("/search", searchRouter);
+router.use("/components", componentRouter);
+router.use("/citations", citationRouter);
 
 export default router;
