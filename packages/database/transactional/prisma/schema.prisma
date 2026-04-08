@@ -285,6 +285,7 @@ model Template {
   contents     Content[]
   translations TemplateTranslation[]
   layoutSections TemplateLayoutSection[]
+  formattingRule TemplateFormattingRule?
 
   @@unique([workspaceId, slug])
   @@unique([workspaceId, name])
@@ -360,6 +361,18 @@ model TemplateLayoutSection {
   @@map("template_layout_sections")
 }
 
+// Optional per-template TipTap formatting constraints (fonts, colors, headings, media).
+model TemplateFormattingRule {
+  id         String   @id @default(uuid())
+  templateId String   @unique
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  rules      Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("template_formatting_rules")
+}
+
 model TemplateChannelBinding {
   id String @id @default(uuid())
 
@@ -404,6 +417,7 @@ model Content {
   coAuthors      ContentCoAuthor[] @relation("ContentCoAuthors")
   citations      ContentCitation[]
   snapshots      ContentSnapshot[]
+  analyticsEvents ContentAnalyticsEvent[]
 
   @@index([authorId])
   @@index([lifecycleState])
@@ -445,6 +459,20 @@ model ContentSnapshot {
 
   @@index([contentId, createdAt])
   @@map("content_snapshots")
+}
+
+// Lightweight analytics events for per-content and aggregate reporting.
+model ContentAnalyticsEvent {
+  id        String   @id @default(uuid())
+  contentId String
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  eventType String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([contentId, createdAt])
+  @@index([createdAt])
+  @@map("content_analytics_events")
 }
 
 // ── ContentVersion ──────────────────────────────────────────────────────────
