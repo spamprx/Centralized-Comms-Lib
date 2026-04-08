@@ -1,11 +1,46 @@
 {
   "settings": {
+    "index": {
+      "max_ngram_diff": 10
+    },
     "analysis": {
+      "filter": {
+        "english_stem": {
+          "type": "stemmer",
+          "language": "english"
+        },
+        "comms_synonyms": {
+          "type": "synonym_graph",
+          "lenient": true,
+          "synonyms": [
+            "quick, fast, rapid",
+            "content, article, post, story",
+            "library, repository, catalog",
+            "author, writer, creator",
+            "review, audit, critique"
+          ]
+        },
+        "edge_ngram_filter": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 15
+        }
+      },
       "analyzer": {
-        "comms_text": {
+        "comms_text_index": {
           "type": "custom",
           "tokenizer": "standard",
-          "filter": ["lowercase", "asciifolding"]
+          "filter": ["lowercase", "asciifolding", "english_stem"]
+        },
+        "comms_text_search": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "comms_synonyms", "english_stem"]
+        },
+        "comms_autocomplete": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "edge_ngram_filter"]
         }
       }
     }
@@ -24,20 +59,27 @@
       "aiGenerated": { "type": "boolean" },
       "title": {
         "type": "text",
-        "analyzer": "comms_text",
-        "fields": { "raw": { "type": "keyword", "ignore_above": 512 } }
+        "analyzer": "comms_text_index",
+        "search_analyzer": "comms_text_search",
+        "fields": {
+          "raw": { "type": "keyword", "ignore_above": 512 },
+          "auto": { "type": "text", "analyzer": "comms_autocomplete", "search_analyzer": "standard" }
+        }
       },
       "summary": {
         "type": "text",
-        "analyzer": "comms_text"
+        "analyzer": "comms_text_index",
+        "search_analyzer": "comms_text_search"
       },
       "body": {
         "type": "text",
-        "analyzer": "comms_text"
+        "analyzer": "comms_text_index",
+        "search_analyzer": "comms_text_search"
       },
       "bodyPlain": {
         "type": "text",
-        "analyzer": "comms_text"
+        "analyzer": "comms_text_index",
+        "search_analyzer": "comms_text_search"
       },
       "tags": { "type": "keyword" },
       "slug": { "type": "keyword" },
