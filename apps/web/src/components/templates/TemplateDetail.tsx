@@ -7,7 +7,6 @@ interface Template {
   id: string;
   name: string;
   description: string;
-  category: string;
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -39,7 +38,6 @@ export default function TemplateDetail({ templateId, onBack, templates, onUpdate
     id: `mock_${templateId}`,
     name: 'Blog Post Template',
     description: 'Standard blog post layout with header, content, and footer sections.',
-    category: 'Content',
     content: `---
 title: "{{title}}"
 author: "{{author}}"
@@ -136,7 +134,7 @@ Published by {{author}} on {{date}}
     setIsEditing(true);
   };
 
-  const showDiffViewer = (version1: Template, version2: Template) => {
+  const handleShowDiff = (version1: Template, version2: Template) => {
     setSelectedVersions([version1, version2]);
   };
 
@@ -284,9 +282,9 @@ Published by {{author}} on {{date}}
       </div>
 
       {versionHistory.length > 0 && (
-        <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6">
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Version History ({versionHistory.length} versions)</h3>
+            <h3 className="text-lg font-semibold text-blue-900">Version History ({versionHistory.length} versions)</h3>
             {selectedVersions && (
               <button
                 onClick={() => {
@@ -301,7 +299,7 @@ Published by {{author}} on {{date}}
           </div>
           <div className="space-y-2">
             {versionHistory.map((version, index) => (
-              <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-200">
+              <div key={index} className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">
                     Version {versionHistory.length - index}
@@ -354,7 +352,7 @@ Published by {{author}} on {{date}}
       )}
 
       {selectedVersions && (
-        <div className="mt-6 bg-gray-900 border border-gray-700 rounded-lg p-6">
+        <div className="mt-6 bg-indigo-900 border border-indigo-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-white">Version Comparison</h3>
             <button
@@ -409,42 +407,23 @@ Published by {{author}} on {{date}}
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-amber-50 rounded-lg border border-amber-200 p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+              <label className="block text-sm font-medium text-amber-900 mb-2">Name</label>
               {isEditing ? (
                 <input
                   type="text"
                   value={editedTemplate?.name || ''}
                   onChange={(e) => setEditedTemplate(prev => prev ? {...prev, name: e.target.value} : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-black"
                 />
               ) : (
                 <h3 className="text-xl font-semibold text-gray-900">{template?.name}</h3>
               )}
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              {isEditing ? (
-                <select
-                  value={editedTemplate?.category || ''}
-                  onChange={(e) => setEditedTemplate(prev => prev ? {...prev, category: e.target.value} : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Content">Content</option>
-                  <option value="E-commerce">E-commerce</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Documentation">Documentation</option>
-                </select>
-              ) : (
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {template?.category}
-                </span>
-              )}
-            </div>
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -452,7 +431,7 @@ Published by {{author}} on {{date}}
                 <select
                   value={editedTemplate?.status || 'active'}
                   onChange={(e) => setEditedTemplate(prev => prev ? {...prev, status: e.target.value as 'active' | 'draft' | 'archived'} : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-black"
                 >
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
@@ -476,7 +455,7 @@ Published by {{author}} on {{date}}
                   value={editedTemplate?.description || ''}
                   onChange={(e) => setEditedTemplate(prev => prev ? {...prev, description: e.target.value} : null)}
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-black"
                 />
               ) : (
                 <p className="text-gray-600">{template?.description}</p>
@@ -503,12 +482,12 @@ Published by {{author}} on {{date}}
                 value={editedTemplate?.content || ''}
                 onChange={(e) => setEditedTemplate(prev => prev ? {...prev, content: e.target.value} : null)}
                 rows={20}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm text-black"
                 placeholder="Enter template content with placeholders like {{title}}, {{content}}, etc."
               />
             ) : (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <pre className="text-sm text-amber-700 whitespace-pre-wrap font-mono">
                   {template?.content}
                 </pre>
               </div>
