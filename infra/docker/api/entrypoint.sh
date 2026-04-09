@@ -8,14 +8,14 @@ RUN_DB_SEED="${RUN_DB_SEED:-true}"
 
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "DATABASE_URL is not set; skipping DB setup."
-  exec node apps/api/dist/main.js
+  exec node apps/api/dist/server.js
 fi
 
 echo "Preparing database (schema: ${SCHEMA_PATH})..."
 
 if [ "${RUN_DB_PUSH}" = "true" ]; then
   i=0
-  until npx prisma db push --schema="${SCHEMA_PATH}" --skip-generate 2>&1; do
+  until npx prisma db push --schema="${SCHEMA_PATH}" --skip-generate --accept-data-loss 2>&1; do
     i=$((i + 1))
     if [ "$i" -ge 30 ]; then
       echo "ERROR: db push failed after ${i} attempts."
@@ -35,5 +35,5 @@ if [ "${RUN_DB_SEED}" = "true" ]; then
   echo "Seed complete."
 fi
 
-exec node apps/api/dist/main.js
+exec node apps/api/dist/server.js
 

@@ -3,14 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/main.ts",
+    "prebuild": "node ../../infra/scripts/prep-api-build.js",
+    "predev": "node ../../infra/scripts/prep-api-build.js",
+    "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
-    "start": "node dist/main.js",
+    "start": "node dist/server.js",
     "lint": "echo 'No lint configured'",
     "test": "echo 'No tests configured'",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@comms-lib/db-elasticsearch": "*",
+    "@comms-lib/db-mongo": "*",
     "@prisma/client": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "bcryptjs": "^3.0.3",
@@ -18,6 +22,7 @@
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
     "express-rate-limit": "^8.2.1",
+    "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"

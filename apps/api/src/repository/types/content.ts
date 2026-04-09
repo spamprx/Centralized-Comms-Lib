@@ -18,6 +18,7 @@ export interface Content {
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
+  templateId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +28,7 @@ export interface CreateDraftInput {
   slug: string;
   authorId: string;
   aiGenerated?: boolean;
+  templateId?: string | null;
 }
 
 export interface ContentVersion {

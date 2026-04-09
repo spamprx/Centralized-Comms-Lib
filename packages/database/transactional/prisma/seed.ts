@@ -200,6 +200,15 @@ async function seedGroupMemberships() {
   console.log(`  ✔ ${memberships.length} group memberships`);
 }
 
+async function seedWorkspace() {
+  await prisma.workspace.upsert({
+    where: { slug: "default" },
+    update: { name: "Default workspace" },
+    create: { id: randomUUID(), slug: "default", name: "Default workspace" },
+  });
+  console.log("  ✔ default workspace");
+}
+
 async function seedTags() {
   const parentTags = [
     { key: "announcements", name: "Announcements", slug: "announcements" },
@@ -233,6 +242,22 @@ async function seedTags() {
   }
 
   console.log(`  ✔ ${parentTags.length + childTags.length} tags`);
+}
+
+async function seedChannels() {
+  const channels = [
+    { name: "Web", key: "web", description: "Browser / responsive surfaces" },
+    { name: "Email", key: "email", description: "Email clients" },
+    { name: "Mobile", key: "mobile", description: "Native / in-app surfaces" },
+  ];
+  for (const c of channels) {
+    await prisma.channel.upsert({
+      where: { key: c.key },
+      update: { name: c.name, description: c.description },
+      create: { id: randomUUID(), name: c.name, key: c.key, description: c.description },
+    });
+  }
+  console.log(`  ✔ ${channels.length} channels`);
 }
 
 async function seedContent() {
@@ -570,7 +595,9 @@ async function main() {
   await seedUserRoles();
   await seedGroups();
   await seedGroupMemberships();
+  await seedWorkspace();
   await seedTags();
+  await seedChannels();
   await seedContent();
   await seedContentVersions();
   await seedContentTags();
