@@ -4,6 +4,7 @@
 export * from './adminService';
 export * from './analyticsService';
 export * from './authService';
+export * from './channelService';
 export * from './contentService';
 export * from './reviewService';
 export * from './tagService';

@@ -152,3 +152,5 @@ const TemplatesPage = () => {
 };
 
 export { TemplatesList, TemplateDetail, TemplatesPage };
+export { default as AddChannelModal } from './AddChannelModal';
+export { default as ChannelBindings } from './ChannelBindings';

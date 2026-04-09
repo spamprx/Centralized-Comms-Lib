@@ -1,0 +1,146 @@
+import { useState } from 'react';
+import { Edit, Trash2, Monitor, Smartphone, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { channelService, type Binding } from '../../services';
+
+interface ChannelBindingsProps {
+  templateId: string;
+  bindings: Binding[];
+  onBindingUpdated: () => void;
+  onEditBinding?: (binding: Binding) => void;
+}
+
+export default function ChannelBindings({ 
+  templateId, 
+  bindings,
+  onBindingUpdated, 
+  onEditBinding 
+}: ChannelBindingsProps) {
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteBinding = async (bindingId: string) => {
+    if (!confirm('Are you sure you want to remove this channel binding?')) {
+      return;
+    }
+
+    setDeletingId(bindingId);
+    try {
+      await channelService.deleteBinding(templateId, bindingId);
+      onBindingUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove binding');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const getChannelIcon = (channelKey: string) => {
+    switch (channelKey.toLowerCase()) {
+      case 'web':
+        return <Monitor size={16} />;
+      case 'mobile':
+        return <Smartphone size={16} />;
+      case 'email':
+        return <Mail size={16} />;
+      default:
+        return <Monitor size={16} />;
+    }
+  };
+
+  const formatConfig = (config: Record<string, any>) => {
+    try {
+      return JSON.stringify(config, null, 2);
+    } catch {
+      return JSON.stringify(config);
+    }
+  };
+
+  
+  if (error) {
+    return (
+      <div className="p-4 bg-red-400/10 border border-red-400/20 rounded-lg">
+        <div className="flex items-center gap-2 text-red-400 text-sm">
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (bindings.length === 0) {
+    return (
+      <div className="p-6 text-center text-gray-500 text-sm border-2 border-dashed border-gray-300 rounded-lg">
+        <Monitor size={24} className="mx-auto mb-2 text-gray-400" />
+        <p>No channels bound to this template yet</p>
+        <p className="text-xs mt-1">Click "Add Channel" to configure rendering for different platforms</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {bindings.map((binding) => (
+        <div
+          key={binding.id}
+          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              {/* Channel Header */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-violet-100 text-violet-600 rounded-lg">
+                  {getChannelIcon(binding.channel.key)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    {binding.channel.name}
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      {binding.channel.key}
+                    </span>
+                  </h3>
+                  <p className="text-sm text-gray-600">{binding.channel.description}</p>
+                </div>
+              </div>
+
+              {/* Configuration Preview */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-gray-700">Layout Configuration:</span>
+                  <span className="text-xs text-gray-500">
+                    Created {new Date(binding.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <pre className="text-xs text-gray-600 font-mono overflow-x-auto whitespace-pre-wrap">
+                  {formatConfig(binding.layoutConfig)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 ml-4">
+              <button
+                onClick={() => onEditBinding?.(binding)}
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Edit binding"
+              >
+                <Edit size={14} />
+              </button>
+              <button
+                onClick={() => handleDeleteBinding(binding.id)}
+                disabled={deletingId === binding.id}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                title="Remove binding"
+              >
+                {deletingId === binding.id ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

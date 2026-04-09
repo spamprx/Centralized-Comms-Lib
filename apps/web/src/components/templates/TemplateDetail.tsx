@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit, Trash2, Save, X, GitCompare, Copy } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Save, X, GitCompare, Copy, Plus } from 'lucide-react';
 import TagEditor from './TagEditor';
-import { templateService, type Tag } from '../../services';
+import AddChannelModal from './AddChannelModal';
+import ChannelBindings from './ChannelBindings';
+import { templateService, channelService, type Tag, type Binding } from '../../services';
 
 interface Template {
   id: string;
@@ -12,6 +14,7 @@ interface Template {
   updatedAt: string;
   status: 'active' | 'draft' | 'archived';
   tags?: Tag[];
+  bindings?: Binding[];
 }
 
 interface TemplateDetailProps {
@@ -33,6 +36,9 @@ export default function TemplateDetail({ templateId, onBack, templates, onUpdate
   const [lastClickedVersion, setLastClickedVersion] = useState<string | null>(null);
   const [showCloneBanner, setShowCloneBanner] = useState(!!cloneInfo);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [showAddChannelModal, setShowAddChannelModal] = useState(false);
+  const [bindings, setBindings] = useState<Binding[]>([]);
+  const [editingBinding, setEditingBinding] = useState<Binding | null>(null);
 
   const mockTemplate: Template = {
     id: `mock_${templateId}`,
@@ -95,6 +101,36 @@ Published by {{author}} on {{date}}
       return () => clearTimeout(timer);
     }
   }, [showCloneBanner, cloneInfo]);
+
+  // Load bindings when template changes
+  useEffect(() => {
+    if (templateId) {
+      loadBindings();
+    }
+  }, [templateId]);
+
+  const loadBindings = async () => {
+    try {
+      const templateBindings = await channelService.getBindings(templateId);
+      // Force re-render by creating new array reference
+      setBindings([...templateBindings]);
+    } catch (error) {
+      console.error('Failed to load bindings:', error);
+      setBindings([]);
+    }
+  };
+
+  const handleBindingUpdated = () => {
+    // Add small delay to ensure localStorage operations complete
+    setTimeout(() => {
+      loadBindings();
+    }, 100);
+  };
+
+  const handleEditBinding = (binding: Binding) => {
+    setEditingBinding(binding);
+    setShowAddChannelModal(true);
+  };
 
   const handleSave = async () => {
     if (editedTemplate) {
@@ -260,7 +296,8 @@ Published by {{author}} on {{date}}
   }
 
   return (
-    <div className="p-6">
+    <>
+      <div className="p-6">
       {/* Clone Banner */}
       {showCloneBanner && cloneInfo && (
         <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
@@ -304,6 +341,13 @@ Published by {{author}} on {{date}}
               >
                 <Copy className="w-4 h-4" />
                 Clone
+              </button>
+              <button
+                onClick={() => setShowAddChannelModal(true)}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Channel
               </button>
               <button
                 onClick={handleDelete}
@@ -547,6 +591,42 @@ Published by {{author}} on {{date}}
           </div>
         </div>
       </div>
+
+      {/* Channel Bindings Section */}
+      <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Channel Bindings</h3>
+          <button
+            onClick={() => setShowAddChannelModal(true)}
+            className="bg-purple-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Channel
+          </button>
+        </div>
+        <ChannelBindings
+          templateId={templateId}
+          bindings={bindings}
+          onBindingUpdated={handleBindingUpdated}
+          onEditBinding={handleEditBinding}
+        />
+      </div>
     </div>
+
+    {/* Add Channel Modal */}
+    {showAddChannelModal && (
+      <AddChannelModal
+        templateId={templateId}
+        templateName={template?.name || ''}
+        existingChannelIds={bindings.map(b => b.channelId)}
+        editingBinding={editingBinding}
+        onClose={() => {
+          setShowAddChannelModal(false);
+          setEditingBinding(null);
+        }}
+        onBindingCreated={handleBindingUpdated}
+      />
+    )}
+    </>
   );
 }

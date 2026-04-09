@@ -1,6 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL;
 import { getAuthToken } from './tokenStore';
 import type { Tag } from './tagService';
+import type { Binding } from './channelService';
 
 export type TemplateStatus = 'active' | 'draft' | 'archived';
 
@@ -13,6 +14,7 @@ export interface Template {
   createdAt: string;
   updatedAt: string;
   tags?: Tag[];
+  bindings?: Binding[];
 }
 
 export interface CreateTemplateRequest {
