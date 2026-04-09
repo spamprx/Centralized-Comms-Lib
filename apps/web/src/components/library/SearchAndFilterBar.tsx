@@ -20,48 +20,21 @@ export function SearchAndFilterBar({
   tags,
 }: SearchAndFilterBarProps) {
   return (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-      <div style={{
-        flex: 1,
-        minWidth: 250,
-        position: 'relative',
-      }}>
-        <Search size={16} style={{
-          position: 'absolute',
-          left: 12,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          color: '#555870',
-        }} />
+    <div className="flex gap-3 flex-wrap items-center">
+      <div className="flex-1 min-w-[250px] relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]" />
         <input
           type="text"
           placeholder="Search by title or author..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '10px 12px 10px 40px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            outline: 'none',
-          }}
+          className="w-full py-2.5 pr-3 pl-10 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none"
         />
       </div>
       <select
         value={selectedType}
         onChange={(e) => onTypeChange(e.target.value)}
-        style={{
-          padding: '10px 12px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 8,
-          color: '#e2e4f0',
-          fontSize: 13,
-          cursor: 'pointer',
-        }}
+        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer"
       >
         <option value="all">All Types</option>
         <option value="article">Articles</option>
@@ -72,15 +45,7 @@ export function SearchAndFilterBar({
       <select
         value={selectedTag}
         onChange={(e) => onTagChange(e.target.value)}
-        style={{
-          padding: '10px 12px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 8,
-          color: '#e2e4f0',
-          fontSize: 13,
-          cursor: 'pointer',
-        }}
+        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer"
       >
         <option value="all">All Tags</option>
         {tags.map(tag => (

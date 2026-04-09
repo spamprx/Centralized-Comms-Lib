@@ -36,60 +36,28 @@ export default function AuthLayout() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(6,182,212,0.1) 100%)',
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: 420,
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 16,
-        padding: 32,
-      }}>
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-violet-500/10 to-cyan-500/10">
+      <div className="w-full max-w-[420px] bg-white/[0.03] border border-white/[0.07] rounded-2xl p-8">
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 48,
-            height: 48,
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            borderRadius: 12,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-          }}>
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-cyan-500 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Lock size={24} color="#fff" />
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#e2e4f0', margin: '0 0 8px' }}>Welcome Back</h1>
-          <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>Sign in to your account to continue</p>
+          <h1 className="text-xl font-bold text-[#e2e4f0] mb-2">Welcome Back</h1>
+          <p className="text-[13px] text-[#555870] m-0">Sign in to your account to continue</p>
         </div>
 
         {/* Login / Signup Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {error && (
-            <div
-              style={{
-                padding: '10px 12px',
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: 8,
-                color: '#fca5a5',
-                fontSize: 12,
-              }}
-            >
+            <div className="px-3 py-2.5 bg-red-500/[0.12] border border-red-500/25 rounded-lg text-red-300 text-xs">
               {error}
             </div>
           )}
           {/* Name Input (signup only) */}
           {isSignup && (
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+              <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
                 Full Name
               </label>
               <input
@@ -98,100 +66,48 @@ export default function AuthLayout() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="John Doe"
                 required
-                style={{
-                  width: '100%',
-                  padding: '12px 12px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                  color: '#e2e4f0',
-                  fontSize: 14,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full px-3 py-3 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-sm outline-none box-border"
               />
             </div>
           )}
 
           {/* Email Input */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+            <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
               Email Address
             </label>
-            <div style={{ position: 'relative' }}>
-              <Mail size={16} style={{
-                position: 'absolute',
-                left: 12,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#555870',
-              }} />
+            <div className="relative">
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 40px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                  color: '#e2e4f0',
-                  fontSize: 14,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full py-3 pr-3 pl-10 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-sm outline-none box-border"
               />
             </div>
           </div>
 
           {/* Password Input */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8', marginBottom: 6, display: 'block' }}>
+            <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
               Password
             </label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                style={{
-                  width: '100%',
-                  padding: '12px 44px 12px 12px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                  color: '#e2e4f0',
-                  fontSize: 14,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className="w-full py-3 pl-3 pr-11 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-sm outline-none box-border"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                style={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(17, 24, 39, 0.35)',
-                  color: '#c7cbe0',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-lg border border-white/[0.12] bg-gray-900/35 text-[#c7cbe0] cursor-pointer p-0"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -200,17 +116,17 @@ export default function AuthLayout() {
 
           {/* Remember Me & Forgot Password (login only) */}
           {!isSignup && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div className="flex justify-between items-center">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: '#8b5cf6' }}
+                  className="w-4 h-4 accent-violet-500"
                 />
-                <span style={{ fontSize: 12, color: '#8b8fa8' }}>Remember me</span>
+                <span className="text-xs text-[#8b8fa8]">Remember me</span>
               </label>
-              <a href="#" style={{ fontSize: 12, color: '#a78bfa', textDecoration: 'none' }}>
+              <a href="#" className="text-xs text-violet-400 no-underline">
                 Forgot password?
               </a>
             </div>
@@ -220,21 +136,11 @@ export default function AuthLayout() {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              padding: '12px 20px',
-              background: loading ? 'rgba(139, 92, 246, 0.5)' : 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-            }}
+            className={`flex items-center justify-center gap-2 px-5 py-3 border-none rounded-lg text-white text-sm font-semibold transition-all duration-200 ${
+              loading
+                ? 'bg-violet-500/50 cursor-not-allowed'
+                : 'bg-gradient-to-br from-violet-500 to-cyan-500 cursor-pointer'
+            }`}
           >
             {loading ? (isSignup ? 'Creating account...' : 'Signing in...') : isSignup ? 'Sign Up' : 'Sign In'}
             {!loading && <ArrowRight size={16} />}
@@ -242,57 +148,26 @@ export default function AuthLayout() {
         </form>
 
         {/* Divider */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          margin: '24px 0',
-        }}>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
-          <span style={{ fontSize: 12, color: '#555870' }}>or continue with</span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-xs text-[#555870]">or continue with</span>
+          <div className="flex-1 h-px bg-white/10" />
         </div>
 
         {/* SSO Options */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '10px 16px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            cursor: 'pointer',
-          }}>
+        <div className="flex gap-3">
+          <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer">
             <Chrome size={16} />
             Google
           </button>
-          <button style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '10px 16px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            cursor: 'pointer',
-          }}>
+          <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer">
             <Github size={16} />
             GitHub
           </button>
         </div>
 
         {/* Sign Up / Sign In Link */}
-        <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: '#555870' }}>
+        <p className="text-center mt-6 text-[13px] text-[#555870]">
           {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button
             type="button"
@@ -300,16 +175,7 @@ export default function AuthLayout() {
               setIsSignup((v) => !v);
               setError(null);
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              margin: 0,
-              color: '#a78bfa',
-              textDecoration: 'none',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
+            className="bg-transparent border-none p-0 m-0 text-violet-400 no-underline font-medium cursor-pointer"
           >
             {isSignup ? 'Sign in' : 'Sign up'}
           </button>

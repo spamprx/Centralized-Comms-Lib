@@ -3,7 +3,7 @@ import { CheckCircle, XCircle, MessageSquare, AlertCircle, Loader2, FileText, Se
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService } from '../services/contentService';
 import { adminUserService } from '../services/adminService';
-import { useReview } from '../context/ReviewContext';
+import { useReviewStore } from '../store/reviewStore';
 
 const screeningData = {
   score: 85,
@@ -31,16 +31,29 @@ type ReviewItem = {
 };
 
 export default function ReviewLayout() {
-  const { addDecision: ctxAddDecision, addComment: ctxAddComment, getComments: ctxGetComments } = useReview();
-  const [decisionComment, setDecisionComment] = useState('');
+  const {
+    addDecision: ctxAddDecision,
+    addComment: ctxAddComment,
+    getComments: ctxGetComments,
+    draftDecisions,
+    draftDecisionComments,
+    draftComments,
+    setDraftDecision,
+    setDraftDecisionComment,
+    setDraftComment,
+    clearDrafts,
+  } = useReviewStore();
   const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; time: string; resolved: boolean }>>([]);
-  const [commentText, setCommentText] = useState('');
-  const [decision, setDecision] = useState<'APPROVED' | 'DENIED' | null>(null);
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionSuccess, setDecisionSuccess] = useState(false);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
+  
+  const currentAssignmentId = selectedItem?.assignmentId;
+  const decision = selectedItem?.verdict || (currentAssignmentId ? draftDecisions[currentAssignmentId] : null) || null;
+  const decisionComment = selectedItem?.savedComment || (currentAssignmentId ? draftDecisionComments[currentAssignmentId] : '') || '';
+  const commentText = (currentAssignmentId ? draftComments[currentAssignmentId] : '') || '';
   const [loading, setLoading] = useState(true);
   const [loadingContent, setLoadingContent] = useState(false);
 
@@ -138,8 +151,6 @@ export default function ReviewLayout() {
 
         const versions = details.versions;
         if (versions && versions.length > 0) {
-          // Find the latest MANUAL_SAVE or AI_GENERATED version (has actual body),
-          // skip STATE_TRANSITION versions which only have {from, to} metadata
           const bodyVersions = versions.filter(
             (v) => v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED'
           );
@@ -148,8 +159,6 @@ export default function ReviewLayout() {
             : null;
 
           if (versionWithBody) {
-            // The body is a top-level field on the version (TipTap JSON document),
-            // NOT inside metadataSnapshot
             const body = (versionWithBody as unknown as { body?: { type: string; content: unknown[] } })?.body;
             if (body && typeof body === 'object' && 'content' in body) {
               const extractText = (node: unknown): string => {
@@ -184,9 +193,8 @@ export default function ReviewLayout() {
 
   useEffect(() => {
     if (!selectedItem?.assignmentId) return;
-    // Restore comments from ReviewContext anytime the selected item changes
     const storedComments = ctxGetComments(selectedItem.assignmentId);
-    let loadedComments: any[] = storedComments.map((c, index) => ({
+    let loadedComments: any[] = storedComments.map((c: { text: string; time: string | number | Date }, index: number) => ({
       id: `ctx_${index}_${Date.now()}`,
       author: 'You',
       text: c.text,
@@ -194,7 +202,6 @@ export default function ReviewLayout() {
       resolved: false,
     }));
 
-    // If they already made a decision in the past, inject that comment into the unified chat
     if (selectedItem.verdict && selectedItem.savedComment) {
       loadedComments.push({
         id: `decision_ctx_${Date.now()}`,
@@ -210,18 +217,12 @@ export default function ReviewLayout() {
 
   const handleSelectItem = (item: ReviewItem) => {
     setSelectedItem(item);
-    // Restore saved decision info if item was already decided
     if (item.verdict) {
-      setDecision(item.verdict);
-      setDecisionComment(item.savedComment || '');
       setDecisionSuccess(true);
     } else {
-      setDecision(null);
-      setDecisionComment('');
       setDecisionSuccess(false);
     }
     setDecisionError(null);
-    setCommentText('');
   };
 
   const handleSubmitDecision = async () => {
@@ -236,7 +237,6 @@ export default function ReviewLayout() {
       await reviewService.decide(selectedItem.assignmentId, decision, decisionComment.trim());
       setDecisionSuccess(true);
 
-      // Also persist the decision comment as a ReviewComment so the author can see it
       try {
         await reviewService.addComment(
           selectedItem.assignmentId,
@@ -246,7 +246,6 @@ export default function ReviewLayout() {
         // Non-critical — decision was already recorded
       }
 
-      // Add the decision comment to the local comments thread
       setComments((prev) => [
         ...prev,
         {
@@ -258,7 +257,6 @@ export default function ReviewLayout() {
         },
       ]);
 
-      // Fetch the review request status after decision
       let requestStatus = 'OPEN';
       try {
         const reviewReq = await reviewService.getRequestById(selectedItem.id);
@@ -267,7 +265,6 @@ export default function ReviewLayout() {
         // Non-critical
       }
 
-      // Save decision info in the review item so it persists across selection changes
       const updatedItem = {
         ...selectedItem,
         status: 'COMPLETED',
@@ -275,8 +272,7 @@ export default function ReviewLayout() {
         savedComment: decisionComment.trim(),
         reviewRequestStatus: requestStatus,
       };
-      
-      // Persist the decision to ReviewContext so the author can read it on the MyContent page
+
       ctxAddDecision(selectedItem.assignmentId, decision, decisionComment.trim());
 
       setReviewItems((prev) =>
@@ -287,6 +283,7 @@ export default function ReviewLayout() {
         )
       );
       setSelectedItem(updatedItem);
+      clearDrafts(selectedItem.assignmentId);
     } catch (err) {
       setDecisionError(err instanceof Error ? err.message : 'Failed to submit decision');
     } finally {
@@ -298,7 +295,6 @@ export default function ReviewLayout() {
     if (!commentText.trim() || !selectedItem) return;
 
     try {
-      // 1. Call the backend API
       await reviewService.addComment(selectedItem.assignmentId, commentText.trim());
 
       const newComment = {
@@ -309,13 +305,9 @@ export default function ReviewLayout() {
         resolved: false,
       };
 
-      // 2. Update local state
       setComments([...comments, newComment]);
-      
-      // 3. Persist to ReviewContext for the Author to view
       ctxAddComment(selectedItem.assignmentId, commentText.trim());
-
-      setCommentText('');
+      setDraftComment(selectedItem.assignmentId, '');
     } catch (err) {
       console.error('Failed to post comment', err);
       alert('Failed to post comment: ' + (err instanceof Error ? err.message : String(err)));
@@ -324,27 +316,19 @@ export default function ReviewLayout() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0b0d14', gap: 12 }}>
-        <Loader2 size={32} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
-        <p style={{ fontSize: 13, color: '#555870' }}>Loading your review assignments...</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-[#0b0d14] gap-3">
+        <Loader2 size={32} color="#a78bfa" className="animate-spin" />
+        <p className="text-[13px] text-[#555870]">Loading your review assignments...</p>
       </div>
     );
   }
 
   if (reviewItems.length === 0) {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: '#0b0d14',
-        gap: 16,
-      }}>
+      <div className="flex flex-col items-center justify-center h-screen bg-[#0b0d14] gap-4">
         <FileText size={48} color="#555870" />
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: '#e2e4f0', margin: 0 }}>No Reviews Assigned</h2>
-        <p style={{ fontSize: 14, color: '#555870', margin: 0 }}>You don't have any content to review yet.</p>
+        <h2 className="text-xl font-semibold text-[#e2e4f0] m-0">No Reviews Assigned</h2>
+        <p className="text-sm text-[#555870] m-0">You don't have any content to review yet.</p>
       </div>
     );
   }
@@ -352,57 +336,33 @@ export default function ReviewLayout() {
   const isAlreadyDecided = selectedItem?.status === 'COMPLETED';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b0d14' }}>
+    <div className="flex flex-col h-screen bg-[#0b0d14]">
       {/* Topbar */}
-      <div style={{
-        padding: '12px 24px',
-        background: 'rgba(255,255,255,0.03)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
+      <div className="px-6 py-3 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
         <div>
-          <h1 style={{ fontSize: 16, fontWeight: 600, color: '#e2e4f0', margin: '0 0 4px' }}>
+          <h1 className="text-base font-semibold text-[#e2e4f0] mb-1">
             {selectedItem?.title || 'Select a review'}
           </h1>
-          <p style={{ fontSize: 12, color: '#555870', margin: 0 }}>
+          <p className="text-xs text-[#555870] m-0">
             {selectedItem
               ? `Author: ${selectedItem.author}${selectedItem.authorEmail ? ` (${selectedItem.authorEmail})` : ''} • Shared by: ${selectedItem.requestedBy} • ${selectedItem.submittedAt}`
               : ''}
           </p>
         </div>
         {isAlreadyDecided && (
-          <span style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 14px',
-            background: 'rgba(16,185,129,0.1)',
-            border: '1px solid rgba(16,185,129,0.3)',
-            borderRadius: 8,
-            color: '#10b981',
-            fontSize: 12,
-            fontWeight: 600,
-          }}>
+          <span className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-500 text-xs font-semibold">
             <Check size={14} /> Decision Submitted
           </span>
         )}
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="flex flex-1 overflow-hidden">
         {/* Review Items Sidebar */}
-        <div style={{
-          width: 300,
-          borderRight: '1px solid rgba(255,255,255,0.05)',
-          background: 'rgba(255,255,255,0.02)',
-          overflowY: 'auto',
-          padding: 12,
-        }}>
-          <h3 style={{ fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase', margin: '8px 8px 12px', letterSpacing: 0.5 }}>
+        <div className="w-[300px] border-r border-white/5 bg-white/[0.02] overflow-y-auto p-3">
+          <h3 className="text-[11px] font-semibold text-[#555870] uppercase mx-2 mt-2 mb-3 tracking-wide">
             Content For Review ({reviewItems.length})
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div className="flex flex-col gap-1">
             {reviewItems.map((item) => {
               const isActive = selectedItem?.assignmentId === item.assignmentId;
               const isPending = item.status === 'PENDING';
@@ -410,34 +370,23 @@ export default function ReviewLayout() {
                 <button
                   key={item.assignmentId}
                   onClick={() => handleSelectItem(item)}
-                  style={{
-                    padding: '14px',
-                    background: isActive ? 'rgba(139,92,246,0.12)' : 'transparent',
-                    border: isActive ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent',
-                    borderRadius: 10,
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    opacity: isPending ? 1 : 0.6,
-                  }}
+                  className={`p-3.5 rounded-[10px] text-left cursor-pointer transition-all duration-150 ${
+                    isActive
+                      ? 'bg-violet-500/[0.12] border border-violet-500/30'
+                      : 'bg-transparent border border-transparent'
+                  } ${isPending ? 'opacity-100' : 'opacity-60'}`}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 600, color: isActive ? '#e2e4f0' : '#c4c7d9', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div className={`text-[13px] font-semibold mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap ${isActive ? 'text-[#e2e4f0]' : 'text-[#c4c7d9]'}`}>
                     {item.title}
                   </div>
-                  <div style={{ fontSize: 11, color: '#555870', marginBottom: 4 }}>
+                  <div className="text-[11px] text-[#555870] mb-1">
                     by {item.author}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, color: '#555870' }}>{item.submittedAt}</span>
-                    <span style={{
-                      fontSize: 9,
-                      padding: '2px 8px',
-                      borderRadius: 8,
-                      background: isPending ? 'rgba(251,191,36,0.15)' : 'rgba(16,185,129,0.15)',
-                      color: isPending ? '#fbbf24' : '#10b981',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                    }}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-[#555870]">{item.submittedAt}</span>
+                    <span className={`text-[9px] px-2 py-0.5 rounded-lg font-semibold uppercase ${
+                      isPending ? 'bg-amber-400/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-500'
+                    }`}>
                       {isPending ? 'PENDING' : 'REVIEWED'}
                     </span>
                   </div>
@@ -448,155 +397,93 @@ export default function ReviewLayout() {
         </div>
 
         {/* Content View Panel */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <div className="flex-1 overflow-y-auto p-6">
           {loadingContent ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
-              <Loader2 size={24} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
+            <div className="flex justify-center p-16">
+              <Loader2 size={24} color="#a78bfa" className="animate-spin" />
             </div>
           ) : (
-            <div style={{
-              maxWidth: 800,
-              background: '#1a1d2e',
-              borderRadius: 12,
-              padding: 32,
-            }}>
+            <div className="max-w-[800px] bg-[#1a1d2e] rounded-xl p-8">
               {/* Content header */}
-              <div style={{ marginBottom: 24 }}>
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: '#e2e4f0', margin: '0 0 8px' }}>
+              <div className="mb-6">
+                <h2 className="text-[22px] font-bold text-[#e2e4f0] mb-2">
                   {selectedItem?.title}
                 </h2>
-                <div style={{
-                  display: 'flex',
-                  gap: 16,
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}>
-                    <div style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}>
+                <div className="flex gap-4 flex-wrap items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-white text-xs font-semibold">
                       {(selectedItem?.author || 'U')[0].toUpperCase()}
                     </div>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: '#c4c7d9' }}>
+                      <div className="text-xs font-medium text-[#c4c7d9]">
                         {selectedItem?.author}
                       </div>
                       {selectedItem?.authorEmail && (
-                        <div style={{ fontSize: 10, color: '#555870' }}>
+                        <div className="text-[10px] text-[#555870]">
                           {selectedItem.authorEmail}
                         </div>
                       )}
                     </div>
                   </div>
-                  <span style={{ color: 'rgba(255,255,255,0.15)' }}>•</span>
-                  <span style={{ fontSize: 11, color: '#555870' }}>
+                  <span className="text-white/15">•</span>
+                  <span className="text-[11px] text-[#555870]">
                     Shared by {selectedItem?.requestedBy}
                   </span>
-                  <span style={{ color: 'rgba(255,255,255,0.15)' }}>•</span>
-                  <span style={{ fontSize: 11, color: '#555870' }}>
+                  <span className="text-white/15">•</span>
+                  <span className="text-[11px] text-[#555870]">
                     {selectedItem?.submittedAt}
                   </span>
                 </div>
               </div>
 
-              <div style={{
-                height: 1,
-                background: 'rgba(255,255,255,0.06)',
-                marginBottom: 24,
-              }} />
+              <div className="h-px bg-white/[0.06] mb-6" />
 
               {/* Content body */}
-              <pre style={{
-                whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word',
-                fontSize: 15,
-                color: '#c4c7d9',
-                lineHeight: 1.9,
-                margin: 0,
-                fontFamily: 'inherit',
-              }}>{selectedItem?.contentBody || 'Loading content...'}</pre>
+              <pre className="whitespace-pre-wrap break-words text-[15px] text-[#c4c7d9] leading-relaxed m-0 font-[inherit]">
+                {selectedItem?.contentBody || 'Loading content...'}
+              </pre>
             </div>
           )}
         </div>
 
         {/* Right Sidebar */}
-        <div style={{
-          width: 380,
-          background: 'rgba(255,255,255,0.02)',
-          borderLeft: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-        }}>
+        <div className="w-[380px] bg-white/[0.02] border-l border-white/5 flex flex-col overflow-y-auto">
           {/* Review Decision */}
-          <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#555870', textTransform: 'uppercase', marginBottom: 12 }}>
+          <div className="p-5 border-b border-white/5">
+            <h3 className="text-xs font-semibold text-[#555870] uppercase mb-3">
               Review Decision
             </h3>
 
             {isAlreadyDecided || decisionSuccess ? (
-              <div style={{
-                padding: 16,
-                background: selectedItem?.verdict === 'DENIED'
-                  ? 'rgba(239,68,68,0.1)'
-                  : 'rgba(16,185,129,0.1)',
-                borderRadius: 10,
-                border: selectedItem?.verdict === 'DENIED'
-                  ? '1px solid rgba(239,68,68,0.2)'
-                  : '1px solid rgba(16,185,129,0.2)',
-                textAlign: 'center',
-              }}>
+              <div className={`p-4 rounded-[10px] text-center ${
+                selectedItem?.verdict === 'DENIED'
+                  ? 'bg-red-500/10 border border-red-500/20'
+                  : 'bg-emerald-500/10 border border-emerald-500/20'
+              }`}>
                 {selectedItem?.verdict === 'DENIED' ? (
-                  <XCircle size={24} color="#f87171" style={{ marginBottom: 8 }} />
+                  <XCircle size={24} color="#f87171" className="mb-2 mx-auto" />
                 ) : (
-                  <CheckCircle size={24} color="#10b981" style={{ marginBottom: 8 }} />
+                  <CheckCircle size={24} color="#10b981" className="mb-2 mx-auto" />
                 )}
-                <p style={{
-                  fontSize: 13,
-                  color: selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981',
-                  fontWeight: 600,
-                  margin: '0 0 4px',
-                }}>
+                <p className={`text-[13px] font-semibold mb-1 ${
+                  selectedItem?.verdict === 'DENIED' ? 'text-red-400' : 'text-emerald-500'
+                }`}>
                   {selectedItem?.verdict === 'APPROVED' ? 'Approved' : selectedItem?.verdict === 'DENIED' ? 'Denied' : 'Decision Submitted'}
                 </p>
 
                 {/* Review Request Status */}
                 {selectedItem?.reviewRequestStatus && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '4px 12px',
-                    borderRadius: 6,
-                    background: selectedItem.reviewRequestStatus === 'CLOSED'
-                      ? 'rgba(139,92,246,0.15)'
-                      : 'rgba(251,191,36,0.15)',
-                    marginBottom: 8,
-                  }}>
-                    <span style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: selectedItem.reviewRequestStatus === 'CLOSED' ? '#a78bfa' : '#fbbf24',
-                    }} />
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: selectedItem.reviewRequestStatus === 'CLOSED' ? '#a78bfa' : '#fbbf24',
-                    }}>
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md mb-2 ${
+                    selectedItem.reviewRequestStatus === 'CLOSED'
+                      ? 'bg-violet-500/15'
+                      : 'bg-amber-400/15'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      selectedItem.reviewRequestStatus === 'CLOSED' ? 'bg-violet-400' : 'bg-amber-400'
+                    }`} />
+                    <span className={`text-[11px] font-semibold ${
+                      selectedItem.reviewRequestStatus === 'CLOSED' ? 'text-violet-400' : 'text-amber-400'
+                    }`}>
                       Review Request: {selectedItem.reviewRequestStatus}
                     </span>
                   </div>
@@ -604,104 +491,62 @@ export default function ReviewLayout() {
 
                 {/* Comment from reviewer */}
                 {selectedItem?.savedComment && (
-                  <div style={{
-                    marginTop: 10,
-                    padding: '10px 14px',
-                    background: 'rgba(255,255,255,0.05)',
-                    borderRadius: 8,
-                    textAlign: 'left',
-                    borderLeft: `3px solid ${selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981'}`,
-                  }}>
-                    <span style={{ fontSize: 10, color: '#555870', textTransform: 'uppercase', fontWeight: 600 }}>Your Comment</span>
-                    <p style={{ fontSize: 12, color: '#c4c7d9', margin: '6px 0 0', lineHeight: 1.5 }}>{selectedItem.savedComment}</p>
+                  <div
+                    className="mt-2.5 px-3.5 py-2.5 bg-white/5 rounded-lg text-left"
+                    style={{ borderLeft: `3px solid ${selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981'}` }}
+                  >
+                    <span className="text-[10px] text-[#555870] uppercase font-semibold">Your Comment</span>
+                    <p className="text-xs text-[#c4c7d9] mt-1.5 mb-0 leading-normal">{selectedItem.savedComment}</p>
                   </div>
                 )}
               </div>
             ) : (
               <>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <div className="flex gap-2 mb-3">
                   <button
-                    onClick={() => { setDecision('APPROVED'); setDecisionError(null); }}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '10px 16px',
-                      background: decision === 'APPROVED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.08)',
-                      border: decision === 'APPROVED' ? '2px solid #10b981' : '2px solid rgba(16, 185, 129, 0.2)',
-                      borderRadius: 8,
-                      color: decision === 'APPROVED' ? '#10b981' : '#059669',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
+                    onClick={() => { if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'APPROVED'); setDecisionError(null); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold cursor-pointer transition-all duration-200 ${
+                      decision === 'APPROVED'
+                        ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-500'
+                        : 'bg-emerald-500/[0.08] border-2 border-emerald-500/20 text-emerald-600'
+                    }`}
                   >
                     <CheckCircle size={16} /> Approve
                   </button>
                   <button
-                    onClick={() => { setDecision('DENIED'); setDecisionError(null); }}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '10px 16px',
-                      background: decision === 'DENIED' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.08)',
-                      border: decision === 'DENIED' ? '2px solid #f87171' : '2px solid rgba(239, 68, 68, 0.2)',
-                      borderRadius: 8,
-                      color: decision === 'DENIED' ? '#f87171' : '#dc2626',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
+                    onClick={() => { if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'DENIED'); setDecisionError(null); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold cursor-pointer transition-all duration-200 ${
+                      decision === 'DENIED'
+                        ? 'bg-red-500/20 border-2 border-red-400 text-red-400'
+                        : 'bg-red-500/[0.08] border-2 border-red-500/20 text-red-600'
+                    }`}
                   >
                     <XCircle size={16} /> Deny
                   </button>
                 </div>
 
                 {decision && (
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 11, color: '#8b8fa8', display: 'block', marginBottom: 6 }}>
-                      Reason for your decision <span style={{ color: '#f87171' }}>*</span>
+                  <div className="mb-3">
+                    <label className="text-[11px] text-[#8b8fa8] block mb-1.5">
+                      Reason for your decision <span className="text-red-400">*</span>
                     </label>
                     <textarea
                       value={decisionComment}
-                      onChange={(e) => { setDecisionComment(e.target.value); setDecisionError(null); }}
+                      onChange={(e) => { if (currentAssignmentId) setDraftDecisionComment(currentAssignmentId, e.target.value); setDecisionError(null); }}
                       placeholder={decision === 'APPROVED'
                         ? 'Why are you approving this content...'
                         : 'What needs to be changed...'}
                       rows={3}
-                      style={{
-                        width: '100%',
-                        padding: 10,
-                        background: 'rgba(255,255,255,0.05)',
-                        border: decisionError
-                          ? '1px solid rgba(248,113,113,0.5)'
-                          : '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 8,
-                        color: '#e2e4f0',
-                        fontSize: 12,
-                        resize: 'none',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                      }}
+                      className={`w-full p-2.5 bg-white/5 rounded-lg text-[#e2e4f0] text-xs resize-none box-border outline-none ${
+                        decisionError ? 'border border-red-400/50' : 'border border-white/10'
+                      }`}
                     />
                   </div>
                 )}
 
                 {decisionError && (
-                  <div style={{
-                    padding: '8px 12px',
-                    background: 'rgba(248,113,113,0.1)',
-                    borderRadius: 6,
-                    marginBottom: 12,
-                  }}>
-                    <span style={{ fontSize: 11, color: '#f87171' }}>{decisionError}</span>
+                  <div className="px-3 py-2 bg-red-400/10 rounded-md mb-3">
+                    <span className="text-[11px] text-red-400">{decisionError}</span>
                   </div>
                 )}
 
@@ -709,29 +554,16 @@ export default function ReviewLayout() {
                   <button
                     onClick={handleSubmitDecision}
                     disabled={submittingDecision}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '10px 16px',
-                      background: submittingDecision
-                        ? 'rgba(139,92,246,0.3)'
+                    className={`w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold transition-all duration-200 ${
+                      submittingDecision
+                        ? 'bg-violet-500/30 cursor-not-allowed'
                         : decision === 'APPROVED'
-                          ? 'linear-gradient(135deg, #10b981, #06b6d4)'
-                          : 'linear-gradient(135deg, #ef4444, #f97316)',
-                      border: 'none',
-                      borderRadius: 8,
-                      color: '#fff',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: submittingDecision ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
+                          ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 cursor-pointer'
+                          : 'bg-gradient-to-br from-red-500 to-orange-500 cursor-pointer'
+                    }`}
                   >
                     {submittingDecision ? (
-                      <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Submitting...</>
+                      <><Loader2 size={14} className="animate-spin" /> Submitting...</>
                     ) : (
                       <><Send size={14} /> Submit {decision === 'APPROVED' ? 'Approval' : 'Denial'}</>
                     )}
@@ -742,63 +574,61 @@ export default function ReviewLayout() {
           </div>
 
           {/* AI Screening Panel */}
-          <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#555870', textTransform: 'uppercase', marginBottom: 12 }}>
+          <div className="p-5 border-b border-white/5">
+            <h3 className="text-xs font-semibold text-[#555870] uppercase mb-3">
               AI Screening
             </h3>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: '#8b8fa8' }}>Quality Score</span>
-                <span style={{ fontSize: 18, fontWeight: 700, color: screeningData.score > 80 ? '#10b981' : '#fbbf24' }}>{screeningData.score}/100</span>
+            <div className="mb-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-[#8b8fa8]">Quality Score</span>
+                <span className={`text-lg font-bold ${screeningData.score > 80 ? 'text-emerald-500' : 'text-amber-400'}`}>
+                  {screeningData.score}/100
+                </span>
               </div>
-              <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{
-                  width: `${screeningData.score}%`,
-                  height: '100%',
-                  background: `linear-gradient(90deg, ${screeningData.score > 80 ? '#10b981' : '#fbbf24'}, ${screeningData.score > 80 ? '#34d399' : '#f59e0b'})`,
-                  borderRadius: 3,
-                }} />
+              <div className="h-1.5 bg-white/10 rounded-sm overflow-hidden">
+                <div
+                  className="h-full rounded-sm"
+                  style={{
+                    width: `${screeningData.score}%`,
+                    background: `linear-gradient(90deg, ${screeningData.score > 80 ? '#10b981' : '#fbbf24'}, ${screeningData.score > 80 ? '#34d399' : '#f59e0b'})`,
+                  }}
+                />
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="flex flex-col gap-2">
               {screeningData.issues.map((issue, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  {issue.type === 'warning' && <AlertCircle size={14} color="#fbbf24" style={{ marginTop: 2 }} />}
-                  {issue.type === 'info' && <AlertCircle size={14} color="#06b6d4" style={{ marginTop: 2 }} />}
-                  {issue.type === 'success' && <CheckCircle size={14} color="#10b981" style={{ marginTop: 2 }} />}
-                  <span style={{ fontSize: 11, color: '#8b8fa8' }}>{issue.text}</span>
+                <div key={i} className="flex gap-2 items-start">
+                  {issue.type === 'warning' && <AlertCircle size={14} color="#fbbf24" className="mt-0.5" />}
+                  {issue.type === 'info' && <AlertCircle size={14} color="#06b6d4" className="mt-0.5" />}
+                  {issue.type === 'success' && <CheckCircle size={14} color="#10b981" className="mt-0.5" />}
+                  <span className="text-[11px] text-[#8b8fa8]">{issue.text}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Comments Thread */}
-          <div style={{ padding: 20, flex: 1 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#555870', textTransform: 'uppercase', marginBottom: 12 }}>
+          <div className="p-5 flex-1">
+            <h3 className="text-xs font-semibold text-[#555870] uppercase mb-3">
               Comments ({comments.length})
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            <div className="flex flex-col gap-3 mb-4">
               {comments.map((comment) => (
-                <div key={comment.id} style={{
-                  padding: 12,
-                  background: 'rgba(255,255,255,0.03)',
-                  borderRadius: 8,
-                  opacity: comment.resolved ? 0.5 : 1,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0' }}>{comment.author}</span>
-                    <span style={{ fontSize: 10, color: '#555870' }}>{comment.time}</span>
+                <div key={comment.id} className={`p-3 bg-white/[0.03] rounded-lg ${comment.resolved ? 'opacity-50' : ''}`}>
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-[#e2e4f0]">{comment.author}</span>
+                    <span className="text-[10px] text-[#555870]">{comment.time}</span>
                   </div>
-                  <p style={{ fontSize: 12, color: '#c4c7d9', margin: '0 0 6px' }}>{comment.text}</p>
+                  <p className="text-xs text-[#c4c7d9] mb-1.5">{comment.text}</p>
                   {comment.resolved && (
-                    <span style={{ fontSize: 10, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span className="text-[10px] text-emerald-500 flex items-center gap-1">
                       <CheckCircle size={10} /> Resolved
                     </span>
                   )}
                 </div>
               ))}
               {comments.length === 0 && (
-                <div style={{ padding: 16, textAlign: 'center', color: '#555870', fontSize: 12 }}>
+                <div className="p-4 text-center text-[#555870] text-xs">
                   No comments yet. Add a comment to discuss this content.
                 </div>
               )}
@@ -807,40 +637,19 @@ export default function ReviewLayout() {
             <div>
               <textarea
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                onChange={(e) => { if (currentAssignmentId) setDraftComment(currentAssignmentId, e.target.value); }}
                 placeholder="Add a comment or feedback..."
                 rows={3}
-                style={{
-                  width: '100%',
-                  padding: 12,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                  color: '#e2e4f0',
-                  fontSize: 12,
-                  resize: 'none',
-                  marginBottom: 8,
-                  boxSizing: 'border-box',
-                }}
+                className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-xs resize-none mb-2 box-border"
               />
               <button
                 onClick={handleAddComment}
                 disabled={!commentText.trim()}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  background: commentText.trim() ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' : 'rgba(255,255,255,0.1)',
-                  border: 'none',
-                  borderRadius: 6,
-                  color: commentText.trim() ? '#fff' : '#555870',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: commentText.trim() ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
+                className={`w-full px-4 py-2.5 border-none rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 ${
+                  commentText.trim()
+                    ? 'bg-gradient-to-br from-violet-500 to-cyan-500 text-white cursor-pointer'
+                    : 'bg-white/10 text-[#555870] cursor-not-allowed'
+                }`}
               >
                 <MessageSquare size={14} /> Post Comment
               </button>

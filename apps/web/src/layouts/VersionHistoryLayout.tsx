@@ -100,31 +100,23 @@ export default function VersionHistoryLayout() {
   const removedLines = 0;
 
   return (
-    <div style={{ padding: 24, height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="p-6 h-screen flex flex-col">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: '0 0 4px' }}>Version History</h1>
-        <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#e2e4f0] mb-1">Version History</h1>
+        <p className="text-[13px] text-[#555870] m-0">
           Track changes and restore previous versions
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 24, flex: 1, minHeight: 0 }}>
+      <div className="flex gap-6 flex-1 min-h-0">
         {/* Version Timeline List */}
-        <div style={{
-          width: 320,
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 12,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 4px' }}>All Versions</h2>
-            <p style={{ fontSize: 11, color: '#555870', margin: 0 }}>{mockVersions.length} versions total</p>
+        <div className="w-80 bg-white/[0.03] border border-white/[0.07] rounded-xl overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-white/5">
+            <h2 className="text-sm font-semibold text-[#e2e4f0] mb-1">All Versions</h2>
+            <p className="text-[11px] text-[#555870] m-0">{mockVersions.length} versions total</p>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+          <div className="flex-1 overflow-y-auto p-3">
             {mockVersions.map((version) => (
               <div
                 key={version.id}
@@ -132,62 +124,42 @@ export default function VersionHistoryLayout() {
                   setSelectedVersion(version);
                   setShowDiff(false);
                 }}
-                style={{
-                  padding: 14,
-                  background: selectedVersion.id === version.id ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.02)',
-                  border: selectedVersion.id === version.id ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid transparent',
-                  borderRadius: 8,
-                  marginBottom: 8,
-                  cursor: 'pointer',
-                  position: 'relative',
-                }}
+                className={`p-3.5 rounded-lg mb-2 cursor-pointer relative ${
+                  selectedVersion.id === version.id
+                    ? 'bg-violet-500/15 border border-violet-500/30'
+                    : 'bg-white/[0.02] border border-transparent'
+                }`}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: selectedVersion.id === version.id ? '#a78bfa' : '#e2e4f0',
-                  }}>{version.version}</span>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className={`text-xs font-bold ${selectedVersion.id === version.id ? 'text-violet-400' : 'text-[#e2e4f0]'}`}>
+                    {version.version}
+                  </span>
                   {version.status === 'current' && (
-                    <span style={{
-                      fontSize: 9,
-                      padding: '2px 6px',
-                      background: 'rgba(16, 185, 129, 0.2)',
-                      borderRadius: 4,
-                      color: '#10b981',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                    }}>Current</span>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/20 rounded text-emerald-500 font-semibold uppercase">
+                      Current
+                    </span>
                   )}
                 </div>
-                <p style={{ fontSize: 11, color: '#8b8fa8', margin: '0 0 6px', lineHeight: 1.4 }}>{version.changes}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#555870' }}>
+                <p className="text-[11px] text-[#8b8fa8] mb-1.5 leading-snug">{version.changes}</p>
+                <div className="flex items-center gap-2 text-[10px] text-[#555870]">
                   <Clock size={10} />
                   {new Date(version.date).toLocaleDateString()}
                 </div>
-                <div style={{ fontSize: 10, color: '#555870', marginTop: 4 }}>by {version.author}</div>
+                <div className="text-[10px] text-[#555870] mt-1">by {version.author}</div>
 
                 {/* Compare checkbox */}
                 {showDiff && selectedVersion.id !== version.id && (
                   <label
                     onClick={(e) => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      top: 14,
-                      right: 14,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 10,
-                      color: compareVersion === version.id ? '#a78bfa' : '#555870',
-                      cursor: 'pointer',
-                    }}
+                    className={`absolute top-3.5 right-3.5 flex items-center gap-1 text-[10px] cursor-pointer ${
+                      compareVersion === version.id ? 'text-violet-400' : 'text-[#555870]'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={compareVersion === version.id}
                       onChange={(e) => setCompareVersion(e.target.checked ? version.id : null)}
-                      style={{ accentColor: '#8b5cf6' }}
+                      className="accent-violet-500"
                     />
                     Compare
                   </label>
@@ -198,89 +170,39 @@ export default function VersionHistoryLayout() {
         </div>
 
         {/* Diff View Panel */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="flex-1 flex flex-col gap-4">
           {/* Toolbar */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: 16,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 12,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="flex justify-between items-center p-4 bg-white/[0.03] border border-white/[0.07] rounded-xl">
+            <div className="flex items-center gap-3">
               <FileText size={18} color="#8b5cf6" />
               <div>
-                <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 2px' }}>
+                <h2 className="text-sm font-semibold text-[#e2e4f0] mb-0.5">
                   {selectedVersion.version} - {selectedVersion.changes}
                 </h2>
-                <p style={{ fontSize: 11, color: '#555870', margin: 0 }}>
+                <p className="text-[11px] text-[#555870] m-0">
                   Last modified {new Date(selectedVersion.date).toLocaleString()}
                 </p>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="flex gap-2">
               <button
                 onClick={() => setShowDiff(!showDiff)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
-                  background: showDiff ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
-                  border: 'none',
-                  borderRadius: 6,
-                  color: showDiff ? '#a78bfa' : '#8b8fa8',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 border-none rounded-md text-xs cursor-pointer ${
+                  showDiff ? 'bg-violet-500/15 text-violet-400' : 'bg-white/5 text-[#8b8fa8]'
+                }`}
               >
                 <GitCompare size={14} /> {showDiff ? 'Hide Diff' : 'Compare'}
               </button>
-              <button style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 6,
-                color: '#8b8fa8',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}>
+              <button className="flex items-center gap-1.5 px-3.5 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-xs cursor-pointer">
                 <Eye size={14} /> Preview
               </button>
-              <button style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 6,
-                color: '#8b8fa8',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}>
+              <button className="flex items-center gap-1.5 px-3.5 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-xs cursor-pointer">
                 <Download size={14} /> Export
               </button>
               {selectedVersion.status !== 'current' && (
-                <button style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: 6,
-                  color: '#10b981',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-                onClick={() => alert('Restore functionality requires backend integration')}
+                <button
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/15 border border-emerald-500/30 rounded-md text-emerald-500 text-xs font-medium cursor-pointer"
+                  onClick={() => alert('Restore functionality requires backend integration')}
                 >
                   <RotateCcw size={14} /> Restore
                 </button>
@@ -289,60 +211,37 @@ export default function VersionHistoryLayout() {
           </div>
 
           {/* Content/Diff View */}
-          <div style={{
-            flex: 1,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 12,
-            overflow: 'auto',
-          }}>
+          <div className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-xl overflow-auto">
             {showDiff && compareVersion ? (
               /* Diff View */
-              <div style={{ padding: 20 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>
+              <div className="p-5">
+                <h3 className="text-sm font-semibold text-[#e2e4f0] mb-4">
                   Comparing {selectedVersion.version} with {mockVersions.find(v => v.id === compareVersion)?.version}
                 </h3>
-                <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                  <div style={{ flex: 1, padding: 12, background: 'rgba(16, 185, 129, 0.1)', borderRadius: 6 }}>
-                    <span style={{ fontSize: 12, color: '#10b981' }}>+{addedLines} lines added</span>
+                <div className="flex gap-4 mb-4">
+                  <div className="flex-1 p-3 bg-emerald-500/10 rounded-md">
+                    <span className="text-xs text-emerald-500">+{addedLines} lines added</span>
                   </div>
-                  <div style={{ flex: 1, padding: 12, background: 'rgba(239, 68, 68, 0.1)', borderRadius: 6 }}>
-                    <span style={{ fontSize: 12, color: '#f87171' }}>-{removedLines} lines removed</span>
+                  <div className="flex-1 p-3 bg-red-500/10 rounded-md">
+                    <span className="text-xs text-red-400">-{removedLines} lines removed</span>
                   </div>
                 </div>
-                <pre style={{
-                  fontSize: 12,
-                  color: '#c4c7d9',
-                  lineHeight: 1.6,
-                  margin: 0,
-                  whiteSpace: 'pre-wrap',
-                  wordWrap: 'break-word',
-                  background: '#1a1d2e',
-                  padding: 20,
-                  borderRadius: 8,
-                }}>
+                <pre className="text-xs text-[#c4c7d9] leading-relaxed m-0 whitespace-pre-wrap break-words bg-[#1a1d2e] p-5 rounded-lg">
 {selectedVersion.content.split('\n').map((line, i) => {
   const compareContent = mockVersions.find(v => v.id === compareVersion)?.content || '';
   const isAdded = !compareContent.includes(line) && line.trim();
 
   if (isAdded) {
-    return <div key={i} style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px' }}><span style={{ color: '#10b981', marginRight: 8 }}>+</span>{line}</div>;
+    return <div key={i} className="bg-emerald-500/15 px-2 py-0.5"><span className="text-emerald-500 mr-2">+</span>{line}</div>;
   }
-  return <div key={i} style={{ padding: '2px 8px' }}>{line || ' '}</div>;
+  return <div key={i} className="px-2 py-0.5">{line || ' '}</div>;
 })}
                 </pre>
               </div>
             ) : (
               /* Regular Content View */
-              <div style={{ padding: 20 }}>
-                <pre style={{
-                  fontSize: 13,
-                  color: '#c4c7d9',
-                  lineHeight: 1.8,
-                  margin: 0,
-                  whiteSpace: 'pre-wrap',
-                  wordWrap: 'break-word',
-                }}>
+              <div className="p-5">
+                <pre className="text-[13px] text-[#c4c7d9] leading-relaxed m-0 whitespace-pre-wrap break-words">
 {selectedVersion.content}
                 </pre>
               </div>

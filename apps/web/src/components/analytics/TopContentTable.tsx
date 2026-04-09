@@ -9,75 +9,66 @@ interface TopContentTableProps {
 export function TopContentTable({ data, loading }: TopContentTableProps) {
   if (loading) {
     return (
-      <div className="table-container">
-        <div className="table-header">
+      <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+        <div className="flex items-center gap-2 mb-4">
           <Trophy size={16} />
-          <span className="table-title">Top Performing Content</span>
+          <span className="text-sm font-semibold text-[#e2e4f0]">Top Performing Content</span>
         </div>
-        <div className="table-loading" />
-        <style>{`
-          .table-container { padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; }
-          .table-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-          .table-title { font-size: 14px; font-weight: 600; color: #e2e4f0; }
-          .table-loading { height: 200px; background: rgba(255,255,255,0.04); border-radius: 8px; animation: pulse 1.5s infinite; }
-          @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.8} }
-        `}</style>
+        <div className="h-[200px] bg-white/[0.04] rounded-lg animate-pulse" />
       </div>
     );
   }
 
+  const rankStyles = [
+    'bg-gradient-to-br from-amber-400 to-amber-500 text-[#1a1d2e]',
+    'bg-gradient-to-br from-gray-400 to-gray-500 text-[#1a1d2e]',
+    'bg-gradient-to-br from-amber-600 to-amber-700 text-[#1a1d2e]',
+  ];
+
   return (
-    <div className="table-container">
-      <div className="table-header">
-        <Trophy size={16} className="table-icon" />
-        <span className="table-title">Top Performing Content</span>
-        <span className="table-subtitle">{data.length} items</span>
+    <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+      <div className="flex items-center gap-2 mb-4">
+        <Trophy size={16} className="text-amber-400" />
+        <span className="text-sm font-semibold text-[#e2e4f0]">Top Performing Content</span>
+        <span className="text-xs text-[#555870] ml-auto">{data.length} items</span>
       </div>
-      <div className="table-wrapper">
-        <table className="content-table">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse min-w-[700px]">
           <thead>
             <tr>
-              <th className="content-table__th">Rank</th>
-              <th className="content-table__th">Title</th>
-              <th className="content-table__th">Author</th>
-              <th className="content-table__th">Views</th>
-              <th className="content-table__th">Engagement</th>
-              <th className="content-table__th">Avg Read Time</th>
-              <th className="content-table__th" />
+              {['Rank', 'Title', 'Author', 'Views', 'Engagement', 'Avg Read Time', ''].map((h, i) => (
+                <th key={i} className="px-3 py-2.5 text-left text-[11px] font-semibold tracking-wide uppercase text-[#555870] bg-white/[0.02] border-b border-white/[0.06]">{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {data.map((item, i) => (
-              <tr key={item.id} className="content-table__row">
-                <td className="content-table__td">
-                  <span className={`content-table__rank ${i < 3 ? `content-table__rank--${i + 1}` : ''}`}>
+              <tr key={item.id} className="transition-colors duration-150 hover:bg-white/[0.025]">
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px]">
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-xs font-semibold ${
+                    i < 3 ? rankStyles[i] : 'bg-white/5 text-[#555870]'
+                  }`}>
                     {i + 1}
                   </span>
                 </td>
-                <td className="content-table__td">
-                  <span className="content-table__title">{item.title}</span>
-                  <span className="content-table__date">{new Date(item.publishedAt).toLocaleDateString()}</span>
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px]">
+                  <span className="block font-medium text-[#e2e4f0] mb-0.5">{item.title}</span>
+                  <span className="block text-[11px] text-[#555870]">{new Date(item.publishedAt).toLocaleDateString()}</span>
                 </td>
-                <td className="content-table__td">
-                  <span className="content-table__author">{item.author}</span>
-                </td>
-                <td className="content-table__td">
-                  <span className="content-table__value">{item.views.toLocaleString()}</span>
-                </td>
-                <td className="content-table__td">
-                  <div className="engagement-bar">
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px] text-[#8b8fa8]">{item.author}</td>
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px] font-semibold text-[#e2e4f0]">{item.views.toLocaleString()}</td>
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px]">
+                  <div className="flex items-center gap-2">
                     <div
-                      className="engagement-bar__fill"
+                      className="h-1.5 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-sm min-w-1"
                       style={{ width: `${item.engagement}%` }}
                     />
-                    <span className="engagement-bar__value">{item.engagement}%</span>
+                    <span className="text-[11px] font-semibold text-[#e2e4f0] min-w-[35px]">{item.engagement}%</span>
                   </div>
                 </td>
-                <td className="content-table__td">
-                  <span className="content-table__time">{item.avgReadTime}</span>
-                </td>
-                <td className="content-table__td content-table__td--action">
-                  <button className="content-table__action" title="View details">
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px] text-[#555870] font-mono">{item.avgReadTime}</td>
+                <td className="px-3 py-3 border-b border-white/[0.04] text-[13px] w-10 text-center">
+                  <button className="inline-flex items-center justify-center w-7 h-7 bg-white/5 border-none rounded-md text-[#555870] cursor-pointer transition-all duration-150 hover:bg-white/10 hover:text-[#e2e4f0]" title="View details">
                     <ExternalLink size={14} />
                   </button>
                 </td>
@@ -86,34 +77,6 @@ export function TopContentTable({ data, loading }: TopContentTableProps) {
           </tbody>
         </table>
       </div>
-      <style>{`
-        .table-container { padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; }
-        .table-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-        .table-icon { color: #fbbf24; }
-        .table-title { font-size: 14px; font-weight: 600; color: #e2e4f0; }
-        .table-subtitle { font-size: 12px; color: #555870; margin-left: auto; }
-        .table-wrapper { overflow-x: auto; }
-        .content-table { width: 100%; border-collapse: collapse; min-width: 700px; }
-        .content-table__th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #555870; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .content-table__row { transition: background 0.15s; }
-        .content-table__row:hover { background: rgba(255,255,255,0.025); }
-        .content-table__td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; }
-        .content-table__td--action { width: 40px; text-align: center; }
-        .content-table__rank { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #555870; background: rgba(255,255,255,0.05); }
-        .content-table__rank--1 { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #1a1d2e; }
-        .content-table__rank--2 { background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); color: #1a1d2e; }
-        .content-table__rank--3 { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); color: #1a1d2e; }
-        .content-table__title { display: block; font-weight: 500; color: #e2e4f0; margin-bottom: 2px; }
-        .content-table__date { display: block; font-size: 11px; color: #555870; }
-        .content-table__author { color: #8b8fa8; }
-        .content-table__value { font-weight: 600; color: #e2e4f0; }
-        .content-table__time { color: #555870; font-family: monospace; }
-        .content-table__action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: rgba(255,255,255,0.05); border: none; border-radius: 6px; color: #555870; cursor: pointer; transition: all 0.15s; }
-        .content-table__action:hover { background: rgba(255,255,255,0.1); color: #e2e4f0; }
-        .engagement-bar { display: flex; align-items: center; gap: 8px; }
-        .engagement-bar__fill { height: 6px; background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%); border-radius: 3px; min-width: 4px; }
-        .engagement-bar__value { font-size: 11px; font-weight: 600; color: #e2e4f0; min-width: 35px; }
-      `}</style>
     </div>
   );
 }

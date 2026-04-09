@@ -29,82 +29,46 @@ export function ContentCard({ item }: ContentCardProps) {
   const TypeIcon = typeIcons[item.type];
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 10,
-      overflow: 'hidden',
-      transition: 'all 0.2s',
-      cursor: 'pointer',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-4px)';
-      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
-    }}
-    >
+    <div className="bg-white/[0.03] border border-white/[0.07] rounded-[10px] overflow-hidden transition-all duration-200 cursor-pointer hover:-translate-y-1 hover:border-violet-500/30">
       {/* Thumbnail */}
-      <div style={{
-        height: 140,
-        background: `linear-gradient(135deg, ${typeColors[item.type]}22, ${typeColors[item.type]}11)`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+      <div
+        className="h-[140px] flex items-center justify-center"
+        style={{ background: `linear-gradient(135deg, ${typeColors[item.type]}22, ${typeColors[item.type]}11)` }}
+      >
         <TypeIcon size={48} style={{ color: typeColors[item.type], opacity: 0.8 }} />
       </div>
 
       {/* Content */}
-      <div style={{ padding: 16 }}>
+      <div className="p-4">
         {/* Status badge */}
-        <span style={{
-          fontSize: 10,
-          padding: '3px 8px',
-          borderRadius: 12,
-          background: `${statusColors[item.status]}22`,
-          color: statusColors[item.status],
-          fontWeight: 600,
-          textTransform: 'uppercase',
-        }}>{item.status}</span>
+        <span
+          className="text-[10px] px-2 py-0.5 rounded-xl font-semibold uppercase"
+          style={{ background: `${statusColors[item.status]}22`, color: statusColors[item.status] }}
+        >{item.status}</span>
 
         {/* Title */}
-        <h3 style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: '#e2e4f0',
-          margin: '8px 0',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-        }}>{item.title}</h3>
+        <h3 className="text-sm font-semibold text-[#e2e4f0] my-2 overflow-hidden text-ellipsis line-clamp-2">
+          {item.title}
+        </h3>
 
         {/* Author */}
-        <p style={{ fontSize: 12, color: '#555870', margin: '0 0 12px' }}>by {item.author}</p>
+        <p className="text-xs text-[#555870] mb-3">by {item.author}</p>
 
         {/* Tags */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+        <div className="flex flex-wrap gap-1 mb-3">
           {item.tags.map(tag => (
-            <span key={tag} style={{
-              fontSize: 10,
-              padding: '2px 6px',
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: 4,
-              color: '#8b8fa8',
-            }}>{tag}</span>
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-white/5 rounded text-[#8b8fa8]">
+              {tag}
+            </span>
           ))}
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <span style={{ fontSize: 11, color: '#555870' }}>
+        <div className="flex justify-between items-center pt-3 border-t border-white/5">
+          <span className="text-[11px] text-[#555870]">
             {item.type === 'video' || item.type === 'article' ? `${item.views.toLocaleString()} views` : 'New'}
           </span>
-          <span style={{ fontSize: 11, color: '#555870' }}>
+          <span className="text-[11px] text-[#555870]">
             {new Date(item.createdAt).toLocaleDateString()}
           </span>
         </div>
@@ -115,11 +79,7 @@ export function ContentCard({ item }: ContentCardProps) {
 
 export function ContentGrid({ items }: { items: ContentItem[] }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-      gap: 20,
-    }}>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5">
       {items.map(item => <ContentCard key={item.id} item={item} />)}
     </div>
   );

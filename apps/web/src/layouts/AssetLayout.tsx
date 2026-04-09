@@ -37,84 +37,40 @@ export default function AssetLayout() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="flex flex-col h-screen">
       {/* Header */}
-      <div style={{ padding: 24, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: '0 0 16px' }}>Asset Management</h1>
-        
+      <div className="p-6 border-b border-white/5">
+        <h1 className="text-2xl font-bold text-[#e2e4f0] mb-4">Asset Management</h1>
+
         {/* Upload Dropzone */}
-        <div style={{
-          padding: 24,
-          background: 'rgba(139, 92, 246, 0.05)',
-          border: '2px dashed rgba(139, 92, 246, 0.3)',
-          borderRadius: 12,
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-          cursor: 'pointer',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-          e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(139, 92, 246, 0.05)';
-          e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-        }}
-        >
+        <div className="p-6 bg-violet-500/5 border-2 border-dashed border-violet-500/30 rounded-xl mb-4 flex items-center justify-center gap-3 cursor-pointer hover:bg-violet-500/10 hover:border-violet-500/50 transition-colors">
           <Upload size={24} color="#a78bfa" />
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 14, fontWeight: 500, color: '#e2e4f0', margin: 0 }}>
+          <div className="text-center">
+            <p className="text-sm font-medium text-[#e2e4f0] m-0">
               Drop files here or click to upload
             </p>
-            <p style={{ fontSize: 12, color: '#555870', margin: '4px 0 0' }}>
+            <p className="text-xs text-[#555870] mt-1 mb-0">
               Supports: Images, Videos, Documents, Audio (Max 25MB)
             </p>
           </div>
         </div>
 
         {/* Search & Filter */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search size={16} style={{
-              position: 'absolute',
-              left: 12,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#555870',
-            }} />
+        <div className="flex gap-3">
+          <div className="flex-1 relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search assets..."
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 40px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                color: '#e2e4f0',
-                fontSize: 13,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+              className="w-full py-2.5 pr-3 pl-10 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
             />
           </div>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            style={{
-              padding: '10px 12px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8,
-              color: '#e2e4f0',
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
+            className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer"
           >
             <option value="all">All Types</option>
             <option value="image">Images</option>
@@ -126,54 +82,30 @@ export default function AssetLayout() {
       </div>
 
       {/* Main Content */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="flex flex-1 overflow-hidden">
         {/* Asset Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: 16,
-          }}>
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
             {filteredAssets.map((asset) => {
               const Icon = typeIcons[asset.type];
               return (
                 <div
                   key={asset.id}
                   onClick={() => setSelectedAsset(asset)}
-                  style={{
-                    background: selectedAsset?.id === asset.id
-                      ? 'rgba(139, 92, 246, 0.15)'
-                      : 'rgba(255,255,255,0.03)',
-                    border: selectedAsset?.id === asset.id
-                      ? '1px solid rgba(139, 92, 246, 0.4)'
-                      : '1px solid rgba(255,255,255,0.07)',
-                    borderRadius: 10,
-                    padding: 16,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
+                  className={`rounded-[10px] p-4 cursor-pointer transition-all duration-200 ${
+                    selectedAsset?.id === asset.id
+                      ? 'bg-violet-500/15 border border-violet-500/40'
+                      : 'bg-white/[0.03] border border-white/[0.07]'
+                  }`}
                 >
-                  <div style={{
-                    aspectRatio: '1',
-                    background: `${typeColors[asset.type]}22`,
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 12,
-                  }}>
+                  <div
+                    className="aspect-square rounded-lg flex items-center justify-center mb-3"
+                    style={{ background: `${typeColors[asset.type]}22` }}
+                  >
                     <Icon size={32} color={typeColors[asset.type]} />
                   </div>
-                  <p style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#e2e4f0',
-                    margin: '0 0 4px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>{asset.name}</p>
-                  <p style={{ fontSize: 10, color: '#555870', margin: 0 }}>{asset.size} • {asset.uploadedAt}</p>
+                  <p className="text-xs font-medium text-[#e2e4f0] mb-1 overflow-hidden text-ellipsis whitespace-nowrap">{asset.name}</p>
+                  <p className="text-[10px] text-[#555870] m-0">{asset.size} • {asset.uploadedAt}</p>
                 </div>
               );
             })}
@@ -182,39 +114,22 @@ export default function AssetLayout() {
 
         {/* Asset Detail Drawer */}
         {selectedAsset && (
-          <div style={{
-            width: 320,
-            background: 'rgba(255,255,255,0.03)',
-            borderLeft: '1px solid rgba(255,255,255,0.05)',
-            padding: 24,
-            overflowY: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 600, color: '#e2e4f0', margin: 0 }}>Asset Details</h2>
+          <div className="w-80 bg-white/[0.03] border-l border-white/5 p-6 overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-base font-semibold text-[#e2e4f0] m-0">Asset Details</h2>
               <button
                 onClick={() => setSelectedAsset(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#555870',
-                  cursor: 'pointer',
-                  padding: 4,
-                }}
+                className="bg-transparent border-none text-[#555870] cursor-pointer p-1"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Preview */}
-            <div style={{
-              aspectRatio: '1',
-              background: `${typeColors[selectedAsset.type]}22`,
-              borderRadius: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 20,
-            }}>
+            <div
+              className="aspect-square rounded-[10px] flex items-center justify-center mb-5"
+              style={{ background: `${typeColors[selectedAsset.type]}22` }}
+            >
               {(() => {
                 const Icon = typeIcons[selectedAsset.type];
                 return <Icon size={64} color={typeColors[selectedAsset.type]} />;
@@ -222,55 +137,31 @@ export default function AssetLayout() {
             </div>
 
             {/* Details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex flex-col gap-3">
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#555870', display: 'block', marginBottom: 4 }}>Name</label>
-                <p style={{ fontSize: 13, color: '#e2e4f0', margin: 0 }}>{selectedAsset.name}</p>
+                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Name</label>
+                <p className="text-[13px] text-[#e2e4f0] m-0">{selectedAsset.name}</p>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#555870', display: 'block', marginBottom: 4 }}>Type</label>
-                <p style={{ fontSize: 13, color: '#e2e4f0', margin: 0, textTransform: 'capitalize' }}>{selectedAsset.type}</p>
+                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Type</label>
+                <p className="text-[13px] text-[#e2e4f0] m-0 capitalize">{selectedAsset.type}</p>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#555870', display: 'block', marginBottom: 4 }}>Size</label>
-                <p style={{ fontSize: 13, color: '#e2e4f0', margin: 0 }}>{selectedAsset.size}</p>
+                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Size</label>
+                <p className="text-[13px] text-[#e2e4f0] m-0">{selectedAsset.size}</p>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#555870', display: 'block', marginBottom: 4 }}>Uploaded</label>
-                <p style={{ fontSize: 13, color: '#e2e4f0', margin: 0 }}>{selectedAsset.uploadedAt}</p>
+                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Uploaded</label>
+                <p className="text-[13px] text-[#e2e4f0] m-0">{selectedAsset.uploadedAt}</p>
               </div>
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
-              <button style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                padding: '10px 16px',
-                background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                border: 'none',
-                borderRadius: 6,
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}>
+            <div className="flex gap-2 mt-6">
+              <button className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-br from-violet-500 to-cyan-500 border-none rounded-md text-white text-[13px] font-medium cursor-pointer">
                 <Download size={16} /> Download
               </button>
-              <button style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '10px 12px',
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: 6,
-                color: '#f87171',
-                cursor: 'pointer',
-              }}>
+              <button className="flex items-center justify-center px-3 py-2.5 bg-red-500/15 border border-red-500/30 rounded-md text-red-400 cursor-pointer">
                 <Trash2 size={16} />
               </button>
             </div>

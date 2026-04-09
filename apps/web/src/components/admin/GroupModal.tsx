@@ -10,6 +10,8 @@ interface GroupModalProps {
   onSave: (data: Omit<Group, 'id' | 'createdAt'>) => Promise<void>;
 }
 
+const inputClass = "w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none transition-colors duration-150 focus:border-violet-400/50 resize-y";
+
 export default function GroupModal({ group, users, roles, onClose, onSave }: GroupModalProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -64,54 +66,38 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
   };
 
   return (
-    <div className="group-modal-overlay" onClick={onClose}>
-      <div className="group-modal" onClick={e => e.stopPropagation()}>
-        <div className="group-modal-header">
-          <h2>{group ? 'Edit Group' : 'Create Group'}</h2>
-          <button className="group-modal-close" onClick={onClose}><X size={18} /></button>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#1a1d29] border border-white/10 rounded-xl w-full max-w-[520px] max-h-[90vh] overflow-y-auto shadow-[0_20px_60px_rgba(0,0,0,0.4)]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08]">
+          <h2 className="m-0 text-lg font-semibold text-[#e2e4f0]">{group ? 'Edit Group' : 'Create Group'}</h2>
+          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-1 flex rounded hover:bg-white/5 hover:text-[#e2e4f0]" onClick={onClose}><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="group-modal-form">
-          {error && <div className="group-modal-error">{error}</div>}
+        <form onSubmit={handleSubmit} className="p-6">
+          {error && <div className="bg-red-400/10 border border-red-400/30 rounded-lg p-3 text-red-400 text-[13px] mb-4">{error}</div>}
 
-          <div className="group-modal-field">
-            <label>Group Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Engineering Team"
-              required
-            />
+          <div className="mb-5">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-2">Group Name</label>
+            <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Engineering Team" required className={inputClass} />
           </div>
 
-          <div className="group-modal-field">
-            <label>Description</label>
-            <textarea
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe the group's purpose..."
-              rows={3}
-              required
-            />
+          <div className="mb-5">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-2">Description</label>
+            <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the group's purpose..." rows={3} required className={inputClass} />
           </div>
 
-          <div className="group-modal-field">
-            <label>Members</label>
-            <div className="group-modal-members">
+          <div className="mb-5">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-2">Members</label>
+            <div className="flex flex-col gap-2 p-3 bg-white/[0.03] border border-white/[0.06] rounded-lg max-h-[180px] overflow-y-auto">
               {users.length === 0 ? (
-                <span className="group-modal-no-items">No users available</span>
+                <span className="text-xs text-[#555870]">No users available</span>
               ) : (
                 users.map(user => (
-                  <label key={user.id} className="group-modal-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={formData.members.includes(user.id)}
-                      onChange={() => toggleMember(user.id)}
-                    />
-                    <div className="group-modal-user-info">
-                      <span className="group-modal-user-name">{user.name}</span>
-                      <span className="group-modal-user-email">{user.email}</span>
+                  <label key={user.id} className="flex items-center gap-2.5 text-[13px] text-[#c4c7d9] cursor-pointer px-2 py-1.5 rounded-md transition-colors duration-150 hover:bg-white/5">
+                    <input type="checkbox" checked={formData.members.includes(user.id)} onChange={() => toggleMember(user.id)} className="accent-violet-400 cursor-pointer w-4 h-4" />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium text-[#e2e4f0]">{user.name}</span>
+                      <span className="text-[11px] text-[#555870]">{user.email}</span>
                     </div>
                   </label>
                 ))
@@ -119,19 +105,15 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
             </div>
           </div>
 
-          <div className="group-modal-field">
-            <label>Group Roles</label>
-            <div className="group-modal-roles">
+          <div className="mb-5">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-2">Group Roles</label>
+            <div className="flex flex-col gap-2 p-3 bg-white/[0.03] border border-white/[0.06] rounded-lg max-h-[180px] overflow-y-auto">
               {roles.length === 0 ? (
-                <span className="group-modal-no-items">No roles available</span>
+                <span className="text-xs text-[#555870]">No roles available</span>
               ) : (
                 roles.map(role => (
-                  <label key={role.id} className="group-modal-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={formData.roles.includes(role.id)}
-                      onChange={() => toggleRole(role.id)}
-                    />
+                  <label key={role.id} className="flex items-center gap-2.5 text-[13px] text-[#c4c7d9] cursor-pointer px-2 py-1.5 rounded-md transition-colors duration-150 hover:bg-white/5">
+                    <input type="checkbox" checked={formData.roles.includes(role.id)} onChange={() => toggleRole(role.id)} className="accent-violet-400 cursor-pointer w-4 h-4" />
                     <span>{role.name}</span>
                   </label>
                 ))
@@ -139,193 +121,16 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
             </div>
           </div>
 
-          <div className="group-modal-actions">
-            <button type="button" className="group-modal-btn-cancel" onClick={onClose}>
+          <div className="flex gap-2.5 justify-end mt-6 pt-5 border-t border-white/[0.08]">
+            <button type="button" className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#9094ae] text-[13px] cursor-pointer transition-all duration-150 hover:bg-white/[0.08] hover:text-[#e2e4f0]" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="group-modal-btn-save" disabled={loading}>
+            <button type="submit" className="px-5 py-2.5 bg-violet-400/15 border border-violet-400/30 rounded-lg text-violet-400 text-[13px] font-medium cursor-pointer transition-all duration-150 hover:bg-violet-400/25 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
               {loading ? 'Saving...' : (group ? 'Update Group' : 'Create Group')}
             </button>
           </div>
         </form>
       </div>
-
-      <style>{`
-        .group-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.7);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          backdrop-filter: blur(4px);
-        }
-        .group-modal {
-          background: #1a1d29;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
-          width: 100%;
-          max-width: 520px;
-          max-height: 90vh;
-          overflow-y: auto;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        }
-        .group-modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 20px 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .group-modal-header h2 {
-          margin: 0;
-          font-size: 18px;
-          font-weight: 600;
-          color: #e2e4f0;
-        }
-        .group-modal-close {
-          background: none;
-          border: none;
-          color: #555870;
-          cursor: pointer;
-          padding: 4px;
-          display: flex;
-          border-radius: 4px;
-        }
-        .group-modal-close:hover {
-          background: rgba(255, 255, 255, 0.05);
-          color: #e2e4f0;
-        }
-        .group-modal-form {
-          padding: 24px;
-        }
-        .group-modal-error {
-          background: rgba(248, 113, 113, 0.1);
-          border: 1px solid rgba(248, 113, 113, 0.3);
-          border-radius: 8px;
-          padding: 12px;
-          color: #f87171;
-          font-size: 13px;
-          margin-bottom: 16px;
-        }
-        .group-modal-field {
-          margin-bottom: 20px;
-        }
-        .group-modal-field label {
-          display: block;
-          font-size: 13px;
-          font-weight: 500;
-          color: #c4c7d9;
-          margin-bottom: 8px;
-        }
-        .group-modal-field input[type="text"],
-        .group-modal-field textarea {
-          width: 100%;
-          padding: 10px 12px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          color: #e2e4f0;
-          font-size: 13px;
-          outline: none;
-          transition: border-color 0.15s;
-          resize: vertical;
-        }
-        .group-modal-field input:focus,
-        .group-modal-field textarea:focus {
-          border-color: rgba(167, 139, 250, 0.5);
-        }
-        .group-modal-members,
-        .group-modal-roles {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          padding: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 8px;
-          max-height: 180px;
-          overflow-y: auto;
-        }
-        .group-modal-no-items {
-          font-size: 12px;
-          color: #555870;
-        }
-        .group-modal-checkbox {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 13px;
-          color: #c4c7d9;
-          cursor: pointer;
-          padding: 6px 8px;
-          border-radius: 6px;
-          transition: background 0.15s;
-        }
-        .group-modal-checkbox:hover {
-          background: rgba(255, 255, 255, 0.05);
-        }
-        .group-modal-checkbox input {
-          accent-color: #a78bfa;
-          cursor: pointer;
-          width: 16px;
-          height: 16px;
-        }
-        .group-modal-user-info {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .group-modal-user-name {
-          font-weight: 500;
-          color: #e2e4f0;
-        }
-        .group-modal-user-email {
-          font-size: 11px;
-          color: #555870;
-        }
-        .group-modal-actions {
-          display: flex;
-          gap: 10px;
-          justify-content: flex-end;
-          margin-top: 24px;
-          padding-top: 20px;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .group-modal-btn-cancel {
-          padding: 10px 20px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          color: #9094ae;
-          font-size: 13px;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .group-modal-btn-cancel:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: #e2e4f0;
-        }
-        .group-modal-btn-save {
-          padding: 10px 20px;
-          background: rgba(167, 139, 250, 0.15);
-          border: 1px solid rgba(167, 139, 250, 0.3);
-          border-radius: 8px;
-          color: #a78bfa;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .group-modal-btn-save:hover:not(:disabled) {
-          background: rgba(167, 139, 250, 0.25);
-        }
-        .group-modal-btn-save:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-      `}</style>
     </div>
   );
 }

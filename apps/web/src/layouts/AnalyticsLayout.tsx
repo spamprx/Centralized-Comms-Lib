@@ -10,12 +10,12 @@ import { TopContentTable } from '../components/analytics/TopContentTable';
 // Simple KPI Card component
 function KPICardsRow({ kpis }: { kpis: any[] }) {
   return (
-    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+    <div className="flex gap-4 flex-wrap mb-6">
       {kpis?.map((kpi, i) => (
-        <div key={i} style={{ padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 10, minWidth: 200, flex: 1 }}>
-          <div style={{ fontSize: 11, color: '#555870', textTransform: 'uppercase', marginBottom: 8 }}>{kpi.label}</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', marginBottom: 4 }}>{kpi.value}</div>
-          <div style={{ fontSize: 12, color: kpi.trend === 'up' ? '#34d399' : kpi.trend === 'down' ? '#f87171' : '#6b7280' }}>
+        <div key={i} className="p-4 bg-white/[0.03] rounded-[10px] min-w-[200px] flex-1">
+          <div className="text-[11px] text-[#555870] uppercase mb-2">{kpi.label}</div>
+          <div className="text-2xl font-bold text-[#e2e4f0] mb-1">{kpi.value}</div>
+          <div className={`text-xs ${kpi.trend === 'up' ? 'text-emerald-400' : kpi.trend === 'down' ? 'text-red-400' : 'text-gray-500'}`}>
             {kpi.change > 0 ? '+' : ''}{kpi.change.toFixed(1)}%
           </div>
         </div>
@@ -39,33 +39,25 @@ export default function AnalyticsLayout() {
   } = useAnalytics(dateRange);
 
   if (error) {
-    return <div style={{ padding: 24, color: '#f87171' }}>Error: {error}</div>;
+    return <div className="p-6 text-red-400">Error: {error}</div>;
   }
 
   if (loading) {
-    return <div style={{ padding: 24, color: '#8b8fa8' }}>Loading analytics...</div>;
+    return <div className="p-6 text-[#8b8fa8]">Loading analytics...</div>;
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div className="p-6 max-w-[1400px] mx-auto">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: 0 }}>Analytics Dashboard</h1>
-          <p style={{ fontSize: 13, color: '#555870', margin: '4px 0 0' }}>Track your content performance and engagement metrics</p>
+          <h1 className="text-2xl font-bold text-[#e2e4f0] m-0">Analytics Dashboard</h1>
+          <p className="text-[13px] text-[#555870] mt-1 mb-0">Track your content performance and engagement metrics</p>
         </div>
         <select
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
+          className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer"
         >
           <option value="7d">Last 7 days</option>
           <option value="14d">Last 14 days</option>
@@ -78,13 +70,13 @@ export default function AnalyticsLayout() {
       <KPICardsRow kpis={kpis} />
 
       {/* Charts Row 1 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(500px,1fr))] gap-4 mb-4">
         <ViewsLineChart data={viewsData} loading={loading} />
         <EngagementBarChart data={engagementData} loading={loading} />
       </div>
 
       {/* Charts Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(350px,1fr))] gap-4 mb-4">
         <ReadingTimeHistogram data={readingTimeData} loading={loading} />
         <ContentTypeBreakdownPie data={contentTypeData} loading={loading} />
         <AIAnalysisSummaryCard data={aiInsights} loading={loading} />

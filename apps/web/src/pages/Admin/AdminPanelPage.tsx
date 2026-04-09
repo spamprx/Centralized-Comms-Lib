@@ -18,34 +18,13 @@ export default function AdminPanelPage() {
   };
 
   return (
-    <div className="admin-page">
+    <div className="flex h-screen bg-[#0b0d14] font-sans text-[#e2e4f0] overflow-hidden">
       <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className="admin-main">
-        <div className="admin-content">
+      <main className="flex-1 overflow-y-auto min-w-0">
+        <div className="p-6 max-w-[1400px] mx-auto">
           {renderTab()}
         </div>
       </main>
-
-      <style>{`
-        .admin-page {
-          display: flex;
-          height: 100vh;
-          background: #0b0d14;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          color: #e2e4f0;
-          overflow: hidden;
-        }
-        .admin-main {
-          flex: 1;
-          overflow-y: auto;
-          min-width: 0;
-        }
-        .admin-content {
-          padding: 24px;
-          max-width: 1400px;
-          margin: 0 auto;
-        }
-      `}</style>
     </div>
   );
 }

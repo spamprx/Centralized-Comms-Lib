@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Users, CheckCircle, Clock, Loader2, MessageCircle } from 'lucide-react';
 import { reviewService, type ReviewRequest } from '../services/reviewService';
 import { adminUserService } from '../services/adminService';
-import { useReview } from '../context/ReviewContext';
+import { useReviewStore } from '../store/reviewStore';
 
 type ReviewFeedbackInfo = {
   requestId: string;
@@ -34,7 +34,7 @@ export default function ReviewFeedbackModal({
   contentTitle,
   onClose,
 }: ReviewFeedbackModalProps) {
-  const { getDecision: ctxGetDecision, getComments: ctxGetComments } = useReview();
+  const { getDecision: ctxGetDecision, getComments: ctxGetComments } = useReviewStore();
   const [feedbackList, setFeedbackList] = useState<ReviewFeedbackInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +44,6 @@ export default function ReviewFeedbackModal({
       try {
         setLoading(true);
 
-        // Get all users to resolve reviewer names
         let userMap: Record<string, { displayName: string; email: string }> = {};
         try {
           const usersRes = await adminUserService.getUsers();
@@ -56,10 +55,8 @@ export default function ReviewFeedbackModal({
           // Non-critical
         }
 
-        // Get review requests for this content
         const requests: ReviewRequest[] = await reviewService.listForContent(contentId);
 
-        // For each request, get full details including assignments
         const feedbacks: ReviewFeedbackInfo[] = [];
         for (const req of requests) {
           try {
@@ -67,10 +64,8 @@ export default function ReviewFeedbackModal({
             const assignments = await Promise.all((fullRequest.assignments || []).map(async (a) => {
               const reviewer = userMap[a.reviewerId];
               
-              // 1. Check for standalone independent comments from ReviewContext
               const standaloneComments = ctxGetComments(a.id);
 
-              // 2. Check for final decision from ReviewContext
               let decisionData = null;
               if (a.status === 'COMPLETED') {
                 const ctxDecision = ctxGetDecision(a.id);
@@ -116,157 +111,90 @@ export default function ReviewFeedbackModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(4px)',
-      }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        style={{
-          width: 520,
-          maxHeight: '80vh',
-          background: '#1a1d2e',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 16,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
-        }}
+        className="w-[520px] max-h-[80vh] bg-[#1a1d2e] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <div className="px-6 py-5 border-b border-white/[0.07] flex justify-between items-center">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div className="flex items-center gap-2 mb-1">
               <MessageCircle size={18} color="#a78bfa" />
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e4f0', margin: 0 }}>
+              <h2 className="text-base font-bold text-[#e2e4f0] m-0">
                 Review Feedback
               </h2>
             </div>
-            <p style={{
-              fontSize: 12,
-              color: '#555870',
-              margin: 0,
-              maxWidth: 380,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
+            <p className="text-xs text-[#555870] m-0 max-w-[380px] overflow-hidden text-ellipsis whitespace-nowrap">
               {contentTitle}
             </p>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: 'none',
-              borderRadius: 8,
-              padding: 8,
-              color: '#8b8fa8',
-              cursor: 'pointer',
-            }}
+            className="bg-white/5 border-none rounded-lg p-2 text-[#8b8fa8] cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
-              <Loader2 size={24} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
+            <div className="flex justify-center p-8">
+              <Loader2 size={24} color="#a78bfa" className="animate-spin" />
             </div>
           ) : error ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#f87171', fontSize: 13 }}>
+            <div className="p-6 text-center text-red-400 text-[13px]">
               {error}
             </div>
           ) : feedbackList.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#555870', fontSize: 13 }}>
+            <div className="p-8 text-center text-[#555870] text-[13px]">
               No review requests found for this content.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="flex flex-col gap-4">
               {feedbackList.map((feedback) => (
                 <div
                   key={feedback.requestId}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    overflow: 'hidden',
-                  }}
+                  className="bg-white/[0.03] rounded-xl border border-white/[0.06] overflow-hidden"
                 >
                   {/* Request Header */}
-                  <div style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
                       <Users size={14} color="#8b8fa8" />
-                      <span style={{ fontSize: 12, color: '#8b8fa8' }}>
+                      <span className="text-xs text-[#8b8fa8]">
                         Review Request
                       </span>
                     </div>
-                    <span style={{
-                      fontSize: 10,
-                      padding: '2px 8px',
-                      borderRadius: 8,
-                      background: feedback.status === 'CLOSED'
-                        ? 'rgba(16,185,129,0.15)'
-                        : 'rgba(251,191,36,0.15)',
-                      color: feedback.status === 'CLOSED' ? '#10b981' : '#fbbf24',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                    }}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold uppercase ${
+                      feedback.status === 'CLOSED'
+                        ? 'bg-emerald-500/15 text-emerald-500'
+                        : 'bg-amber-400/15 text-amber-400'
+                    }`}>
                       {feedback.status}
                     </span>
                   </div>
 
                   {/* Assignments */}
-                  <div style={{ padding: '8px 16px 16px' }}>
+                  <div className="px-4 py-2 pb-4">
                     {feedback.assignments.length === 0 ? (
-                      <div style={{ padding: 12, textAlign: 'center', color: '#555870', fontSize: 12 }}>
+                      <div className="p-3 text-center text-[#555870] text-xs">
                         No reviewers assigned yet
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div className="flex flex-col gap-2">
                         {feedback.assignments.map((assignment) => {
                           const isCompleted = assignment.status === 'COMPLETED';
                           return (
-                            <div key={assignment.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div key={assignment.id} className="flex flex-col gap-2">
                               <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 12,
-                                  padding: '12px 14px',
-                                  background: isCompleted
-                                    ? 'rgba(16,185,129,0.06)'
-                                    : 'rgba(255,255,255,0.02)',
-                                  borderRadius: 8,
-                                  border: isCompleted
-                                    ? '1px solid rgba(16,185,129,0.15)'
-                                    : '1px solid rgba(255,255,255,0.04)',
-                                }}
+                                className={`flex items-center gap-3 px-3.5 py-3 rounded-lg ${
+                                  isCompleted
+                                    ? 'bg-emerald-500/[0.06] border border-emerald-500/15'
+                                    : 'bg-white/[0.02] border border-white/[0.04]'
+                                }`}
                               >
                                 {/* Status icon */}
                                 {isCompleted ? (
@@ -277,46 +205,31 @@ export default function ReviewFeedbackModal({
 
                                 {/* Reviewer avatar */}
                                 <div
-                                  style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: '50%',
-                                    background: isCompleted
-                                      ? 'linear-gradient(135deg, #10b981, #06b6d4)'
-                                      : 'linear-gradient(135deg, #374151, #4b5563)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#fff',
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    flexShrink: 0,
-                                  }}
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[13px] font-semibold shrink-0 ${
+                                    isCompleted
+                                      ? 'bg-gradient-to-br from-emerald-500 to-cyan-500'
+                                      : 'bg-gradient-to-br from-gray-700 to-gray-600'
+                                  }`}
                                 >
                                   {assignment.reviewerName[0].toUpperCase()}
                                 </div>
 
                                 {/* Reviewer info */}
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e4f0' }}>
+                                <div className="flex-1">
+                                  <div className="text-[13px] font-medium text-[#e2e4f0]">
                                     {assignment.reviewerName}
                                   </div>
-                                  <div style={{ fontSize: 11, color: '#555870' }}>
+                                  <div className="text-[11px] text-[#555870]">
                                     {assignment.reviewerEmail}
                                   </div>
                                 </div>
 
                                 {/* Status label */}
-                                <span style={{
-                                  fontSize: 10,
-                                  padding: '3px 8px',
-                                  borderRadius: 6,
-                                  background: isCompleted
-                                    ? 'rgba(16,185,129,0.15)'
-                                    : 'rgba(251,191,36,0.15)',
-                                  color: isCompleted ? '#10b981' : '#fbbf24',
-                                  fontWeight: 600,
-                                }}>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
+                                  isCompleted
+                                    ? 'bg-emerald-500/15 text-emerald-500'
+                                    : 'bg-amber-400/15 text-amber-400'
+                                }`}>
                                   {isCompleted
                                     ? `Reviewed ${assignment.completedAt ? new Date(assignment.completedAt).toLocaleDateString() : ''}`
                                     : 'Pending'}
@@ -325,24 +238,16 @@ export default function ReviewFeedbackModal({
                               
                               {/* Decision Feedback Details */}
                               {isCompleted && assignment.decision && (
-                                <div style={{
-                                  marginLeft: 44, // Align with text
-                                  padding: '12px 14px',
-                                  background: 'rgba(255,255,255,0.03)',
-                                  borderRadius: 8,
-                                  borderLeft: `3px solid ${assignment.decision.verdict === 'APPROVED' ? '#10b981' : '#f87171'}`,
-                                  marginBottom: 8,
-                                }}>
-                                  <div style={{ 
-                                    fontSize: 11, 
-                                    fontWeight: 600, 
-                                    color: assignment.decision.verdict === 'APPROVED' ? '#10b981' : '#f87171',
-                                    marginBottom: 4,
-                                    textTransform: 'uppercase'
-                                  }}>
+                                <div
+                                  className="ml-11 px-3.5 py-3 bg-white/[0.03] rounded-lg mb-2"
+                                  style={{ borderLeft: `3px solid ${assignment.decision.verdict === 'APPROVED' ? '#10b981' : '#f87171'}` }}
+                                >
+                                  <div className={`text-[11px] font-semibold mb-1 uppercase ${
+                                    assignment.decision.verdict === 'APPROVED' ? 'text-emerald-500' : 'text-red-400'
+                                  }`}>
                                     {assignment.decision.verdict}
                                   </div>
-                                  <div style={{ fontSize: 13, color: '#c4c7d9', lineHeight: 1.5 }}>
+                                  <div className="text-[13px] text-[#c4c7d9] leading-relaxed">
                                     {assignment.decision.comment}
                                   </div>
                                 </div>
@@ -350,21 +255,16 @@ export default function ReviewFeedbackModal({
 
                               {/* Standalone Comments */}
                               {assignment.standaloneComments && assignment.standaloneComments.length > 0 && (
-                                <div style={{ marginLeft: 44, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <div className="ml-11 flex flex-col gap-1.5">
                                   {assignment.standaloneComments.map((comment, idx) => (
-                                    <div key={idx} style={{
-                                      padding: '10px 12px',
-                                      background: 'rgba(255,255,255,0.02)',
-                                      borderRadius: 8,
-                                      border: '1px solid rgba(255,255,255,0.05)',
-                                    }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#e2e4f0' }}>Reviewer Comment</span>
-                                        <span style={{ fontSize: 10, color: '#555870' }}>
+                                    <div key={idx} className="px-3 py-2.5 bg-white/[0.02] rounded-lg border border-white/5">
+                                      <div className="flex justify-between mb-1">
+                                        <span className="text-[11px] font-semibold text-[#e2e4f0]">Reviewer Comment</span>
+                                        <span className="text-[10px] text-[#555870]">
                                           {new Date(comment.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                       </div>
-                                      <div style={{ fontSize: 12, color: '#c4c7d9', lineHeight: 1.5 }}>
+                                      <div className="text-xs text-[#c4c7d9] leading-relaxed">
                                         {comment.text}
                                       </div>
                                     </div>
@@ -384,25 +284,10 @@ export default function ReviewFeedbackModal({
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '12px 24px',
-            borderTop: '1px solid rgba(255,255,255,0.07)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-          }}
-        >
+        <div className="px-6 py-3 border-t border-white/[0.07] flex justify-end">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 20px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8,
-              color: '#8b8fa8',
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
+            className="px-5 py-2 bg-white/5 border border-white/10 rounded-lg text-[#8b8fa8] text-[13px] cursor-pointer"
           >
             Close
           </button>

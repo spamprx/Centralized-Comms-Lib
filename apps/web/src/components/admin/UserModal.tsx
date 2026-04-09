@@ -24,6 +24,8 @@ const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
 ];
 
+const inputClass = "w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none transition-colors duration-150 focus:border-violet-400/50";
+
 export default function UserModal({ user, groups, onClose, onSave }: UserModalProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -73,75 +75,49 @@ export default function UserModal({ user, groups, onClose, onSave }: UserModalPr
   };
 
   return (
-    <div className="user-modal-overlay" onClick={onClose}>
-      <div className="user-modal" onClick={e => e.stopPropagation()}>
-        <div className="user-modal-header">
-          <h2>{user ? 'Edit User' : 'Invite User'}</h2>
-          <button className="user-modal-close" onClick={onClose}><X size={18} /></button>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#1a1d29] border border-white/10 rounded-xl w-full max-w-[480px] max-h-[90vh] overflow-y-auto shadow-[0_20px_60px_rgba(0,0,0,0.4)]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08]">
+          <h2 className="m-0 text-lg font-semibold text-[#e2e4f0]">{user ? 'Edit User' : 'Invite User'}</h2>
+          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-1 flex rounded hover:bg-white/5 hover:text-[#e2e4f0]" onClick={onClose}><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="user-modal-form">
-          {error && <div className="user-modal-error">{error}</div>}
+        <form onSubmit={handleSubmit} className="p-6">
+          {error && <div className="bg-red-400/10 border border-red-400/30 rounded-lg p-3 text-red-400 text-[13px] mb-4">{error}</div>}
 
-          <div className="user-modal-field">
-            <label>Full Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Enter full name"
-              required
-            />
+          <div className="mb-4">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-1.5">Full Name</label>
+            <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Enter full name" required className={inputClass} />
           </div>
 
-          <div className="user-modal-field">
-            <label>Email</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={e => setFormData({ ...formData, email: e.target.value })}
-              placeholder="Enter email address"
-              required
-            />
+          <div className="mb-4">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-1.5">Email</label>
+            <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="Enter email address" required className={inputClass} />
           </div>
 
-          <div className="user-modal-field">
-            <label>Role</label>
-            <select
-              value={formData.role}
-              onChange={e => setFormData({ ...formData, role: e.target.value as UserRole })}
-            >
-              {ROLE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
+          <div className="mb-4">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-1.5">Role</label>
+            <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value as UserRole })} className={`${inputClass} cursor-pointer`}>
+              {ROLE_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </select>
           </div>
 
-          <div className="user-modal-field">
-            <label>Status</label>
-            <select
-              value={formData.status}
-              onChange={e => setFormData({ ...formData, status: e.target.value as UserStatus })}
-            >
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
+          <div className="mb-4">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-1.5">Status</label>
+            <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as UserStatus })} className={`${inputClass} cursor-pointer`}>
+              {STATUS_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </select>
           </div>
 
-          <div className="user-modal-field">
-            <label>Groups</label>
-            <div className="user-modal-groups">
+          <div className="mb-4">
+            <label className="block text-[13px] font-medium text-[#c4c7d9] mb-1.5">Groups</label>
+            <div className="flex flex-col gap-2 p-3 bg-white/[0.03] border border-white/[0.06] rounded-lg max-h-[150px] overflow-y-auto">
               {groups.length === 0 ? (
-                <span className="user-modal-no-groups">No groups available</span>
+                <span className="text-xs text-[#555870]">No groups available</span>
               ) : (
                 groups.map(group => (
-                  <label key={group.id} className="user-modal-group-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={formData.groups.includes(group.name)}
-                      onChange={() => toggleGroup(group.name)}
-                    />
+                  <label key={group.id} className="flex items-center gap-2 text-[13px] text-[#c4c7d9] cursor-pointer">
+                    <input type="checkbox" checked={formData.groups.includes(group.name)} onChange={() => toggleGroup(group.name)} className="accent-violet-400 cursor-pointer" />
                     <span>{group.name}</span>
                   </label>
                 ))
@@ -149,174 +125,16 @@ export default function UserModal({ user, groups, onClose, onSave }: UserModalPr
             </div>
           </div>
 
-          <div className="user-modal-actions">
-            <button type="button" className="user-modal-btn-cancel" onClick={onClose}>
+          <div className="flex gap-2.5 justify-end mt-6 pt-5 border-t border-white/[0.08]">
+            <button type="button" className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#9094ae] text-[13px] cursor-pointer transition-all duration-150 hover:bg-white/[0.08] hover:text-[#e2e4f0]" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="user-modal-btn-save" disabled={loading}>
+            <button type="submit" className="px-5 py-2.5 bg-violet-400/15 border border-violet-400/30 rounded-lg text-violet-400 text-[13px] font-medium cursor-pointer transition-all duration-150 hover:bg-violet-400/25 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
               {loading ? 'Saving...' : (user ? 'Update User' : 'Invite User')}
             </button>
           </div>
         </form>
       </div>
-
-      <style>{`
-        .user-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.7);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          backdrop-filter: blur(4px);
-        }
-        .user-modal {
-          background: #1a1d29;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
-          width: 100%;
-          max-width: 480px;
-          max-height: 90vh;
-          overflow-y: auto;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        }
-        .user-modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 20px 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .user-modal-header h2 {
-          margin: 0;
-          font-size: 18px;
-          font-weight: 600;
-          color: #e2e4f0;
-        }
-        .user-modal-close {
-          background: none;
-          border: none;
-          color: #555870;
-          cursor: pointer;
-          padding: 4px;
-          display: flex;
-          border-radius: 4px;
-        }
-        .user-modal-close:hover {
-          background: rgba(255, 255, 255, 0.05);
-          color: #e2e4f0;
-        }
-        .user-modal-form {
-          padding: 24px;
-        }
-        .user-modal-error {
-          background: rgba(248, 113, 113, 0.1);
-          border: 1px solid rgba(248, 113, 113, 0.3);
-          border-radius: 8px;
-          padding: 12px;
-          color: #f87171;
-          font-size: 13px;
-          margin-bottom: 16px;
-        }
-        .user-modal-field {
-          margin-bottom: 16px;
-        }
-        .user-modal-field label {
-          display: block;
-          font-size: 13px;
-          font-weight: 500;
-          color: #c4c7d9;
-          margin-bottom: 6px;
-        }
-        .user-modal-field input[type="text"],
-        .user-modal-field input[type="email"],
-        .user-modal-field select {
-          width: 100%;
-          padding: 10px 12px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          color: #e2e4f0;
-          font-size: 13px;
-          outline: none;
-          transition: border-color 0.15s;
-        }
-        .user-modal-field input:focus,
-        .user-modal-field select:focus {
-          border-color: rgba(167, 139, 250, 0.5);
-        }
-        .user-modal-field select {
-          cursor: pointer;
-        }
-        .user-modal-groups {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          padding: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 8px;
-          max-height: 150px;
-          overflow-y: auto;
-        }
-        .user-modal-no-groups {
-          font-size: 12px;
-          color: #555870;
-        }
-        .user-modal-group-checkbox {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 13px;
-          color: #c4c7d9;
-          cursor: pointer;
-        }
-        .user-modal-group-checkbox input {
-          accent-color: #a78bfa;
-          cursor: pointer;
-        }
-        .user-modal-actions {
-          display: flex;
-          gap: 10px;
-          justify-content: flex-end;
-          margin-top: 24px;
-          padding-top: 20px;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .user-modal-btn-cancel {
-          padding: 10px 20px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          color: #9094ae;
-          font-size: 13px;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .user-modal-btn-cancel:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: #e2e4f0;
-        }
-        .user-modal-btn-save {
-          padding: 10px 20px;
-          background: rgba(167, 139, 250, 0.15);
-          border: 1px solid rgba(167, 139, 250, 0.3);
-          border-radius: 8px;
-          color: #a78bfa;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .user-modal-btn-save:hover:not(:disabled) {
-          background: rgba(167, 139, 250, 0.25);
-        }
-        .user-modal-btn-save:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-      `}</style>
     </div>
   );
 }

@@ -4,14 +4,9 @@ import { Calendar, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 export function AnalyticsHeader() {
   return (
-    <div className="analytics-header">
-      <h1 className="analytics-header__title">Analytics Dashboard</h1>
-      <p className="analytics-header__subtitle">Track your content performance and engagement metrics</p>
-      <style>{`
-        .analytics-header { display: flex; flex-direction: column; gap: 4px; }
-        .analytics-header__title { font-size: 24px; font-weight: 700; color: #e2e4f0; margin: 0; }
-        .analytics-header__subtitle { font-size: 13px; color: #555870; margin: 0; }
-      `}</style>
+    <div className="flex flex-col gap-1">
+      <h1 className="text-2xl font-bold text-[#e2e4f0] m-0">Analytics Dashboard</h1>
+      <p className="text-[13px] text-[#555870] m-0">Track your content performance and engagement metrics</p>
     </div>
   );
 }
@@ -34,30 +29,17 @@ interface DateRangePickerProps {
 
 export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
   return (
-    <div className="date-range-picker">
-      <Calendar size={14} className="date-range-picker__icon" />
+    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg">
+      <Calendar size={14} className="text-[#555870]" />
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="date-range-picker__select"
+        className="bg-transparent border-none text-[#e2e4f0] text-[13px] cursor-pointer outline-none [&_option]:bg-[#1a1d2e] [&_option]:text-[#e2e4f0]"
       >
         {DATE_RANGES.map(range => (
           <option key={range.value} value={range.value}>{range.label}</option>
         ))}
       </select>
-      <style>{`
-        .date-range-picker {
-          display: flex; align-items: center; gap: 8px;
-          padding: 8px 12px; background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-        }
-        .date-range-picker__icon { color: #555870; }
-        .date-range-picker__select {
-          background: none; border: none; color: #e2e4f0;
-          font-size: 13px; cursor: pointer; outline: none;
-        }
-        .date-range-picker__select option { background: #1a1d2e; color: #e2e4f0; }
-      `}</style>
     </div>
   );
 }
@@ -73,27 +55,16 @@ interface KPI {
 
 export function KPICard({ kpi }: { kpi: KPI }) {
   const TrendIcon = kpi.trend === 'up' ? TrendingUp : kpi.trend === 'down' ? TrendingDown : Minus;
-  const trendColor = kpi.trend === 'up' ? '#34d399' : kpi.trend === 'down' ? '#f87171' : '#6b7280';
+  const trendColor = kpi.trend === 'up' ? 'text-emerald-400' : kpi.trend === 'down' ? 'text-red-400' : 'text-gray-500';
 
   return (
-    <div className="kpi-card">
-      <div className="kpi-card__label">{kpi.label}</div>
-      <div className="kpi-card__value">{kpi.value}</div>
-      <div className="kpi-card__trend" style={{ color: trendColor }}>
+    <div className="flex-1 min-w-[12rem] p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px] flex flex-col gap-2">
+      <div className="text-[11px] font-semibold tracking-wide uppercase text-[#555870]">{kpi.label}</div>
+      <div className="text-2xl font-bold text-[#e2e4f0]">{kpi.value}</div>
+      <div className={`flex items-center gap-1 text-xs font-medium ${trendColor}`}>
         <TrendIcon size={12} />
         <span>{kpi.change > 0 ? '+' : ''}{kpi.change.toFixed(1)}%</span>
       </div>
-      <style>{`
-        .kpi-card {
-          flex: 1; min-width: 12rem; padding: 16px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 10px; display: flex; flex-direction: column; gap: 8px;
-        }
-        .kpi-card__label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #555870; }
-        .kpi-card__value { font-size: 24px; font-weight: 700; color: #e2e4f0; }
-        .kpi-card__trend { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
-      `}</style>
     </div>
   );
 }
@@ -102,11 +73,8 @@ export function KPICard({ kpi }: { kpi: KPI }) {
 
 export function KPICardsRow({ kpis }: { kpis: KPI[] }) {
   return (
-    <div className="kpi-cards-row">
+    <div className="flex gap-4 flex-wrap">
       {kpis.map((kpi, i) => <KPICard key={i} kpi={kpi} />)}
-      <style>{`
-        .kpi-cards-row { display: flex; gap: 16px; flex-wrap: wrap; }
-      `}</style>
     </div>
   );
 }

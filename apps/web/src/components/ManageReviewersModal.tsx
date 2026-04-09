@@ -68,7 +68,6 @@ export default function ManageReviewersModal({
     setAssigning(true);
     setError(null);
     try {
-      // 1. Get content details to find the latest version ID
       const contentDetails = await contentService.getById(contentId);
       const versions = contentDetails.versions;
       if (!versions || versions.length === 0) {
@@ -76,19 +75,16 @@ export default function ManageReviewersModal({
         setAssigning(false);
         return;
       }
-      // Use the latest version (highest versionNumber)
       const latestVersion = versions.reduce((prev, curr) =>
         curr.versionNumber > prev.versionNumber ? curr : prev
       );
 
-      // 2. Create a review request
       const reviewRequest = await reviewService.createRequest(
         contentId,
         latestVersion.id,
         selectedIds.size,
       );
 
-      // 3. Assign each selected reviewer
       const assignPromises = Array.from(selectedIds).map((reviewerId) =>
         reviewService.assignReviewer(reviewRequest.id, reviewerId)
       );
@@ -108,193 +104,103 @@ export default function ManageReviewersModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(4px)',
-      }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        style={{
-          width: 480,
-          maxHeight: '80vh',
-          background: '#1a1d2e',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 16,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
-        }}
+        className="w-[480px] max-h-[80vh] bg-[#1a1d2e] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <div className="px-6 py-5 border-b border-white/[0.07] flex justify-between items-center">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div className="flex items-center gap-2 mb-1">
               <Users size={18} color="#a78bfa" />
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e4f0', margin: 0 }}>
+              <h2 className="text-base font-bold text-[#e2e4f0] m-0">
                 Manage Reviewers
               </h2>
             </div>
-            <p style={{ fontSize: 12, color: '#555870', margin: 0, maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p className="text-xs text-[#555870] m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
               {contentTitle}
             </p>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: 'none',
-              borderRadius: 8,
-              padding: 8,
-              color: '#8b8fa8',
-              cursor: 'pointer',
-            }}
+            className="bg-white/5 border-none rounded-lg p-2 text-[#8b8fa8] cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Search */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ position: 'relative' }}>
+        <div className="px-6 py-3 border-b border-white/5">
+          <div className="relative">
             <Search
               size={14}
-              color="#555870"
-              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search users..."
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 36px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                color: '#e2e4f0',
-                fontSize: 13,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+              className="w-full py-2.5 pr-3 pl-9 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
             />
           </div>
         </div>
 
         {/* User List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px' }}>
+        <div className="flex-1 overflow-y-auto px-6 py-2">
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
-              <Loader2 size={24} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
+            <div className="flex justify-center p-8">
+              <Loader2 size={24} color="#a78bfa" className="animate-spin" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#555870', fontSize: 13 }}>
+            <div className="p-8 text-center text-[#555870] text-[13px]">
               No users found
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="flex flex-col gap-1">
               {filteredUsers.map((user) => {
                 const isSelected = selectedIds.has(user.id);
                 return (
                   <button
                     key={user.id}
                     onClick={() => toggleUser(user.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '12px 14px',
-                      background: isSelected
-                        ? 'rgba(139, 92, 246, 0.12)'
-                        : 'rgba(255,255,255,0.02)',
-                      border: isSelected
-                        ? '1px solid rgba(139, 92, 246, 0.3)'
-                        : '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.15s ease',
-                    }}
+                    className={`flex items-center gap-3 px-3.5 py-3 rounded-[10px] cursor-pointer text-left transition-all duration-150 ${
+                      isSelected
+                        ? 'bg-violet-500/[0.12] border border-violet-500/30'
+                        : 'bg-white/[0.02] border border-white/5'
+                    }`}
                   >
                     {/* Checkbox */}
                     <div
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 6,
-                        border: isSelected
-                          ? '2px solid #a78bfa'
-                          : '2px solid rgba(255,255,255,0.2)',
-                        background: isSelected ? '#8b5cf6' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        transition: 'all 0.15s ease',
-                      }}
+                      className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-all duration-150 ${
+                        isSelected
+                          ? 'bg-violet-500 border-2 border-violet-400'
+                          : 'bg-transparent border-2 border-white/20'
+                      }`}
                     >
                       {isSelected && <Check size={12} color="#fff" strokeWidth={3} />}
                     </div>
 
                     {/* Avatar */}
                     <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '50%',
-                        background: `linear-gradient(135deg, ${isSelected ? '#8b5cf6' : '#374151'}, ${isSelected ? '#06b6d4' : '#4b5563'})`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        flexShrink: 0,
-                      }}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0 ${
+                        isSelected
+                          ? 'bg-gradient-to-br from-violet-500 to-cyan-500'
+                          : 'bg-gradient-to-br from-gray-700 to-gray-600'
+                      }`}
                     >
                       {(user.displayName || user.email)[0].toUpperCase()}
                     </div>
 
                     {/* User Info */}
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          color: isSelected ? '#e2e4f0' : '#c4c7d9',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                    <div className="flex-1 overflow-hidden">
+                      <div className={`text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap ${isSelected ? 'text-[#e2e4f0]' : 'text-[#c4c7d9]'}`}>
                         {user.displayName || 'No name'}
                       </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: '#555870',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                      <div className="text-[11px] text-[#555870] overflow-hidden text-ellipsis whitespace-nowrap">
                         {user.email}
                       </div>
                     </div>
@@ -306,71 +212,34 @@ export default function ManageReviewersModal({
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderTop: '1px solid rgba(255,255,255,0.07)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span style={{ fontSize: 12, color: '#555870' }}>
+        <div className="px-6 py-4 border-t border-white/[0.07] flex justify-between items-center">
+          <span className="text-xs text-[#555870]">
             {selectedIds.size} reviewer{selectedIds.size !== 1 ? 's' : ''} selected
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="flex gap-2">
             <button
               onClick={onClose}
-              style={{
-                padding: '10px 18px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                color: '#8b8fa8',
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
+              className="px-[18px] py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#8b8fa8] text-[13px] cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleAssign}
               disabled={selectedIds.size === 0 || assigning || success}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 20px',
-                background: success
-                  ? 'linear-gradient(135deg, #10b981, #06b6d4)'
+              className={`flex items-center gap-1.5 px-5 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold transition-all duration-200 ${
+                success
+                  ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 cursor-not-allowed'
                   : selectedIds.size === 0
-                    ? 'rgba(139, 92, 246, 0.3)'
-                    : 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                border: 'none',
-                borderRadius: 8,
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: selectedIds.size === 0 || assigning || success ? 'not-allowed' : 'pointer',
-                opacity: selectedIds.size === 0 ? 0.5 : 1,
-                transition: 'all 0.2s ease',
-              }}
+                    ? 'bg-violet-500/30 cursor-not-allowed opacity-50'
+                    : 'bg-gradient-to-br from-violet-500 to-cyan-500 cursor-pointer'
+              }`}
             >
               {assigning ? (
-                <>
-                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                  Assigning...
-                </>
+                <><Loader2 size={14} className="animate-spin" /> Assigning...</>
               ) : success ? (
-                <>
-                  <Check size={14} />
-                  Assigned!
-                </>
+                <><Check size={14} /> Assigned!</>
               ) : (
-                <>
-                  <UserPlus size={14} />
-                  Assign Reviewers
-                </>
+                <><UserPlus size={14} /> Assign Reviewers</>
               )}
             </button>
           </div>
@@ -378,16 +247,7 @@ export default function ManageReviewersModal({
 
         {/* Error display */}
         {error && (
-          <div
-            style={{
-              padding: '10px 24px',
-              background: 'rgba(248, 113, 113, 0.1)',
-              borderTop: '1px solid rgba(248, 113, 113, 0.2)',
-              color: '#f87171',
-              fontSize: 12,
-              textAlign: 'center',
-            }}
-          >
+          <div className="px-6 py-2.5 bg-red-400/10 border-t border-red-400/20 text-red-400 text-xs text-center">
             {error}
           </div>
         )}

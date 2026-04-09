@@ -2,40 +2,21 @@ import type { Activity } from '../../data/mockDashboardData';
 
 export function RecentActivityFeed({ activities }: { activities: Activity[] }) {
   return (
-    <div style={{
-      padding: 20,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 10,
-      width: 320,
-      flexShrink: 0,
-    }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>Recent Activity</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="p-5 bg-white/[0.03] border border-white/[0.07] rounded-[10px] w-80 shrink-0">
+      <h3 className="text-sm font-semibold text-[#e2e4f0] mb-4">Recent Activity</h3>
+      <div className="flex flex-col gap-3">
         {activities.map((activity) => (
-          <div key={activity.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#fff',
-              flexShrink: 0,
-            }}>
+          <div key={activity.id} className="flex gap-2.5 items-start">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-xs font-semibold text-white shrink-0">
               {activity.user.split(' ').map(n => n[0]).join('')}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 12, color: '#e2e4f0', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                <span style={{ fontWeight: 500 }}>{activity.user}</span>{' '}
-                <span style={{ color: '#8b8fa8' }}>{activity.action}</span>{' '}
-                <span style={{ fontWeight: 500, color: '#a78bfa' }}>{activity.target}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-[#e2e4f0] m-0 whitespace-nowrap overflow-hidden text-ellipsis">
+                <span className="font-medium">{activity.user}</span>{' '}
+                <span className="text-[#8b8fa8]">{activity.action}</span>{' '}
+                <span className="font-medium text-violet-400">{activity.target}</span>
               </p>
-              <span style={{ fontSize: 10, color: '#555870' }}>{activity.time}</span>
+              <span className="text-[10px] text-[#555870]">{activity.time}</span>
             </div>
           </div>
         ))}

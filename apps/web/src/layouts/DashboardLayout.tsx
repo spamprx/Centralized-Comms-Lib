@@ -6,12 +6,12 @@ export default function DashboardLayout() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', padding: 24 }}>
-        <div style={{ width: 256, marginRight: 24, background: 'rgba(255,255,255,0.03)', borderRadius: 10 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ height: 64, background: 'rgba(255,255,255,0.03)', borderRadius: 10, marginBottom: 24 }} />
-          <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-            {[1, 2, 3, 4].map(i => <div key={i} style={{ height: 96, flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />)}
+      <div className="flex min-h-screen p-6">
+        <div className="w-64 mr-6 bg-white/[0.03] rounded-[10px]" />
+        <div className="flex-1">
+          <div className="h-16 bg-white/[0.03] rounded-[10px] mb-6" />
+          <div className="flex gap-4 mb-6">
+            {[1, 2, 3, 4].map(i => <div key={i} className="h-24 flex-1 bg-white/[0.03] rounded-[10px] animate-pulse" />)}
           </div>
         </div>
       </div>
@@ -19,48 +19,38 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="flex min-h-screen">
       {/* Sidebar placeholder */}
-      <div style={{
-        width: 256,
-        background: 'rgba(255,255,255,0.02)',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        padding: 20,
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e4f0', marginBottom: 24 }}>Dashboard</div>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="w-64 bg-white/[0.02] border-r border-white/5 p-5">
+        <div className="text-sm font-bold text-[#e2e4f0] mb-6">Dashboard</div>
+        <nav className="flex flex-col gap-2">
           {['Overview', 'Content', 'Analytics', 'Settings'].map(item => (
-            <a key={item} href="#" style={{
-              padding: '10px 12px',
-              borderRadius: 6,
-              color: '#8b8fa8',
-              textDecoration: 'none',
-              fontSize: 13,
-              transition: 'all 0.15s',
-            }}>{item}</a>
+            <a key={item} href="#" className="px-3 py-2.5 rounded-md text-[#8b8fa8] no-underline text-[13px] transition-all duration-150">
+              {item}
+            </a>
           ))}
         </nav>
       </div>
 
       {/* Main content */}
-      <main style={{ flex: 1, padding: 24 }}>
+      <main className="flex-1 p-6">
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: '0 0 4px' }}>Welcome back!</h1>
-          <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>Here's what's happening with your content today.</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-[#e2e4f0] mb-1">Welcome back!</h1>
+          <p className="text-[13px] text-[#555870] m-0">Here's what's happening with your content today.</p>
         </div>
 
         {/* Stat Cards */}
         <StatCardsRow statCards={statCards} />
 
         {/* Quick Actions & Recent Activity */}
-        <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
+        <div className="flex gap-6 mb-6">
           <QuickActionsPanel actions={quickActions} />
           <RecentActivityFeed activities={recentActivity} />
         </div>
 
         {/* Pending Items & Notifications */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+        <div className="grid grid-cols-2 gap-6">
           <PendingItemsList items={pendingItems} />
           <NotificationsSummary notifications={notifications} />
         </div>

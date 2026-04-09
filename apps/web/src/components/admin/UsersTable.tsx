@@ -47,41 +47,38 @@ export default function UsersTable({ users, loading, onEdit, onDelete, onStatusC
   const handleBulkDelete = () => { if (selected.size && onBulkDelete) { onBulkDelete(Array.from(selected)); setSelected(new Set()); } };
 
   if (loading) return (
-    <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+    <div className="flex flex-col gap-px">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} style={{ height:54, background:'rgba(255,255,255,0.04)', borderRadius:4, opacity: 1 - i * 0.1, animation:'pulse 1.5s infinite' }} />
+        <div key={i} className="h-[54px] bg-white/[0.04] rounded animate-pulse" style={{ opacity: 1 - i * 0.1 }} />
       ))}
     </div>
   );
 
   if (!users.length) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:60, color:'#555870', fontSize:14 }}>
+    <div className="flex items-center justify-center p-[60px] text-[#555870] text-sm">
       No users found matching your criteria.
     </div>
   );
 
   return (
-    <div className="ut-wrapper">
+    <div className="flex flex-col">
       {selected.size > 0 && (
-        <div className="ut-bulk-bar">
+        <div className="flex items-center gap-2.5 px-3.5 py-2 bg-violet-400/[0.08] border border-violet-400/20 rounded-lg mb-2 text-[13px] text-violet-400">
           <span>{selected.size} selected</span>
-          <button className="ut-bulk-delete" onClick={handleBulkDelete}><Trash2 size={13} /> Delete selected</button>
-          <button className="ut-bulk-clear" onClick={() => setSelected(new Set())}>Cancel</button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/30 rounded-md text-red-400 text-xs cursor-pointer" onClick={handleBulkDelete}><Trash2 size={13} /> Delete selected</button>
+          <button className="bg-transparent border-none text-gray-500 text-xs cursor-pointer ml-1" onClick={() => setSelected(new Set())}>Cancel</button>
         </div>
       )}
-      <div className="ut-table-wrap">
-        <table className="ut-table">
+      <div className="overflow-x-auto rounded-[10px] border border-white/[0.07]">
+        <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="ut-th ut-th--check">
-                <input type="checkbox" checked={selected.size === users.length && users.length > 0} onChange={toggleAll} className="ut-checkbox" />
+              <th className="px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-wide uppercase text-[#555870] bg-white/[0.02] border-b border-white/[0.06] whitespace-nowrap w-11">
+                <input type="checkbox" checked={selected.size === users.length && users.length > 0} onChange={toggleAll} className="accent-violet-400 cursor-pointer" />
               </th>
-              <th className="ut-th">User</th>
-              <th className="ut-th">Role</th>
-              <th className="ut-th">Status</th>
-              <th className="ut-th">Groups</th>
-              <th className="ut-th">Last Active</th>
-              <th className="ut-th ut-th--actions" />
+              {['User', 'Role', 'Status', 'Groups', 'Last Active', ''].map((h, i) => (
+                <th key={i} className={`px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-wide uppercase text-[#555870] bg-white/[0.02] border-b border-white/[0.06] whitespace-nowrap ${i === 6 ? 'w-[50px]' : ''}`}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -90,44 +87,44 @@ export default function UsersTable({ users, loading, onEdit, onDelete, onStatusC
               const StatusIcon = statusCfg.icon;
               const isSelected = selected.has(user.id);
               return (
-                <tr key={user.id} className={`ut-row ${isSelected ? 'ut-row--selected' : ''}`}>
-                  <td className="ut-td ut-td--check">
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(user.id)} className="ut-checkbox" />
+                <tr key={user.id} className={`transition-colors duration-100 hover:bg-white/[0.025] last:[&>td]:border-b-0 ${isSelected ? 'bg-violet-400/[0.06]' : ''}`}>
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle w-11">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(user.id)} className="accent-violet-400 cursor-pointer" />
                   </td>
-                  <td className="ut-td">
-                    <div className="ut-user">
-                      <div className="ut-avatar" style={{ background: ROLE_COLORS[user.role] + '33' }}>
-                        {user.avatar ? <img src={user.avatar} alt={user.name} className="ut-avatar__img" /> : <span style={{ color: ROLE_COLORS[user.role] }}>{user.name.charAt(0)}</span>}
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-semibold shrink-0" style={{ background: ROLE_COLORS[user.role] + '33' }}>
+                        {user.avatar ? <img src={user.avatar} alt={user.name} className="w-full h-full rounded-lg object-cover" /> : <span style={{ color: ROLE_COLORS[user.role] }}>{user.name.charAt(0)}</span>}
                       </div>
                       <div>
-                        <div className="ut-user__name">{user.name}</div>
-                        <div className="ut-user__email">{user.email}</div>
+                        <div className="text-[13px] font-medium text-[#e2e4f0]">{user.name}</div>
+                        <div className="text-xs text-[#555870]">{user.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="ut-td">
-                    <span className="ut-role" style={{ color: ROLE_COLORS[user.role], background: ROLE_COLORS[user.role] + '1a' }}>{user.role.replace('_', ' ')}</span>
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle">
+                    <span className="inline-block px-2 py-0.5 rounded-[20px] text-[11px] font-medium capitalize whitespace-nowrap" style={{ color: ROLE_COLORS[user.role], background: ROLE_COLORS[user.role] + '1a' }}>{user.role.replace('_', ' ')}</span>
                   </td>
-                  <td className="ut-td">
-                    <span className="ut-status" style={{ color: statusCfg.color }}><StatusIcon size={12} />{statusCfg.label}</span>
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle">
+                    <span className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: statusCfg.color }}><StatusIcon size={12} />{statusCfg.label}</span>
                   </td>
-                  <td className="ut-td">
-                    <div className="ut-groups">
-                      {user.groups.slice(0, 2).map(g => <span key={g} className="ut-group-tag">{g}</span>)}
-                      {user.groups.length > 2 && <span className="ut-group-tag ut-group-tag--more">+{user.groups.length - 2}</span>}
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle">
+                    <div className="flex flex-wrap gap-1">
+                      {user.groups.slice(0, 2).map(g => <span key={g} className="px-[7px] py-0.5 bg-white/[0.06] rounded text-[11px] text-[#8b8fa8] whitespace-nowrap">{g}</span>)}
+                      {user.groups.length > 2 && <span className="px-[7px] py-0.5 bg-white/[0.06] rounded text-[11px] text-[#555870] whitespace-nowrap">+{user.groups.length - 2}</span>}
                     </div>
                   </td>
-                  <td className="ut-td"><span className="ut-date">{formatRelative(user.lastActive)}</span></td>
-                  <td className="ut-td ut-td--actions">
-                    <div className="ut-menu-wrap">
-                      <button className="ut-menu-btn" onClick={() => setOpenMenu(openMenu === user.id ? null : user.id)}><MoreHorizontal size={15} /></button>
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle"><span className="text-xs text-[#555870] whitespace-nowrap">{formatRelative(user.lastActive)}</span></td>
+                  <td className="px-3.5 py-3 border-b border-white/[0.04] align-middle w-[50px]">
+                    <div className="relative">
+                      <button className="flex items-center justify-center w-[30px] h-[30px] bg-transparent border-none rounded-md text-[#555870] cursor-pointer transition-all duration-150 hover:bg-white/[0.07] hover:text-[#c4c7d9]" onClick={() => setOpenMenu(openMenu === user.id ? null : user.id)}><MoreHorizontal size={15} /></button>
                       {openMenu === user.id && (
-                        <div className="ut-menu">
-                          {onEdit && <button className="ut-menu-item" onClick={() => { onEdit(user); setOpenMenu(null); }}><Edit2 size={13} /> Edit user</button>}
-                          {onResetPassword && <button className="ut-menu-item" onClick={() => { onResetPassword(user.id); setOpenMenu(null); }}><Lock size={13} /> Reset password</button>}
-                          {onStatusChange && user.status !== 'suspended' && <button className="ut-menu-item ut-menu-item--warn" onClick={() => { onStatusChange(user.id, 'suspended'); setOpenMenu(null); }}><AlertCircle size={13} /> Suspend</button>}
-                          {onStatusChange && user.status === 'suspended' && <button className="ut-menu-item" onClick={() => { onStatusChange(user.id, 'active'); setOpenMenu(null); }}><CheckCircle2 size={13} /> Reactivate</button>}
-                          {onDelete && <button className="ut-menu-item ut-menu-item--danger" onClick={() => { onDelete(user.id); setOpenMenu(null); }}><Trash2 size={13} /> Delete</button>}
+                        <div className="absolute right-0 top-9 z-[100] bg-[#1a1d2e] border border-white/10 rounded-lg p-1 min-w-[160px] shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
+                          {onEdit && <button className="flex items-center gap-2 w-full px-2.5 py-2 bg-transparent border-none rounded-md text-[#c4c7d9] text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-white/[0.07]" onClick={() => { onEdit(user); setOpenMenu(null); }}><Edit2 size={13} /> Edit user</button>}
+                          {onResetPassword && <button className="flex items-center gap-2 w-full px-2.5 py-2 bg-transparent border-none rounded-md text-[#c4c7d9] text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-white/[0.07]" onClick={() => { onResetPassword(user.id); setOpenMenu(null); }}><Lock size={13} /> Reset password</button>}
+                          {onStatusChange && user.status !== 'suspended' && <button className="flex items-center gap-2 w-full px-2.5 py-2 bg-transparent border-none rounded-md text-amber-400 text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-amber-400/10" onClick={() => { onStatusChange(user.id, 'suspended'); setOpenMenu(null); }}><AlertCircle size={13} /> Suspend</button>}
+                          {onStatusChange && user.status === 'suspended' && <button className="flex items-center gap-2 w-full px-2.5 py-2 bg-transparent border-none rounded-md text-[#c4c7d9] text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-white/[0.07]" onClick={() => { onStatusChange(user.id, 'active'); setOpenMenu(null); }}><CheckCircle2 size={13} /> Reactivate</button>}
+                          {onDelete && <button className="flex items-center gap-2 w-full px-2.5 py-2 bg-transparent border-none rounded-md text-red-400 text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-red-500/10" onClick={() => { onDelete(user.id); setOpenMenu(null); }}><Trash2 size={13} /> Delete</button>}
                         </div>
                       )}
                     </div>
@@ -138,45 +135,6 @@ export default function UsersTable({ users, loading, onEdit, onDelete, onStatusC
           </tbody>
         </table>
       </div>
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.8} }
-        .ut-wrapper { display:flex; flex-direction:column; }
-        .ut-bulk-bar { display:flex; align-items:center; gap:10px; padding:8px 14px; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.2); border-radius:8px; margin-bottom:8px; font-size:13px; color:#a78bfa; }
-        .ut-bulk-delete { display:flex; align-items:center; gap:5px; padding:5px 12px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:6px; color:#f87171; font-size:12px; cursor:pointer; }
-        .ut-bulk-clear { background:none; border:none; color:#6b7280; font-size:12px; cursor:pointer; margin-left:4px; }
-        .ut-table-wrap { overflow-x:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.07); }
-        .ut-table { width:100%; border-collapse:collapse; }
-        .ut-th { padding:10px 14px; text-align:left; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#555870; background:rgba(255,255,255,0.02); border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap; }
-        .ut-th--check, .ut-td--check { width:44px; }
-        .ut-th--actions, .ut-td--actions { width:50px; }
-        .ut-td { padding:12px 14px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
-        .ut-row { transition:background 0.1s; }
-        .ut-row:hover { background:rgba(255,255,255,0.025); }
-        .ut-row--selected { background:rgba(167,139,250,0.06); }
-        .ut-row:last-child .ut-td { border-bottom:none; }
-        .ut-checkbox { accent-color:#a78bfa; cursor:pointer; }
-        .ut-user { display:flex; align-items:center; gap:10px; }
-        .ut-avatar { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; flex-shrink:0; }
-        .ut-avatar__img { width:100%; height:100%; border-radius:8px; object-fit:cover; }
-        .ut-user__name { font-size:13px; font-weight:500; color:#e2e4f0; }
-        .ut-user__email { font-size:12px; color:#555870; }
-        .ut-role { display:inline-block; padding:3px 8px; border-radius:20px; font-size:11px; font-weight:500; text-transform:capitalize; white-space:nowrap; }
-        .ut-status { display:flex; align-items:center; gap:5px; font-size:12px; white-space:nowrap; }
-        .ut-groups { display:flex; flex-wrap:wrap; gap:4px; }
-        .ut-group-tag { padding:2px 7px; background:rgba(255,255,255,0.06); border-radius:4px; font-size:11px; color:#8b8fa8; white-space:nowrap; }
-        .ut-group-tag--more { color:#555870; }
-        .ut-date { font-size:12px; color:#555870; white-space:nowrap; }
-        .ut-menu-wrap { position:relative; }
-        .ut-menu-btn { display:flex; align-items:center; justify-content:center; width:30px; height:30px; background:none; border:none; border-radius:6px; color:#555870; cursor:pointer; transition:all 0.15s; }
-        .ut-menu-btn:hover { background:rgba(255,255,255,0.07); color:#c4c7d9; }
-        .ut-menu { position:absolute; right:0; top:36px; z-index:100; background:#1a1d2e; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:4px; min-width:160px; box-shadow:0 8px 24px rgba(0,0,0,0.4); }
-        .ut-menu-item { display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px; background:none; border:none; border-radius:6px; color:#c4c7d9; font-size:13px; cursor:pointer; text-align:left; transition:background 0.1s; }
-        .ut-menu-item:hover { background:rgba(255,255,255,0.07); }
-        .ut-menu-item--warn { color:#fbbf24; }
-        .ut-menu-item--warn:hover { background:rgba(251,191,36,0.1); }
-        .ut-menu-item--danger { color:#f87171; }
-        .ut-menu-item--danger:hover { background:rgba(239,68,68,0.1); }
-      `}</style>
     </div>
   );
 }

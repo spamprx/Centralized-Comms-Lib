@@ -44,7 +44,6 @@ export default function AITutorPage() {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI response
     setTimeout(() => {
       const aiResponse = {
         id: String(Date.now() + 1),
@@ -71,99 +70,54 @@ export default function AITutorPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0b0d14' }}>
+    <div className="flex h-screen bg-[#0b0d14]">
       {/* Main Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div style={{
-          padding: '20px 32px',
-          background: 'rgba(255,255,255,0.03)',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+        <div className="px-8 py-5 bg-white/[0.03] border-b border-white/5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
               <Sparkles size={24} color="#fff" />
             </div>
             <div>
-              <h1 style={{ fontSize: 18, fontWeight: 700, color: '#e2e4f0', margin: '0 0 4px' }}>AI Learning Assistant</h1>
-              <p style={{ fontSize: 12, color: '#10b981', margin: 0 }}>● Ready to help you learn</p>
+              <h1 className="text-lg font-bold text-[#e2e4f0] mb-1">AI Learning Assistant</h1>
+              <p className="text-xs text-emerald-500 m-0">● Ready to help you learn</p>
             </div>
           </div>
         </div>
 
         {/* Messages */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: 32,
-        }}>
-          <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div className="flex-1 overflow-y-auto p-8">
+          <div className="max-w-[800px] mx-auto flex flex-col gap-6">
             {messages.map((message) => (
               <div
                 key={message.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
-                }}
+                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.type === 'ai' && (
-                  <div style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                    flexShrink: 0,
-                  }}>
+                  <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center mr-3 shrink-0">
                     <Sparkles size={18} color="#fff" />
                   </div>
                 )}
-                <div style={{
-                  maxWidth: '75%',
-                  padding: '16px 20px',
-                  background: message.type === 'user'
-                    ? 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(6,182,212,0.3))'
-                    : 'rgba(255,255,255,0.05)',
-                  borderRadius: message.type === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                  color: '#e2e4f0',
-                  fontSize: 14,
-                  lineHeight: 1.7,
-                  whiteSpace: 'pre-wrap',
-                }}>
+                <div className={`max-w-[75%] px-5 py-4 text-[#e2e4f0] text-sm leading-[1.7] whitespace-pre-wrap ${
+                  message.type === 'user'
+                    ? 'bg-gradient-to-br from-violet-500/30 to-cyan-500/30 rounded-[20px_20px_4px_20px]'
+                    : 'bg-white/5 rounded-[20px_20px_20px_4px]'
+                }`}>
                   {message.content}
                 </div>
               </div>
             ))}
             {isTyping && (
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 12,
-                }}>
+              <div className="flex items-center">
+                <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center mr-3">
                   <Sparkles size={18} color="#fff" />
                 </div>
-                <div style={{ padding: '16px 20px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px 20px 20px 4px' }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <div style={{ width: 8, height: 8, background: '#8b5cf6', borderRadius: '50%', animation: 'bounce 1.4s infinite' }} />
-                    <div style={{ width: 8, height: 8, background: '#8b5cf6', borderRadius: '50%', animation: 'bounce 1.4s infinite 0.2s' }} />
-                    <div style={{ width: 8, height: 8, background: '#8b5cf6', borderRadius: '50%', animation: 'bounce 1.4s infinite 0.4s' }} />
+                <div className="px-5 py-4 bg-white/5 rounded-[20px_20px_20px_4px]">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce [animation-delay:0.4s]" />
                   </div>
                 </div>
               </div>
@@ -172,31 +126,16 @@ export default function AITutorPage() {
         </div>
 
         {/* Quick Actions */}
-        <div style={{
-          padding: '16px 32px',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
-        }}>
-          <p style={{ fontSize: 11, color: '#555870', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div className="px-8 py-4 border-t border-white/5">
+          <p className="text-[11px] text-[#555870] mb-3 uppercase tracking-wide">
             Quick Actions
           </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="flex gap-2 flex-wrap">
             {quickActions.map((action) => (
               <button
                 key={action.label}
                 onClick={() => handleQuickAction(action.prompt)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  border: '1px solid rgba(139, 92, 246, 0.2)',
-                  borderRadius: 20,
-                  color: '#a78bfa',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-500/10 border border-violet-500/20 rounded-[20px] text-violet-400 text-xs cursor-pointer whitespace-nowrap"
               >
                 <action.icon size={14} />
                 {action.label}
@@ -206,49 +145,24 @@ export default function AITutorPage() {
         </div>
 
         {/* Input Bar */}
-        <div style={{
-          padding: '20px 32px',
-          background: 'rgba(255,255,255,0.03)',
-        }}>
-          <div style={{
-            maxWidth: 800,
-            margin: '0 auto',
-            display: 'flex',
-            gap: 12,
-          }}>
+        <div className="px-8 py-5 bg-white/[0.03]">
+          <div className="max-w-[800px] mx-auto flex gap-3">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Ask anything about your learning materials..."
-              style={{
-                flex: 1,
-                padding: '14px 20px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 12,
-                color: '#e2e4f0',
-                fontSize: 14,
-                outline: 'none',
-              }}
+              className="flex-1 px-5 py-3.5 bg-white/5 border border-white/10 rounded-xl text-[#e2e4f0] text-sm outline-none"
             />
             <button
               onClick={handleSend}
               disabled={!inputValue.trim()}
-              style={{
-                padding: '14px 24px',
-                background: inputValue.trim() ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' : 'rgba(255,255,255,0.1)',
-                border: 'none',
-                borderRadius: 12,
-                color: inputValue.trim() ? '#fff' : '#555870',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: inputValue.trim() ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
+              className={`px-6 py-3.5 border-none rounded-xl text-sm font-semibold flex items-center gap-2 ${
+                inputValue.trim()
+                  ? 'bg-gradient-to-br from-violet-500 to-cyan-500 text-white cursor-pointer'
+                  : 'bg-white/10 text-[#555870] cursor-not-allowed'
+              }`}
             >
               <Send size={18} />
               Send
@@ -258,43 +172,17 @@ export default function AITutorPage() {
       </div>
 
       {/* Sidebar - Suggested Topics */}
-      <div style={{
-        width: 300,
-        background: 'rgba(255,255,255,0.02)',
-        borderLeft: '1px solid rgba(255,255,255,0.05)',
-        padding: 24,
-        overflowY: 'auto',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div className="w-[300px] bg-white/[0.02] border-l border-white/5 p-6 overflow-y-auto">
+        <div className="flex items-center gap-2 mb-5">
           <Zap size={18} color="#fbbf24" />
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: 0 }}>Suggested Topics</h2>
+          <h2 className="text-sm font-semibold text-[#e2e4f0] m-0">Suggested Topics</h2>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {suggestedTopics.map((topic, i) => (
             <button
               key={i}
               onClick={() => handleQuickAction(`Tell me about ${topic}`)}
-              style={{
-                padding: '12px 16px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.05)',
-                borderRadius: 8,
-                color: '#8b8fa8',
-                fontSize: 12,
-                textAlign: 'left',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                e.currentTarget.style.color = '#a78bfa';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
-                e.currentTarget.style.color = '#8b8fa8';
-              }}
+              className="px-4 py-3 bg-white/[0.03] border border-white/5 rounded-lg text-[#8b8fa8] text-xs text-left cursor-pointer transition-all duration-150 hover:bg-violet-500/10 hover:border-violet-500/30 hover:text-violet-400"
             >
               {topic}
             </button>
@@ -302,45 +190,38 @@ export default function AITutorPage() {
         </div>
 
         {/* Learning Progress */}
-        <div style={{ marginTop: 32 }}>
-          <h3 style={{ fontSize: 12, fontWeight: 600, color: '#555870', textTransform: 'uppercase', marginBottom: 16 }}>
+        <div className="mt-8">
+          <h3 className="text-xs font-semibold text-[#555870] uppercase mb-4">
             Your Learning Stats
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="flex flex-col gap-4">
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: '#8b8fa8' }}>Topics Mastered</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0' }}>12/50</span>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-xs text-[#8b8fa8]">Topics Mastered</span>
+                <span className="text-xs font-semibold text-[#e2e4f0]">12/50</span>
               </div>
-              <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: '24%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #06b6d4)', borderRadius: 3 }} />
+              <div className="h-1.5 bg-white/10 rounded-sm overflow-hidden">
+                <div className="w-[24%] h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-sm" />
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: '#8b8fa8' }}>Learning Streak</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0' }}>5 days</span>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-xs text-[#8b8fa8]">Learning Streak</span>
+                <span className="text-xs font-semibold text-[#e2e4f0]">5 days</span>
               </div>
-              <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: '71%', height: '100%', background: 'linear-gradient(90deg, #f59e0b, #fbbf24)', borderRadius: 3 }} />
+              <div className="h-1.5 bg-white/10 rounded-sm overflow-hidden">
+                <div className="w-[71%] h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-sm" />
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: '#8b8fa8' }}>Questions Asked</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0' }}>47</span>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-xs text-[#8b8fa8]">Questions Asked</span>
+                <span className="text-xs font-semibold text-[#e2e4f0]">47</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
-        }
-      `}</style>
     </div>
   );
 }

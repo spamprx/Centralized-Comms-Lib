@@ -25,15 +25,15 @@ export default function LibraryLayout() {
 
   if (loading) {
     return (
-      <div style={{ padding: 24 }}>
-        <div style={{ height: 48, background: 'rgba(255,255,255,0.03)', borderRadius: 10, marginBottom: 24 }} />
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-          <div style={{ height: 40, flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }} />
-          <div style={{ height: 40, width: 150, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }} />
+      <div className="p-6">
+        <div className="h-12 bg-white/[0.03] rounded-[10px] mb-6" />
+        <div className="flex gap-3 mb-6">
+          <div className="h-10 flex-1 bg-white/[0.03] rounded-lg" />
+          <div className="h-10 w-[150px] bg-white/[0.03] rounded-lg" />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+        <div className="grid grid-cols-3 gap-5">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
-            <div key={i} style={{ height: 280, background: 'rgba(255,255,255,0.03)', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />
+            <div key={i} className="h-[280px] bg-white/[0.03] rounded-[10px] animate-pulse" />
           ))}
         </div>
       </div>
@@ -41,11 +41,11 @@ export default function LibraryLayout() {
   }
 
   return (
-    <div style={{ padding: 24, minHeight: '100vh' }}>
+    <div className="p-6 min-h-screen">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: '0 0 4px' }}>Content Library</h1>
-        <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>Browse and manage all content assets</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#e2e4f0] mb-1">Content Library</h1>
+        <p className="text-[13px] text-[#555870] m-0">Browse and manage all content assets</p>
       </div>
 
       {/* Search and Filters */}
@@ -61,56 +61,24 @@ export default function LibraryLayout() {
 
       {/* Active filters */}
       {(searchQuery || selectedType !== 'all' || selectedTag !== 'all') && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="flex gap-2 mt-3 flex-wrap">
           {searchQuery && (
-            <span style={{
-              padding: '4px 10px',
-              background: 'rgba(139, 92, 246, 0.15)',
-              borderRadius: 16,
-              fontSize: 12,
-              color: '#a78bfa',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}>
+            <span className="px-2.5 py-1 bg-violet-500/15 rounded-2xl text-xs text-violet-400 flex items-center gap-1.5">
               Search: "{searchQuery}"
-              <button onClick={() => setSearchQuery('')} style={{
-                background: 'none',
-                border: 'none',
-                color: '#a78bfa',
-                cursor: 'pointer',
-                padding: 0,
-                display: 'flex',
-              }}>×</button>
+              <button onClick={() => setSearchQuery('')} className="bg-transparent border-none text-violet-400 cursor-pointer p-0 flex">×</button>
             </span>
           )}
           {selectedType !== 'all' && (
-            <span style={{
-              padding: '4px 10px',
-              background: 'rgba(6, 182, 212, 0.15)',
-              borderRadius: 16,
-              fontSize: 12,
-              color: '#06b6d4',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}>
+            <span className="px-2.5 py-1 bg-cyan-500/15 rounded-2xl text-xs text-cyan-500 flex items-center gap-1.5">
               {selectedType}
-              <button onClick={() => setSelectedType('all')} style={{
-                background: 'none',
-                border: 'none',
-                color: '#06b6d4',
-                cursor: 'pointer',
-                padding: 0,
-                display: 'flex',
-              }}>×</button>
+              <button onClick={() => setSelectedType('all')} className="bg-transparent border-none text-cyan-500 cursor-pointer p-0 flex">×</button>
             </span>
           )}
         </div>
       )}
 
       {/* Content Grid */}
-      <div style={{ marginTop: 24 }}>
+      <div className="mt-6">
         <ContentGrid items={paginatedItems} />
       </div>
 

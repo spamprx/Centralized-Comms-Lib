@@ -15,33 +15,23 @@ const typeIcons: Record<string, any> = {
 
 export function PendingItemsList({ items }: { items: PendingItem[] }) {
   return (
-    <div style={{ padding: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>Pending Review</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="p-5 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+      <h3 className="text-sm font-semibold text-[#e2e4f0] mb-4">Pending Review</h3>
+      <div className="flex flex-col gap-2.5">
         {items.map((item) => (
-          <div key={item.id} style={{
-            padding: 12,
-            background: 'rgba(255,255,255,0.02)',
-            borderRadius: 6,
-            border: '1px solid rgba(255,255,255,0.04)',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#8b8fa8' }}>
+          <div key={item.id} className="p-3 bg-white/[0.02] rounded-md border border-white/[0.04]">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-2 text-[#8b8fa8]">
                 {typeIcons[item.type] || typeIcons.Document}
-                <span style={{ fontSize: 11, color: '#555870' }}>{item.type}</span>
+                <span className="text-[11px] text-[#555870]">{item.type}</span>
               </div>
-              <span style={{
-                fontSize: 9,
-                padding: '2px 6px',
-                borderRadius: 4,
-                background: `${priorityColors[item.priority]}22`,
-                color: priorityColors[item.priority],
-                fontWeight: 600,
-                textTransform: 'uppercase',
-              }}>{item.priority}</span>
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase"
+                style={{ background: `${priorityColors[item.priority]}22`, color: priorityColors[item.priority] }}
+              >{item.priority}</span>
             </div>
-            <p style={{ fontSize: 13, fontWeight: 500, color: '#e2e4f0', margin: '0 0 4px' }}>{item.title}</p>
-            <p style={{ fontSize: 11, color: '#555870', margin: 0 }}>Submitted by {item.submittedBy} • {new Date(item.submittedAt).toLocaleDateString()}</p>
+            <p className="text-[13px] font-medium text-[#e2e4f0] mb-1">{item.title}</p>
+            <p className="text-[11px] text-[#555870] m-0">Submitted by {item.submittedBy} • {new Date(item.submittedAt).toLocaleDateString()}</p>
           </div>
         ))}
       </div>
@@ -58,21 +48,20 @@ export function NotificationsSummary({ notifications }: { notifications: Notific
   };
 
   return (
-    <div style={{ padding: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>Notifications</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="p-5 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+      <h3 className="text-sm font-semibold text-[#e2e4f0] mb-4">Notifications</h3>
+      <div className="flex flex-col gap-2.5">
         {notifications.map((notif) => (
-          <div key={notif.id} style={{
-            padding: 10,
-            background: notif.read ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-            borderRadius: 6,
-            borderLeft: `3px solid ${typeColors[notif.type]}`,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0' }}>{notif.title}</span>
-              <span style={{ fontSize: 10, color: '#555870' }}>{notif.time}</span>
+          <div
+            key={notif.id}
+            className={`p-2.5 rounded-md border-l-[3px] ${notif.read ? 'bg-white/[0.01]' : 'bg-white/[0.03]'}`}
+            style={{ borderLeftColor: typeColors[notif.type] }}
+          >
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs font-semibold text-[#e2e4f0]">{notif.title}</span>
+              <span className="text-[10px] text-[#555870]">{notif.time}</span>
             </div>
-            <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0 }}>{notif.message}</p>
+            <p className="text-[11px] text-[#8b8fa8] m-0">{notif.message}</p>
           </div>
         ))}
       </div>

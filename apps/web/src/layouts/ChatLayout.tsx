@@ -32,108 +32,51 @@ export default function ChatLayout() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="flex flex-col h-screen">
       {/* Chat Header */}
-      <div style={{
-        padding: '16px 24px',
-        background: 'rgba(255,255,255,0.03)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 14,
-            fontWeight: 700,
-            color: '#fff',
-          }}>
+      <div className="px-6 py-4 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-sm font-bold text-white">
             AI
           </div>
           <div>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: 0 }}>AI Assistant</h2>
-            <span style={{ fontSize: 11, color: '#10b981' }}>● Online</span>
+            <h2 className="text-sm font-semibold text-[#e2e4f0] m-0">AI Assistant</h2>
+            <span className="text-[11px] text-emerald-500">● Online</span>
           </div>
         </div>
-        <button style={{
-          background: 'none',
-          border: 'none',
-          color: '#555870',
-          cursor: 'pointer',
-          padding: 8,
-        }}>
+        <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
           <MoreVertical size={20} />
         </button>
       </div>
 
       {/* Message Thread */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}>
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
         {messages.map((msg) => (
           <div
             key={msg.id}
-            style={{
-              display: 'flex',
-              justifyContent: msg.sender === 'me' ? 'flex-end' : 'flex-start',
-            }}
+            className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
           >
-            <div style={{
-              maxWidth: '70%',
-              padding: '12px 16px',
-              background: msg.sender === 'me'
-                ? 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(6,182,212,0.2))'
-                : 'rgba(255,255,255,0.05)',
-              borderRadius: msg.sender === 'me' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-              color: '#e2e4f0',
-              fontSize: 14,
-              lineHeight: 1.5,
-            }}>
+            <div className={`max-w-[70%] px-4 py-3 text-[#e2e4f0] text-sm leading-normal ${
+              msg.sender === 'me'
+                ? 'bg-gradient-to-br from-violet-500/20 to-cyan-500/20 rounded-2xl rounded-br-sm'
+                : 'bg-white/5 rounded-2xl rounded-bl-sm'
+            }`}>
               {msg.text}
-              <div style={{
-                fontSize: 10,
-                color: '#555870',
-                marginTop: 4,
-                textAlign: 'right',
-              }}>{msg.time}</div>
+              <div className="text-[10px] text-[#555870] mt-1 text-right">{msg.time}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Suggested Questions */}
-      <div style={{
-        padding: '12px 24px',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-      }}>
-        <p style={{ fontSize: 11, color: '#555870', marginBottom: 8 }}>Suggested questions:</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="px-6 py-3 border-t border-white/5">
+        <p className="text-[11px] text-[#555870] mb-2">Suggested questions:</p>
+        <div className="flex gap-2 flex-wrap">
           {suggestedQuestions.map((q, i) => (
             <button
               key={i}
               onClick={() => setInputValue(q)}
-              style={{
-                padding: '6px 12px',
-                background: 'rgba(139, 92, 246, 0.1)',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-                borderRadius: 16,
-                color: '#a78bfa',
-                fontSize: 11,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
+              className="px-3 py-1.5 bg-violet-500/10 border border-violet-500/20 rounded-2xl text-violet-400 text-[11px] cursor-pointer whitespace-nowrap"
             >
               {q}
             </button>
@@ -142,23 +85,9 @@ export default function ChatLayout() {
       </div>
 
       {/* Input Bar */}
-      <div style={{
-        padding: '16px 24px',
-        background: 'rgba(255,255,255,0.03)',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-      }}>
-        <div style={{
-          display: 'flex',
-          gap: 12,
-          alignItems: 'center',
-        }}>
-          <button style={{
-            background: 'none',
-            border: 'none',
-            color: '#555870',
-            cursor: 'pointer',
-            padding: 8,
-          }}>
+      <div className="px-6 py-4 bg-white/[0.03] border-t border-white/5">
+        <div className="flex gap-3 items-center">
+          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
             <Paperclip size={20} />
           </button>
           <input
@@ -167,40 +96,14 @@ export default function ChatLayout() {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask anything..."
-            style={{
-              flex: 1,
-              padding: '12px 16px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 24,
-              color: '#e2e4f0',
-              fontSize: 14,
-              outline: 'none',
-            }}
+            className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-3xl text-[#e2e4f0] text-sm outline-none"
           />
-          <button style={{
-            background: 'none',
-            border: 'none',
-            color: '#555870',
-            cursor: 'pointer',
-            padding: 8,
-          }}>
+          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
             <Smile size={20} />
           </button>
           <button
             onClick={handleSend}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-              border: 'none',
-              color: '#fff',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 border-none text-white cursor-pointer flex items-center justify-center"
           >
             <Send size={20} />
           </button>

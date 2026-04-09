@@ -29,49 +29,29 @@ export default function PreviewLayout() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b0d14' }}>
+    <div className="flex flex-col h-screen bg-[#0b0d14]">
       {/* Topbar */}
-      <div style={{
-        padding: '12px 24px',
-        background: 'rgba(255,255,255,0.03)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button style={{
-            background: 'none',
-            border: 'none',
-            color: '#555870',
-            cursor: 'pointer',
-            padding: 8,
-          }}>
+      <div className="px-6 py-3 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
             <ChevronLeft size={20} />
           </button>
-          <h1 style={{ fontSize: 16, fontWeight: 600, color: '#e2e4f0', margin: 0 }}>Preview Mode</h1>
-          <span style={{ color: 'rgba(255,255,255,0.2)', margin: '0 8px' }}>|</span>
-          <span style={{ fontSize: 13, color: '#8b8fa8' }}>{mockContent.title}</span>
+          <h1 className="text-base font-semibold text-[#e2e4f0] m-0">Preview Mode</h1>
+          <span className="text-white/20 mx-2">|</span>
+          <span className="text-[13px] text-[#8b8fa8]">{mockContent.title}</span>
         </div>
 
         {/* Channel Switcher */}
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 4 }}>
+        <div className="flex bg-white/5 rounded-lg p-1">
           {channels.map((channel) => (
             <button
               key={channel.id}
               onClick={() => setActiveChannel(channel.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 12px',
-                background: activeChannel === channel.id ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                border: 'none',
-                borderRadius: 6,
-                color: activeChannel === channel.id ? '#a78bfa' : '#555870',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
+              className={`flex items-center gap-1.5 px-3 py-2 border-none rounded-md text-xs cursor-pointer ${
+                activeChannel === channel.id
+                  ? 'bg-violet-500/20 text-violet-400'
+                  : 'bg-transparent text-[#555870]'
+              }`}
             >
               <channel.icon size={14} />
               {channel.name}
@@ -79,102 +59,52 @@ export default function PreviewLayout() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 6,
-            color: '#8b8fa8',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}>
+        <div className="flex gap-2">
+          <button className="flex items-center gap-1.5 px-3.5 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-xs cursor-pointer">
             <Download size={14} /> Export
           </button>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            border: 'none',
-            borderRadius: 6,
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}>
+          <button className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-br from-violet-500 to-cyan-500 border-none rounded-md text-white text-xs font-semibold cursor-pointer">
             <Share2 size={14} /> Share
           </button>
         </div>
       </div>
 
       {/* Preview Canvas */}
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        padding: 40,
-        display: 'flex',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.3)',
-      }}>
-        <div style={{
-          width: getPreviewWidth(),
-          maxWidth: '100%',
-          background: '#fff',
-          borderRadius: activeChannel === 'web' ? 0 : 24,
-          overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        }}>
+      <div className="flex-1 overflow-auto p-10 flex justify-center bg-black/30">
+        <div
+          style={{ width: getPreviewWidth() }}
+          className={`max-w-full bg-white overflow-hidden shadow-2xl ${activeChannel === 'web' ? 'rounded-none' : 'rounded-3xl'}`}
+        >
           {/* Preview Header */}
-          <div style={{
-            padding: '24px 32px',
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            color: '#fff',
-          }}>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>{mockContent.title}</h1>
-            <p style={{ fontSize: 13, opacity: 0.8, margin: 0 }}>Last updated: March 11, 2025</p>
+          <div className="px-8 py-6 bg-gradient-to-br from-violet-500 to-cyan-500 text-white">
+            <h1 className="text-2xl font-bold mb-2">{mockContent.title}</h1>
+            <p className="text-[13px] opacity-80 m-0">Last updated: March 11, 2025</p>
           </div>
 
           {/* Preview Content */}
-          <div style={{ padding: 32 }}>
+          <div className="p-8">
             {mockContent.sections.map((section, index) => {
               if (section.type === 'heading') {
                 return (
-                  <h2 key={index} style={{
-                    fontSize: 20,
-                    fontWeight: 600,
-                    color: '#1a1d2e',
-                    margin: '0 0 16px',
-                  }}>{section.content}</h2>
+                  <h2 key={index} className="text-xl font-semibold text-[#1a1d2e] mb-4">
+                    {section.content}
+                  </h2>
                 );
               }
               if (section.type === 'paragraph') {
                 return (
-                  <p key={index} style={{
-                    fontSize: 15,
-                    color: '#4b5563',
-                    lineHeight: 1.7,
-                    margin: '0 0 16px',
-                  }}>{section.content}</p>
+                  <p key={index} className="text-[15px] text-gray-600 leading-relaxed mb-4">
+                    {section.content}
+                  </p>
                 );
               }
               if (section.type === 'list') {
                 return (
-                  <ul key={index} style={{
-                    margin: '0 0 16px 20px',
-                    padding: 0,
-                  }}>
+                  <ul key={index} className="mb-4 ml-5 p-0">
                     {section.items?.map((item, i) => (
-                      <li key={i} style={{
-                        fontSize: 15,
-                        color: '#4b5563',
-                        lineHeight: 1.7,
-                        marginBottom: 8,
-                      }}>{item}</li>
+                      <li key={i} className="text-[15px] text-gray-600 leading-relaxed mb-2">
+                        {item}
+                      </li>
                     ))}
                   </ul>
                 );
@@ -184,12 +114,8 @@ export default function PreviewLayout() {
           </div>
 
           {/* Preview Footer */}
-          <div style={{
-            padding: '20px 32px',
-            borderTop: '1px solid #e5e7eb',
-            background: '#f9fafb',
-          }}>
-            <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>
+          <div className="px-8 py-5 border-t border-gray-200 bg-gray-50">
+            <p className="text-xs text-gray-500 m-0">
               © 2025 CommsLib. All rights reserved.
             </p>
           </div>
@@ -197,21 +123,11 @@ export default function PreviewLayout() {
       </div>
 
       {/* Conditional Sections Panel */}
-      <div style={{
-        width: 280,
-        background: 'rgba(255,255,255,0.03)',
-        borderLeft: '1px solid rgba(255,255,255,0.05)',
-        padding: 20,
-        position: 'absolute',
-        right: 0,
-        top: 57,
-        bottom: 0,
-        overflowY: 'auto',
-      }}>
-        <h3 style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>
+      <div className="w-[280px] bg-white/[0.03] border-l border-white/5 p-5 absolute right-0 top-[57px] bottom-0 overflow-y-auto">
+        <h3 className="text-xs font-semibold text-[#e2e4f0] mb-4">
           Conditional Sections
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="flex flex-col gap-3">
           {[
             { name: 'Introduction', enabled: true },
             { name: 'Getting Started', enabled: true },
@@ -221,21 +137,13 @@ export default function PreviewLayout() {
           ].map((section) => (
             <label
               key={section.name}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '10px 12px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
+              className="flex justify-between items-center px-3 py-2.5 bg-white/[0.03] rounded-md cursor-pointer"
             >
-              <span style={{ fontSize: 12, color: '#8b8fa8' }}>{section.name}</span>
+              <span className="text-xs text-[#8b8fa8]">{section.name}</span>
               <input
                 type="checkbox"
                 defaultChecked={section.enabled}
-                style={{ accentColor: '#8b5cf6' }}
+                className="accent-violet-500"
               />
             </label>
           ))}
