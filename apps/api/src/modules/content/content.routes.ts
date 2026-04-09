@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import type { LifecycleState, Visibility } from "../../repository";
 import type { AuthRequest } from "../../middlewares/auth.middleware";
+import { aiDraftQuotaGate } from "../../middlewares/aiDraftQuotaGate.middleware";
 import { contentService } from "../../service";
 import type { AuditContext } from "../../shared/context";
 
@@ -205,10 +206,14 @@ router.post("/:id/co-authors/respond", async (req: AuthRequest, res: Response) =
  *         description: Invalid payload
  *       422:
  *         description: Template formatting rule violations
+ *       429:
+ *         description: AI user or organization quota exceeded (response includes machine-readable `code`)
+ *       503:
+ *         description: Quota storage unavailable (response includes `code` AI_QUOTA_UNAVAILABLE)
  *       500:
  *         description: Server error
  */
-router.post("/", async (req: AuthRequest, res: Response) => {
+router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
   try {
     const { title, body, aiGenerated, templateId } = req.body;
     if (!title) {
