@@ -1,12 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Eye, Copy } from 'lucide-react';
-import { type Tag } from '../../services';
+import { tagService, templateService, type Tag } from '../../services';
 
 interface Template {
   id: string;
   name: string;
   description: string;
-  category: string;
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -39,14 +38,34 @@ export default function TemplatesList({
   deletingId?: string | null;
 }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedTag, setSelectedTag] = useState('all');
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
 
   const filteredTemplates = templates.filter(template => {
     const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        template.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesTag = selectedTag === 'all' || (template.tags && template.tags.some(tag => tag.id === selectedTag));
+    return matchesSearch && matchesTag;
   });
+
+  // Load all available tags from API
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        setTagsLoading(true);
+        const tags = await tagService.list();
+        setAvailableTags(tags);
+      } catch (error) {
+        console.error('Failed to load tags:', error);
+        setAvailableTags([]);
+      } finally {
+        setTagsLoading(false);
+      }
+    };
+
+    loadTags();
+  }, []);
 
   const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -61,13 +80,12 @@ export default function TemplatesList({
     return `${Math.floor(diffDays / 30)} months ago`;
   };
 
-  const handleCreateTemplate = () => {
-    const newTemplate: Template = {
-      id: Date.now().toString(),
-      name: 'New Template',
-      description: 'Click to edit this template - A versatile template for various content types',
-      category: 'Content',
-      content: `---
+  const handleCreateTemplate = async () => {
+    try {
+      const newTemplate = await templateService.create({
+        name: 'New Template',
+        description: 'Click to edit this template - A versatile template for various content types',
+        content: `---
 title: "{{title}}"
 author: "{{author}}"
 date: "{{date}}"
@@ -84,30 +102,65 @@ Published by {{author}} on {{date}}
 ---
 *Tags: {{tags}}*
 *Last updated: {{date}}*`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: 'draft',
-      tags: [
-        { id: 'tag_1', name: 'blog', slug: 'blog' },
-        { id: 'tag_2', name: 'content', slug: 'content' },
-        { id: 'tag_3', name: 'markdown', slug: 'markdown' }
-      ],
-      variables: {
-        title: 'The main title or headline',
-        author: 'Content author name',
-        date: 'Publication date',
-        tags: 'Comma-separated tags',
-        content: 'Main body content'
-      },
-      usage_count: 0,
-      last_used: 'Never'
-    };
-    
-    setTemplates((prev) => {
-      const updated = [...prev, newTemplate];
-      localStorage.setItem('templates', JSON.stringify(updated));
-      return updated;
-    });
+        status: 'draft'
+      });
+      
+      // Update local state with the created template
+      setTemplates((prev) => {
+        const updated = [...prev, newTemplate];
+        return updated;
+      });
+      
+      console.log('Template created successfully:', newTemplate);
+    } catch (error) {
+      console.error('Failed to create template:', error);
+      // Fallback to localStorage if API fails
+      const fallbackTemplate: Template = {
+        id: Date.now().toString(),
+        name: 'New Template',
+        description: 'Click to edit this template - A versatile template for various content types',
+        content: `---
+title: "{{title}}"
+author: "{{author}}"
+date: "{{date}}"
+tags: [{{tags}}]
+
+# {{title}}
+
+Published by {{author}} on {{date}}
+
+---
+
+{{content}}
+
+---
+*Tags: {{tags}}*
+*Last updated: {{date}}*`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'draft',
+        tags: [
+          { id: 'tag_1', name: 'blog', slug: 'blog' },
+          { id: 'tag_2', name: 'content', slug: 'content' },
+          { id: 'tag_3', name: 'markdown', slug: 'markdown' }
+        ],
+        variables: {
+          title: 'The main title or headline',
+          author: 'Content author name',
+          date: 'Publication date',
+          tags: 'Comma-separated tags',
+          content: 'Main body content'
+        },
+        usage_count: 0,
+        last_used: 'Never'
+      };
+      
+      setTemplates((prev) => {
+        const updated = [...prev, fallbackTemplate];
+        localStorage.setItem('templates', JSON.stringify(updated));
+        return updated;
+      });
+    }
   };
 
   return (
@@ -136,15 +189,15 @@ Published by {{author}} on {{date}}
           />
         </div>
         <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={selectedTag}
+          onChange={(e) => setSelectedTag(e.target.value)}
+          disabled={tagsLoading}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
         >
-          <option value="all">All Categories</option>
-          <option value="Content">Content</option>
-          <option value="E-commerce">E-commerce</option>
-          <option value="Marketing">Marketing</option>
-          <option value="Documentation">Documentation</option>
+          <option value="all">All Tags</option>
+          {availableTags.map(tag => (
+            <option key={tag.id} value={tag.id}>{tag.name}</option>
+          ))}
         </select>
       </div>
 
@@ -279,12 +332,6 @@ Published by {{author}} on {{date}}
                   Created {formatRelativeTime(template.createdAt)}
                 </div>
                 <div className="flex items-center">
-                  {template.category && (
-                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                      {template.category}
-                    </span>
-                  )}
-                  <span className="mx-2">•</span>
                   <div className="flex items-center">
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h5a2 2 0 002-2V7a2 2 0 00-2-2zm0 0h14v14H0z"/>
@@ -334,11 +381,6 @@ Published by {{author}} on {{date}}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  {template.category && (
-                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                      {template.category}
-                    </span>
-                  )}
                   <button
                     onClick={() => onRestoreTemplate?.(template)}
                     className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
