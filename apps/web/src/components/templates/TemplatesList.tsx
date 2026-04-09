@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Eye, Copy } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, Copy, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { tagService, templateService, type Tag } from '../../services';
 
 interface Template {
@@ -41,6 +41,8 @@ export default function TemplatesList({
   const [selectedTag, setSelectedTag] = useState('all');
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(6);
 
   const filteredTemplates = templates.filter(template => {
     const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -48,6 +50,17 @@ export default function TemplatesList({
     const matchesTag = selectedTag === 'all' || (template.tags && template.tags.some(tag => tag.id === selectedTag));
     return matchesSearch && matchesTag;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredTemplates.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTemplates = filteredTemplates.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters or items per page change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedTag, itemsPerPage]);
 
   // Load all available tags from API
   useEffect(() => {
@@ -201,9 +214,44 @@ Published by {{author}} on {{date}}
         </select>
       </div>
 
+      {/* Pagination Controls */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          {/* Items per page selector */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
+              <span className="text-sm font-medium text-gray-700">Show</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="bg-transparent border-none focus:outline-none focus:ring-0 text-sm font-medium text-blue-600 cursor-pointer"
+              >
+                <option value={3}>3</option>
+                <option value={6}>6</option>
+                <option value={9}>9</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+              </select>
+              <span className="text-sm font-medium text-gray-700">per page</span>
+            </div>
+          </div>
+          
+          {/* Results count */}
+          {totalPages > 1 && (
+            <div className="flex items-center">
+              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg">
+                <span className="text-sm font-medium">
+                  {startIndex + 1}-{Math.min(endIndex, filteredTemplates.length)} of {filteredTemplates.length} templates
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTemplates.map((template) => (
+        {paginatedTemplates.map((template) => (
           <div key={template.id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
             {/* Header Section */}
             <div className="relative bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
@@ -345,10 +393,110 @@ Published by {{author}} on {{date}}
         ))}
       </div>
 
-      {filteredTemplates.length === 0 && (
+      {filteredTemplates.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500">No templates found matching your criteria.</p>
         </div>
+      ) : (
+        totalPages > 1 && (
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mt-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              {/* Page navigation */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+                
+                <div className="flex items-center">
+                  {(() => {
+                    const pages = [];
+                    const maxVisible = 7;
+                    
+                    if (totalPages <= maxVisible) {
+                      // Show all pages if total is small
+                      for (let i = 1; i <= totalPages; i++) {
+                        pages.push(i);
+                      }
+                    } else {
+                      // Complex pagination logic for many pages
+                      if (currentPage <= 4) {
+                        // Show first pages + ... + last
+                        for (let i = 1; i <= 5; i++) {
+                          pages.push(i);
+                        }
+                        pages.push('ellipsis');
+                        pages.push(totalPages);
+                      } else if (currentPage >= totalPages - 3) {
+                        // Show first + ... + last pages
+                        pages.push(1);
+                        pages.push('ellipsis');
+                        for (let i = totalPages - 4; i <= totalPages; i++) {
+                          pages.push(i);
+                        }
+                      } else {
+                        // Show first + ... + current + ... + last
+                        pages.push(1);
+                        pages.push('ellipsis');
+                        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+                          pages.push(i);
+                        }
+                        pages.push('ellipsis');
+                        pages.push(totalPages);
+                      }
+                    }
+                    
+                    return pages.map((page, index) => {
+                      if (page === 'ellipsis') {
+                        return (
+                          <div key={`ellipsis-${index}`} className="flex items-center justify-center w-10 h-10">
+                            <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page as number)}
+                          className={`w-10 h-10 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white shadow-md transform scale-105'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Page info */}
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-200">
+                  <span className="text-sm font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* Deleted Templates Section */}
