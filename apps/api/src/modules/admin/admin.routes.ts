@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
 import { adminService } from "../../service";
 import type { AuditContext } from "../../shared/context";
+import { getAdminOperationalMetrics } from "../../observability/operationalMetrics";
 
 const router = Router();
 
@@ -863,6 +864,33 @@ router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: Aut
       req.params.userId,
     );
     res.status(200).json({ message: "User removed from group" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// ── Monitoring (JSON for admin UI; use GET /metrics for Prometheus) ─────────
+
+/**
+ * @openapi
+ * /api/v1/admin/monitoring/metrics:
+ *   get:
+ *     summary: Operational metrics snapshot for admin dashboards
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Metric cards data
+ *       403:
+ *         description: Forbidden
+ */
+router.get("/monitoring/metrics", authorize("ADMIN"), async (_req: AuthRequest, res: Response) => {
+  try {
+    const metrics = await getAdminOperationalMetrics();
+    res.status(200).json(metrics);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

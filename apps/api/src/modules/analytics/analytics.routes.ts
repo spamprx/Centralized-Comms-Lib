@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
+import { forwardAnalyticsTrackEvent } from "../../observability/analyticsIngest";
 
 const router = Router();
 
@@ -74,6 +75,13 @@ router.post("/track", async (req: AuthRequest, res: Response) => {
         eventType: eventType.trim(),
         metadata: metadata === undefined ? undefined : (metadata as object),
       },
+    });
+    forwardAnalyticsTrackEvent({
+      contentId: content.id,
+      eventType: eventType.trim(),
+      metadata,
+      recordedAt: new Date().toISOString(),
+      actorUserId: req.user?.id,
     });
     res.status(204).send();
   } catch (err) {
