@@ -370,6 +370,8 @@ model TemplateFormattingRule {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([updatedAt])
+  @@index([rules], type: Gin)
   @@map("template_formatting_rules")
 }
 

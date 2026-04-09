@@ -326,10 +326,16 @@ export const templateService = {
       if (!withBindings) throw new Error("Clone failed: template missing after create");
 
       await repos.audit.append({
-        action: "CREATE",
+        action: "TEMPLATE_CLONED",
         resource: "TEMPLATE",
         resourceId: created.id,
-        newValue: { clonedFrom: sourceId, name, slug, workspaceId },
+        newValue: {
+          sourceTemplateId: sourceId,
+          targetTemplateId: created.id,
+          name,
+          slug,
+          workspaceId,
+        },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,

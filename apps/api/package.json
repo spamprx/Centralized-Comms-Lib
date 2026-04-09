@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "lint": "echo 'No lint configured'",
     "test": "echo 'No tests configured'",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "job:vector-reindex": "ts-node -r dotenv/config src/jobs/nightlyVectorReindex.ts"
   },
   "dependencies": {
     "@comms-lib/db-elasticsearch": "*",
@@ -23,6 +24,7 @@
     "express-rate-limit": "^8.2.1",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.3",
+    "prom-client": "^15.1.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
