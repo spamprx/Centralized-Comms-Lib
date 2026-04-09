@@ -79,7 +79,7 @@ export function EngagementBarChart({ data, loading }: EngagementBarChartProps) {
           <div key={key} className="flex flex-col gap-1">
             <span className="text-[10px] font-semibold uppercase" style={{ color }}>{key}</span>
             <span className="text-sm font-semibold text-[#e2e4f0]">
-              {data.reduce((sum, d) => sum + d[key as keyof EngagementData] as number, 0).toLocaleString()}
+              {data.reduce((sum, d) => sum + (d[key as 'views' | 'likes' | 'shares' | 'comments'] || 0), 0).toLocaleString()}
             </span>
           </div>
         ))}
