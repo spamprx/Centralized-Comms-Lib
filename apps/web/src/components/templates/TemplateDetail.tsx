@@ -136,10 +136,6 @@ Published by {{author}} on {{date}}
     setIsEditing(true);
   };
 
-  const showDiffViewer = (version1: Template, version2: Template) => {
-    setSelectedVersions([version1, version2]);
-  };
-
   const handleCancel = () => {
     setEditedTemplate(template);
     setIsEditing(false);

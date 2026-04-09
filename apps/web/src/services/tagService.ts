@@ -116,7 +116,7 @@ async function apiDelete(tagId: string): Promise<void> {
   });
 }
 
-async function apiGetTemplateTags(templateId: string): Promise<TemplateTag[]> {
+async function apiGetTemplateTags(_templateId: string): Promise<TemplateTag[]> {
   // Since there's no direct endpoint for template tags, we'll return empty array
   // The template-tag association should be handled by the template service
   return [];
@@ -135,7 +135,7 @@ async function apiAddTagToTemplate(templateId: string, tagId: string): Promise<T
   };
 }
 
-async function apiRemoveTagFromTemplate(templateId: string, tagId: string): Promise<void> {
+async function apiRemoveTagFromTemplate(_templateId: string, _tagId: string): Promise<void> {
   // Since there's no direct endpoint for template-tag association,
   // we'll just return success
   // The actual removal should be handled by the template service
