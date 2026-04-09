@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Edit, Trash2, Save, X, GitCompare, Copy } from 'lucide-react';
 import TagEditor from './TagEditor';
-import { type Tag } from '../../services';
+import { templateService, type Tag } from '../../services';
 
 interface Template {
   id: string;
@@ -96,29 +96,82 @@ Published by {{author}} on {{date}}
     }
   }, [showCloneBanner, cloneInfo]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editedTemplate) {
-      // Include tags in the saved template
-      const templateToSave = {
-        ...editedTemplate,
-        tags: tags,
-      };
-      
-      if (template && JSON.stringify(template) !== JSON.stringify(templateToSave)) {
-        const newHistory = [...versionHistory, { 
-          ...template, 
-          id: `${template.id}_${Date.now()}`, // Create unique ID
-          updatedAt: new Date().toISOString()
-        }];
-        setVersionHistory(newHistory);
-        localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
-      }
-      
-      setTemplate(templateToSave);
-      setIsEditing(false);
-      
-      if (onUpdateTemplate) {
-        onUpdateTemplate(templateToSave);
+      try {
+        // Include tags in the saved template
+        const templateToSave = {
+          ...editedTemplate,
+          tags: tags,
+        };
+        
+        // Save to API first
+        const updatedTemplate = await templateService.update(template!.id, templateToSave);
+        
+        if (updatedTemplate) {
+          if (template && JSON.stringify(template) !== JSON.stringify(templateToSave)) {
+            const newHistory = [...versionHistory, { 
+              ...template, 
+              id: `${template.id}_${Date.now()}`, // Create unique ID
+              updatedAt: new Date().toISOString()
+            }];
+            setVersionHistory(newHistory);
+            localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
+          }
+          
+          setTemplate(updatedTemplate);
+          setIsEditing(false);
+          
+          if (onUpdateTemplate) {
+            onUpdateTemplate(updatedTemplate);
+          }
+          
+          console.log('Template updated successfully:', updatedTemplate);
+        } else {
+          // API returned null, fall back to local update
+          if (template && JSON.stringify(template) !== JSON.stringify(templateToSave)) {
+            const newHistory = [...versionHistory, { 
+              ...template, 
+              id: `${template.id}_${Date.now()}`, // Create unique ID
+              updatedAt: new Date().toISOString()
+            }];
+            setVersionHistory(newHistory);
+            localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
+          }
+          
+          setTemplate(templateToSave);
+          setIsEditing(false);
+          
+          if (onUpdateTemplate) {
+            onUpdateTemplate(templateToSave);
+          }
+          
+          console.log('Template updated locally (API returned null):', templateToSave);
+        }
+      } catch (error) {
+        console.error('Failed to update template:', error);
+        // Fallback to localStorage if API fails
+        const templateToSave = {
+          ...editedTemplate,
+          tags: tags,
+        };
+        
+        if (template && JSON.stringify(template) !== JSON.stringify(templateToSave)) {
+          const newHistory = [...versionHistory, { 
+            ...template, 
+            id: `${template.id}_${Date.now()}`, // Create unique ID
+            updatedAt: new Date().toISOString()
+          }];
+          setVersionHistory(newHistory);
+          localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
+        }
+        
+        setTemplate(templateToSave);
+        setIsEditing(false);
+        
+        if (onUpdateTemplate) {
+          onUpdateTemplate(templateToSave);
+        }
       }
     }
   };
@@ -134,7 +187,7 @@ Published by {{author}} on {{date}}
     setIsEditing(true);
   };
 
-  const handleShowDiff = (version1: Template, version2: Template) => {
+  const showDiffViewer = (version1: Template, version2: Template) => {
     setSelectedVersions([version1, version2]);
   };
 
@@ -318,7 +371,7 @@ Published by {{author}} on {{date}}
                       } else {
                         // This version was not last clicked - show diff
                         const previousVersion = template;
-                        setSelectedVersions([previousVersion, version]);
+                        showDiffViewer(previousVersion, version);
                         setLastClickedVersion(version.id);
                       }
                     }}
@@ -423,7 +476,6 @@ Published by {{author}} on {{date}}
                 <h3 className="text-xl font-semibold text-gray-900">{template?.name}</h3>
               )}
             </div>
-
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>

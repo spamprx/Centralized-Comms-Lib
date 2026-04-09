@@ -4,6 +4,7 @@ import TemplatesList from './TemplatesList';
 import TemplateDetail from './TemplateDetail';
 import { templateService, type Template } from '../../services';
 
+
 const TemplatesPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,14 +48,20 @@ const TemplatesPage = () => {
   }, []);
 
   const updateTemplate = async (updatedTemplate: Template) => {
-  try {
-    const saved = await templateService.update(updatedTemplate.id, updatedTemplate);
-    if (saved) {
-      setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? saved : t));
+    try {
+      const saved = await templateService.update(updatedTemplate.id, updatedTemplate);
+      if (saved) {
+        // API succeeded, use the returned template
+        setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? saved : t));
+      } else {
+        // API returned null, use the local updated template
+        setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
+      }
+    } catch (error) {
+      console.error('Failed to update template:', error);
+      // Even on error, update local state with the changes
+      setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
     }
-  } catch (error) {
-    console.error('Failed to update template:', error);
-  }
   };
 
   const handleClone = async (templateId: string) => {
@@ -79,11 +86,10 @@ const TemplatesPage = () => {
 
   const restoreTemplate = async (template: Template) => {
     try {
-      // Create the template again (restore)
+      // Create template again (restore)
       const restoredTemplate = await templateService.create({
         name: template.name,
         description: template.description,
-        category: template.category,
         content: template.content,
         status: template.status,
       });

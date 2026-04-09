@@ -8,7 +8,6 @@ export interface Template {
   id: string;
   name: string;
   description: string;
-  category: string;
   content: string;
   status: TemplateStatus;
   createdAt: string;
@@ -19,7 +18,6 @@ export interface Template {
 export interface CreateTemplateRequest {
   name: string;
   description: string;
-  category: string;
   content: string;
   status?: TemplateStatus;
 }
@@ -27,7 +25,6 @@ export interface CreateTemplateRequest {
 export interface UpdateTemplateRequest {
   name?: string;
   description?: string;
-  category?: string;
   content?: string;
   status?: TemplateStatus;
 }

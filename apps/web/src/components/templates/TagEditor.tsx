@@ -10,7 +10,7 @@ interface TagEditorProps {
   templateTags?: Tag[]; // Add this to get current template tags
 }
 
-export default function TagEditor({ templateId, isEditing, tags, onTagsChange, templateTags: initialTemplateTags }: TagEditorProps) {
+export default function TagEditor({ templateId, isEditing, tags, onTagsChange, templateTags: _initialTemplateTags }: TagEditorProps) {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [filteredSuggestions, setFilteredSuggestions] = useState<Tag[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
