@@ -1,18 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLibrary } from '../hooks/useLibrary';
-import { SearchAndFilterBar, ContentGrid, Pagination } from '../components/library';
+import { LibraryFilterBar, LibraryFilterChips, ContentGrid, Pagination, SearchResultsList } from '../components/library';
+import { serializeLibrarySearchParams } from '../lib/libraryUrlState';
 
 export default function LibraryLayout() {
   const {
     contentItems,
     tags,
+    tagSlugFromMockName,
+    authors,
+    channels,
     loading,
-    searchQuery,
-    setSearchQuery,
-    selectedType,
-    setSelectedType,
-    selectedTag,
-    setSelectedTag,
+    filters,
+    searchInput,
+    setSearchInput,
+    patchFilters,
+    toggleTag,
+    clearAllFilters,
+    hasActiveFilters,
+    searchHits,
+    searchLoading,
+    searchUnavailable,
+    searchError,
   } = useLibrary();
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,8 +29,17 @@ export default function LibraryLayout() {
   const totalPages = Math.ceil(contentItems.length / itemsPerPage);
   const paginatedItems = contentItems.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
+
+  const filterKey = useMemo(
+    () => `${serializeLibrarySearchParams(filters).toString()}|${searchInput}`,
+    [filters, searchInput],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterKey]);
 
   if (loading) {
     return (
@@ -32,7 +50,7 @@ export default function LibraryLayout() {
           <div className="h-10 w-[150px] bg-white/[0.03] rounded-lg" />
         </div>
         <div className="grid grid-cols-3 gap-5">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
             <div key={i} className="h-[280px] bg-white/[0.03] rounded-[10px] animate-pulse" />
           ))}
         </div>
@@ -42,47 +60,63 @@ export default function LibraryLayout() {
 
   return (
     <div className="p-6 min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#e2e4f0] mb-1">Content Library</h1>
         <p className="text-[13px] text-[#555870] m-0">Browse and manage all content assets</p>
+        <p className="text-[11px] text-[#555870] m-0 mt-2 opacity-90">
+          Filters update the URL so you can copy and share the current view.
+        </p>
       </div>
 
-      {/* Search and Filters */}
-      <SearchAndFilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        selectedType={selectedType}
-        onTypeChange={setSelectedType}
-        selectedTag={selectedTag}
-        onTagChange={setSelectedTag}
+      <LibraryFilterBar
+        searchInput={searchInput}
+        onSearchChange={setSearchInput}
+        filters={filters}
+        onAuthorChange={(author) => patchFilters({ author })}
+        onChannelChange={(channel) => patchFilters({ channel })}
+        onStatusChange={(status) => patchFilters({ status })}
+        onTypeChange={(type) => patchFilters({ type })}
+        onDateFromChange={(dateFrom) => patchFilters({ dateFrom })}
+        onDateToChange={(dateTo) => patchFilters({ dateTo })}
         tags={tags}
+        tagSlugFromMockName={tagSlugFromMockName}
+        onToggleTag={toggleTag}
+        authors={authors}
+        channels={channels}
       />
 
-      {/* Active filters */}
-      {(searchQuery || selectedType !== 'all' || selectedTag !== 'all') && (
-        <div className="flex gap-2 mt-3 flex-wrap">
-          {searchQuery && (
-            <span className="px-2.5 py-1 bg-violet-500/15 rounded-2xl text-xs text-violet-400 flex items-center gap-1.5">
-              Search: "{searchQuery}"
-              <button onClick={() => setSearchQuery('')} className="bg-transparent border-none text-violet-400 cursor-pointer p-0 flex">×</button>
-            </span>
-          )}
-          {selectedType !== 'all' && (
-            <span className="px-2.5 py-1 bg-cyan-500/15 rounded-2xl text-xs text-cyan-500 flex items-center gap-1.5">
-              {selectedType}
-              <button onClick={() => setSelectedType('all')} className="bg-transparent border-none text-cyan-500 cursor-pointer p-0 flex">×</button>
-            </span>
-          )}
-        </div>
+      {(hasActiveFilters || searchInput.trim() !== '') && (
+        <LibraryFilterChips
+          filters={filters}
+          searchDisplay={searchInput.trim() || filters.q.trim()}
+          tagCatalog={tags}
+          onRemoveSearch={() => {
+            setSearchInput('');
+            patchFilters({ q: '' });
+          }}
+          onRemoveTag={(slug) => toggleTag(slug)}
+          onRemoveAuthor={() => patchFilters({ author: '' })}
+          onRemoveChannel={() => patchFilters({ channel: '' })}
+          onRemoveStatus={() => patchFilters({ status: 'all' })}
+          onRemoveType={() => patchFilters({ type: 'all' })}
+          onRemoveDateFrom={() => patchFilters({ dateFrom: '' })}
+          onRemoveDateTo={() => patchFilters({ dateTo: '' })}
+          onClearAll={clearAllFilters}
+        />
       )}
 
-      {/* Content Grid */}
+      <SearchResultsList
+        q={filters.q.trim() || searchInput.trim()}
+        loading={searchLoading}
+        unavailable={searchUnavailable}
+        error={searchError}
+        hits={searchHits}
+      />
+
       <div className="mt-6">
         <ContentGrid items={paginatedItems} />
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <Pagination
           currentPage={currentPage}

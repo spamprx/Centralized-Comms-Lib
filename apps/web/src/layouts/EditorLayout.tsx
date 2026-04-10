@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Save,
   Eye,
@@ -21,8 +22,10 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { contentService } from '../services/contentService';
 import { useEditorStore } from '../store/editorStore';
+import SimilarContentWidget from '../components/content/SimilarContentWidget';
 
 export default function EditorLayout() {
+  const { contentId: routeContentId } = useParams<{ contentId: string }>();
   const { draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft } = useEditorStore();
   const [title, setTitle] = useState(draftTitle);
   const [content, setContent] = useState(draftContent || '<p></p>');
@@ -62,7 +65,10 @@ export default function EditorLayout() {
     } finally {
       setSaving(false);
     }
-  }, [title, content, contentId]);
+  }, [title, content, contentId, clearDraft]);
+
+  const similarCheckContentId =
+    contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null);
 
   useEffect(() => {
     setDraftTitle(title);
@@ -225,6 +231,10 @@ export default function EditorLayout() {
             placeholder="Enter title..."
             className="px-6 py-4 bg-transparent border-none border-b border-white/5 text-[#e2e4f0] text-2xl font-bold outline-none box-border"
           />
+
+          <div className="px-6 pb-3 pt-1">
+            <SimilarContentWidget title={title} bodyHtml={content} contentId={similarCheckContentId} />
+          </div>
 
           {/* Editor/Preview Area */}
           <div className="flex-1 overflow-auto p-6">
