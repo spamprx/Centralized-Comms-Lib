@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit, Trash2, Save, X, GitCompare, Copy, Plus } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Save, X, GitCompare, Copy, Plus, Globe } from 'lucide-react';
 import TagEditor from './TagEditor';
 import AddChannelModal from './AddChannelModal';
 import ChannelBindings from './ChannelBindings';
+import TranslationPreview from './TranslationPreview';
 import { templateService, channelService, type Tag, type Binding } from '../../services';
 
 interface Template {
@@ -39,6 +40,7 @@ export default function TemplateDetail({ templateId, onBack, templates, onUpdate
   const [showAddChannelModal, setShowAddChannelModal] = useState(false);
   const [bindings, setBindings] = useState<Binding[]>([]);
   const [editingBinding, setEditingBinding] = useState<Binding | null>(null);
+  const [showTranslationModal, setShowTranslationModal] = useState(false);
 
   const mockTemplate: Template = {
     id: `mock_${templateId}`,
@@ -350,6 +352,13 @@ Published by {{author}} on {{date}}
                 Add Channel
               </button>
               <button
+                onClick={() => setShowTranslationModal(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+              >
+                <Globe className="w-4 h-4" />
+                Translation Preview
+              </button>
+              <button
                 onClick={handleDelete}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-700 transition-colors"
               >
@@ -625,6 +634,16 @@ Published by {{author}} on {{date}}
           setEditingBinding(null);
         }}
         onBindingCreated={handleBindingUpdated}
+      />
+    )}
+
+    {/* Translation Preview Modal */}
+    {showTranslationModal && template && (
+      <TranslationPreview
+        templateId={template.id}
+        templateName={template.name}
+        templateContent={template.content}
+        onClose={() => setShowTranslationModal(false)}
       />
     )}
     </>
