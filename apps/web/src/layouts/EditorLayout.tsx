@@ -4,6 +4,9 @@ import {
   Save,
   Eye,
   Settings,
+  Puzzle,
+  BookMarked,
+  Search,
   Type,
   Image,
   Link as LinkIcon,
@@ -21,8 +24,55 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { contentService } from '../services/contentService';
+import { componentService } from '../services/componentService';
+import {
+  renderCitation,
+  searchReferences,
+  toCitationWork,
+  type CitationStyle,
+} from '../services/citationService';
+import type { ContentSearchHit } from '../services/searchService';
 import { useEditorStore } from '../store/editorStore';
 import SimilarContentWidget from '../components/content/SimilarContentWidget';
+
+type CitationItem = {
+  marker: number;
+  style: CitationStyle;
+  text: string;
+  title: string;
+  sourceId: string;
+};
+
+const BIB_START = '<!--BIBLIO_START-->';
+const BIB_END = '<!--BIBLIO_END-->';
+
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function bibliographyHtml(citations: CitationItem[]): string {
+  if (citations.length === 0) return '';
+  const items = citations
+    .map((c) => `<li>[${c.marker}] ${escapeHtml(c.text)}</li>`)
+    .join('');
+  return `${BIB_START}<h2>Bibliography</h2><ol>${items}</ol>${BIB_END}`;
+}
+
+function upsertBibliography(currentHtml: string, citations: CitationItem[]): string {
+  const block = bibliographyHtml(citations);
+  const re = /<!--BIBLIO_START-->[\s\S]*?<!--BIBLIO_END-->/m;
+  if (re.test(currentHtml)) {
+    if (!block) return currentHtml.replace(re, '');
+    return currentHtml.replace(re, block);
+  }
+  if (!block) return currentHtml;
+  return `${currentHtml}${currentHtml.endsWith('</p>') ? '' : '<p></p>'}${block}`;
+}
 
 export default function EditorLayout() {
   const { contentId: routeContentId } = useParams<{ contentId: string }>();
@@ -34,6 +84,22 @@ export default function EditorLayout() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSaveComponentModal, setShowSaveComponentModal] = useState(false);
+  const [componentName, setComponentName] = useState('');
+  const [componentKey, setComponentKey] = useState('');
+  const [componentMode, setComponentMode] = useState<'linked' | 'detached'>('linked');
+  const [componentDescription, setComponentDescription] = useState('');
+  const [componentSaving, setComponentSaving] = useState(false);
+  const [componentSaveError, setComponentSaveError] = useState<string | null>(null);
+  const [componentNotice, setComponentNotice] = useState<string | null>(null);
+  const [selectionText, setSelectionText] = useState('');
+  const [showCitationDialog, setShowCitationDialog] = useState(false);
+  const [citationQuery, setCitationQuery] = useState('');
+  const [citationStyle, setCitationStyle] = useState<CitationStyle>('APA');
+  const [citationResults, setCitationResults] = useState<ContentSearchHit[]>([]);
+  const [citationLoading, setCitationLoading] = useState(false);
+  const [citationError, setCitationError] = useState<string | null>(null);
+  const [citationItems, setCitationItems] = useState<CitationItem[]>([]);
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) {
@@ -97,6 +163,11 @@ export default function EditorLayout() {
     ],
     content,
     onUpdate: ({ editor }) => setContent(editor.getHTML()),
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      const text = from === to ? '' : editor.state.doc.textBetween(from, to, ' ').trim();
+      setSelectionText(text);
+    },
     editorProps: {
       attributes: {
         class: 'min-h-[400px] p-6 bg-white/[0.02] border border-white/5 rounded-xl text-[#e2e4f0] text-[15px] leading-relaxed outline-none box-border',
@@ -110,6 +181,151 @@ export default function EditorLayout() {
       editor.commands.setContent(content);
     }
   }, [content, editor]);
+
+  const selectedText = selectionText;
+
+  const openSaveComponentModal = useCallback(() => {
+    if (!selectedText) return;
+    const compact = selectedText.replace(/\s+/g, ' ').trim();
+    const defaultName = compact.slice(0, 42) || 'New Component';
+    const suggestedKey = defaultName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+    setComponentName(defaultName);
+    setComponentKey(suggestedKey || `component-${Date.now().toString(36)}`);
+    setComponentMode('linked');
+    setComponentDescription('');
+    setComponentSaveError(null);
+    setShowSaveComponentModal(true);
+  }, [selectedText]);
+
+  const handleSaveSelectionAsComponent = useCallback(async () => {
+    if (!editor) return;
+    if (!componentName.trim() || !componentKey.trim()) {
+      setComponentSaveError('Component name and key are required');
+      return;
+    }
+    const { from, to } = editor.state.selection;
+    if (from === to) {
+      setComponentSaveError('Please select text before saving as a component');
+      return;
+    }
+
+    setComponentSaving(true);
+    setComponentSaveError(null);
+    try {
+      const created = await componentService.create({
+        key: componentKey.trim(),
+        name: componentName.trim(),
+        description: componentDescription.trim() || null,
+      });
+
+      const sourceContentId =
+        contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null);
+
+      const linkRefs =
+        componentMode === 'linked'
+          ? {
+              mode: 'linked',
+              source: {
+                contentId: sourceContentId,
+                selection: { from, to },
+              },
+            }
+          : {
+              mode: 'detached',
+            };
+
+      await componentService.createVersion(created.id, {
+        version: 'v1',
+        linkRefs,
+        propSchema: {
+          mode: componentMode,
+          selection: { from, to },
+          snapshotText: selectedText,
+          snapshotHtml: editor.getHTML(),
+          savedAt: new Date().toISOString(),
+        },
+      });
+
+      setShowSaveComponentModal(false);
+      setComponentNotice(
+        `Saved "${componentName.trim()}" as ${componentMode === 'linked' ? 'linked' : 'detached'} component`,
+      );
+      window.setTimeout(() => setComponentNotice(null), 3500);
+    } catch (err) {
+      setComponentSaveError(err instanceof Error ? err.message : 'Failed to save component');
+    } finally {
+      setComponentSaving(false);
+    }
+  }, [
+    componentDescription,
+    componentKey,
+    componentMode,
+    componentName,
+    contentId,
+    editor,
+    routeContentId,
+    selectedText,
+  ]);
+
+  const openCitationDialog = useCallback(() => {
+    setShowCitationDialog(true);
+    setCitationError(null);
+  }, []);
+
+  const handleSearchCitations = useCallback(async () => {
+    if (!citationQuery.trim()) {
+      setCitationResults([]);
+      return;
+    }
+    setCitationLoading(true);
+    setCitationError(null);
+    try {
+      const hits = await searchReferences(citationQuery.trim());
+      setCitationResults(hits);
+    } catch (err) {
+      setCitationError(err instanceof Error ? err.message : 'Failed to search references');
+      setCitationResults([]);
+    } finally {
+      setCitationLoading(false);
+    }
+  }, [citationQuery]);
+
+  const applyCitationWithBibliography = useCallback(
+    async (hit: ContentSearchHit) => {
+      if (!editor) return;
+      const work = toCitationWork(hit);
+      try {
+        const text = await renderCitation(citationStyle, work);
+        let marker = 0;
+        setCitationItems((prev) => {
+          marker = prev.length + 1;
+          const next: CitationItem[] = [
+            ...prev,
+            {
+              marker,
+              style: citationStyle,
+              text,
+              title: work.title,
+              sourceId: hit.contentId,
+            },
+          ];
+          const nextHtml = upsertBibliography(editor.getHTML(), next);
+          setContent(nextHtml);
+          return next;
+        });
+
+        editor.chain().focus().insertContent(`<sup>[${marker}]</sup>`).run();
+        setShowCitationDialog(false);
+      } catch (err) {
+        setCitationError(err instanceof Error ? err.message : 'Failed to render citation');
+      }
+    },
+    [citationStyle, editor],
+  );
 
   const insertBlocks = useMemo(
     () => [
@@ -146,9 +362,10 @@ export default function EditorLayout() {
           editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
         },
       },
+      { icon: BookMarked, label: 'Citation', color: '#22d3ee', onClick: () => openCitationDialog() },
       { icon: Image, label: 'Image (soon)', color: '#555870', onClick: () => {} },
     ],
-    [editor],
+    [editor, openCitationDialog],
   );
 
   return (
@@ -172,8 +389,33 @@ export default function EditorLayout() {
                 ? `Last saved: ${lastSaved.toLocaleTimeString()}`
                 : 'Not saved yet'}
           </span>
+          {componentNotice && (
+            <>
+              <span className="text-white/20">|</span>
+              <span className="text-[13px] text-emerald-400">{componentNotice}</span>
+            </>
+          )}
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={openCitationDialog}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-[13px] cursor-pointer hover:text-violet-300"
+            title="Search references and insert citation"
+          >
+            <BookMarked size={16} /> Cite
+          </button>
+          <button
+            onClick={openSaveComponentModal}
+            disabled={!selectedText}
+            className={`flex items-center gap-1.5 px-4 py-2 border rounded-md text-[13px] ${
+              selectedText
+                ? 'bg-white/5 border-white/10 text-[#8b8fa8] cursor-pointer hover:text-violet-300'
+                : 'bg-white/[0.02] border-white/[0.06] text-[#555870] cursor-not-allowed'
+            }`}
+            title={selectedText ? 'Save selected text as reusable component' : 'Select text in editor first'}
+          >
+            <Puzzle size={16} /> Save as Component
+          </button>
           <button className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-[13px] cursor-pointer">
             <Settings size={16} /> Settings
           </button>
@@ -314,6 +556,189 @@ export default function EditorLayout() {
           </div>
         </div>
       </div>
+      {showCitationDialog && (
+        <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4">
+          <div className="w-full max-w-[760px] rounded-xl border border-white/10 bg-[#1a1d2e] p-5 max-h-[80vh] overflow-hidden flex flex-col">
+            <h3 className="m-0 text-lg text-[#e2e4f0] font-semibold">Insert Citation</h3>
+            <p className="mt-1 mb-4 text-[12px] text-[#8b8fa8]">
+              Search references and insert inline marker with bibliography auto-update.
+            </p>
+
+            <div className="flex gap-2 mb-3">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]" />
+                <input
+                  value={citationQuery}
+                  onChange={(e) => setCitationQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleSearchCitations();
+                    }
+                  }}
+                  placeholder="Search references by title, summary, or body…"
+                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[13px] text-[#e2e4f0] outline-none"
+                />
+              </div>
+              <select
+                value={citationStyle}
+                onChange={(e) => setCitationStyle(e.target.value as CitationStyle)}
+                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[13px] text-[#e2e4f0]"
+              >
+                <option value="APA">APA</option>
+                <option value="IEEE">IEEE</option>
+                <option value="MLA">MLA</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void handleSearchCitations()}
+                className="px-3.5 py-2.5 rounded-md text-[13px] bg-violet-500/20 text-violet-300 border border-violet-500/30"
+              >
+                Search
+              </button>
+            </div>
+
+            {citationError && <div className="text-[12px] text-red-400 mb-2">{citationError}</div>}
+            <div className="text-[11px] text-[#555870] mb-2">
+              Existing citations in this draft: {citationItems.length}
+            </div>
+
+            <div className="flex-1 overflow-auto rounded-md border border-white/10 bg-white/[0.02]">
+              {citationLoading ? (
+                <div className="p-4 text-[13px] text-[#8b8fa8]">Searching references…</div>
+              ) : citationResults.length === 0 ? (
+                <div className="p-4 text-[13px] text-[#555870]">No references yet. Try a broader query.</div>
+              ) : (
+                <ul className="list-none m-0 p-0 divide-y divide-white/[0.06]">
+                  {citationResults.map((hit) => {
+                    const sourceTitle =
+                      typeof hit.source.title === 'string'
+                        ? hit.source.title
+                        : typeof hit.source.name === 'string'
+                          ? hit.source.name
+                          : 'Untitled';
+                    return (
+                      <li key={hit.contentId} className="p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-semibold text-[#e2e4f0] truncate">{sourceTitle}</div>
+                            {hit.snippetHtml ? (
+                              <div
+                                className="text-[12px] text-[#8b8fa8] mt-1"
+                                dangerouslySetInnerHTML={{ __html: hit.snippetHtml }}
+                              />
+                            ) : (
+                              <div className="text-[12px] text-[#555870] mt-1">No snippet available.</div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void applyCitationWithBibliography(hit)}
+                            className="px-2.5 py-1.5 text-[12px] rounded-md border border-cyan-500/30 bg-cyan-500/15 text-cyan-300 shrink-0"
+                          >
+                            Insert [{citationItems.length + 1}]
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCitationDialog(false)}
+                className="px-3 py-2 text-[13px] bg-white/5 border border-white/10 rounded-md text-[#8b8fa8]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showSaveComponentModal && (
+        <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4">
+          <div className="w-full max-w-[520px] rounded-xl border border-white/10 bg-[#1a1d2e] p-5">
+            <h3 className="m-0 text-lg text-[#e2e4f0] font-semibold">Save Selection as Component</h3>
+            <p className="mt-1 mb-4 text-[12px] text-[#8b8fa8]">
+              Create a reusable component from current selection.
+            </p>
+
+            <div className="text-[11px] text-[#555870] mb-2">Selection preview</div>
+            <div className="rounded-md border border-white/10 bg-white/[0.03] p-3 text-[12px] text-[#c4c8dc] max-h-[90px] overflow-auto mb-4">
+              {selectedText || 'No selection'}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <input
+                value={componentName}
+                onChange={(e) => setComponentName(e.target.value)}
+                placeholder="Component name"
+                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none"
+              />
+              <input
+                value={componentKey}
+                onChange={(e) => setComponentKey(e.target.value)}
+                placeholder="component-key"
+                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none"
+              />
+              <textarea
+                value={componentDescription}
+                onChange={(e) => setComponentDescription(e.target.value)}
+                placeholder="Description (optional)"
+                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none min-h-[72px]"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setComponentMode('linked')}
+                  className={`px-3 py-2 rounded-md text-[12px] border ${
+                    componentMode === 'linked'
+                      ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                      : 'bg-white/5 text-[#8b8fa8] border-white/10'
+                  }`}
+                >
+                  Linked (live-sync)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComponentMode('detached')}
+                  className={`px-3 py-2 rounded-md text-[12px] border ${
+                    componentMode === 'detached'
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                      : 'bg-white/5 text-[#8b8fa8] border-white/10'
+                  }`}
+                >
+                  Detached (snapshot)
+                </button>
+              </div>
+              {componentSaveError && (
+                <div className="text-[12px] text-red-400">{componentSaveError}</div>
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSaveComponentModal(false)}
+                className="px-3 py-2 text-[13px] bg-white/5 border border-white/10 rounded-md text-[#8b8fa8]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveSelectionAsComponent}
+                disabled={componentSaving}
+                className="px-3 py-2 text-[13px] rounded-md text-white bg-gradient-to-br from-violet-500 to-cyan-500 disabled:opacity-70"
+              >
+                {componentSaving ? 'Saving…' : 'Save Component'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
