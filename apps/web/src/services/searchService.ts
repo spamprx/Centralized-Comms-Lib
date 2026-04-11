@@ -1,6 +1,5 @@
+import { joinApiV1Path } from '../lib/apiBase';
 import { getAuthToken } from './tokenStore';
-
-const API_BASE = import.meta.env.VITE_API_URL;
 
 export type ContentCheckHit = {
   contentId: string;
@@ -40,7 +39,7 @@ export async function fetchSimilarByContentId(
   if (opts?.minScore != null) params.set('minScore', String(opts.minScore));
 
   const token = getAuthToken();
-  const res = await fetch(`${API_BASE}/search/content-check?${params}`, {
+  const res = await fetch(joinApiV1Path(`/search/content-check?${params}`), {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -74,7 +73,7 @@ export async function searchContent(
   params.set('includeFacets', 'false');
 
   const token = getAuthToken();
-  const res = await fetch(`${API_BASE}/search/content?${params}`, {
+  const res = await fetch(joinApiV1Path(`/search/content?${params}`), {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

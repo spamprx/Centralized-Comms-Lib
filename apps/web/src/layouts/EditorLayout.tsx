@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Save,
@@ -6,7 +6,6 @@ import {
   Settings,
   Puzzle,
   BookMarked,
-  Search,
   Type,
   Image,
   Link as LinkIcon,
@@ -26,16 +25,24 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { contentService } from '../services/contentService';
 import { componentService } from '../services/componentService';
 import {
-  renderCitation,
-  searchReferences,
+  renderCitationWithFallback,
   toCitationWork,
   type CitationStyle,
+  type CitationWork,
 } from '../services/citationService';
 import type { ContentSearchHit } from '../services/searchService';
 import { useEditorStore } from '../store/editorStore';
 import SimilarContentWidget from '../components/content/SimilarContentWidget';
+import CitationSearchDialog from '../components/editor/CitationSearchDialog';
 import ComponentLibraryPanel from '../components/editor/ComponentLibraryPanel';
 import { Surface } from '../components/ui/Surface';
+import {
+  emptyReferencesSectionHtml,
+  hasBibliographySection,
+  upsertBibliographySection,
+  type CitationMarkerMode,
+} from '../lib/citationMarkers';
+import { CitationMarker, citationMarkLabel } from '../tiptap/CitationMarker';
 
 type CitationItem = {
   marker: number;
@@ -43,38 +50,8 @@ type CitationItem = {
   text: string;
   title: string;
   sourceId: string;
+  work: CitationWork;
 };
-
-const BIB_START = '<!--BIBLIO_START-->';
-const BIB_END = '<!--BIBLIO_END-->';
-
-function escapeHtml(raw: string): string {
-  return raw
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function bibliographyHtml(citations: CitationItem[]): string {
-  if (citations.length === 0) return '';
-  const items = citations
-    .map((c) => `<li>[${c.marker}] ${escapeHtml(c.text)}</li>`)
-    .join('');
-  return `${BIB_START}<h2>Bibliography</h2><ol>${items}</ol>${BIB_END}`;
-}
-
-function upsertBibliography(currentHtml: string, citations: CitationItem[]): string {
-  const block = bibliographyHtml(citations);
-  const re = /<!--BIBLIO_START-->[\s\S]*?<!--BIBLIO_END-->/m;
-  if (re.test(currentHtml)) {
-    if (!block) return currentHtml.replace(re, '');
-    return currentHtml.replace(re, block);
-  }
-  if (!block) return currentHtml;
-  return `${currentHtml}${currentHtml.endsWith('</p>') ? '' : '<p></p>'}${block}`;
-}
 
 export default function EditorLayout() {
   const { contentId: routeContentId } = useParams<{ contentId: string }>();
@@ -96,12 +73,13 @@ export default function EditorLayout() {
   const [componentNotice, setComponentNotice] = useState<string | null>(null);
   const [selectionText, setSelectionText] = useState('');
   const [showCitationDialog, setShowCitationDialog] = useState(false);
-  const [citationQuery, setCitationQuery] = useState('');
+  const [citationDialogMountKey, setCitationDialogMountKey] = useState(0);
   const [citationStyle, setCitationStyle] = useState<CitationStyle>('APA');
-  const [citationResults, setCitationResults] = useState<ContentSearchHit[]>([]);
-  const [citationLoading, setCitationLoading] = useState(false);
-  const [citationError, setCitationError] = useState<string | null>(null);
+  const [citationMarkerMode, setCitationMarkerMode] = useState<CitationMarkerMode>('chip');
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
   const [citationItems, setCitationItems] = useState<CitationItem[]>([]);
+  const citationItemsRef = useRef(citationItems);
+  citationItemsRef.current = citationItems;
   const [rightPanelTab, setRightPanelTab] = useState<'properties' | 'library'>('library');
 
   const handleSaveDraft = useCallback(async () => {
@@ -151,6 +129,7 @@ export default function EditorLayout() {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      CitationMarker,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -276,59 +255,81 @@ export default function EditorLayout() {
   ]);
 
   const openCitationDialog = useCallback(() => {
+    setCitationDialogMountKey((k) => k + 1);
     setShowCitationDialog(true);
-    setCitationError(null);
   }, []);
 
-  const handleSearchCitations = useCallback(async () => {
-    if (!citationQuery.trim()) {
-      setCitationResults([]);
+  /** Re-render bibliography entries when the global citation format changes. */
+  useEffect(() => {
+    const snapshot = citationItemsRef.current;
+    if (snapshot.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const updated = await Promise.all(
+        snapshot.map(async (c) => ({
+          ...c,
+          style: citationStyle,
+          text: await renderCitationWithFallback(citationStyle, c.work),
+        })),
+      );
+      if (cancelled) return;
+      setCitationItems(updated);
+      setContent((prev) => upsertBibliographySection(prev, updated));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [citationStyle]);
+
+  const placeReferencesSectionHere = useCallback(() => {
+    if (!editor) return;
+    const html = editor.getHTML();
+    if (hasBibliographySection(html)) {
+      setReferenceNotice('This draft already has a References section.');
+      window.setTimeout(() => setReferenceNotice(null), 4000);
       return;
     }
-    setCitationLoading(true);
-    setCitationError(null);
-    try {
-      const hits = await searchReferences(citationQuery.trim());
-      setCitationResults(hits);
-    } catch (err) {
-      setCitationError(err instanceof Error ? err.message : 'Failed to search references');
-      setCitationResults([]);
-    } finally {
-      setCitationLoading(false);
-    }
-  }, [citationQuery]);
+    editor.chain().focus().insertContent(emptyReferencesSectionHtml()).run();
+    setReferenceNotice('References block inserted at the cursor. Add citations from the Cite dialog.');
+    window.setTimeout(() => setReferenceNotice(null), 4000);
+  }, [editor]);
 
   const applyCitationWithBibliography = useCallback(
     async (hit: ContentSearchHit) => {
       if (!editor) return;
       const work = toCitationWork(hit);
-      try {
-        const text = await renderCitation(citationStyle, work);
-        let marker = 0;
-        setCitationItems((prev) => {
-          marker = prev.length + 1;
-          const next: CitationItem[] = [
-            ...prev,
-            {
-              marker,
-              style: citationStyle,
-              text,
-              title: work.title,
-              sourceId: hit.contentId,
-            },
-          ];
-          const nextHtml = upsertBibliography(editor.getHTML(), next);
-          setContent(nextHtml);
-          return next;
-        });
+      const text = await renderCitationWithFallback(citationStyle, work);
+      let marker = 0;
+      setCitationItems((prev) => {
+        marker = prev.length + 1;
+        const next: CitationItem[] = [
+          ...prev,
+          {
+            marker,
+            style: citationStyle,
+            text,
+            title: work.title,
+            sourceId: hit.contentId,
+            work,
+          },
+        ];
+        const nextHtml = upsertBibliographySection(editor.getHTML(), next);
+        setContent(nextHtml);
+        return next;
+      });
 
-        editor.chain().focus().insertContent(`<sup>[${marker}]</sup>`).run();
-        setShowCitationDialog(false);
-      } catch (err) {
-        setCitationError(err instanceof Error ? err.message : 'Failed to render citation');
-      }
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'text',
+          text: citationMarkLabel(marker, citationMarkerMode),
+          marks: [{ type: 'citationMarker', attrs: { marker, mode: citationMarkerMode } }],
+        })
+        .run();
+      setShowCitationDialog(false);
     },
-    [citationStyle, editor],
+    [citationMarkerMode, citationStyle, editor],
   );
 
   const insertBlocks = useMemo(
@@ -401,12 +402,26 @@ export default function EditorLayout() {
               <span className="hidden truncate text-[13px] text-emerald-300/95 sm:inline">{componentNotice}</span>
             </>
           )}
+          {referenceNotice && (
+            <>
+              <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
+              <span className="hidden truncate text-[13px] text-cyan-300/90 sm:inline">{referenceNotice}</span>
+            </>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <button
+            type="button"
+            onClick={placeReferencesSectionHere}
+            className="flex items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted transition-colors hover:border-cyan-500/35 hover:text-cyan-300"
+            title="Insert “References” heading and list at the cursor (citations fill this block)"
+          >
+            <ListOrdered size={16} /> <span className="hidden md:inline">Refs block</span>
+          </button>
+          <button
             onClick={openCitationDialog}
             className="flex items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted transition-colors hover:border-app-accent/30 hover:text-app-accent"
-            title="Search references and insert citation"
+            title="Search references — marker is inserted where the cursor is"
           >
             <BookMarked size={16} /> <span className="hidden sm:inline">Cite</span>
           </button>
@@ -616,108 +631,18 @@ export default function EditorLayout() {
           )}
         </Surface>
       </div>
-      {showCitationDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[80vh] w-full max-w-[760px] flex-col overflow-hidden rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl">
-            <h3 className="m-0 text-lg text-app-text font-semibold">Insert Citation</h3>
-            <p className="mt-1 mb-4 text-[12px] text-app-muted">
-              Search references and insert inline marker with bibliography auto-update.
-            </p>
-
-            <div className="flex gap-2 mb-3">
-              <div className="relative flex-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
-                <input
-                  value={citationQuery}
-                  onChange={(e) => setCitationQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      void handleSearchCitations();
-                    }
-                  }}
-                  placeholder="Search references by title, summary, or body…"
-                  className="w-full pl-9 pr-3 py-2.5 bg-app-surface border border-app-border rounded-md text-[13px] text-app-text outline-none"
-                />
-              </div>
-              <select
-                value={citationStyle}
-                onChange={(e) => setCitationStyle(e.target.value as CitationStyle)}
-                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-[13px] text-app-text"
-              >
-                <option value="APA">APA</option>
-                <option value="IEEE">IEEE</option>
-                <option value="MLA">MLA</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void handleSearchCitations()}
-                className="px-3.5 py-2.5 rounded-md text-[13px] bg-violet-500/20 text-violet-300 border border-violet-500/30"
-              >
-                Search
-              </button>
-            </div>
-
-            {citationError && <div className="text-[12px] text-red-400 mb-2">{citationError}</div>}
-            <div className="text-[11px] text-app-faint mb-2">
-              Existing citations in this draft: {citationItems.length}
-            </div>
-
-            <div className="flex-1 overflow-auto rounded-md border border-app-border bg-app-bg/60">
-              {citationLoading ? (
-                <div className="p-4 text-[13px] text-app-muted">Searching references…</div>
-              ) : citationResults.length === 0 ? (
-                <div className="p-4 text-[13px] text-app-faint">No references yet. Try a broader query.</div>
-              ) : (
-                <ul className="list-none m-0 p-0 divide-y divide-app-border">
-                  {citationResults.map((hit) => {
-                    const sourceTitle =
-                      typeof hit.source.title === 'string'
-                        ? hit.source.title
-                        : typeof hit.source.name === 'string'
-                          ? hit.source.name
-                          : 'Untitled';
-                    return (
-                      <li key={hit.contentId} className="p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-semibold text-app-text truncate">{sourceTitle}</div>
-                            {hit.snippetHtml ? (
-                              <div
-                                className="text-[12px] text-app-muted mt-1"
-                                dangerouslySetInnerHTML={{ __html: hit.snippetHtml }}
-                              />
-                            ) : (
-                              <div className="text-[12px] text-app-faint mt-1">No snippet available.</div>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => void applyCitationWithBibliography(hit)}
-                            className="px-2.5 py-1.5 text-[12px] rounded-md border border-cyan-500/30 bg-cyan-500/15 text-cyan-300 shrink-0"
-                          >
-                            Insert [{citationItems.length + 1}]
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowCitationDialog(false)}
-                className="px-3 py-2 text-[13px] bg-app-surface border border-app-border rounded-md text-app-muted"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CitationSearchDialog
+        key={citationDialogMountKey}
+        open={showCitationDialog}
+        onClose={() => setShowCitationDialog(false)}
+        citationStyle={citationStyle}
+        onCitationStyleChange={setCitationStyle}
+        citationMarkerMode={citationMarkerMode}
+        onCitationMarkerModeChange={setCitationMarkerMode}
+        onPlaceReferencesHere={placeReferencesSectionHere}
+        existingCitationCount={citationItems.length}
+        onInsert={applyCitationWithBibliography}
+      />
       {showSaveComponentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
           <div className="w-full max-w-[520px] rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl">

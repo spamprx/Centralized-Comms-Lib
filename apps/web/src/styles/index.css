@@ -225,6 +225,38 @@
   .tiptap-content a {
     @apply text-app-accent underline decoration-app-accent/40 underline-offset-2;
   }
+
+  /* Inline citation callouts (not raw <sup>) */
+  .tiptap-content .ProseMirror .citation-marker {
+    @apply inline font-semibold tabular-nums text-cyan-400/95;
+    margin: 0 0.06em;
+  }
+
+  .tiptap-content .ProseMirror .citation-marker--chip {
+    @apply rounded-md border border-cyan-500/35 bg-cyan-500/15 px-1 py-0.5 text-[0.72em] leading-none text-cyan-200;
+    vertical-align: 0.12em;
+  }
+
+  .tiptap-content .ProseMirror .citation-marker--raised {
+    font-size: 0.72em;
+    line-height: 0;
+    position: relative;
+    top: -0.45em;
+    color: rgba(165, 243, 252, 0.92);
+  }
+
+  .tiptap-content .ProseMirror .citation-marker--paren {
+    @apply text-[0.88em] text-cyan-300/90;
+    vertical-align: 0.02em;
+  }
+
+  .tiptap-content .ProseMirror h2.editor-references-heading {
+    @apply mt-6 border-t border-app-border/50 pt-4 text-lg text-app-muted;
+  }
+
+  .tiptap-content .ProseMirror h2.editor-references-heading + ol {
+    @apply mb-6 border-b border-app-border/40 pb-4;
+  }
 }
 
 #root {

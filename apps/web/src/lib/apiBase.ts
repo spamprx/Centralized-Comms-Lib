@@ -11,3 +11,10 @@ export function resolveApiV1Base(): string {
   if (/\/api\/v\d+$/i.test(base)) return base;
   return `${base}/api/v1`;
 }
+
+/** Absolute URL for a path under `/api/v1` (e.g. `/search/content`). */
+export function joinApiV1Path(path: string): string {
+  const base = resolveApiV1Base().replace(/\/$/, '');
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${p}`;
+}
