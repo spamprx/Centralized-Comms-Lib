@@ -521,4 +521,214 @@ router.get("/ai-insights", authorize("ADMIN"), async (req: AuthRequest, res: Res
   }
 });
 
+// ─── CSV Export ─────────────────────────────────────────────────────────────
+
+function escapeCsvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function toCsvRow(fields: string[]): string {
+  return fields.map(escapeCsvField).join(",");
+}
+
+/**
+ * @openapi
+ * /api/v1/analytics/export/csv:
+ *   get:
+ *     summary: Export per-content analytics metrics as CSV
+ *     description: >
+ *       Returns a downloadable CSV with per-content metrics (views, unique readers,
+ *       avg reading time, reactions) within the requested date range.
+ *       Supports optional filters by contentId, authorId, and eventType.
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start of date range (ISO 8601). Defaults to 30 days ago.
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End of date range (ISO 8601). Defaults to now.
+ *       - in: query
+ *         name: contentId
+ *         schema:
+ *           type: string
+ *         description: Filter to a single content item
+ *       - in: query
+ *         name: authorId
+ *         schema:
+ *           type: string
+ *         description: Filter to content by a specific author
+ *     responses:
+ *       200:
+ *         description: CSV file download
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *       400:
+ *         description: Invalid date range
+ */
+router.get("/export/csv", async (req: AuthRequest, res: Response) => {
+  try {
+    const range = parseDateRange(req.query.from, req.query.to);
+    if ("error" in range) {
+      res.status(400).json({ error: range.error });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+
+    type RawEvent = { contentId: string; eventType: string; metadata: unknown };
+
+    let events: RawEvent[];
+    if (req.query.contentId) {
+      events = await prisma.$queryRawUnsafe<RawEvent[]>(
+        `SELECT "contentId", "eventType", metadata
+         FROM content_analytics_events
+         WHERE "createdAt" >= $1 AND "createdAt" <= $2 AND "contentId" = $3`,
+        range.from, range.to, String(req.query.contentId),
+      );
+    } else {
+      events = await prisma.$queryRawUnsafe<RawEvent[]>(
+        `SELECT "contentId", "eventType", metadata
+         FROM content_analytics_events
+         WHERE "createdAt" >= $1 AND "createdAt" <= $2`,
+        range.from, range.to,
+      );
+    }
+
+    const contentIdSet = new Set(events.map((e) => e.contentId));
+    const contentIds: string[] = [...contentIdSet];
+    const contentMap = new Map<string, { title: string; author: string }>();
+
+    if (contentIds.length > 0) {
+      const authorFilter = req.query.authorId ? { authorId: String(req.query.authorId) } : {};
+      const contents = await prisma.content.findMany({
+        where: { id: { in: contentIds }, ...authorFilter },
+        include: { author: { select: { displayName: true } } },
+      });
+      for (const c of contents) {
+        contentMap.set(c.id, {
+          title: c.title,
+          author: c.author?.displayName ?? "Unknown",
+        });
+      }
+    }
+
+    const filteredContentIds = req.query.authorId
+      ? contentIds.filter((id) => contentMap.has(id))
+      : contentIds;
+
+    type ContentMetrics = {
+      views: number;
+      uniqueReaders: Set<string>;
+      readingTimeSeconds: number[];
+      likes: number;
+      shares: number;
+      bookmarks: number;
+    };
+
+    const metricsMap = new Map<string, ContentMetrics>();
+    for (const cid of filteredContentIds) {
+      metricsMap.set(cid, {
+        views: 0,
+        uniqueReaders: new Set(),
+        readingTimeSeconds: [],
+        likes: 0,
+        shares: 0,
+        bookmarks: 0,
+      });
+    }
+
+    for (const ev of events) {
+      const m = metricsMap.get(ev.contentId);
+      if (!m) continue;
+      const meta = (typeof ev.metadata === "object" ? ev.metadata : null) as Record<string, unknown> | null;
+      const userId = meta?.userId as string | undefined;
+
+      switch (ev.eventType) {
+        case "view":
+          m.views++;
+          if (userId) m.uniqueReaders.add(userId);
+          break;
+        case "reading_time": {
+          const secs = Number(meta?.seconds) || 0;
+          if (secs > 0) m.readingTimeSeconds.push(secs);
+          break;
+        }
+        case "like":
+          m.likes++;
+          break;
+        case "share":
+          m.shares++;
+          break;
+        case "bookmark":
+          m.bookmarks++;
+          break;
+      }
+    }
+
+    const CSV_HEADERS = [
+      "Content ID",
+      "Title",
+      "Author",
+      "Total Views",
+      "Unique Readers",
+      "Avg Reading Time (s)",
+      "Likes",
+      "Shares",
+      "Bookmarks",
+      "Total Reactions",
+    ];
+    const rows: string[] = [toCsvRow(CSV_HEADERS)];
+
+    for (const cid of filteredContentIds) {
+      const m = metricsMap.get(cid)!;
+      const info = contentMap.get(cid) ?? { title: "Unknown", author: "Unknown" };
+      const avgReadTime =
+        m.readingTimeSeconds.length > 0
+          ? (m.readingTimeSeconds.reduce((a, b) => a + b, 0) / m.readingTimeSeconds.length).toFixed(1)
+          : "0";
+      const totalReactions = m.likes + m.shares + m.bookmarks;
+
+      rows.push(
+        toCsvRow([
+          cid,
+          info.title,
+          info.author,
+          String(m.views),
+          String(m.uniqueReaders.size),
+          avgReadTime,
+          String(m.likes),
+          String(m.shares),
+          String(m.bookmarks),
+          String(totalReactions),
+        ]),
+      );
+    }
+
+    const fromStr = range.from.toISOString().split("T")[0];
+    const toStr = range.to.toISOString().split("T")[0];
+    const filename = `analytics_${fromStr}_to_${toStr}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(rows.join("\n"));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;
