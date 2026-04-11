@@ -4,6 +4,7 @@ import type { AuthRequest } from "../../middlewares/auth.middleware";
 import {
   searchContentCached,
   searchContentCheck,
+  searchContentCheckByText,
 } from "../../search/contentSearch.service";
 import { parseContentSearchFilters } from "./search.filters";
 import { assertValidQueryVector, type RankBlendWeights } from "../../search/rankBlend";
@@ -181,17 +182,43 @@ router.get("/content", async (req: AuthRequest, res: Response) => {
  *     parameters:
  *       - in: query
  *         name: contentId
- *         required: true
  *         schema:
  *           type: string
+ *         description: >
+ *           ID of an already-indexed content document.  When provided the
+ *           server uses `more_like_this` against the stored fields.  Mutually
+ *           exclusive with title/summary/body text params.
+ *       - in: query
+ *         name: title
+ *         schema:
+ *           type: string
+ *         description: Draft title typed by the author (text-based mode)
+ *       - in: query
+ *         name: summary
+ *         schema:
+ *           type: string
+ *         description: Draft summary / subtitle (text-based mode)
+ *       - in: query
+ *         name: body
+ *         schema:
+ *           type: string
+ *         description: >
+ *           Draft body text.  Truncated server-side to
+ *           CONTENT_CHECK_BODY_MAX_CHARS (default 8 000) before querying the
+ *           search engine.
  *       - in: query
  *         name: size
  *         schema:
  *           type: integer
+ *           default: 10
  *       - in: query
  *         name: minScore
  *         schema:
  *           type: number
+ *         description: >
+ *           Minimum raw ES score to include a hit (higher = stricter).
+ *           Defaults are tuned per mode so only reasonably similar content is
+ *           returned.
  *       - in: query
  *         name: workspaceId
  *         schema:
@@ -200,35 +227,67 @@ router.get("/content", async (req: AuthRequest, res: Response) => {
  *         name: lifecycleState
  *         schema:
  *           type: string
+ *           enum: [DRAFT, IN_REVIEW, PUBLISHED, ARCHIVED]
  *       - in: query
  *         name: visibility
  *         schema:
  *           type: string
  *     responses:
  *       200:
- *         description: Similar hits excluding the source id
+ *         description: >
+ *           List of similar content hits with similarity score.  When
+ *           `inputTooShort` is true the input was too short for a meaningful
+ *           search and `hits` will be empty.
  *       400:
- *         description: Missing contentId or invalid filters
+ *         description: Neither contentId nor text params supplied, or invalid filters
  *       503:
- *         description: Search unavailable
+ *         description: Search index unavailable
  */
 router.get("/content-check", async (req: AuthRequest, res: Response) => {
   try {
-    const contentId = typeof req.query.contentId === "string" ? req.query.contentId : "";
-    if (!contentId) {
-      res.status(400).json({ error: "contentId query parameter is required" });
+    const contentId = typeof req.query.contentId === "string" ? req.query.contentId.trim() : "";
+    const title     = typeof req.query.title     === "string" ? req.query.title             : undefined;
+    const summary   = typeof req.query.summary   === "string" ? req.query.summary           : undefined;
+    const body      = typeof req.query.body      === "string" ? req.query.body              : undefined;
+    const hasText   = !!(title || summary || body);
+
+    if (!contentId && !hasText) {
+      res.status(400).json({
+        error: "Provide either contentId or at least one of title, summary, body",
+      });
       return;
     }
+
     const { filters, errors } = parseContentSearchFilters(req.query as Record<string, unknown>);
     if (errors.length) {
       res.status(400).json({ error: "Invalid filter parameters", details: errors });
       return;
     }
-    const size = req.query.size ? Math.min(50, Math.max(1, parseInt(String(req.query.size), 10) || 12)) : 12;
+
+    const size = req.query.size
+      ? Math.min(50, Math.max(1, parseInt(String(req.query.size), 10) || 10))
+      : 10;
     const minScore = req.query.minScore ? parseFloat(String(req.query.minScore)) : undefined;
 
-    const raw = await searchContentCheck({
-      contentId,
+    if (contentId) {
+      const raw = await searchContentCheck({
+        contentId,
+        filters,
+        size,
+        ...(minScore !== undefined && Number.isFinite(minScore) ? { minScore } : {}),
+      });
+      if (raw === null) {
+        res.status(503).json({ error: "Search index unavailable" });
+        return;
+      }
+      res.status(200).json(raw);
+      return;
+    }
+
+    const raw = await searchContentCheckByText({
+      title,
+      summary,
+      body,
       filters,
       size,
       ...(minScore !== undefined && Number.isFinite(minScore) ? { minScore } : {}),

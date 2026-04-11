@@ -52,3 +52,19 @@ export interface ContentCheckSearchRequest {
   minScore?: number;
   size?: number;
 }
+
+export interface ContentCheckByTextRequest {
+  title?: string;
+  summary?: string;
+  body?: string;
+  filters?: ContentSearchFilters;
+  minScore?: number;
+  size?: number;
+}
+
+export interface ContentCheckByTextResponse {
+  total: number;
+  hits: ContentSearchHit[];
+  inputTooShort?: boolean;
+  message?: string;
+}
