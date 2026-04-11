@@ -136,6 +136,48 @@ app.get("/dev/repo-check", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /dev/reindex:
+ *   post:
+ *     summary: "Dev-only: bulk-index all content from Postgres into Elasticsearch"
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Reindex complete with count
+ *       404:
+ *         description: Not available in production
+ *       503:
+ *         description: Elasticsearch not configured
+ */
+app.post("/dev/reindex", async (_req: Request, res: Response) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  try {
+    const { getElasticsearchClient } = await import("@comms-lib/db-elasticsearch");
+    const esClient = getElasticsearchClient();
+    if (!esClient) {
+      res.status(503).json({ error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)" });
+      return;
+    }
+    const { syncContentIndexFromDb } = await import("./search/contentSearch.service");
+    const prisma = getPrismaClient();
+    const rows = await prisma.content.findMany({ select: { id: true } });
+    let indexed = 0;
+    for (const row of rows) {
+      await syncContentIndexFromDb(prisma, row.id);
+      indexed++;
+    }
+    res.status(200).json({ status: "ok", indexed, total: rows.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 app.use(API_V1_PREFIX, apiRouter);
 
 app.use((req: Request, res: Response) => {
