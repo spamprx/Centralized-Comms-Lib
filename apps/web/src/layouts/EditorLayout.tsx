@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Save,
   Eye,
@@ -17,6 +17,7 @@ import {
   Heading2,
   Loader2,
   Check,
+  History,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -81,6 +82,11 @@ export default function EditorLayout() {
   const citationItemsRef = useRef(citationItems);
   citationItemsRef.current = citationItems;
   const [rightPanelTab, setRightPanelTab] = useState<'properties' | 'library'>('library');
+
+  const persistedContentId = useMemo(
+    () => contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null),
+    [contentId, routeContentId],
+  );
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) {
@@ -388,6 +394,15 @@ export default function EditorLayout() {
           >
             <Eye size={16} /> {showPreview ? 'Edit' : 'Preview'}
           </button>
+          {persistedContentId && (
+            <RouterLink
+              to={`/history/${persistedContentId}`}
+              className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3.5 py-2 text-[13px] text-app-muted transition-colors hover:border-app-accent/30 hover:text-app-accent"
+              title="Version history for this document only"
+            >
+              <History size={16} /> <span className="hidden sm:inline">History</span>
+            </RouterLink>
+          )}
           <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
           <span className={`min-w-0 truncate text-[13px] ${saveError ? 'text-red-300' : 'text-app-faint'}`}>
             {saveError

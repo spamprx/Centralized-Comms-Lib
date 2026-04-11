@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, XCircle, MessageSquare, AlertCircle, Loader2, FileText, Send, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle, XCircle, MessageSquare, AlertCircle, Loader2, FileText, Send, Check, History } from 'lucide-react';
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService } from '../services/contentService';
 import { adminUserService } from '../services/adminService';
@@ -355,6 +356,15 @@ export default function ReviewLayout() {
               ? `Author: ${selectedItem.author}${selectedItem.authorEmail ? ` (${selectedItem.authorEmail})` : ''} · Shared by ${selectedItem.requestedBy} · ${selectedItem.submittedAt}`
               : ''}
           </p>
+          {selectedItem && (
+            <Link
+              to={`/history/${selectedItem.contentId}`}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-app-md border border-app-border/70 bg-app-bg/40 px-2.5 py-1 text-[11px] font-medium text-app-muted transition-colors hover:border-app-accent/35 hover:text-app-accent"
+            >
+              <History size={12} />
+              Version history (this document)
+            </Link>
+          )}
         </div>
         {isAlreadyDecided && (
           <span className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">

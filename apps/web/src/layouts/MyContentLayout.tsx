@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMyContent } from '../hooks/useMyContent';
-import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send, MessageCircle } from 'lucide-react';
+import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send, MessageCircle, History } from 'lucide-react';
 import { contentService } from '../services/contentService';
 import ManageReviewersModal from '../components/ManageReviewersModal';
 import ReviewFeedbackModal from '../components/ReviewFeedbackModal';
@@ -222,6 +223,13 @@ export default function MyContentLayout() {
                           Feedback
                         </button>
                       )}
+                      <Link
+                        to={`/history/${item.id}`}
+                        className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                        title="Version history for this item"
+                      >
+                        <History size={14} />
+                      </Link>
                       <button type="button" className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text" title="Edit">
                         <Edit2 size={14} />
                       </button>

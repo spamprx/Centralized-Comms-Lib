@@ -34,10 +34,7 @@ export const navCategories: NavCategory[] = [
   },
   {
     label: "Review",
-    items: [
-      { path: "/review/new", label: "Review" },
-      { path: "/history/new", label: "Version History" },
-    ],
+    items: [{ path: "/review/new", label: "Review" }],
   },
   {
     label: "Assets",
