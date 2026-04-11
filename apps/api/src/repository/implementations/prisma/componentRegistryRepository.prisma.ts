@@ -1,0 +1,109 @@
+import { Prisma } from "@prisma/client";
+
+import type { ComponentRegistryRepository } from "../../interfaces/componentRegistryRepository";
+import type { ComponentRecord, ComponentVersionRecord } from "../../types";
+import type { PrismaDb } from "./prismaTypes";
+
+function toComponent(row: {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): ComponentRecord {
+  return {
+    id: row.id,
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toVersion(row: {
+  id: string;
+  componentId: string;
+  version: string;
+  linkRefs: unknown;
+  propSchema: unknown;
+  createdAt: Date;
+}): ComponentVersionRecord {
+  return {
+    id: row.id,
+    componentId: row.componentId,
+    version: row.version,
+    linkRefs: row.linkRefs,
+    propSchema: row.propSchema ?? null,
+    createdAt: row.createdAt,
+  };
+}
+
+export class PrismaComponentRegistryRepository implements ComponentRegistryRepository {
+  public constructor(private readonly db: PrismaDb) {}
+
+  async createComponent(input: {
+    key: string;
+    name: string;
+    description?: string | null;
+  }): Promise<ComponentRecord> {
+    const row = await this.db.component.create({
+      data: {
+        key: input.key,
+        name: input.name,
+        description: input.description ?? null,
+      },
+    });
+    return toComponent(row);
+  }
+
+  async getComponentById(id: string): Promise<ComponentRecord | null> {
+    const row = await this.db.component.findUnique({ where: { id } });
+    return row ? toComponent(row) : null;
+  }
+
+  async getComponentByKey(key: string): Promise<ComponentRecord | null> {
+    const row = await this.db.component.findUnique({ where: { key } });
+    return row ? toComponent(row) : null;
+  }
+
+  async listComponents(): Promise<ComponentRecord[]> {
+    const rows = await this.db.component.findMany({ orderBy: { key: "asc" } });
+    return rows.map(toComponent);
+  }
+
+  async createVersion(input: {
+    componentId: string;
+    version: string;
+    linkRefs?: unknown;
+    propSchema?: unknown | null;
+  }): Promise<ComponentVersionRecord> {
+    const row = await this.db.componentVersion.create({
+      data: {
+        componentId: input.componentId,
+        version: input.version,
+        linkRefs: (input.linkRefs ?? []) as object,
+        propSchema: input.propSchema === undefined
+          ? undefined
+          : input.propSchema === null
+            ? Prisma.JsonNull
+            : (input.propSchema as Prisma.InputJsonValue),
+      },
+    });
+    return toVersion(row);
+  }
+
+  async getVersionById(id: string): Promise<ComponentVersionRecord | null> {
+    const row = await this.db.componentVersion.findUnique({ where: { id } });
+    return row ? toVersion(row) : null;
+  }
+
+  async listVersionsForComponent(componentId: string): Promise<ComponentVersionRecord[]> {
+    const rows = await this.db.componentVersion.findMany({
+      where: { componentId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(toVersion);
+  }
+}

@@ -47,7 +47,9 @@ Thumbs.db
 
 # ── Infrastructure not needed inside images ───────────────
 infra/k8s
-infra/scripts
+# Keep infra/scripts/prep-api-build.js for the API Dockerfile; drop the rest.
+infra/scripts/*
+!infra/scripts/prep-api-build.js
 infra/docker/api/README*
 infra/docker/web/README*
 

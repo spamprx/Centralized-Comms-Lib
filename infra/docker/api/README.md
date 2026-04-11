@@ -10,7 +10,7 @@ All commands are run from the **monorepo root** (`Centralized-Comms-Lib/`).
 | Stage     | Image             | Purpose                                                               |
 |-----------|-------------------|-----------------------------------------------------------------------|
 | `builder` | `node:20-alpine`  | Runs `npm ci` + `tsc`, outputs compiled JS to `dist/`                |
-| `runner`  | `node:20-alpine`  | Installs prod-only deps, runs `node dist/main.js` as a non-root user |
+| `runner`  | `node:20-alpine`  | Installs prod-only deps, runs `node dist/server.js` as a non-root user |
 
 ---
 
@@ -100,8 +100,19 @@ curl http://localhost:8000/health
 | `JWT_AUDIENCE`        | No       | —             | JWT audience claim                     |
 | `DATABASE_URL`        | **Yes**  | —             | PostgreSQL connection string           |
 | `REDIS_URL`           | No       | —             | Redis connection string                |
-| `AI_DAILY_QUOTA`      | No       | `50`          | Max AI requests per day                |
-| `AI_QUOTA_WINDOW_MS`  | No       | `86400000`    | Quota window in milliseconds           |
+| `REMOTE_URL`          | **Yes**       | —             | Base URL of the web frontend (for CORS, links) |
+| `AI_DAILY_QUOTA`      | No       | `50`          | Max AI-assisted draft requests per user per UTC day |
+| `AI_ORG_DAILY_QUOTA`  | No       | `0` (off)     | Optional per-workspace cap when using Redis         |
+| `AI_QUOTA_WINDOW_MS`  | No       | `86400000`    | Legacy note (daily quotas use UTC day keys with Redis) |
+| `METRICS_ENABLED`     | No       | *(on)*       | Set `false` to disable `GET /metrics`               |
+| `ANALYTICS_INGEST_URL`| No       | —             | Forward `/analytics/track` payloads to HTTP ingest   |
+| `ANALYTICS_INGEST_API_KEY` | No  | —             | Bearer token for analytics ingest                     |
+| `SEARCH_CACHE_MAX_VALUE_BYTES` | No | `262144` | Max JSON size stored per search cache entry    |
+| `REDIS_CONNECT_TIMEOUT_MS` | No  | `10000`       | Redis TCP/connect budget                              |
+| `REDIS_COMMAND_TIMEOUT_MS` | No | `5000`        | Per-command timeout                                   |
+| `EMBEDDING_SERVICE_URL` | No    | —             | Optional embedding HTTP API for nightly vector refresh |
+| `ENABLE_NIGHTLY_VECTOR_REINDEX` | No | `false`  | In-process nightly job (prefer external cron)        |
+| `NIGHTLY_VECTOR_REINDEX_INITIAL_DELAY_MS` | No | `3600000` | Delay before first reindex when in-process job enabled |
 
 ---
 

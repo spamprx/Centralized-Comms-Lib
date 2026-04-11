@@ -4,4 +4,12 @@ export * from "./audit";
 export * from "./outbox";
 export * from "./tag";
 export * from "./review";
+export * from "./channel";
+export * from "./template";
+export * from "./workspace";
+export * from "./templateTranslation";
+export * from "./componentRegistry";
+export * from "./templateLayoutSection";
+export * from "./contentCitation";
+export * from "./contentSnapshot";
 

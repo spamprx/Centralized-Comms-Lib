@@ -1,11 +1,35 @@
-# Local development: frontend, API backend, and PostgreSQL.
+# Local development: frontend, API backend, PostgreSQL, and optional document/search stores.
 # Usage: docker compose up -d
 #   - Postgres: localhost:5432
+#   - MongoDB:    localhost:27017 — drivers in packages/database/mongo
+#   - Elasticsearch: localhost:9200 — index mapping in packages/database/elasticsearch
 #   - API:      http://localhost:8000
 #   - Frontend: http://localhost:3000
 # Optional: copy apps/api/env.example to apps/api/.env and add to backend env_file for overrides.
 
 services:
+  mongo:
+    image: mongo:7
+    container_name: comms-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - comms_mongo:/data/db
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    container_name: comms-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - comms_esdata:/usr/share/elasticsearch/data
+
   postgres:
     image: postgres:16-alpine
     container_name: comms-postgres
@@ -32,10 +56,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mongo:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
     environment:
       NODE_ENV: development
       PORT: "8000"
       DATABASE_URL: postgresql://comms:comms-dev@postgres:5432/comms
+      MONGODB_URI: mongodb://mongo:27017/comms
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_CONTENT_INDEX: comms-content
+      DEFAULT_WORKSPACE_SLUG: default
+      REMOTE_URL: http://localhost:8000
+      RUN_DB_PUSH: "true"
+      RUN_DB_SEED: "true"
+      PRISMA_SCHEMA_PATH: packages/database/transactional/prisma/schema.prisma
       JWT_SECRET: your-super-secret-key-change-in-production
       JWT_ISSUER: your-app-name
       JWT_AUDIENCE: your-app-client
@@ -59,3 +95,5 @@ services:
 
 volumes:
   comms_pgdata:
+  comms_mongo:
+  comms_esdata:

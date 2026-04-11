@@ -18,6 +18,7 @@ export interface Content {
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
+  templateId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +28,7 @@ export interface CreateDraftInput {
   slug: string;
   authorId: string;
   aiGenerated?: boolean;
+  templateId?: string | null;
 }
 
 export interface ContentVersion {
@@ -34,17 +36,21 @@ export interface ContentVersion {
   versionNumber: number;
   changeType: VersionChangeType;
   title: string;
+  body: TipTapDocument | null;
   metadataSnapshot: unknown | null;
   contentId: string;
   authorId: string;
   createdAt: Date;
 }
 
+export type TipTapDocument = Record<string, unknown>;
+
 export interface CreateContentVersionInput {
   contentId: string;
   authorId: string;
   changeType: VersionChangeType;
   title: string;
+  body?: TipTapDocument | null;
   metadataSnapshot?: unknown;
 }
 

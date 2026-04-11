@@ -54,6 +54,12 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
     if (filters?.resource) where.resource = filters.resource;
     if (filters?.resourceId) where.resourceId = filters.resourceId;
     if (filters?.action) where.action = filters.action;
+    if (filters?.from || filters?.to) {
+      const createdAt: Record<string, Date> = {};
+      if (filters.from) createdAt.gte = filters.from;
+      if (filters.to) createdAt.lte = filters.to;
+      where.createdAt = createdAt;
+    }
 
     const rows = await this.db.auditLog.findMany({
       where,

@@ -2,19 +2,35 @@ import type { PrismaClient, Prisma } from "@prisma/client";
 
 import type {
   AuditLogRepository,
+  ChannelRepository,
+  ComponentRegistryRepository,
+  ContentCitationRepository,
   ContentRepository,
+  ContentSnapshotRepository,
   OutboxRepository,
   ReviewRepository,
   TagRepository,
+  TemplateLayoutSectionRepository,
+  TemplateRepository,
+  TemplateTranslationRepository,
   UserRoleRepository,
+  WorkspaceRepository,
 } from "../../interfaces";
 
 import { PrismaAuditLogRepository } from "./auditLogRepository.prisma";
+import { PrismaChannelRepository } from "./channelRepository.prisma";
+import { PrismaComponentRegistryRepository } from "./componentRegistryRepository.prisma";
+import { PrismaContentCitationRepository } from "./contentCitationRepository.prisma";
 import { PrismaContentRepository } from "./contentRepository.prisma";
+import { PrismaContentSnapshotRepository } from "./contentSnapshotRepository.prisma";
 import { PrismaOutboxRepository } from "./outboxRepository.prisma";
 import { PrismaReviewRepository } from "./reviewRepository.prisma";
 import { PrismaTagRepository } from "./tagRepository.prisma";
+import { PrismaTemplateLayoutSectionRepository } from "./templateLayoutSectionRepository.prisma";
+import { PrismaTemplateRepository } from "./templateRepository.prisma";
+import { PrismaTemplateTranslationRepository } from "./templateTranslationRepository.prisma";
 import { PrismaUserRoleRepository } from "./userRoleRepository.prisma";
+import { PrismaWorkspaceRepository } from "./workspaceRepository.prisma";
 import type { PrismaDb } from "./prismaTypes";
 
 export interface Repositories {
@@ -24,6 +40,14 @@ export interface Repositories {
   review: ReviewRepository;
   audit: AuditLogRepository;
   outbox: OutboxRepository;
+  channel: ChannelRepository;
+  template: TemplateRepository;
+  workspace: WorkspaceRepository;
+  templateTranslation: TemplateTranslationRepository;
+  componentRegistry: ComponentRegistryRepository;
+  templateLayoutSection: TemplateLayoutSectionRepository;
+  contentCitation: ContentCitationRepository;
+  contentSnapshot: ContentSnapshotRepository;
 }
 
 export function createPrismaRepositories(db: PrismaDb | Prisma.TransactionClient): Repositories {
@@ -34,6 +58,14 @@ export function createPrismaRepositories(db: PrismaDb | Prisma.TransactionClient
     review: new PrismaReviewRepository(db),
     audit: new PrismaAuditLogRepository(db),
     outbox: new PrismaOutboxRepository(db),
+    channel: new PrismaChannelRepository(db),
+    template: new PrismaTemplateRepository(db),
+    workspace: new PrismaWorkspaceRepository(db),
+    templateTranslation: new PrismaTemplateTranslationRepository(db),
+    componentRegistry: new PrismaComponentRegistryRepository(db),
+    templateLayoutSection: new PrismaTemplateLayoutSectionRepository(db),
+    contentCitation: new PrismaContentCitationRepository(db),
+    contentSnapshot: new PrismaContentSnapshotRepository(db),
   };
 }
 
@@ -50,4 +82,3 @@ export class PrismaUnitOfWork {
     );
   }
 }
-
