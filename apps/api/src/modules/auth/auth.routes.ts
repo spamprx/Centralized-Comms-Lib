@@ -121,7 +121,10 @@ router.post("/login", async (req: Request, res: Response) => {
       res.status(400).json({ error: "email and password are required" });
       return;
     }
-    const result = await authService.login({ email, password });
+    const result = await authService.login(
+      { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
+      { email, password },
+    );
     if ("invalidCredentials" in result) {
       res.status(401).json({ error: "Invalid credentials" });
       return;

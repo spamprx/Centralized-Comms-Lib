@@ -171,6 +171,13 @@ app.post("/dev/reindex", async (_req: Request, res: Response) => {
       await syncContentIndexFromDb(prisma, row.id);
       indexed++;
     }
+    const uow = new PrismaUnitOfWork(prisma);
+    await uow.repos().audit.append({
+      action: "DEV_REINDEX",
+      resource: "ELASTICSEARCH",
+      resourceId: "bulk",
+      newValue: { indexed, total: rows.length },
+    });
     res.status(200).json({ status: "ok", indexed, total: rows.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -76,14 +76,25 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: "key and name are required" });
       return;
     }
+    const ctx = auditContext(req);
     const uow = new PrismaUnitOfWork(getPrismaClient());
-    const c = await uow.withTransaction((r) =>
-      r.componentRegistry.createComponent({
+    const c = await uow.withTransaction(async (r) => {
+      const comp = await r.componentRegistry.createComponent({
         key: key.trim(),
         name: name.trim(),
         description: description ?? null,
-      }),
-    );
+      });
+      await r.audit.append({
+        action: "CREATE",
+        resource: "COMPONENT",
+        resourceId: comp.id,
+        newValue: { key: key.trim(), name: name.trim(), description: description ?? null },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return comp;
+    });
     res.status(201).json(c);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -190,15 +201,26 @@ router.post("/:componentId/versions", async (req: AuthRequest, res: Response) =>
       res.status(400).json({ error: "version is required" });
       return;
     }
+    const ctx = auditContext(req);
     const uow = new PrismaUnitOfWork(getPrismaClient());
-    const v = await uow.withTransaction((r) =>
-      r.componentRegistry.createVersion({
+    const v = await uow.withTransaction(async (r) => {
+      const ver = await r.componentRegistry.createVersion({
         componentId: req.params.componentId,
         version: version.trim(),
         linkRefs,
         propSchema,
-      }),
-    );
+      });
+      await r.audit.append({
+        action: "CREATE",
+        resource: "COMPONENT_VERSION",
+        resourceId: ver.id,
+        newValue: { componentId: req.params.componentId, version: version.trim() },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return ver;
+    });
     res.status(201).json(v);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -260,16 +282,32 @@ router.post("/templates/:templateId/sections", async (req: AuthRequest, res: Res
       res.status(400).json({ error: "sortOrder must be a non-negative number" });
       return;
     }
+    const ctx = auditContext(req);
     const uow = new PrismaUnitOfWork(getPrismaClient());
-    const row = await uow.withTransaction((r) =>
-      r.templateLayoutSection.create({
+    const row = await uow.withTransaction(async (r) => {
+      const section = await r.templateLayoutSection.create({
         templateId: req.params.templateId,
         phase,
         sortOrder,
         componentVersionId: componentVersionId ?? null,
         props: props ?? {},
-      }),
-    );
+      });
+      await r.audit.append({
+        action: "CREATE",
+        resource: "TEMPLATE_LAYOUT_SECTION",
+        resourceId: section.id,
+        newValue: {
+          templateId: req.params.templateId,
+          phase,
+          sortOrder,
+          componentVersionId: componentVersionId ?? null,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return section;
+    });
     res.status(201).json(row);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

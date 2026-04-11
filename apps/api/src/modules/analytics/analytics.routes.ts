@@ -2,6 +2,16 @@ import { Router, Response } from "express";
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
 import { forwardAnalyticsTrackEvent } from "../../observability/analyticsIngest";
+import type { AuditContext } from "../../shared/context";
+
+function auditContext(req: AuthRequest): AuditContext {
+  return {
+    actorId: req.user!.id,
+    isAdmin: req.user!.role === "ADMIN",
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  };
+}
 
 const router = Router();
 
@@ -75,6 +85,17 @@ router.post("/track", async (req: AuthRequest, res: Response) => {
         eventType: eventType.trim(),
         metadata: metadata === undefined ? undefined : (metadata as object),
       },
+    });
+    const ctx = auditContext(req);
+    const repos = new PrismaUnitOfWork(prisma).repos();
+    await repos.audit.append({
+      action: "ANALYTICS_TRACK",
+      resource: "CONTENT",
+      resourceId: content.id,
+      newValue: { eventType: eventType.trim(), metadata: metadata ?? null },
+      actorId: ctx.actorId,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
     });
     forwardAnalyticsTrackEvent({
       contentId: content.id,

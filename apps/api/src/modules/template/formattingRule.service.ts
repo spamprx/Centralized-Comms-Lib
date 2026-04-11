@@ -1,4 +1,4 @@
-import { getPrismaClient } from "../../repository";
+import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
 import type { TemplateFormattingRules } from "./formattingRules.types";
 
@@ -19,7 +19,7 @@ export const formattingRuleService = {
   },
 
   async upsert(
-    _ctx: AuditContext,
+    ctx: AuditContext,
     templateId: string,
     rules: unknown,
   ): Promise<{ ok: true } | { notFound: true } | { invalid: true; message: string }> {
@@ -30,25 +30,45 @@ export const formattingRuleService = {
     const tpl = await prisma.template.findUnique({ where: { id: templateId }, select: { id: true } });
     if (!tpl) return { notFound: true };
 
+    const existing = await prisma.templateFormattingRule.findUnique({ where: { templateId } });
     await prisma.templateFormattingRule.upsert({
       where: { templateId },
       create: { templateId, rules: rules as object },
       update: { rules: rules as object },
     });
+    const repos = new PrismaUnitOfWork(prisma).repos();
+    await repos.audit.append({
+      action: existing ? "UPDATE" : "CREATE",
+      resource: "TEMPLATE_FORMATTING_RULE",
+      resourceId: templateId,
+      oldValue: existing ? existing.rules : undefined,
+      newValue: rules,
+      actorId: ctx.actorId,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
     return { ok: true };
   },
 
   async delete(
-    _ctx: AuditContext,
+    ctx: AuditContext,
     templateId: string,
   ): Promise<{ ok: true } | { notFound: true }> {
     const prisma = getPrismaClient();
-    try {
-      await prisma.templateFormattingRule.delete({ where: { templateId } });
-      return { ok: true };
-    } catch {
-      return { notFound: true };
-    }
+    const existing = await prisma.templateFormattingRule.findUnique({ where: { templateId } });
+    if (!existing) return { notFound: true };
+    await prisma.templateFormattingRule.delete({ where: { templateId } });
+    const repos = new PrismaUnitOfWork(prisma).repos();
+    await repos.audit.append({
+      action: "DELETE",
+      resource: "TEMPLATE_FORMATTING_RULE",
+      resourceId: templateId,
+      oldValue: existing.rules,
+      actorId: ctx.actorId,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+    return { ok: true };
   },
 };
 
