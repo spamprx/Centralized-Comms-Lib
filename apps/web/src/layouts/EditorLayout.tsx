@@ -34,6 +34,7 @@ import {
 import type { ContentSearchHit } from '../services/searchService';
 import { useEditorStore } from '../store/editorStore';
 import SimilarContentWidget from '../components/content/SimilarContentWidget';
+import ComponentLibraryPanel from '../components/editor/ComponentLibraryPanel';
 import { Surface } from '../components/ui/Surface';
 
 type CitationItem = {
@@ -101,6 +102,7 @@ export default function EditorLayout() {
   const [citationLoading, setCitationLoading] = useState(false);
   const [citationError, setCitationError] = useState<string | null>(null);
   const [citationItems, setCitationItems] = useState<CitationItem[]>([]);
+  const [rightPanelTab, setRightPanelTab] = useState<'properties' | 'library'>('library');
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) {
@@ -252,6 +254,7 @@ export default function EditorLayout() {
       });
 
       setShowSaveComponentModal(false);
+      setRightPanelTab('library');
       setComponentNotice(
         `Saved "${componentName.trim()}" as ${componentMode === 'linked' ? 'linked' : 'detached'} component`,
       );
@@ -507,60 +510,110 @@ export default function EditorLayout() {
           </div>
         </Surface>
 
-        {/* Properties Panel */}
-        <Surface variant="glass" padding="md" className="hidden w-[280px] shrink-0 overflow-y-auto lg:block">
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
-            Properties
-          </h3>
-
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
-                Content Type
-              </label>
-              <select className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none box-border">
-                <option>Article</option>
-                <option>Guide</option>
-                <option>Documentation</option>
-                <option>Blog Post</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
-                Tags
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {['tutorial', 'guide', '2025'].map(tag => (
-                  <span key={tag} className="px-2.5 py-1 bg-violet-500/15 rounded-xl text-[11px] text-violet-400 flex items-center gap-1">
-                    {tag}
-                    <button className="bg-transparent border-none text-violet-400 cursor-pointer p-0 flex">×</button>
-                  </span>
-                ))}
-                <button type="button" className="cursor-pointer rounded-xl border border-dashed border-app-border-strong bg-app-surface px-2.5 py-1 text-[11px] text-app-faint">+ Add</button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
-                Visibility
-              </label>
-              <select className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none box-border">
-                <option>Public</option>
-                <option>Team Only</option>
-                <option>Private</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
-                Featured Image
-              </label>
-              <div className="flex h-[120px] cursor-pointer items-center justify-center rounded-app-md border border-dashed border-app-border-strong bg-app-surface/50 text-xs text-app-faint">
-                Click to upload
-              </div>
-            </div>
+        {/* Properties + component library */}
+        <Surface
+          variant="glass"
+          padding="md"
+          className="hidden min-h-0 w-[300px] shrink-0 flex-col overflow-hidden lg:flex"
+        >
+          <div
+            className="mb-3 flex shrink-0 gap-1 rounded-app-md border border-app-border/60 bg-app-bg/30 p-1"
+            role="tablist"
+            aria-label="Editor sidebar"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanelTab === 'library'}
+              onClick={() => setRightPanelTab('library')}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                rightPanelTab === 'library'
+                  ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
+                  : 'text-app-faint hover:bg-app-elevated hover:text-app-muted'
+              }`}
+            >
+              <Puzzle size={14} />
+              Library
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanelTab === 'properties'}
+              onClick={() => setRightPanelTab('properties')}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                rightPanelTab === 'properties'
+                  ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
+                  : 'text-app-faint hover:bg-app-elevated hover:text-app-muted'
+              }`}
+            >
+              <Settings size={14} />
+              Properties
+            </button>
           </div>
+
+          {rightPanelTab === 'library' ? (
+            <ComponentLibraryPanel editor={editor} />
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                Properties
+              </h3>
+
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Content Type</label>
+                  <select className="box-border w-full rounded-md border border-app-border bg-app-surface px-3 py-2.5 text-[13px] text-app-text outline-none">
+                    <option>Article</option>
+                    <option>Guide</option>
+                    <option>Documentation</option>
+                    <option>Blog Post</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Tags</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['tutorial', 'guide', '2025'].map((tag) => (
+                      <span
+                        key={tag}
+                        className="flex items-center gap-1 rounded-xl bg-violet-500/15 px-2.5 py-1 text-[11px] text-violet-400"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          className="flex cursor-pointer border-none bg-transparent p-0 text-violet-400"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-xl border border-dashed border-app-border-strong bg-app-surface px-2.5 py-1 text-[11px] text-app-faint"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Visibility</label>
+                  <select className="box-border w-full rounded-md border border-app-border bg-app-surface px-3 py-2.5 text-[13px] text-app-text outline-none">
+                    <option>Public</option>
+                    <option>Team Only</option>
+                    <option>Private</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Featured Image</label>
+                  <div className="flex h-[120px] cursor-pointer items-center justify-center rounded-app-md border border-dashed border-app-border-strong bg-app-surface/50 text-xs text-app-faint">
+                    Click to upload
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </Surface>
       </div>
       {showCitationDialog && (
