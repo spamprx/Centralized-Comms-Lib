@@ -8,7 +8,7 @@ export function ContentViewPanel() {
 }
 export function ReviewActionsPanel() {
   return (
-    <div className="flex w-96 shrink-0 flex-col gap-4 border-l border-gray-700 p-4">
+    <div className="flex w-96 shrink-0 flex-col gap-4 border-l border-app-border p-4">
       <Slot className="h-14" />
       <Slot className="min-h-[8rem]" />
       <Slot className="min-h-[12rem]" />

@@ -4,6 +4,7 @@ import { reviewService, type ReviewAssignment } from '../services/reviewService'
 import { contentService } from '../services/contentService';
 import { adminUserService } from '../services/adminService';
 import { useReviewStore } from '../store/reviewStore';
+import { Surface } from '../components/ui/Surface';
 
 const screeningData = {
   score: 85,
@@ -316,19 +317,25 @@ export default function ReviewLayout() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-[#0b0d14] gap-3">
-        <Loader2 size={32} color="#a78bfa" className="animate-spin" />
-        <p className="text-[13px] text-[#555870]">Loading your review assignments...</p>
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4">
+        <Surface variant="glass" padding="lg" className="flex max-w-md flex-col items-center gap-4 text-center">
+          <Loader2 size={32} className="animate-spin text-app-accent" aria-hidden />
+          <p className="m-0 text-[13px] text-app-muted">Loading your review assignments…</p>
+        </Surface>
       </div>
     );
   }
 
   if (reviewItems.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-[#0b0d14] gap-4">
-        <FileText size={48} color="#555870" />
-        <h2 className="text-xl font-semibold text-[#e2e4f0] m-0">No Reviews Assigned</h2>
-        <p className="text-sm text-[#555870] m-0">You don't have any content to review yet.</p>
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4">
+        <Surface variant="glass" padding="lg" className="flex max-w-md flex-col items-center gap-3 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-app-xl bg-app-accent-muted text-app-accent">
+            <FileText size={28} strokeWidth={1.75} />
+          </div>
+          <h2 className="m-0 text-xl font-semibold text-app-text">No reviews assigned</h2>
+          <p className="m-0 text-sm text-app-faint">You do not have any content to review yet.</p>
+        </Surface>
       </div>
     );
   }
@@ -336,56 +343,61 @@ export default function ReviewLayout() {
   const isAlreadyDecided = selectedItem?.status === 'COMPLETED';
 
   return (
-    <div className="flex flex-col h-screen bg-[#0b0d14]">
+    <div className="flex h-screen flex-col bg-app-bg">
       {/* Topbar */}
-      <div className="px-6 py-3 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
-        <div>
-          <h1 className="text-base font-semibold text-[#e2e4f0] mb-1">
+      <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:items-center sm:px-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="mb-1 truncate text-base font-semibold text-app-text">
             {selectedItem?.title || 'Select a review'}
           </h1>
-          <p className="text-xs text-[#555870] m-0">
+          <p className="m-0 text-xs text-app-faint">
             {selectedItem
-              ? `Author: ${selectedItem.author}${selectedItem.authorEmail ? ` (${selectedItem.authorEmail})` : ''} • Shared by: ${selectedItem.requestedBy} • ${selectedItem.submittedAt}`
+              ? `Author: ${selectedItem.author}${selectedItem.authorEmail ? ` (${selectedItem.authorEmail})` : ''} · Shared by ${selectedItem.requestedBy} · ${selectedItem.submittedAt}`
               : ''}
           </p>
         </div>
         {isAlreadyDecided && (
-          <span className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-500 text-xs font-semibold">
-            <Check size={14} /> Decision Submitted
+          <span className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+            <Check size={14} /> Decision submitted
           </span>
         )}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 sm:p-3 lg:flex-row">
         {/* Review Items Sidebar */}
-        <div className="w-[300px] border-r border-white/5 bg-white/[0.02] overflow-y-auto p-3">
-          <h3 className="text-[11px] font-semibold text-[#555870] uppercase mx-2 mt-2 mb-3 tracking-wide">
-            Content For Review ({reviewItems.length})
+        <Surface
+          variant="glass"
+          padding="sm"
+          className="max-h-[40vh] w-full shrink-0 overflow-y-auto lg:max-h-none lg:w-[300px]"
+        >
+          <h3 className="mx-1 mb-3 mt-1 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+            Inbox ({reviewItems.length})
           </h3>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             {reviewItems.map((item) => {
               const isActive = selectedItem?.assignmentId === item.assignmentId;
               const isPending = item.status === 'PENDING';
               return (
                 <button
+                  type="button"
                   key={item.assignmentId}
                   onClick={() => handleSelectItem(item)}
-                  className={`p-3.5 rounded-[10px] text-left cursor-pointer transition-all duration-150 ${
+                  className={`rounded-app-lg border p-3.5 text-left transition-all duration-150 ${
                     isActive
-                      ? 'bg-violet-500/[0.12] border border-violet-500/30'
-                      : 'bg-transparent border border-transparent'
-                  } ${isPending ? 'opacity-100' : 'opacity-60'}`}
+                      ? 'border-app-accent/35 bg-app-accent-muted shadow-[0_0_0_1px_rgba(147,124,248,0.12)]'
+                      : 'border-transparent bg-app-bg/25 hover:border-app-border/80 hover:bg-app-elevated'
+                  } ${isPending ? 'opacity-100' : 'opacity-65'}`}
                 >
-                  <div className={`text-[13px] font-semibold mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap ${isActive ? 'text-[#e2e4f0]' : 'text-[#c4c7d9]'}`}>
+                  <div className={`text-[13px] font-semibold mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap ${isActive ? 'text-app-text' : 'text-app-muted'}`}>
                     {item.title}
                   </div>
-                  <div className="text-[11px] text-[#555870] mb-1">
+                  <div className="text-[11px] text-app-faint mb-1">
                     by {item.author}
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-[#555870]">{item.submittedAt}</span>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-lg font-semibold uppercase ${
-                      isPending ? 'bg-amber-400/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-500'
+                    <span className="text-[10px] text-app-faint">{item.submittedAt}</span>
+                    <span className={`rounded-lg px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                      isPending ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
                     }`}>
                       {isPending ? 'PENDING' : 'REVIEWED'}
                     </span>
@@ -394,19 +406,19 @@ export default function ReviewLayout() {
               );
             })}
           </div>
-        </div>
+        </Surface>
 
         {/* Content View Panel */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-w-0 flex-1 overflow-y-auto p-2 sm:p-3 lg:p-1">
           {loadingContent ? (
             <div className="flex justify-center p-16">
-              <Loader2 size={24} color="#a78bfa" className="animate-spin" />
+              <Loader2 size={24} className="animate-spin text-app-accent" />
             </div>
           ) : (
-            <div className="max-w-[800px] bg-[#1a1d2e] rounded-xl p-8">
+            <Surface variant="default" padding="lg" className="mx-auto max-w-[800px]">
               {/* Content header */}
               <div className="mb-6">
-                <h2 className="text-[22px] font-bold text-[#e2e4f0] mb-2">
+                <h2 className="text-[22px] font-bold text-app-text mb-2">
                   {selectedItem?.title}
                 </h2>
                 <div className="flex gap-4 flex-wrap items-center">
@@ -415,47 +427,51 @@ export default function ReviewLayout() {
                       {(selectedItem?.author || 'U')[0].toUpperCase()}
                     </div>
                     <div>
-                      <div className="text-xs font-medium text-[#c4c7d9]">
+                      <div className="text-xs font-medium text-app-muted">
                         {selectedItem?.author}
                       </div>
                       {selectedItem?.authorEmail && (
-                        <div className="text-[10px] text-[#555870]">
+                        <div className="text-[10px] text-app-faint">
                           {selectedItem.authorEmail}
                         </div>
                       )}
                     </div>
                   </div>
-                  <span className="text-white/15">•</span>
-                  <span className="text-[11px] text-[#555870]">
+                  <span className="text-app-faint">·</span>
+                  <span className="text-[11px] text-app-faint">
                     Shared by {selectedItem?.requestedBy}
                   </span>
-                  <span className="text-white/15">•</span>
-                  <span className="text-[11px] text-[#555870]">
+                  <span className="text-app-faint">·</span>
+                  <span className="text-[11px] text-app-faint">
                     {selectedItem?.submittedAt}
                   </span>
                 </div>
               </div>
 
-              <div className="h-px bg-white/[0.06] mb-6" />
+              <div className="h-px bg-app-elevated mb-6" />
 
               {/* Content body */}
-              <pre className="whitespace-pre-wrap break-words text-[15px] text-[#c4c7d9] leading-relaxed m-0 font-[inherit]">
+              <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[15px] leading-relaxed text-app-muted">
                 {selectedItem?.contentBody || 'Loading content...'}
               </pre>
-            </div>
+            </Surface>
           )}
         </div>
 
         {/* Right Sidebar */}
-        <div className="w-[380px] bg-white/[0.02] border-l border-white/5 flex flex-col overflow-y-auto">
+        <Surface
+          variant="glass"
+          padding="none"
+          className="flex max-h-[min(52vh,520px)] w-full shrink-0 flex-col overflow-y-auto lg:max-h-none lg:w-[380px]"
+        >
           {/* Review Decision */}
-          <div className="p-5 border-b border-white/5">
-            <h3 className="text-xs font-semibold text-[#555870] uppercase mb-3">
+          <div className="p-5 border-b border-app-border/80">
+            <h3 className="text-xs font-semibold text-app-faint uppercase mb-3">
               Review Decision
             </h3>
 
             {isAlreadyDecided || decisionSuccess ? (
-              <div className={`p-4 rounded-[10px] text-center ${
+              <div className={`p-4 rounded-app-lg text-center ${
                 selectedItem?.verdict === 'DENIED'
                   ? 'bg-red-500/10 border border-red-500/20'
                   : 'bg-emerald-500/10 border border-emerald-500/20'
@@ -465,8 +481,8 @@ export default function ReviewLayout() {
                 ) : (
                   <CheckCircle size={24} color="#10b981" className="mb-2 mx-auto" />
                 )}
-                <p className={`text-[13px] font-semibold mb-1 ${
-                  selectedItem?.verdict === 'DENIED' ? 'text-red-400' : 'text-emerald-500'
+                <p className={`mb-1 text-[13px] font-semibold ${
+                  selectedItem?.verdict === 'DENIED' ? 'text-red-300' : 'text-emerald-300'
                 }`}>
                   {selectedItem?.verdict === 'APPROVED' ? 'Approved' : selectedItem?.verdict === 'DENIED' ? 'Denied' : 'Decision Submitted'}
                 </p>
@@ -492,11 +508,11 @@ export default function ReviewLayout() {
                 {/* Comment from reviewer */}
                 {selectedItem?.savedComment && (
                   <div
-                    className="mt-2.5 px-3.5 py-2.5 bg-white/5 rounded-lg text-left"
+                    className="mt-2.5 px-3.5 py-2.5 bg-app-surface rounded-lg text-left"
                     style={{ borderLeft: `3px solid ${selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981'}` }}
                   >
-                    <span className="text-[10px] text-[#555870] uppercase font-semibold">Your Comment</span>
-                    <p className="text-xs text-[#c4c7d9] mt-1.5 mb-0 leading-normal">{selectedItem.savedComment}</p>
+                    <span className="text-[10px] text-app-faint uppercase font-semibold">Your Comment</span>
+                    <p className="text-xs text-app-muted mt-1.5 mb-0 leading-normal">{selectedItem.savedComment}</p>
                   </div>
                 )}
               </div>
@@ -505,20 +521,20 @@ export default function ReviewLayout() {
                 <div className="flex gap-2 mb-3">
                   <button
                     onClick={() => { if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'APPROVED'); setDecisionError(null); }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold cursor-pointer transition-all duration-200 ${
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
                       decision === 'APPROVED'
-                        ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-500'
-                        : 'bg-emerald-500/[0.08] border-2 border-emerald-500/20 text-emerald-600'
+                        ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                        : 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300/90'
                     }`}
                   >
                     <CheckCircle size={16} /> Approve
                   </button>
                   <button
                     onClick={() => { if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'DENIED'); setDecisionError(null); }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold cursor-pointer transition-all duration-200 ${
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
                       decision === 'DENIED'
-                        ? 'bg-red-500/20 border-2 border-red-400 text-red-400'
-                        : 'bg-red-500/[0.08] border-2 border-red-500/20 text-red-600'
+                        ? 'border-red-400/70 bg-red-500/20 text-red-200'
+                        : 'border-red-500/25 bg-red-500/[0.08] text-red-300/90'
                     }`}
                   >
                     <XCircle size={16} /> Deny
@@ -527,7 +543,7 @@ export default function ReviewLayout() {
 
                 {decision && (
                   <div className="mb-3">
-                    <label className="text-[11px] text-[#8b8fa8] block mb-1.5">
+                    <label className="text-[11px] text-app-muted block mb-1.5">
                       Reason for your decision <span className="text-red-400">*</span>
                     </label>
                     <textarea
@@ -537,16 +553,16 @@ export default function ReviewLayout() {
                         ? 'Why are you approving this content...'
                         : 'What needs to be changed...'}
                       rows={3}
-                      className={`w-full p-2.5 bg-white/5 rounded-lg text-[#e2e4f0] text-xs resize-none box-border outline-none ${
-                        decisionError ? 'border border-red-400/50' : 'border border-white/10'
+                      className={`w-full p-2.5 bg-app-surface rounded-lg text-app-text text-xs resize-none box-border outline-none ${
+                        decisionError ? 'border border-red-400/50' : 'border border-app-border'
                       }`}
                     />
                   </div>
                 )}
 
                 {decisionError && (
-                  <div className="px-3 py-2 bg-red-400/10 rounded-md mb-3">
-                    <span className="text-[11px] text-red-400">{decisionError}</span>
+                  <div className="mb-3 rounded-app-md border border-red-400/25 bg-red-500/10 px-3 py-2">
+                    <span className="text-[11px] text-red-200">{decisionError}</span>
                   </div>
                 )}
 
@@ -554,12 +570,12 @@ export default function ReviewLayout() {
                   <button
                     onClick={handleSubmitDecision}
                     disabled={submittingDecision}
-                    className={`w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold transition-all duration-200 ${
+                    className={`flex w-full items-center justify-center gap-1.5 rounded-app-lg border-none px-4 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
                       submittingDecision
-                        ? 'bg-violet-500/30 cursor-not-allowed'
+                        ? 'cursor-not-allowed bg-app-accent/35'
                         : decision === 'APPROVED'
-                          ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 cursor-pointer'
-                          : 'bg-gradient-to-br from-red-500 to-orange-500 cursor-pointer'
+                          ? 'cursor-pointer bg-gradient-to-br from-emerald-500 to-app-accent-2'
+                          : 'cursor-pointer bg-gradient-to-br from-red-500 to-orange-500'
                     }`}
                   >
                     {submittingDecision ? (
@@ -574,13 +590,13 @@ export default function ReviewLayout() {
           </div>
 
           {/* AI Screening Panel */}
-          <div className="p-5 border-b border-white/5">
-            <h3 className="text-xs font-semibold text-[#555870] uppercase mb-3">
-              AI Screening
+          <div className="border-b border-app-border/80 p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase text-app-faint">
+              AI screening
             </h3>
             <div className="mb-3">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs text-[#8b8fa8]">Quality Score</span>
+                <span className="text-xs text-app-muted">Quality Score</span>
                 <span className={`text-lg font-bold ${screeningData.score > 80 ? 'text-emerald-500' : 'text-amber-400'}`}>
                   {screeningData.score}/100
                 </span>
@@ -601,25 +617,25 @@ export default function ReviewLayout() {
                   {issue.type === 'warning' && <AlertCircle size={14} color="#fbbf24" className="mt-0.5" />}
                   {issue.type === 'info' && <AlertCircle size={14} color="#06b6d4" className="mt-0.5" />}
                   {issue.type === 'success' && <CheckCircle size={14} color="#10b981" className="mt-0.5" />}
-                  <span className="text-[11px] text-[#8b8fa8]">{issue.text}</span>
+                  <span className="text-[11px] text-app-muted">{issue.text}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Comments Thread */}
-          <div className="p-5 flex-1">
-            <h3 className="text-xs font-semibold text-[#555870] uppercase mb-3">
+          <div className="flex flex-1 flex-col p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase text-app-faint">
               Comments ({comments.length})
             </h3>
             <div className="flex flex-col gap-3 mb-4">
               {comments.map((comment) => (
-                <div key={comment.id} className={`p-3 bg-white/[0.03] rounded-lg ${comment.resolved ? 'opacity-50' : ''}`}>
+                <div key={comment.id} className={`p-3 bg-app-surface rounded-lg ${comment.resolved ? 'opacity-50' : ''}`}>
                   <div className="flex justify-between mb-1.5">
-                    <span className="text-xs font-semibold text-[#e2e4f0]">{comment.author}</span>
-                    <span className="text-[10px] text-[#555870]">{comment.time}</span>
+                    <span className="text-xs font-semibold text-app-text">{comment.author}</span>
+                    <span className="text-[10px] text-app-faint">{comment.time}</span>
                   </div>
-                  <p className="text-xs text-[#c4c7d9] mb-1.5">{comment.text}</p>
+                  <p className="text-xs text-app-muted mb-1.5">{comment.text}</p>
                   {comment.resolved && (
                     <span className="text-[10px] text-emerald-500 flex items-center gap-1">
                       <CheckCircle size={10} /> Resolved
@@ -628,7 +644,7 @@ export default function ReviewLayout() {
                 </div>
               ))}
               {comments.length === 0 && (
-                <div className="p-4 text-center text-[#555870] text-xs">
+                <div className="p-4 text-center text-app-faint text-xs">
                   No comments yet. Add a comment to discuss this content.
                 </div>
               )}
@@ -640,22 +656,22 @@ export default function ReviewLayout() {
                 onChange={(e) => { if (currentAssignmentId) setDraftComment(currentAssignmentId, e.target.value); }}
                 placeholder="Add a comment or feedback..."
                 rows={3}
-                className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-xs resize-none mb-2 box-border"
+                className="w-full p-3 bg-app-surface border border-app-border rounded-lg text-app-text text-xs resize-none mb-2 box-border"
               />
               <button
                 onClick={handleAddComment}
                 disabled={!commentText.trim()}
-                className={`w-full px-4 py-2.5 border-none rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-app-md border-none px-4 py-2.5 text-xs font-semibold ${
                   commentText.trim()
-                    ? 'bg-gradient-to-br from-violet-500 to-cyan-500 text-white cursor-pointer'
-                    : 'bg-white/10 text-[#555870] cursor-not-allowed'
+                    ? 'cursor-pointer bg-gradient-to-br from-app-accent to-app-accent-2 text-white shadow-app-soft'
+                    : 'cursor-not-allowed bg-app-elevated text-app-faint'
                 }`}
               >
                 <MessageSquare size={14} /> Post Comment
               </button>
             </div>
           </div>
-        </div>
+        </Surface>
       </div>
     </div>
   );

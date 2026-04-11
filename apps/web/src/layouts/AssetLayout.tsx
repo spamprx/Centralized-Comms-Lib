@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { Upload, Search, Image, FileText, Video, Music, X, Download, Trash2 } from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
+import { PageShell } from '../components/ui/PageShell';
+import { Surface } from '../components/ui/Surface';
 
 const mockAssets = Array.from({ length: 15 }, (_, i) => ({
   id: String(i + 1),
@@ -37,54 +40,53 @@ export default function AssetLayout() {
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="p-6 border-b border-white/5">
-        <h1 className="text-2xl font-bold text-[#e2e4f0] mb-4">Asset Management</h1>
+    <PageShell wide className="flex min-h-0 flex-1 flex-col pb-6">
+      <PageHeader
+        title="Asset library"
+        accentWord="library"
+        description="Upload, search, and manage media and files for your content."
+      />
 
-        {/* Upload Dropzone */}
-        <div className="p-6 bg-violet-500/5 border-2 border-dashed border-violet-500/30 rounded-xl mb-4 flex items-center justify-center gap-3 cursor-pointer hover:bg-violet-500/10 hover:border-violet-500/50 transition-colors">
-          <Upload size={24} color="#a78bfa" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-[#e2e4f0] m-0">
-              Drop files here or click to upload
-            </p>
-            <p className="text-xs text-[#555870] mt-1 mb-0">
-              Supports: Images, Videos, Documents, Audio (Max 25MB)
+      <Surface variant="glass" padding="md" className="mb-6">
+        <div className="mb-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-app-xl border-2 border-dashed border-app-accent/35 bg-app-accent-muted/30 p-6 transition-colors hover:border-app-accent/55 hover:bg-app-accent/10 sm:flex-row sm:justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-app-lg bg-app-accent-muted text-app-accent">
+            <Upload size={24} aria-hidden />
+          </div>
+          <div className="text-center sm:text-left">
+            <p className="m-0 text-sm font-medium text-app-text">Drop files here or click to upload</p>
+            <p className="mt-1 mb-0 text-xs text-app-faint">
+              Images, video, documents, audio — up to 25MB
             </p>
           </div>
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]" />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search assets..."
-              className="w-full py-2.5 pr-3 pl-10 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
+              placeholder="Search assets…"
+              className="box-border w-full rounded-app-lg border border-app-border bg-app-bg-subtle py-2.5 pl-10 pr-3 text-[13px] text-app-text outline-none focus:border-app-accent/40"
             />
           </div>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer"
+            className="cursor-pointer rounded-app-lg border border-app-border bg-app-bg-subtle px-3 py-2.5 text-[13px] text-app-text"
           >
-            <option value="all">All Types</option>
+            <option value="all">All types</option>
             <option value="image">Images</option>
             <option value="document">Documents</option>
             <option value="video">Videos</option>
             <option value="audio">Audio</option>
           </select>
         </div>
-      </div>
+      </Surface>
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Asset Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-app-xl border border-app-border/80 bg-app-bg/40 lg:flex-row">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
             {filteredAssets.map((asset) => {
               const Icon = typeIcons[asset.type];
@@ -92,10 +94,10 @@ export default function AssetLayout() {
                 <div
                   key={asset.id}
                   onClick={() => setSelectedAsset(asset)}
-                  className={`rounded-[10px] p-4 cursor-pointer transition-all duration-200 ${
+                  className={`rounded-app-lg p-4 cursor-pointer transition-all duration-200 ${
                     selectedAsset?.id === asset.id
-                      ? 'bg-violet-500/15 border border-violet-500/40'
-                      : 'bg-white/[0.03] border border-white/[0.07]'
+                      ? 'bg-app-accent-muted border border-app-accent/40'
+                      : 'bg-app-surface border border-app-border'
                   }`}
                 >
                   <div
@@ -104,8 +106,8 @@ export default function AssetLayout() {
                   >
                     <Icon size={32} color={typeColors[asset.type]} />
                   </div>
-                  <p className="text-xs font-medium text-[#e2e4f0] mb-1 overflow-hidden text-ellipsis whitespace-nowrap">{asset.name}</p>
-                  <p className="text-[10px] text-[#555870] m-0">{asset.size} • {asset.uploadedAt}</p>
+                  <p className="text-xs font-medium text-app-text mb-1 overflow-hidden text-ellipsis whitespace-nowrap">{asset.name}</p>
+                  <p className="text-[10px] text-app-faint m-0">{asset.size} • {asset.uploadedAt}</p>
                 </div>
               );
             })}
@@ -114,12 +116,14 @@ export default function AssetLayout() {
 
         {/* Asset Detail Drawer */}
         {selectedAsset && (
-          <div className="w-80 bg-white/[0.03] border-l border-white/5 p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-base font-semibold text-[#e2e4f0] m-0">Asset Details</h2>
+          <Surface variant="glass" padding="md" className="w-full shrink-0 overflow-y-auto border-t border-app-border/80 lg:w-80 lg:border-l lg:border-t-0">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="m-0 text-base font-semibold text-app-text">Asset details</h2>
               <button
+                type="button"
                 onClick={() => setSelectedAsset(null)}
-                className="bg-transparent border-none text-[#555870] cursor-pointer p-1"
+                className="cursor-pointer rounded-app-md border-none bg-transparent p-1 text-app-faint hover:bg-app-elevated hover:text-app-text"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
@@ -127,7 +131,7 @@ export default function AssetLayout() {
 
             {/* Preview */}
             <div
-              className="aspect-square rounded-[10px] flex items-center justify-center mb-5"
+              className="aspect-square rounded-app-lg flex items-center justify-center mb-5"
               style={{ background: `${typeColors[selectedAsset.type]}22` }}
             >
               {(() => {
@@ -139,35 +143,42 @@ export default function AssetLayout() {
             {/* Details */}
             <div className="flex flex-col gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Name</label>
-                <p className="text-[13px] text-[#e2e4f0] m-0">{selectedAsset.name}</p>
+                <label className="text-[11px] font-semibold text-app-faint block mb-1">Name</label>
+                <p className="text-[13px] text-app-text m-0">{selectedAsset.name}</p>
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Type</label>
-                <p className="text-[13px] text-[#e2e4f0] m-0 capitalize">{selectedAsset.type}</p>
+                <label className="text-[11px] font-semibold text-app-faint block mb-1">Type</label>
+                <p className="text-[13px] text-app-text m-0 capitalize">{selectedAsset.type}</p>
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Size</label>
-                <p className="text-[13px] text-[#e2e4f0] m-0">{selectedAsset.size}</p>
+                <label className="text-[11px] font-semibold text-app-faint block mb-1">Size</label>
+                <p className="text-[13px] text-app-text m-0">{selectedAsset.size}</p>
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[#555870] block mb-1">Uploaded</label>
-                <p className="text-[13px] text-[#e2e4f0] m-0">{selectedAsset.uploadedAt}</p>
+                <label className="text-[11px] font-semibold text-app-faint block mb-1">Uploaded</label>
+                <p className="text-[13px] text-app-text m-0">{selectedAsset.uploadedAt}</p>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 mt-6">
-              <button className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-br from-violet-500 to-cyan-500 border-none rounded-md text-white text-[13px] font-medium cursor-pointer">
+            <div className="mt-6 flex gap-2">
+              <button
+                type="button"
+                className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-md border-none bg-gradient-to-br from-app-accent to-app-accent-deep px-4 py-2.5 text-[13px] font-medium text-white shadow-app-soft"
+              >
                 <Download size={16} /> Download
               </button>
-              <button className="flex items-center justify-center px-3 py-2.5 bg-red-500/15 border border-red-500/30 rounded-md text-red-400 cursor-pointer">
+              <button
+                type="button"
+                className="flex cursor-pointer items-center justify-center rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2.5 text-red-300 hover:bg-red-500/15"
+                aria-label="Delete"
+              >
                 <Trash2 size={16} />
               </button>
             </div>
-          </div>
+          </Surface>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

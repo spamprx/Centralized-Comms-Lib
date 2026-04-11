@@ -40,7 +40,7 @@ export default function UserManagementTab() {
   if (error) return (
     <div className="flex flex-col items-center gap-3 p-12 text-red-400 text-sm">
       <p>⚠ {error}</p>
-      <button onClick={refetch} className="px-4 py-1.5 bg-white/[0.07] border border-white/10 rounded-md text-[#e2e4f0] cursor-pointer">Retry</button>
+      <button onClick={refetch} className="px-4 py-1.5 bg-app-elevated border border-app-border rounded-md text-app-text cursor-pointer">Retry</button>
     </div>
   );
 
@@ -48,10 +48,10 @@ export default function UserManagementTab() {
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#e2e4f0] mb-1">Users</h2>
-          <p className="text-[13px] text-[#555870] m-0">Manage accounts, roles, and permissions</p>
+          <h2 className="text-lg font-semibold text-app-text mb-1">Users</h2>
+          <p className="text-[13px] text-app-faint m-0">Manage accounts, roles, and permissions</p>
         </div>
-        <button className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-400/15 border border-violet-400/30 rounded-lg text-violet-400 text-[13px] font-medium cursor-pointer hover:bg-violet-400/25" onClick={() => setShowInviteModal(true)}><Plus size={14} /> Invite user</button>
+        <button className="flex items-center gap-1.5 px-3.5 py-2 bg-app-accent-muted border border-app-accent/30 rounded-lg text-app-accent text-[13px] font-medium cursor-pointer hover:bg-app-accent/20" onClick={() => setShowInviteModal(true)}><Plus size={14} /> Invite user</button>
       </div>
 
       <SearchAndFilterBar 
@@ -74,9 +74,9 @@ export default function UserManagementTab() {
 
       {pagination.total > pagination.limit && (
         <div className="flex items-center justify-center gap-4 pt-2">
-          <button className="px-3.5 py-1.5 bg-white/5 border border-white/10 rounded-md text-[#9094ae] text-[13px] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" disabled={pagination.page === 1} onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}>← Prev</button>
-          <span className="text-[13px] text-[#555870]">Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}</span>
-          <button className="px-3.5 py-1.5 bg-white/5 border border-white/10 rounded-md text-[#9094ae] text-[13px] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)} onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}>Next →</button>
+          <button className="px-3.5 py-1.5 bg-app-surface border border-app-border rounded-md text-app-muted text-[13px] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" disabled={pagination.page === 1} onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}>← Prev</button>
+          <span className="text-[13px] text-app-faint">Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}</span>
+          <button className="px-3.5 py-1.5 bg-app-surface border border-app-border rounded-md text-app-muted text-[13px] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)} onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}>Next →</button>
         </div>
       )}
 

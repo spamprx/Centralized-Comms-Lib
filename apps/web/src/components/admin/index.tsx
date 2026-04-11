@@ -5,7 +5,7 @@ export function AdminSidebar() {
 }
 export function AdminTabs() {
   return (
-    <div className="flex gap-2 border-b border-gray-700 pb-4">
+    <div className="flex gap-2 border-b border-app-border pb-4">
       <Slot className="h-9 w-24" />
       <Slot className="h-9 w-24" />
       <Slot className="h-9 w-24" />

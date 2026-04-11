@@ -121,10 +121,10 @@ export default function TranslationPreview({
   if (!templateContent || templateContent.trim() === '') {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <div className="bg-app-surface rounded-lg p-6 w-full max-w-2xl">
           <div className="text-center">
             <Globe className="text-blue-600 mx-auto mb-4" size={48} />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Translation Preview</h3>
+            <h3 className="text-lg font-semibold text-app-text mb-2">Translation Preview</h3>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-yellow-800">
                 <strong>Template Content is Empty</strong>
@@ -152,10 +152,10 @@ export default function TranslationPreview({
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div className="bg-app-surface rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-center py-8">
             <Loader2 className="animate-spin text-blue-600" size={24} />
-            <span className="ml-3 text-gray-600">Loading translations from API...</span>
+            <span className="ml-3 text-app-muted">Loading translations from API...</span>
           </div>
         </div>
       </div>
@@ -164,18 +164,18 @@ export default function TranslationPreview({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-app-surface rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <Globe className="text-blue-600" size={20} />
-            <h3 className="text-lg font-semibold text-gray-900">Translation Preview</h3>
-            <span className="text-sm text-gray-500">({templateName})</span>
+            <h3 className="text-lg font-semibold text-app-text">Translation Preview</h3>
+            <span className="text-sm text-app-faint">({templateName})</span>
           </div>
           
           <button
             onClick={onClose}
-            className="p-2 text-gray-500 hover:text-gray-700 rounded-lg"
+            className="p-2 text-app-faint hover:text-app-muted rounded-lg"
           >
             <X size={16} />
           </button>
@@ -219,13 +219,13 @@ export default function TranslationPreview({
         </div>
 
         {/* Language Selector */}
-        <div className="p-4 bg-gray-50 rounded-lg mb-6">
-          <h4 className="font-medium text-gray-900 mb-4">Select Preview Language</h4>
+        <div className="p-4 bg-app-surface rounded-lg mb-6">
+          <h4 className="font-medium text-app-text mb-4">Select Preview Language</h4>
           <div className="max-w-md">
             <select
               value={selectedLocale}
               onChange={(e) => handleLocaleChange(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black text-lg bg-white"
+              className="w-full rounded-lg border-2 border-app-border bg-app-surface px-4 py-3 text-lg text-app-text outline-none focus:ring-2 focus:ring-app-accent"
             >
               {SUPPORTED_LANGUAGES.map(lang => (
                 <option key={lang.code} value={lang.code}>
@@ -237,12 +237,12 @@ export default function TranslationPreview({
         </div>
 
         {/* Template Preview */}
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-medium text-gray-900 mb-2">
+        <div className="p-4 bg-app-surface rounded-lg">
+          <h4 className="font-medium text-app-text mb-2">
             Template Preview in {currentLanguage?.flag} ({currentLanguage?.name})
           </h4>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
+          <div className="bg-app-surface border border-app-border rounded-lg p-4">
+            <pre className="text-sm text-app-text whitespace-pre-wrap font-mono">
               {translatedContent}
             </pre>
           </div>

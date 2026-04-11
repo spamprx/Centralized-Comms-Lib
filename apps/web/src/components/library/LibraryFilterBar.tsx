@@ -41,29 +41,29 @@ export function LibraryFilterBar({
     <div className="flex flex-col gap-4">
       <div className="flex gap-3 flex-wrap items-end">
         <div className="flex-1 min-w-[220px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             Search
           </label>
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870] pointer-events-none" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint pointer-events-none" />
             <input
               type="text"
               placeholder="Title or author…"
               value={searchInput}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full py-2.5 pr-3 pl-10 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
+              className="w-full py-2.5 pr-3 pl-10 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none box-border"
             />
           </div>
         </div>
 
         <div className="min-w-[140px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             Author
           </label>
           <select
             value={filters.author}
             onChange={(e) => onAuthorChange(e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer box-border"
+            className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
             <option value="">All authors</option>
             {authors.map((a) => (
@@ -75,13 +75,13 @@ export function LibraryFilterBar({
         </div>
 
         <div className="min-w-[140px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             Channel
           </label>
           <select
             value={filters.channel}
             onChange={(e) => onChannelChange(e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer box-border"
+            className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
             <option value="">All channels</option>
             {channels.map((c) => (
@@ -93,13 +93,13 @@ export function LibraryFilterBar({
         </div>
 
         <div className="min-w-[130px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             Status
           </label>
           <select
             value={filters.status}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer box-border"
+            className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
             <option value="all">All statuses</option>
             <option value="draft">Draft</option>
@@ -109,13 +109,13 @@ export function LibraryFilterBar({
         </div>
 
         <div className="min-w-[130px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             Type
           </label>
           <select
             value={filters.type}
             onChange={(e) => onTypeChange(e.target.value)}
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer box-border"
+            className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
             <option value="all">All types</option>
             <option value="article">Article</option>
@@ -126,32 +126,32 @@ export function LibraryFilterBar({
         </div>
 
         <div className="min-w-[130px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             From
           </label>
           <input
             type="date"
             value={filters.dateFrom}
             onChange={(e) => onDateFromChange(e.target.value)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
+            className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none box-border"
           />
         </div>
 
         <div className="min-w-[130px]">
-          <label className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-1.5">
+          <label className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-1.5">
             To
           </label>
           <input
             type="date"
             value={filters.dateTo}
             onChange={(e) => onDateToChange(e.target.value)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
+            className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none box-border"
           />
         </div>
       </div>
 
       <div>
-        <span className="text-[10px] font-semibold text-[#555870] uppercase tracking-wide block mb-2">
+        <span className="text-[10px] font-semibold text-app-faint uppercase tracking-wide block mb-2">
           Tags (any match)
         </span>
         <div className="flex flex-wrap gap-2">
@@ -166,7 +166,7 @@ export function LibraryFilterBar({
                 className={`text-[11px] px-2.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
                   on
                     ? 'text-white border-transparent'
-                    : 'text-[#8b8fa8] border-white/10 bg-white/[0.02] hover:border-white/20'
+                    : 'text-app-muted border-app-border bg-app-bg/60 hover:border-white/20'
                 }`}
                 style={
                   on

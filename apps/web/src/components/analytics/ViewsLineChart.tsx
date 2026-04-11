@@ -9,12 +9,12 @@ interface ViewsLineChartProps {
 export function ViewsLineChart({ data, loading }: ViewsLineChartProps) {
   if (loading) {
     return (
-      <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+      <div className="p-4 bg-app-surface border border-app-border rounded-app-lg">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp size={16} />
-          <span className="text-sm font-semibold text-[#e2e4f0]">Views Over Time</span>
+          <span className="text-sm font-semibold text-app-text">Views Over Time</span>
         </div>
-        <div className="h-[200px] bg-white/[0.04] rounded-lg animate-pulse" />
+        <div className="h-[200px] bg-app-surface rounded-lg animate-pulse" />
       </div>
     );
   }
@@ -35,11 +35,11 @@ export function ViewsLineChart({ data, loading }: ViewsLineChartProps) {
   const labelIndices = [0, Math.floor(data.length / 4), Math.floor(data.length / 2), Math.floor(3 * data.length / 4), data.length - 1];
 
   return (
-    <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+    <div className="p-4 bg-app-surface border border-app-border rounded-app-lg">
       <div className="flex items-center gap-2 mb-4">
-        <TrendingUp size={16} className="text-violet-500" />
-        <span className="text-sm font-semibold text-[#e2e4f0]">Views Over Time</span>
-        <span className="text-xs text-[#555870] ml-auto">{data.length} days</span>
+        <TrendingUp size={16} className="text-app-accent" />
+        <span className="text-sm font-semibold text-app-text">Views Over Time</span>
+        <span className="text-xs text-app-faint ml-auto">{data.length} days</span>
       </div>
       <div className="relative">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[150px] block" preserveAspectRatio="none">
@@ -62,23 +62,23 @@ export function ViewsLineChart({ data, loading }: ViewsLineChartProps) {
         </svg>
         <div className="flex justify-between mt-2 px-1">
           {labelIndices.map((idx, i) => (
-            <span key={i} className="text-[10px] text-[#555870]">{data[idx].date.slice(5)}</span>
+            <span key={i} className="text-[10px] text-app-faint">{data[idx].date.slice(5)}</span>
           ))}
         </div>
       </div>
       {/* Stats */}
-      <div className="flex gap-6 mt-4 pt-4 border-t border-white/5">
+      <div className="flex gap-6 mt-4 pt-4 border-t border-app-border/80">
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-[#555870] uppercase tracking-wide">Total</span>
-          <span className="text-sm font-semibold text-[#e2e4f0]">{data.reduce((sum, d) => sum + d.value, 0).toLocaleString()}</span>
+          <span className="text-[10px] text-app-faint uppercase tracking-wide">Total</span>
+          <span className="text-sm font-semibold text-app-text">{data.reduce((sum, d) => sum + d.value, 0).toLocaleString()}</span>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-[#555870] uppercase tracking-wide">Avg/Day</span>
-          <span className="text-sm font-semibold text-[#e2e4f0]">{Math.round(data.reduce((sum, d) => sum + d.value, 0) / data.length).toLocaleString()}</span>
+          <span className="text-[10px] text-app-faint uppercase tracking-wide">Avg/Day</span>
+          <span className="text-sm font-semibold text-app-text">{Math.round(data.reduce((sum, d) => sum + d.value, 0) / data.length).toLocaleString()}</span>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-[#555870] uppercase tracking-wide">Peak</span>
-          <span className="text-sm font-semibold text-[#e2e4f0]">{maxValue.toLocaleString()}</span>
+          <span className="text-[10px] text-app-faint uppercase tracking-wide">Peak</span>
+          <span className="text-sm font-semibold text-app-text">{maxValue.toLocaleString()}</span>
         </div>
       </div>
     </div>

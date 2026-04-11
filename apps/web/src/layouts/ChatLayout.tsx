@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { Send, Paperclip, Smile, MoreVertical } from 'lucide-react';
 
 const mockMessages = [
-  { id: '1', text: 'Hey! How\'s the content review going?', sender: 'them', time: '10:30 AM' },
+  { id: '1', text: "Hey! How's the content review going?", sender: 'them', time: '10:30 AM' },
   { id: '2', text: 'Pretty good! Just finished reviewing the Q1 marketing plan.', sender: 'me', time: '10:32 AM' },
   { id: '3', text: 'Great! Any feedback?', sender: 'them', time: '10:33 AM' },
-  { id: '4', text: 'Just a few minor suggestions. Overall it looks fantastic! 🎉', sender: 'me', time: '10:35 AM' },
+  { id: '4', text: 'Just a few minor suggestions. Overall it looks fantastic!', sender: 'me', time: '10:35 AM' },
   { id: '5', text: 'Awesome! When can we schedule a follow-up?', sender: 'them', time: '10:36 AM' },
 ];
 
 const suggestedQuestions = [
-  'What\'s the status of my content?',
+  "What's the status of my content?",
   'How do I publish an article?',
   'Can you help me with formatting?',
   'Where are my drafts?',
@@ -22,61 +22,68 @@ export default function ChatLayout() {
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
-    setMessages([...messages, {
-      id: String(Date.now()),
-      text: inputValue,
-      sender: 'me',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }]);
+    setMessages([
+      ...messages,
+      {
+        id: String(Date.now()),
+        text: inputValue,
+        sender: 'me',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
     setInputValue('');
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Chat Header */}
-      <div className="px-6 py-4 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
+    <div className="flex h-screen min-h-0 flex-col bg-app-bg">
+      <header className="flex shrink-0 items-center justify-between border-b border-app-border/80 bg-app-surface/70 px-4 py-4 backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-sm font-bold text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-app-accent to-app-accent-deep text-sm font-bold text-white shadow-app-soft">
             AI
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-[#e2e4f0] m-0">AI Assistant</h2>
-            <span className="text-[11px] text-emerald-500">● Online</span>
+            <h2 className="m-0 text-sm font-semibold text-app-text">AI assistant</h2>
+            <span className="flex items-center gap-1.5 text-[11px] text-emerald-300/95">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Online
+            </span>
           </div>
         </div>
-        <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
+        <button
+          type="button"
+          className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-app-elevated hover:text-app-text"
+          aria-label="More"
+        >
           <MoreVertical size={20} />
         </button>
-      </div>
+      </header>
 
-      {/* Message Thread */}
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[70%] px-4 py-3 text-[#e2e4f0] text-sm leading-normal ${
-              msg.sender === 'me'
-                ? 'bg-gradient-to-br from-violet-500/20 to-cyan-500/20 rounded-2xl rounded-br-sm'
-                : 'bg-white/5 rounded-2xl rounded-bl-sm'
-            }`}>
+          <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className={`max-w-[85%] px-4 py-3 text-sm leading-normal text-app-text sm:max-w-[70%] ${
+                msg.sender === 'me'
+                  ? 'rounded-2xl rounded-br-sm border border-app-accent/25 bg-gradient-to-br from-app-accent/18 to-app-accent-2/15 shadow-app-soft'
+                  : 'rounded-2xl rounded-bl-sm border border-app-border/70 bg-app-surface/80 backdrop-blur-sm'
+              }`}
+            >
               {msg.text}
-              <div className="text-[10px] text-[#555870] mt-1 text-right">{msg.time}</div>
+              <div className="mt-1 text-right text-[10px] text-app-faint">{msg.time}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Suggested Questions */}
-      <div className="px-6 py-3 border-t border-white/5">
-        <p className="text-[11px] text-[#555870] mb-2">Suggested questions:</p>
-        <div className="flex gap-2 flex-wrap">
+      <div className="shrink-0 border-t border-app-border/80 bg-app-bg/60 px-4 py-3 backdrop-blur-md sm:px-6">
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-app-faint">Suggested</p>
+        <div className="flex flex-wrap gap-2">
           {suggestedQuestions.map((q, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => setInputValue(q)}
-              className="px-3 py-1.5 bg-violet-500/10 border border-violet-500/20 rounded-2xl text-violet-400 text-[11px] cursor-pointer whitespace-nowrap"
+              className="rounded-full border border-app-accent/25 bg-app-accent-muted px-3 py-1.5 text-[11px] text-app-accent transition-colors hover:border-app-accent/40 hover:bg-app-accent/20"
             >
               {q}
             </button>
@@ -84,26 +91,37 @@ export default function ChatLayout() {
         </div>
       </div>
 
-      {/* Input Bar */}
-      <div className="px-6 py-4 bg-white/[0.03] border-t border-white/5">
-        <div className="flex gap-3 items-center">
-          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
+      <div className="shrink-0 border-t border-app-border/80 bg-app-surface/70 px-4 py-4 backdrop-blur-xl sm:px-6">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            className="rounded-app-md p-2 text-app-faint hover:bg-app-elevated hover:text-app-muted"
+            aria-label="Attach"
+          >
             <Paperclip size={20} />
           </button>
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask anything..."
-            className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-3xl text-[#e2e4f0] text-sm outline-none"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSend();
+            }}
+            placeholder="Ask anything…"
+            className="min-w-0 flex-1 rounded-full border border-app-border/90 bg-app-bg-subtle/80 px-4 py-3 text-sm text-app-text outline-none placeholder:text-app-faint focus:border-app-accent/35"
           />
-          <button className="bg-transparent border-none text-[#555870] cursor-pointer p-2">
+          <button
+            type="button"
+            className="rounded-full p-2 text-app-faint hover:bg-app-elevated hover:text-app-muted"
+            aria-label="Emoji"
+          >
             <Smile size={20} />
           </button>
           <button
+            type="button"
             onClick={handleSend}
-            className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 border-none text-white cursor-pointer flex items-center justify-center"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-none bg-gradient-to-br from-app-accent to-app-accent-deep text-white shadow-app-glow"
+            aria-label="Send"
           >
             <Send size={20} />
           </button>

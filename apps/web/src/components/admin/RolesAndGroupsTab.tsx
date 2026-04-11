@@ -51,11 +51,11 @@ export default function RolesAndGroupsTab() {
     refetch();
   };
 
-  if (loading) return <div className="flex flex-col gap-2">{[1,2,3].map(i => <div key={i} className="h-[100px] bg-white/[0.04] rounded-lg animate-pulse" />)}</div>;
+  if (loading) return <div className="flex flex-col gap-2">{[1,2,3].map(i => <div key={i} className="h-[100px] bg-app-surface rounded-lg animate-pulse" />)}</div>;
   if (error) return (
     <div className="p-12 text-center text-red-400 text-sm">
       <p>⚠ {error}</p>
-      <button onClick={refetch} className="mt-3 px-4 py-1.5 bg-white/[0.07] border border-white/10 rounded-md text-[#e2e4f0] cursor-pointer">Retry</button>
+      <button onClick={refetch} className="mt-3 px-4 py-1.5 bg-app-elevated border border-app-border rounded-md text-app-text cursor-pointer">Retry</button>
     </div>
   );
 
@@ -63,20 +63,20 @@ export default function RolesAndGroupsTab() {
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#e2e4f0] mb-1">Roles &amp; Groups</h2>
-          <p className="text-[13px] text-[#555870] m-0">Control access levels and team organization</p>
+          <h2 className="text-lg font-semibold text-app-text mb-1">Roles &amp; Groups</h2>
+          <p className="text-[13px] text-app-faint m-0">Control access levels and team organization</p>
         </div>
         <button 
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-400/15 border border-violet-400/30 rounded-lg text-violet-400 text-[13px] cursor-pointer hover:bg-violet-400/25" 
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-app-accent-muted border border-app-accent/30 rounded-lg text-app-accent text-[13px] cursor-pointer hover:bg-app-accent/20" 
           onClick={() => view === 'roles' ? setShowRoleModal(true) : setShowGroupModal(true)}
         >
           <Plus size={14} /> New {view === 'roles' ? 'role' : 'group'}
         </button>
       </div>
 
-      <div className="flex gap-1 p-1 bg-white/[0.03] rounded-lg w-fit">
-        <button className={`flex items-center gap-1.5 px-3.5 py-1.5 border-none rounded-md text-[13px] cursor-pointer ${view === 'roles' ? 'bg-white/[0.08] text-[#e2e4f0]' : 'bg-transparent text-[#8b8fa8]'}`} onClick={() => setView('roles')}><Shield size={14} /> Roles ({roles.length})</button>
-        <button className={`flex items-center gap-1.5 px-3.5 py-1.5 border-none rounded-md text-[13px] cursor-pointer ${view === 'groups' ? 'bg-white/[0.08] text-[#e2e4f0]' : 'bg-transparent text-[#8b8fa8]'}`} onClick={() => setView('groups')}><Users size={14} /> Groups ({groups.length})</button>
+      <div className="flex gap-1 p-1 bg-app-surface rounded-lg w-fit">
+        <button className={`flex items-center gap-1.5 px-3.5 py-1.5 border-none rounded-md text-[13px] cursor-pointer ${view === 'roles' ? 'bg-white/[0.08] text-app-text' : 'bg-transparent text-app-muted'}`} onClick={() => setView('roles')}><Shield size={14} /> Roles ({roles.length})</button>
+        <button className={`flex items-center gap-1.5 px-3.5 py-1.5 border-none rounded-md text-[13px] cursor-pointer ${view === 'groups' ? 'bg-white/[0.08] text-app-text' : 'bg-transparent text-app-muted'}`} onClick={() => setView('groups')}><Users size={14} /> Groups ({groups.length})</button>
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
@@ -120,12 +120,12 @@ export default function RolesAndGroupsTab() {
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm" onClick={() => setShowDeleteConfirm(null)}>
-          <div className="bg-[#1a1d29] border border-white/10 rounded-xl p-6 max-w-[400px] w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="m-0 mb-3 text-base font-semibold text-[#e2e4f0]">Delete {showDeleteConfirm.type === 'role' ? 'Role' : 'Group'}</h3>
-            <p className="m-0 mb-5 text-[13px] text-[#8b8fa8] leading-relaxed">Are you sure you want to delete <strong className="text-[#e2e4f0]">{showDeleteConfirm.name}</strong>? This action cannot be undone.</p>
+          <div className="bg-[#1a1d29] border border-app-border rounded-xl p-6 max-w-[400px] w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="m-0 mb-3 text-base font-semibold text-app-text">Delete {showDeleteConfirm.type === 'role' ? 'Role' : 'Group'}</h3>
+            <p className="m-0 mb-5 text-[13px] text-app-muted leading-relaxed">Are you sure you want to delete <strong className="text-app-text">{showDeleteConfirm.name}</strong>? This action cannot be undone.</p>
             <div className="flex gap-2.5 justify-end">
-              <button className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#9094ae] text-[13px] cursor-pointer hover:bg-white/[0.08]" onClick={() => setShowDeleteConfirm(null)}>Cancel</button>
-              <button className="px-5 py-2.5 bg-red-500/15 border border-red-500/30 rounded-lg text-red-400 text-[13px] font-medium cursor-pointer hover:bg-red-500/25" onClick={handleDelete}>Delete</button>
+              <button className="px-5 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer hover:bg-app-surface-hover" onClick={() => setShowDeleteConfirm(null)}>Cancel</button>
+              <button className="px-5 py-2.5 bg-red-100 border border-red-200 rounded-lg text-red-400 text-[13px] font-medium cursor-pointer hover:bg-red-500/25" onClick={handleDelete}>Delete</button>
             </div>
           </div>
         </div>
@@ -136,22 +136,22 @@ export default function RolesAndGroupsTab() {
 
 function RoleCard({ role, onEdit, onDelete }: { role: Role; onEdit: () => void; onDelete: () => void }) {
   return (
-    <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px] flex flex-col gap-2.5 transition-colors duration-150 hover:border-violet-400/20">
+    <div className="p-4 bg-app-surface border border-app-border rounded-app-lg flex flex-col gap-2.5 transition-colors duration-150 hover:border-app-accent/30">
       <div className="flex items-center gap-2.5">
-        <div className="w-[30px] h-[30px] rounded-[7px] bg-violet-400/15 flex items-center justify-center text-violet-400 shrink-0"><Shield size={14} /></div>
+        <div className="w-[30px] h-[30px] rounded-[7px] bg-app-accent-muted flex items-center justify-center text-app-accent shrink-0"><Shield size={14} /></div>
         <div className="flex-1 min-w-0">
-          <span className="block text-[13px] font-semibold text-[#e2e4f0]">{role.name}</span>
-          <span className="text-[11px] text-[#555870]">{role.userCount} users</span>
+          <span className="block text-[13px] font-semibold text-app-text">{role.name}</span>
+          <span className="text-[11px] text-app-faint">{role.userCount} users</span>
         </div>
         <div className="flex gap-1">
-          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-[#555870] cursor-pointer hover:bg-white/[0.07] hover:text-[#c4c7d9]" onClick={onEdit}><Edit2 size={13} /></button>
-          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-[#555870] cursor-pointer hover:bg-red-500/10 hover:text-red-400" onClick={onDelete}><Trash2 size={13} /></button>
+          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-app-faint cursor-pointer hover:bg-app-surface-hover hover:text-app-muted" onClick={onEdit}><Edit2 size={13} /></button>
+          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-app-faint cursor-pointer hover:bg-red-50 hover:text-red-400" onClick={onDelete}><Trash2 size={13} /></button>
         </div>
       </div>
-      <p className="text-xs text-gray-500 m-0 leading-relaxed">{role.description}</p>
+      <p className="text-xs text-app-faint m-0 leading-relaxed">{role.description}</p>
       <div className="flex flex-wrap gap-1">
-        {role.permissions.slice(0, 4).map(p => <span key={p.id} className="px-[7px] py-0.5 bg-white/5 rounded text-[11px] text-[#8b8fa8] font-mono">{p.resource}:{p.action}</span>)}
-        {role.permissions.length > 4 && <span className="px-[7px] py-0.5 bg-white/5 rounded text-[11px] text-[#555870] font-mono">+{role.permissions.length - 4} more</span>}
+        {role.permissions.slice(0, 4).map(p => <span key={p.id} className="px-[7px] py-0.5 bg-app-surface rounded text-[11px] text-app-muted font-mono">{p.resource}:{p.action}</span>)}
+        {role.permissions.length > 4 && <span className="px-[7px] py-0.5 bg-app-surface rounded text-[11px] text-app-faint font-mono">+{role.permissions.length - 4} more</span>}
       </div>
     </div>
   );
@@ -159,22 +159,22 @@ function RoleCard({ role, onEdit, onDelete }: { role: Role; onEdit: () => void; 
 
 function GroupCard({ group, onEdit, onDelete }: { group: Group; onEdit: () => void; onDelete: () => void }) {
   return (
-    <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px] flex flex-col gap-2.5 transition-colors duration-150 hover:border-violet-400/20">
+    <div className="p-4 bg-app-surface border border-app-border rounded-app-lg flex flex-col gap-2.5 transition-colors duration-150 hover:border-app-accent/30">
       <div className="flex items-center gap-2.5">
         <div className="w-[30px] h-[30px] rounded-[7px] bg-sky-400/15 flex items-center justify-center text-sky-400 shrink-0"><Users size={14} /></div>
         <div className="flex-1 min-w-0">
-          <span className="block text-[13px] font-semibold text-[#e2e4f0]">{group.name}</span>
-          <span className="text-[11px] text-[#555870]">{group.members.length} members</span>
+          <span className="block text-[13px] font-semibold text-app-text">{group.name}</span>
+          <span className="text-[11px] text-app-faint">{group.members.length} members</span>
         </div>
         <div className="flex gap-1">
-          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-[#555870] cursor-pointer hover:bg-white/[0.07] hover:text-[#c4c7d9]" onClick={onEdit}><Edit2 size={13} /></button>
-          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-[#555870] cursor-pointer hover:bg-red-500/10 hover:text-red-400" onClick={onDelete}><Trash2 size={13} /></button>
+          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-app-faint cursor-pointer hover:bg-app-surface-hover hover:text-app-muted" onClick={onEdit}><Edit2 size={13} /></button>
+          <button className="flex items-center justify-center w-[26px] h-[26px] bg-transparent border-none rounded-[5px] text-app-faint cursor-pointer hover:bg-red-50 hover:text-red-400" onClick={onDelete}><Trash2 size={13} /></button>
         </div>
       </div>
-      <p className="text-xs text-gray-500 m-0 leading-relaxed">{group.description}</p>
+      <p className="text-xs text-app-faint m-0 leading-relaxed">{group.description}</p>
       <div className="flex flex-wrap gap-1">
         {group.roles.slice(0, 3).map(r => <span key={r} className="px-[7px] py-0.5 bg-sky-400/10 rounded text-[11px] text-sky-400">{r}</span>)}
-        {group.roles.length > 3 && <span className="px-[7px] py-0.5 bg-white/5 rounded text-[11px] text-[#555870]">+{group.roles.length - 3} roles</span>}
+        {group.roles.length > 3 && <span className="px-[7px] py-0.5 bg-app-surface rounded text-[11px] text-app-faint">+{group.roles.length - 3} roles</span>}
       </div>
     </div>
   );

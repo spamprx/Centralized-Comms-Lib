@@ -6,9 +6,13 @@ export default function App() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full bg-app-bg">
       {isAuthenticated && <Sidebar />}
-      <main className={isAuthenticated ? "pl-14 min-h-screen w-full" : "min-h-screen w-full"}>
+      <main
+        className={`relative min-h-screen w-full transition-[padding] duration-300 ease-out ${
+          isAuthenticated ? "app-main-canvas md:pl-16" : ""
+        }`}
+      >
         <AppRoutes />
       </main>
     </div>

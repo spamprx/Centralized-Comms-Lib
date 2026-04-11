@@ -1,50 +1,145 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-app-bg: #080a0f;
+  --color-app-bg-subtle: #0c0f16;
+  --color-app-surface: rgba(255, 255, 255, 0.045);
+  --color-app-surface-hover: rgba(255, 255, 255, 0.09);
+  --color-app-elevated: rgba(255, 255, 255, 0.07);
+  --color-app-border: rgba(255, 255, 255, 0.085);
+  --color-app-border-strong: rgba(255, 255, 255, 0.16);
+
+  --color-app-text: #eceef4;
+  --color-app-muted: #8f96ad;
+  --color-app-faint: #5a6178;
+
+  --color-app-accent: #937cf8;
+  --color-app-accent-deep: #5b4ab8;
+  --color-app-accent-hover: #b4a3fc;
+  --color-app-accent-muted: rgba(147, 124, 248, 0.2);
+  --color-app-accent-2: #2dd4bf;
+
+  --shadow-app-soft: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 24px rgba(0, 0, 0, 0.35), 0 24px 64px rgba(0, 0, 0, 0.25);
+  --shadow-app-glow: 0 0 0 1px rgba(147, 124, 248, 0.14),
+    0 8px 40px rgba(147, 124, 248, 0.12), 0 24px 80px rgba(0, 0, 0, 0.35);
+  --shadow-app-lift: 0 12px 40px -8px rgba(0, 0, 0, 0.45);
+
+  --radius-app-sm: 0.5rem;
+  --radius-app-md: 0.75rem;
+  --radius-app-lg: 1rem;
+  --radius-app-xl: 1.35rem;
+
+  --spacing-app-page: 1.25rem;
+  --spacing-app-page-lg: 1.85rem;
+}
+
 @layer base {
   :root {
-    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-    line-height: 1.5;
-    font-weight: 400;
-    color-scheme: light dark;
+    color-scheme: dark;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply m-0 min-w-80 min-h-screen bg-gray-900 text-gray-100;
+    @apply m-0 min-w-80 min-h-screen bg-app-bg font-sans text-app-text antialiased;
   }
 
   a {
-    @apply font-medium text-blue-400 no-underline transition-colors hover:text-blue-300;
+    @apply font-medium text-app-accent no-underline transition-colors duration-200 hover:text-app-accent-hover;
   }
 
   h1 {
-    @apply text-5xl leading-tight;
+    @apply text-4xl font-bold tracking-tight text-app-text md:text-5xl;
   }
 
-  button {
-    @apply rounded-lg border border-transparent px-5 py-2 text-base font-medium transition-colors;
-    @apply bg-gray-800 cursor-pointer hover:border-blue-400;
-    @apply focus-visible:outline-4 focus-visible:outline-blue-400;
+  button:not(:disabled) {
+    @apply cursor-pointer;
   }
 
-  @media (prefers-color-scheme: light) {
-    :root {
-      @apply bg-white text-gray-800;
-    }
-    
-    a:hover {
-      @apply text-blue-500;
-    }
-    
-    button {
-      @apply bg-gray-50;
-    }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-2 outline-offset-2 outline-app-accent;
   }
 }
 
 @layer utilities {
-  /* Hide browser-native password reveal icons (Edge/IE) */
+  /**
+   * Layered mesh + grid for authenticated app main (no extra HTTP).
+   */
+  .app-main-canvas {
+    background-color: var(--color-app-bg);
+    background-image: radial-gradient(
+        ellipse 120% 80% at 10% -20%,
+        rgba(147, 124, 248, 0.14),
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse 80% 50% at 90% 0%,
+        rgba(45, 212, 191, 0.08),
+        transparent 45%
+      ),
+      linear-gradient(
+        rgba(255, 255, 255, 0.02) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.02) 1px,
+        transparent 1px
+      );
+    background-size: auto, auto, 48px 48px, 48px 48px;
+    background-attachment: fixed;
+  }
+
+  .app-hero-grid {
+    background-image: linear-gradient(
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px
+      );
+    background-size: 56px 56px;
+    mask-image: radial-gradient(
+      ellipse 70% 60% at 50% 0%,
+      black 20%,
+      transparent 75%
+    );
+  }
+
+  .app-text-gradient {
+    @apply bg-gradient-to-r from-app-accent via-cyan-300 to-app-accent-2 bg-clip-text text-transparent;
+  }
+
+  .app-border-gradient {
+    position: relative;
+    background: linear-gradient(
+        var(--color-app-bg-subtle),
+        var(--color-app-bg-subtle)
+      )
+      padding-box,
+      linear-gradient(
+        135deg,
+        rgba(147, 124, 248, 0.45),
+        rgba(45, 212, 191, 0.25),
+        rgba(147, 124, 248, 0.15)
+      )
+      border-box;
+    border: 1px solid transparent;
+  }
+
   .password-input-hide-reveal {
     input[type="password"]::-ms-reveal,
     input[type="password"]::-ms-clear {
@@ -52,7 +147,48 @@
     }
   }
 
-  /* TipTap / ProseMirror base styles */
+  .animate-fade-in {
+    animation: app-fade-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-fade-in-delayed {
+    animation: app-fade-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+  }
+
+  @keyframes app-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes app-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .app-shimmer-hover {
+    background: linear-gradient(
+      110deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 45%,
+      transparent 90%
+    );
+    background-size: 200% 100%;
+  }
+
+  .group:hover .app-shimmer-hover {
+    animation: app-shimmer 1.2s ease-in-out;
+  }
+
   .tiptap-content .ProseMirror {
     @apply whitespace-pre-wrap outline-none;
   }
@@ -62,16 +198,16 @@
   }
 
   .tiptap-content .ProseMirror h1 {
-    @apply text-3xl leading-tight my-3;
+    @apply my-3 text-3xl leading-tight;
   }
 
   .tiptap-content .ProseMirror h2 {
-    @apply text-xl leading-snug my-3;
+    @apply my-3 text-xl leading-snug;
   }
 
   .tiptap-content .ProseMirror ul,
   .tiptap-content .ProseMirror ol {
-    @apply pl-6 my-0 mb-3;
+    @apply my-0 mb-3 pl-6;
   }
 
   .tiptap-content .ProseMirror ul {
@@ -87,7 +223,7 @@
   }
 
   .tiptap-content a {
-    @apply text-purple-400 underline;
+    @apply text-app-accent underline decoration-app-accent/40 underline-offset-2;
   }
 }
 

@@ -45,7 +45,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'q',
       label: `Search: "${searchDisplay.trim()}"`,
-      className: 'bg-violet-500/15 text-violet-300 border border-violet-500/25',
+      className: 'bg-app-accent-muted text-app-accent border border-app-accent/25',
       onRemove: onRemoveSearch,
     });
   }
@@ -90,7 +90,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'type',
       label: `Type: ${filters.type}`,
-      className: 'bg-cyan-500/12 text-cyan-300 border border-cyan-500/22',
+      className: 'bg-cyan-500/12 text-emerald-800 border border-emerald-600/22',
       onRemove: onRemoveType,
     });
   }
@@ -99,7 +99,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'from',
       label: `From: ${filters.dateFrom}`,
-      className: 'bg-white/[0.06] text-[#c4c8dc] border border-white/10',
+      className: 'bg-app-elevated text-app-muted border border-app-border',
       onRemove: onRemoveDateFrom,
     });
   }
@@ -108,7 +108,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'to',
       label: `To: ${filters.dateTo}`,
-      className: 'bg-white/[0.06] text-[#c4c8dc] border border-white/10',
+      className: 'bg-app-elevated text-app-muted border border-app-border',
       onRemove: onRemoveDateTo,
     });
   }
@@ -133,7 +133,7 @@ export function LibraryFilterChips({
       <button
         type="button"
         onClick={onClearAll}
-        className="text-[11px] text-[#555870] hover:text-[#8b8fa8] bg-transparent border-none cursor-pointer underline-offset-2 hover:underline ml-1"
+        className="text-[11px] text-app-faint hover:text-app-muted bg-transparent border-none cursor-pointer underline-offset-2 hover:underline ml-1"
       >
         Clear all
       </button>

@@ -20,6 +20,9 @@ import {
   type TemplateStatus,
   type UpdateTemplateInput,
 } from '../../services/templateCrudService';
+import { PageHeader } from '../ui/PageHeader';
+import { PageShell } from '../ui/PageShell';
+import { Surface } from '../ui/Surface';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
@@ -597,31 +600,32 @@ export default function TemplatesPage() {
 
   return (
     <>
-      <div className="p-6 min-h-screen text-[#e2e4f0]">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold m-0">Templates</h1>
-        <p className="text-[13px] text-[#888ca6] mt-1 mb-0">
-          Browse reusable templates, search quickly, and open full details.
-        </p>
+      <PageShell wide className="min-h-screen text-app-text">
+      <PageHeader
+        title="Templates"
+        accentWord="Templates"
+        description="Browse reusable templates, search quickly, and open full details."
+      />
+      <div className="mb-6 space-y-3">
         {cloneBanner && (
-          <div className="mt-3 rounded-lg border border-green-400/30 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+          <div className="rounded-app-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
             Cloned from "{cloneBanner}".
           </div>
         )}
         {mutationError && (
-          <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-200">
             {mutationError}
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-4">
-        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <Surface padding="md">
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div className="min-w-[260px] flex-1">
-              <label className="text-[12px] text-[#9ca3bf] block mb-1">Search</label>
+              <label className="text-[12px] text-app-muted block mb-1">Search</label>
               <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6f748f]" />
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
                 <input
                   value={q}
                   onChange={(e) =>
@@ -632,12 +636,12 @@ export default function TemplatesPage() {
                     })
                   }
                   placeholder="Search by name, slug or description..."
-                  className="w-full rounded-lg border border-white/10 bg-[#0f1220] pl-9 pr-3 py-2 text-sm outline-none focus:border-[#6d7cff]"
+                  className="w-full rounded-lg border border-app-border bg-app-bg-subtle pl-9 pr-3 py-2 text-sm outline-none focus:border-app-accent/50"
                 />
               </div>
             </div>
             <div>
-              <label className="text-[12px] text-[#9ca3bf] block mb-1">Status</label>
+              <label className="text-[12px] text-app-muted block mb-1">Status</label>
               <select
                 value={status}
                 onChange={(e) =>
@@ -647,7 +651,7 @@ export default function TemplatesPage() {
                     return prev;
                   })
                 }
-                className="rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm"
+                className="rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm"
               >
                 <option value="ALL">All</option>
                 <option value="DRAFT">Draft</option>
@@ -658,13 +662,13 @@ export default function TemplatesPage() {
             <div>
               <button
                 onClick={openCreateForm}
-                className="rounded-lg border border-[#6d7cff] bg-[#6d7cff]/20 px-3 py-2 text-sm hover:bg-[#6d7cff]/30 flex items-center gap-2"
+                className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3 py-2 text-sm hover:bg-app-accent/25 flex items-center gap-2"
               >
                 <Plus size={14} /> New template
               </button>
             </div>
             <div>
-              <label className="text-[12px] text-[#9ca3bf] block mb-1">Page size</label>
+              <label className="text-[12px] text-app-muted block mb-1">Page size</label>
               <select
                 value={pageSize}
                 onChange={(e) =>
@@ -674,7 +678,7 @@ export default function TemplatesPage() {
                     return prev;
                   })
                 }
-                className="rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm"
+                className="rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm"
               >
                 {PAGE_SIZE_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>
@@ -686,23 +690,23 @@ export default function TemplatesPage() {
           </div>
 
           {loading ? (
-            <div className="h-40 flex items-center justify-center text-[#9ca3bf]">
+            <div className="h-40 flex items-center justify-center text-app-muted">
               <Loader2 size={18} className="animate-spin mr-2" /> Loading templates...
             </div>
           ) : error ? (
-            <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            <div className="rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-200">
               {error}
             </div>
           ) : items.length === 0 ? (
-            <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-6 text-sm text-[#9ca3bf] text-center">
+            <div className="rounded-lg border border-app-border bg-black/20 px-3 py-6 text-sm text-app-muted text-center">
               No templates found for current filters.
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-[#9ca3bf]">
-                    <tr className="border-b border-white/10">
+                  <thead className="text-left text-app-muted">
+                    <tr className="border-b border-app-border">
                       <th className="py-2 pr-2 font-medium">Name</th>
                       <th className="py-2 pr-2 font-medium">Type</th>
                       <th className="py-2 pr-2 font-medium">Status</th>
@@ -716,20 +720,20 @@ export default function TemplatesPage() {
                       <tr
                         key={t.id}
                         onClick={() => navigate(`/templates/${t.id}`)}
-                        className="border-b border-white/5 hover:bg-white/[0.03] cursor-pointer"
+                        className="border-b border-app-border/80 hover:bg-app-surface cursor-pointer"
                       >
                         <td className="py-2 pr-2">
                           <div className="font-medium">{t.name}</div>
-                          <div className="text-[11px] text-[#7f85a3]">{t.slug}</div>
+                          <div className="text-[11px] text-app-faint">{t.slug}</div>
                         </td>
-                        <td className="py-2 pr-2 text-[#c5c9de]">{templateType(t)}</td>
+                        <td className="py-2 pr-2 text-app-muted">{templateType(t)}</td>
                         <td className="py-2 pr-2">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] border ${statusPill(t.status)}`}>
                             {t.status}
                           </span>
                         </td>
-                        <td className="py-2 pr-2 text-[#c5c9de]">{t.authorId}</td>
-                        <td className="py-2 pr-2 text-[#c5c9de]">
+                        <td className="py-2 pr-2 text-app-muted">{t.authorId}</td>
+                        <td className="py-2 pr-2 text-app-muted">
                           {new Date(t.updatedAt).toLocaleString()}
                         </td>
                         <td className="py-2 pr-2">
@@ -739,7 +743,7 @@ export default function TemplatesPage() {
                                 e.stopPropagation();
                                 openEditForm(t);
                               }}
-                              className="px-2 py-1 rounded border border-white/10 hover:bg-white/[0.05]"
+                              className="px-2 py-1 rounded border border-app-border hover:bg-app-surface-hover"
                             >
                               <Pencil size={13} />
                             </button>
@@ -749,7 +753,7 @@ export default function TemplatesPage() {
                                 setCloneTarget(t);
                                 setMutationError(null);
                               }}
-                              className="px-2 py-1 rounded border border-white/10 hover:bg-white/[0.05]"
+                              className="px-2 py-1 rounded border border-app-border hover:bg-app-surface-hover"
                             >
                               <Copy size={13} />
                             </button>
@@ -759,7 +763,7 @@ export default function TemplatesPage() {
                                 setDeleteTarget(t);
                                 setMutationError(null);
                               }}
-                              className="px-2 py-1 rounded border border-red-400/30 text-red-300 hover:bg-red-500/10"
+                              className="rounded border border-red-400/35 px-2 py-1 text-red-200 hover:bg-red-500/10"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -772,7 +776,7 @@ export default function TemplatesPage() {
               </div>
 
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs text-[#8d92ae]">
+                <span className="text-xs text-app-faint">
                   {items.length} total templates · page {currentPage} / {pageCount}
                 </span>
                 <div className="flex items-center gap-2">
@@ -784,7 +788,7 @@ export default function TemplatesPage() {
                       })
                     }
                     disabled={currentPage <= 1}
-                    className="px-2 py-1 rounded border border-white/10 disabled:opacity-40"
+                    className="px-2 py-1 rounded border border-app-border disabled:opacity-40"
                   >
                     <ChevronLeft size={14} />
                   </button>
@@ -796,7 +800,7 @@ export default function TemplatesPage() {
                       })
                     }
                     disabled={currentPage >= pageCount}
-                    className="px-2 py-1 rounded border border-white/10 disabled:opacity-40"
+                    className="px-2 py-1 rounded border border-app-border disabled:opacity-40"
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -804,24 +808,24 @@ export default function TemplatesPage() {
               </div>
             </>
           )}
-        </section>
+        </Surface>
 
-        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4 min-h-[320px]">
-          <h2 className="text-base font-semibold mt-0 mb-3">Template Detail</h2>
+        <Surface padding="md" className="min-h-[320px]">
+          <h2 className="mt-0 mb-3 text-base font-semibold text-app-text">Template detail</h2>
           {!templateId ? (
-            <p className="text-sm text-[#8d92ae]">Select a template from the list to view details.</p>
+            <p className="text-sm text-app-faint">Select a template from the list to view details.</p>
           ) : detailLoading ? (
-            <div className="h-40 flex items-center justify-center text-[#9ca3bf]">
+            <div className="h-40 flex items-center justify-center text-app-muted">
               <Loader2 size={18} className="animate-spin mr-2" /> Loading detail...
             </div>
           ) : detailError ? (
-            <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            <div className="rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-200">
               {detailError}
             </div>
           ) : detail ? (
             <div className="space-y-3 text-sm">
               <div>
-                <div className="text-[#8d92ae] text-[12px]">Name</div>
+                <div className="text-app-faint text-[12px]">Name</div>
                 <div className="flex items-center justify-between gap-2">
                   <span>{detail.name}</span>
                   <div className="flex items-center gap-1">
@@ -830,13 +834,13 @@ export default function TemplatesPage() {
                         setCloneTarget(detail);
                         setMutationError(null);
                       }}
-                      className="px-2 py-1 rounded border border-white/10 hover:bg-white/[0.05] text-xs"
+                      className="px-2 py-1 rounded border border-app-border hover:bg-app-surface-hover text-xs"
                     >
                       Clone
                     </button>
                     <button
                       onClick={() => openEditForm(detail)}
-                      className="px-2 py-1 rounded border border-white/10 hover:bg-white/[0.05] text-xs"
+                      className="px-2 py-1 rounded border border-app-border hover:bg-app-surface-hover text-xs"
                     >
                       Edit
                     </button>
@@ -844,73 +848,73 @@ export default function TemplatesPage() {
                 </div>
               </div>
               <div>
-                <div className="text-[#8d92ae] text-[12px]">Description</div>
+                <div className="text-app-faint text-[12px]">Description</div>
                 <div>{detail.description || '—'}</div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[#8d92ae] text-[12px]">Status</div>
+                  <div className="text-app-faint text-[12px]">Status</div>
                   <div>{detail.status}</div>
                 </div>
                 <div>
-                  <div className="text-[#8d92ae] text-[12px]">Owner</div>
+                  <div className="text-app-faint text-[12px]">Owner</div>
                   <div>{detail.authorId}</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[#8d92ae] text-[12px]">Created</div>
+                  <div className="text-app-faint text-[12px]">Created</div>
                   <div>{new Date(detail.createdAt).toLocaleString()}</div>
                 </div>
                 <div>
-                  <div className="text-[#8d92ae] text-[12px]">Updated</div>
+                  <div className="text-app-faint text-[12px]">Updated</div>
                   <div>{new Date(detail.updatedAt).toLocaleString()}</div>
                 </div>
               </div>
               <div>
-                <div className="text-[#8d92ae] text-[12px]">Bindings</div>
+                <div className="text-app-faint text-[12px]">Bindings</div>
                 <div>{detail.bindings?.length ?? 0}</div>
               </div>
-              <div className="rounded-lg border border-white/10 p-3 bg-black/10">
+              <div className="rounded-lg border border-app-border p-3 bg-black/10">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-[#8d92ae] text-[12px]">Bound Channels</div>
+                  <div className="text-app-faint text-[12px]">Bound Channels</div>
                   <button
                     onClick={openAddChannelDialog}
                     disabled={channelsLoading}
-                    className="px-2 py-1 rounded border border-[#6d7cff]/50 text-xs hover:bg-[#6d7cff]/20 disabled:opacity-50"
+                    className="px-2 py-1 rounded border border-app-accent/45 text-xs hover:bg-app-accent-muted disabled:opacity-50"
                   >
                     Add Channel
                   </button>
                 </div>
                 {(!detail.bindings || detail.bindings.length === 0) && (
-                  <p className="text-xs text-[#8d92ae] m-0">No channels bound yet.</p>
+                  <p className="text-xs text-app-faint m-0">No channels bound yet.</p>
                 )}
                 <div className="space-y-2">
                   {detail.bindings?.map((b) => {
                     const channel = channels.find((c) => c.id === b.channelId);
                     return (
-                      <div key={b.id} className="rounded border border-white/10 p-2 bg-black/20">
+                      <div key={b.id} className="rounded border border-app-border p-2 bg-black/20">
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm">{channel?.name ?? b.channelId}</div>
-                            <div className="text-[11px] text-[#8d92ae]">{channel?.key ?? 'channel'}</div>
+                            <div className="text-[11px] text-app-faint">{channel?.key ?? 'channel'}</div>
                           </div>
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => openEditChannelDialog(b.id, b.channelId)}
-                              className="px-2 py-1 rounded border border-white/10 text-xs hover:bg-white/[0.05]"
+                              className="px-2 py-1 rounded border border-app-border text-xs hover:bg-app-surface-hover"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => removeBinding(b.id)}
-                              className="px-2 py-1 rounded border border-red-400/30 text-red-300 text-xs hover:bg-red-500/10"
+                              className="rounded border border-red-400/35 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
                             >
                               Remove
                             </button>
                           </div>
                         </div>
-                        <pre className="mt-2 text-[11px] bg-black/30 border border-white/10 rounded p-2 overflow-auto max-h-28">
+                        <pre className="mt-2 text-[11px] bg-black/30 border border-app-border rounded p-2 overflow-auto max-h-28">
                           {readBindingConfig(b.id)}
                         </pre>
                       </div>
@@ -918,13 +922,13 @@ export default function TemplatesPage() {
                   })}
                 </div>
               </div>
-              <div className="rounded-lg border border-white/10 p-3 bg-black/10">
+              <div className="rounded-lg border border-app-border p-3 bg-black/10">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-[#8d92ae] text-[12px]">Translations</div>
+                  <div className="text-app-faint text-[12px]">Translations</div>
                   <button
                     onClick={saveLocaleTranslations}
                     disabled={i18nSaving || !detail}
-                    className="px-2 py-1 rounded border border-[#6d7cff]/50 text-xs hover:bg-[#6d7cff]/20 disabled:opacity-50 flex items-center gap-1"
+                    className="px-2 py-1 rounded border border-app-accent/45 text-xs hover:bg-app-accent-muted disabled:opacity-50 flex items-center gap-1"
                   >
                     {i18nSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                     Save {localeTab}
@@ -934,7 +938,7 @@ export default function TemplatesPage() {
                   {Object.keys(i18nData).length === 0 && (
                     <button
                       onClick={() => setI18nData({ en: {} })}
-                      className="px-2 py-1 rounded border border-white/10 text-xs"
+                      className="px-2 py-1 rounded border border-app-border text-xs"
                     >
                       Init en
                     </button>
@@ -945,8 +949,8 @@ export default function TemplatesPage() {
                       onClick={() => setLocaleTab(loc)}
                       className={`px-2 py-1 rounded text-xs border ${
                         localeTab === loc
-                          ? 'border-[#6d7cff] bg-[#6d7cff]/20'
-                          : 'border-white/10 hover:bg-white/[0.05]'
+                          ? 'border-app-accent/50 bg-app-accent-muted'
+                          : 'border-app-border hover:bg-app-surface-hover'
                       }`}
                     >
                       {loc}
@@ -956,26 +960,26 @@ export default function TemplatesPage() {
                     value={newLocaleCode}
                     onChange={(e) => setNewLocaleCode(e.target.value)}
                     placeholder="fr or en-US"
-                    className="rounded border border-white/10 bg-[#0f1220] px-2 py-1 text-xs w-24"
+                    className="rounded border border-app-border bg-app-bg-subtle px-2 py-1 text-xs w-24"
                   />
                   <button
                     onClick={addLocaleTab}
-                    className="px-2 py-1 rounded border border-white/10 text-xs hover:bg-white/[0.05]"
+                    className="px-2 py-1 rounded border border-app-border text-xs hover:bg-app-surface-hover"
                   >
                     Add Locale
                   </button>
-                  <span className="text-[11px] text-[#8d92ae]">
+                  <span className="text-[11px] text-app-faint">
                     Missing in {localeTab}: {missingCount}
                   </span>
                 </div>
                 {i18nError && (
-                  <div className="mb-2 rounded border border-red-400/40 bg-red-500/10 px-2 py-1 text-xs text-red-300">
+                  <div className="mb-2 rounded-app-md border border-red-400/35 bg-red-500/10 px-2 py-1 text-xs text-red-200">
                     {i18nError}
                   </div>
                 )}
-                <div className="max-h-64 overflow-auto rounded border border-white/10">
+                <div className="max-h-64 overflow-auto rounded border border-app-border">
                   <table className="w-full text-xs">
-                    <thead className="bg-black/30 text-[#8d92ae]">
+                    <thead className="bg-black/30 text-app-faint">
                       <tr>
                         <th className="text-left px-2 py-1">Key</th>
                         <th className="text-left px-2 py-1">Translation ({localeTab})</th>
@@ -985,7 +989,7 @@ export default function TemplatesPage() {
                     <tbody>
                       {baseKeys.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-2 py-2 text-[#8d92ae]">
+                          <td colSpan={3} className="px-2 py-2 text-app-faint">
                             No translatable keys found yet.
                           </td>
                         </tr>
@@ -1002,25 +1006,25 @@ export default function TemplatesPage() {
                                 value={current}
                                 onChange={(e) => updateTranslation(key, e.target.value)}
                                 placeholder="Enter translation"
-                                className="w-full rounded border border-white/10 bg-[#0f1220] px-2 py-1 text-xs"
+                                className="w-full rounded border border-app-border bg-app-bg-subtle px-2 py-1 text-xs"
                               />
                             </td>
-                            <td className="px-2 py-1 text-[#c5c9de]">{fallback}</td>
+                            <td className="px-2 py-1 text-app-muted">{fallback}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-                <div className="mt-3 rounded border border-white/10 p-2 bg-black/20">
+                <div className="mt-3 rounded border border-app-border p-2 bg-black/20">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="text-[12px] text-[#9ca3bf]">Template Preview</div>
+                    <div className="text-[12px] text-app-muted">Template Preview</div>
                     <div className="flex items-center gap-2">
-                      <label className="text-[11px] text-[#8d92ae]">Locale</label>
+                      <label className="text-[11px] text-app-faint">Locale</label>
                       <select
                         value={previewLocale}
                         onChange={(e) => setPreviewLocale(e.target.value)}
-                        className="rounded border border-white/10 bg-[#0f1220] px-2 py-1 text-xs"
+                        className="rounded border border-app-border bg-app-bg-subtle px-2 py-1 text-xs"
                       >
                         {Object.keys(i18nData).map((loc) => (
                           <option key={loc} value={loc}>
@@ -1030,37 +1034,37 @@ export default function TemplatesPage() {
                       </select>
                     </div>
                   </div>
-                  <pre className="text-[11px] bg-black/30 border border-white/10 rounded p-2 overflow-auto max-h-44">
+                  <pre className="text-[11px] bg-black/30 border border-app-border rounded p-2 overflow-auto max-h-44">
                     {translatedPreview || 'No preview available'}
                   </pre>
-                  <p className="text-[11px] text-[#8d92ae] mt-2 mb-0">
+                  <p className="text-[11px] text-app-faint mt-2 mb-0">
                     Missing keys automatically fallback to {baseLocale}.
                   </p>
                 </div>
               </div>
               <div>
-                <div className="text-[#8d92ae] text-[12px]">Draft Layout</div>
-                <pre className="text-[11px] bg-black/20 border border-white/10 rounded p-2 overflow-auto max-h-40">
+                <div className="text-app-faint text-[12px]">Draft Layout</div>
+                <pre className="text-[11px] bg-black/20 border border-app-border rounded p-2 overflow-auto max-h-40">
                   {JSON.stringify(detail.draftLayout, null, 2) || 'null'}
                 </pre>
               </div>
               <div>
-                <div className="text-[#8d92ae] text-[12px]">Active Layout</div>
-                <pre className="text-[11px] bg-black/20 border border-white/10 rounded p-2 overflow-auto max-h-40">
+                <div className="text-app-faint text-[12px]">Active Layout</div>
+                <pre className="text-[11px] bg-black/20 border border-app-border rounded p-2 overflow-auto max-h-40">
                   {JSON.stringify(detail.activeLayout, null, 2) || 'null'}
                 </pre>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-[#8d92ae]">Template unavailable.</p>
+            <p className="text-sm text-app-faint">Template unavailable.</p>
           )}
-        </section>
+        </Surface>
       </div>
-      </div>
+      </PageShell>
       {showForm && (
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg rounded-xl border border-white/10 bg-[#151829] p-4">
-          <div className="flex items-center justify-between mb-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-lg rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-4 shadow-app-lift backdrop-blur-xl">
+          <div className="mb-4 flex items-center justify-between">
             <h3 className="m-0 text-lg font-semibold">
               {formMode === 'create' ? 'Create Template' : 'Edit Template'}
             </h3>
@@ -1070,19 +1074,19 @@ export default function TemplatesPage() {
                 setFormServerError(null);
                 if (formMode === 'edit' && detail) navigate(`/templates/${detail.id}`);
               }}
-              className="p-1 rounded hover:bg-white/[0.05]"
+              className="p-1 rounded hover:bg-app-surface-hover"
             >
               <X size={16} />
             </button>
           </div>
           <div className="space-y-3">
             {formServerError && (
-              <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              <div className="rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                 {formServerError}
               </div>
             )}
             <div>
-              <label className="text-[12px] text-[#9ca3bf] block mb-1">Name</label>
+              <label className="text-[12px] text-app-muted block mb-1">Name</label>
               <input
                 value={formData.name}
                 onChange={(e) => {
@@ -1090,12 +1094,12 @@ export default function TemplatesPage() {
                   if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: undefined }));
                   if (formServerError) setFormServerError(null);
                 }}
-                className="w-full rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm"
               />
-              {formErrors.name && <p className="text-red-300 text-xs mt-1 mb-0">{formErrors.name}</p>}
+              {formErrors.name && <p className="mt-1 mb-0 text-xs text-red-300">{formErrors.name}</p>}
             </div>
             <div>
-              <label className="text-[12px] text-[#9ca3bf] block mb-1">Description</label>
+              <label className="text-[12px] text-app-muted block mb-1">Description</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => {
@@ -1104,21 +1108,21 @@ export default function TemplatesPage() {
                   if (formServerError) setFormServerError(null);
                 }}
                 rows={4}
-                className="w-full rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm"
               />
               {formErrors.description && (
-                <p className="text-red-300 text-xs mt-1 mb-0">{formErrors.description}</p>
+                <p className="mt-1 mb-0 text-xs text-red-300">{formErrors.description}</p>
               )}
             </div>
             {formMode === 'edit' && (
               <div>
-                <label className="text-[12px] text-[#9ca3bf] block mb-1">Status</label>
+                <label className="text-[12px] text-app-muted block mb-1">Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, status: e.target.value as TemplateStatus }))
                   }
-                  className="w-full rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm"
                 >
                   <option value="DRAFT">DRAFT</option>
                   <option value="ACTIVE">ACTIVE</option>
@@ -1133,14 +1137,14 @@ export default function TemplatesPage() {
                   setFormServerError(null);
                   if (formMode === 'edit' && detail) navigate(`/templates/${detail.id}`);
                 }}
-                className="px-3 py-2 rounded border border-white/10 text-sm"
+                className="px-3 py-2 rounded border border-app-border text-sm"
               >
                 Cancel
               </button>
               <button
                 disabled={mutating}
                 onClick={onSubmitForm}
-                className="px-3 py-2 rounded border border-[#6d7cff] bg-[#6d7cff]/20 text-sm disabled:opacity-50"
+                className="px-3 py-2 rounded border border-app-accent/50 bg-app-accent-muted text-sm disabled:opacity-50"
               >
                 {mutating ? 'Saving...' : formMode === 'create' ? 'Create' : 'Save'}
               </button>
@@ -1150,26 +1154,26 @@ export default function TemplatesPage() {
       </div>
       )}
       {deleteTarget && (
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#151829] p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-4 shadow-app-lift backdrop-blur-xl">
           <h3 className="m-0 text-lg font-semibold">Delete Template</h3>
-          <p className="text-sm text-[#9ca3bf] mt-2 mb-0">
-            Are you sure you want to delete <span className="text-white">{deleteTarget.name}</span>?
+          <p className="text-sm text-app-muted mt-2 mb-0">
+            Are you sure you want to delete <span className="font-medium text-app-text">{deleteTarget.name}</span>?
           </p>
-          <p className="text-xs text-[#7f85a3] mt-1">
+          <p className="text-xs text-app-faint mt-1">
             Deletion may be blocked if this template is active or currently in use.
           </p>
           <div className="pt-3 flex justify-end gap-2">
             <button
               onClick={() => setDeleteTarget(null)}
-              className="px-3 py-2 rounded border border-white/10 text-sm"
+              className="px-3 py-2 rounded border border-app-border text-sm"
             >
               Cancel
             </button>
             <button
               disabled={mutating}
               onClick={confirmDelete}
-              className="px-3 py-2 rounded border border-red-400/40 bg-red-500/10 text-sm text-red-300 disabled:opacity-50"
+              className="rounded-app-md border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm text-red-200 disabled:opacity-50"
             >
               {mutating ? 'Deleting...' : 'Delete'}
             </button>
@@ -1178,26 +1182,26 @@ export default function TemplatesPage() {
       </div>
       )}
       {cloneTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#151829] p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-4 shadow-app-lift backdrop-blur-xl">
             <h3 className="m-0 text-lg font-semibold">Clone Template</h3>
-            <p className="text-sm text-[#9ca3bf] mt-2 mb-0">
-              Create a deep copy of <span className="text-white">{cloneTarget.name}</span>?
+            <p className="mt-2 mb-0 text-sm text-app-muted">
+              Create a deep copy of <span className="font-medium text-app-text">{cloneTarget.name}</span>?
             </p>
-            <p className="text-xs text-[#7f85a3] mt-1">
+            <p className="text-xs text-app-faint mt-1">
               A new template will be created with a copy suffix and draft status.
             </p>
             <div className="pt-3 flex justify-end gap-2">
               <button
                 onClick={() => setCloneTarget(null)}
-                className="px-3 py-2 rounded border border-white/10 text-sm"
+                className="px-3 py-2 rounded border border-app-border text-sm"
               >
                 Cancel
               </button>
               <button
                 disabled={mutating}
                 onClick={confirmClone}
-                className="px-3 py-2 rounded border border-[#6d7cff] bg-[#6d7cff]/20 text-sm disabled:opacity-50"
+                className="px-3 py-2 rounded border border-app-accent/50 bg-app-accent-muted text-sm disabled:opacity-50"
               >
                 {mutating ? 'Cloning...' : 'Clone'}
               </button>
@@ -1206,26 +1210,26 @@ export default function TemplatesPage() {
         </div>
       )}
       {showChannelDialog && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-[#151829] p-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-4 shadow-app-lift backdrop-blur-xl">
+            <div className="mb-4 flex items-center justify-between">
               <h3 className="m-0 text-lg font-semibold">
                 {editingBindingId ? 'Edit Channel Binding' : 'Add Channel Binding'}
               </h3>
               <button
                 onClick={() => setShowChannelDialog(false)}
-                className="p-1 rounded hover:bg-white/[0.05]"
+                className="p-1 rounded hover:bg-app-surface-hover"
               >
                 <X size={16} />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-[12px] text-[#9ca3bf] block mb-1">Channel</label>
+                <label className="text-[12px] text-app-muted block mb-1">Channel</label>
                 <select
                   value={channelIdInput}
                   onChange={(e) => setChannelIdInput(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm"
                 >
                   <option value="">Select a channel</option>
                   {channels.map((c) => (
@@ -1236,32 +1240,32 @@ export default function TemplatesPage() {
                 </select>
               </div>
               <div>
-                <label className="text-[12px] text-[#9ca3bf] block mb-1">
+                <label className="text-[12px] text-app-muted block mb-1">
                   Channel Rendering Config (JSON)
                 </label>
                 <textarea
                   rows={8}
                   value={channelConfigInput}
                   onChange={(e) => setChannelConfigInput(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-[#0f1220] px-3 py-2 text-sm font-mono"
+                  className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm font-mono"
                 />
               </div>
               {channelError && (
-                <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                <div className="rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                   {channelError}
                 </div>
               )}
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   onClick={() => setShowChannelDialog(false)}
-                  className="px-3 py-2 rounded border border-white/10 text-sm"
+                  className="px-3 py-2 rounded border border-app-border text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={mutating}
                   onClick={submitChannelDialog}
-                  className="px-3 py-2 rounded border border-[#6d7cff] bg-[#6d7cff]/20 text-sm disabled:opacity-50"
+                  className="px-3 py-2 rounded border border-app-accent/50 bg-app-accent-muted text-sm disabled:opacity-50"
                 >
                   {mutating ? 'Saving...' : editingBindingId ? 'Update Binding' : 'Add Binding'}
                 </button>
@@ -1275,7 +1279,7 @@ export default function TemplatesPage() {
           <div
             className={`max-w-sm rounded-lg border px-3 py-2 text-sm shadow-lg ${
               channelToast.type === 'error'
-                ? 'border-red-400/40 bg-red-500/15 text-red-200'
+                ? 'border-red-400/40 bg-red-500/15 text-red-100'
                 : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
             }`}
           >

@@ -115,25 +115,25 @@ export default function ReviewFeedbackModal({
       onClick={onClose}
     >
       <div
-        className="w-[520px] max-h-[80vh] bg-[#1a1d2e] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
+        className="w-[520px] max-h-[80vh] bg-[#1a1d2e] border border-app-border rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-white/[0.07] flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-app-border flex justify-between items-center">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <MessageCircle size={18} color="#a78bfa" />
-              <h2 className="text-base font-bold text-[#e2e4f0] m-0">
+              <h2 className="text-base font-bold text-app-text m-0">
                 Review Feedback
               </h2>
             </div>
-            <p className="text-xs text-[#555870] m-0 max-w-[380px] overflow-hidden text-ellipsis whitespace-nowrap">
+            <p className="text-xs text-app-faint m-0 max-w-[380px] overflow-hidden text-ellipsis whitespace-nowrap">
               {contentTitle}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="bg-white/5 border-none rounded-lg p-2 text-[#8b8fa8] cursor-pointer"
+            className="bg-app-surface border-none rounded-lg p-2 text-app-muted cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -150,7 +150,7 @@ export default function ReviewFeedbackModal({
               {error}
             </div>
           ) : feedbackList.length === 0 ? (
-            <div className="p-8 text-center text-[#555870] text-[13px]">
+            <div className="p-8 text-center text-app-faint text-[13px]">
               No review requests found for this content.
             </div>
           ) : (
@@ -158,13 +158,13 @@ export default function ReviewFeedbackModal({
               {feedbackList.map((feedback) => (
                 <div
                   key={feedback.requestId}
-                  className="bg-white/[0.03] rounded-xl border border-white/[0.06] overflow-hidden"
+                  className="bg-app-surface rounded-xl border border-app-border overflow-hidden"
                 >
                   {/* Request Header */}
-                  <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center">
+                  <div className="px-4 py-3 border-b border-app-border/80 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <Users size={14} color="#8b8fa8" />
-                      <span className="text-xs text-[#8b8fa8]">
+                      <span className="text-xs text-app-muted">
                         Review Request
                       </span>
                     </div>
@@ -180,7 +180,7 @@ export default function ReviewFeedbackModal({
                   {/* Assignments */}
                   <div className="px-4 py-2 pb-4">
                     {feedback.assignments.length === 0 ? (
-                      <div className="p-3 text-center text-[#555870] text-xs">
+                      <div className="p-3 text-center text-app-faint text-xs">
                         No reviewers assigned yet
                       </div>
                     ) : (
@@ -193,7 +193,7 @@ export default function ReviewFeedbackModal({
                                 className={`flex items-center gap-3 px-3.5 py-3 rounded-lg ${
                                   isCompleted
                                     ? 'bg-emerald-500/[0.06] border border-emerald-500/15'
-                                    : 'bg-white/[0.02] border border-white/[0.04]'
+                                    : 'bg-app-bg/60 border border-app-border'
                                 }`}
                               >
                                 {/* Status icon */}
@@ -208,7 +208,7 @@ export default function ReviewFeedbackModal({
                                   className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[13px] font-semibold shrink-0 ${
                                     isCompleted
                                       ? 'bg-gradient-to-br from-emerald-500 to-cyan-500'
-                                      : 'bg-gradient-to-br from-gray-700 to-gray-600'
+                                      : 'bg-gradient-to-br from-app-bg-subtle to-app-surface'
                                   }`}
                                 >
                                   {assignment.reviewerName[0].toUpperCase()}
@@ -216,10 +216,10 @@ export default function ReviewFeedbackModal({
 
                                 {/* Reviewer info */}
                                 <div className="flex-1">
-                                  <div className="text-[13px] font-medium text-[#e2e4f0]">
+                                  <div className="text-[13px] font-medium text-app-text">
                                     {assignment.reviewerName}
                                   </div>
-                                  <div className="text-[11px] text-[#555870]">
+                                  <div className="text-[11px] text-app-faint">
                                     {assignment.reviewerEmail}
                                   </div>
                                 </div>
@@ -239,7 +239,7 @@ export default function ReviewFeedbackModal({
                               {/* Decision Feedback Details */}
                               {isCompleted && assignment.decision && (
                                 <div
-                                  className="ml-11 px-3.5 py-3 bg-white/[0.03] rounded-lg mb-2"
+                                  className="ml-11 px-3.5 py-3 bg-app-surface rounded-lg mb-2"
                                   style={{ borderLeft: `3px solid ${assignment.decision.verdict === 'APPROVED' ? '#10b981' : '#f87171'}` }}
                                 >
                                   <div className={`text-[11px] font-semibold mb-1 uppercase ${
@@ -247,7 +247,7 @@ export default function ReviewFeedbackModal({
                                   }`}>
                                     {assignment.decision.verdict}
                                   </div>
-                                  <div className="text-[13px] text-[#c4c7d9] leading-relaxed">
+                                  <div className="text-[13px] text-app-muted leading-relaxed">
                                     {assignment.decision.comment}
                                   </div>
                                 </div>
@@ -257,14 +257,14 @@ export default function ReviewFeedbackModal({
                               {assignment.standaloneComments && assignment.standaloneComments.length > 0 && (
                                 <div className="ml-11 flex flex-col gap-1.5">
                                   {assignment.standaloneComments.map((comment, idx) => (
-                                    <div key={idx} className="px-3 py-2.5 bg-white/[0.02] rounded-lg border border-white/5">
+                                    <div key={idx} className="px-3 py-2.5 bg-app-bg/60 rounded-lg border border-app-border/80">
                                       <div className="flex justify-between mb-1">
-                                        <span className="text-[11px] font-semibold text-[#e2e4f0]">Reviewer Comment</span>
-                                        <span className="text-[10px] text-[#555870]">
+                                        <span className="text-[11px] font-semibold text-app-text">Reviewer Comment</span>
+                                        <span className="text-[10px] text-app-faint">
                                           {new Date(comment.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                       </div>
-                                      <div className="text-xs text-[#c4c7d9] leading-relaxed">
+                                      <div className="text-xs text-app-muted leading-relaxed">
                                         {comment.text}
                                       </div>
                                     </div>
@@ -284,10 +284,10 @@ export default function ReviewFeedbackModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-white/[0.07] flex justify-end">
+        <div className="px-6 py-3 border-t border-app-border flex justify-end">
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-white/5 border border-white/10 rounded-lg text-[#8b8fa8] text-[13px] cursor-pointer"
+            className="px-5 py-2 bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer"
           >
             Close
           </button>

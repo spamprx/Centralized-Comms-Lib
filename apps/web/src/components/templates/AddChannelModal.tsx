@@ -122,25 +122,25 @@ export default function AddChannelModal({
       onClick={onClose}
     >
       <div
-        className="w-[520px] max-h-[80vh] bg-[#1a1d2e] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
+        className="w-[520px] max-h-[80vh] bg-[#1a1d2e] border border-app-border rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-white/[0.07] flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-app-border flex justify-between items-center">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Plus size={18} color="#a78bfa" />
-              <h2 className="text-base font-bold text-[#e2e4f0] m-0">
+              <Plus size={18} color="#0f766e" />
+              <h2 className="text-base font-bold text-app-text m-0">
                 {editingBinding ? 'Edit Channel' : 'Add Channel'}
               </h2>
             </div>
-            <p className="text-xs text-[#555870] m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
+            <p className="text-xs text-app-faint m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
               {templateName}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="bg-white/5 border-none rounded-lg p-2 text-[#8b8fa8] cursor-pointer"
+            className="bg-app-surface border-none rounded-lg p-2 text-app-muted cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -150,10 +150,10 @@ export default function AddChannelModal({
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex justify-center p-8">
-              <Loader2 size={24} color="#a78bfa" className="animate-spin" />
+              <Loader2 size={24} color="#0f766e" className="animate-spin" />
             </div>
           ) : channels.length === 0 ? (
-            <div className="p-8 text-center text-[#555870] text-[13px]">
+            <div className="p-8 text-center text-app-faint text-[13px]">
               {existingChannelIds.length > 0 
                 ? 'All available channels are already bound to this template'
                 : 'No channels available'
@@ -163,13 +163,13 @@ export default function AddChannelModal({
             <div className="space-y-4">
               {/* Channel Selection */}
               <div>
-                <label className="block text-sm font-medium text-[#e2e4f0] mb-2">
+                <label className="block text-sm font-medium text-app-text mb-2">
                   Select Channel
                 </label>
                 <select
                   value={selectedChannelId}
                   onChange={(e) => setSelectedChannelId(e.target.value)}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-sm outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm outline-none focus:border-app-accent/50 transition-colors"
                 >
                   <option value="">Choose a channel...</option>
                   {channels.map((channel) => (
@@ -182,17 +182,17 @@ export default function AddChannelModal({
 
               {/* Channel Info */}
               {selectedChannel && (
-                <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-lg">
+                <div className="p-3 bg-app-accent-muted border border-app-accent/25 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-violet-300">
+                    <div className="w-2 h-2 bg-app-accent rounded-full"></div>
+                    <span className="text-sm font-medium text-app-accent">
                       {selectedChannel.name}
                     </span>
-                    <span className="text-xs text-violet-400">
+                    <span className="text-xs text-app-accent">
                       ({selectedChannel.key})
                     </span>
                   </div>
-                  <p className="text-xs text-violet-200">
+                  <p className="text-xs text-app-accent">
                     {selectedChannel.description}
                   </p>
                 </div>
@@ -200,14 +200,14 @@ export default function AddChannelModal({
 
               {/* Layout Configuration */}
               <div>
-                <label className="block text-sm font-medium text-[#e2e4f0] mb-2">
+                <label className="block text-sm font-medium text-app-text mb-2">
                   Layout Configuration (JSON)
                 </label>
                 <textarea
                   value={layoutConfig}
                   onChange={(e) => handleConfigChange(e.target.value)}
                   rows={8}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-sm font-mono outline-none focus:border-violet-500/50 transition-colors resize-none"
+                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm font-mono outline-none focus:border-app-accent/50 transition-colors resize-none"
                   placeholder="Enter layout configuration as JSON..."
                 />
                 {configError && (
@@ -222,14 +222,14 @@ export default function AddChannelModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/[0.07] flex justify-between items-center">
-          <span className="text-xs text-[#555870]">
+        <div className="px-6 py-4 border-t border-app-border flex justify-between items-center">
+          <span className="text-xs text-app-faint">
             Configure channel-specific rendering settings
           </span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-[18px] py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#8b8fa8] text-[13px] cursor-pointer"
+              className="px-[18px] py-2.5 bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer"
             >
               Cancel
             </button>
@@ -238,10 +238,10 @@ export default function AddChannelModal({
               disabled={!selectedChannelId || !!configError || submitting || success || channels.length === 0}
               className={`flex items-center gap-1.5 px-5 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold transition-all duration-200 ${
                 success
-                  ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 cursor-not-allowed'
+                  ? 'bg-gradient-to-br from-emerald-500 to-app-accent-deep cursor-not-allowed'
                   : !selectedChannelId || !!configError || channels.length === 0
-                    ? 'bg-violet-500/30 cursor-not-allowed opacity-50'
-                    : 'bg-gradient-to-br from-violet-500 to-cyan-500 cursor-pointer'
+                    ? 'bg-app-accent/30 cursor-not-allowed opacity-50'
+                    : 'bg-gradient-to-br from-app-accent to-app-accent-deep cursor-pointer'
               }`}
             >
               {submitting ? (

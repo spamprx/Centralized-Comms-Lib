@@ -179,7 +179,7 @@ Published by {{author}} on {{date}}
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Templates</h1>
+        <h1 className="text-3xl font-bold text-app-text">Templates</h1>
         <button 
           onClick={handleCreateTemplate}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
@@ -192,20 +192,20 @@ Published by {{author}} on {{date}}
       {/* Search and Filter */}
       <div className="flex gap-4 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-3 w-4 h-4 text-app-faint" />
           <input
             type="text"
             placeholder="Search templates..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-app-border bg-app-bg/40 py-2 pl-10 pr-4 text-app-text outline-none focus:ring-2 focus:ring-app-accent"
           />
         </div>
         <select
           value={selectedTag}
           onChange={(e) => setSelectedTag(e.target.value)}
           disabled={tagsLoading}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="rounded-lg border border-app-border bg-app-bg/40 px-4 py-2 text-app-text outline-none focus:ring-2 focus:ring-app-accent disabled:opacity-50"
         >
           <option value="all">All Tags</option>
           {availableTags.map(tag => (
@@ -215,12 +215,12 @@ Published by {{author}} on {{date}}
       </div>
 
       {/* Pagination Controls */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+      <div className="bg-app-surface border border-app-border rounded-xl shadow-sm p-6 mb-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           {/* Items per page selector */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">Show</span>
+            <div className="flex items-center gap-2 bg-app-surface px-3 py-2 rounded-lg">
+              <span className="text-sm font-medium text-app-muted">Show</span>
               <select
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
@@ -232,7 +232,7 @@ Published by {{author}} on {{date}}
                 <option value={12}>12</option>
                 <option value={24}>24</option>
               </select>
-              <span className="text-sm font-medium text-gray-700">per page</span>
+              <span className="text-sm font-medium text-app-muted">per page</span>
             </div>
           </div>
           
@@ -252,12 +252,12 @@ Published by {{author}} on {{date}}
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {paginatedTemplates.map((template) => (
-          <div key={template.id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+          <div key={template.id} className="bg-app-surface border border-app-border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
             {/* Header Section */}
-            <div className="relative bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
+            <div className="relative bg-gradient-to-r from-app-accent/15 to-cyan-500/10 px-4 py-3 border-b border-app-border">
               <div className="text-center">
-                <h3 className="text-lg font-bold text-gray-900 mb-1">{template.name}</h3>
-                <p className="text-sm text-gray-600 mb-2">{template.description}</p>
+                <h3 className="text-lg font-bold text-app-text mb-1">{template.name}</h3>
+                <p className="text-sm text-app-muted mb-2">{template.description}</p>
               </div>
             </div>
 
@@ -266,7 +266,7 @@ Published by {{author}} on {{date}}
               {/* Tags */}
               {template.tags && template.tags.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Tags</p>
+                  <p className="text-xs font-medium text-app-faint mb-2 uppercase tracking-wider">Tags</p>
                   <div className="flex flex-wrap gap-1">
                     {template.tags?.map((tag, index) => (
                       <span key={tag.id || index} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
@@ -281,13 +281,13 @@ Published by {{author}} on {{date}}
               {/* Variables */}
               {template.variables && Object.keys(template.variables).length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Variables</p>
-                  <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs font-medium text-app-faint mb-2 uppercase tracking-wider">Variables</p>
+                  <div className="bg-app-surface rounded-lg p-3">
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       {Object.entries(template.variables).map(([key, value], index) => (
                         <div key={index} className="flex items-center">
-                          <span className="font-mono text-gray-600 bg-gray-200 px-2 py-1 rounded">{key}</span>
-                          <span className="text-gray-400">=</span>
+                          <span className="font-mono text-app-muted bg-app-border px-2 py-1 rounded">{key}</span>
+                          <span className="text-app-faint">=</span>
                           <span className="font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">{value}</span>
                         </div>
                       ))}
@@ -337,7 +337,7 @@ Published by {{author}} on {{date}}
                   </button>
                   <button 
                     onClick={() => onEditTemplate?.(template.id)}
-                    className="inline-flex items-center px-3 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                    className="inline-flex items-center px-3 py-2 bg-app-muted text-white text-sm font-medium rounded-lg hover:bg-app-bg-subtle transition-colors"
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
@@ -371,8 +371,8 @@ Published by {{author}} on {{date}}
             </div>
 
             {/* Footer */}
-            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
-              <div className="flex justify-between items-center text-xs text-gray-500">
+            <div className="bg-app-surface px-4 py-3 border-t border-app-border">
+              <div className="flex justify-between items-center text-xs text-app-faint">
                 <div className="flex items-center">
                   <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6 0l3-3m-3 3v4m0-6h-6"/>
@@ -395,18 +395,18 @@ Published by {{author}} on {{date}}
 
       {filteredTemplates.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">No templates found matching your criteria.</p>
+          <p className="text-app-faint">No templates found matching your criteria.</p>
         </div>
       ) : (
         totalPages > 1 && (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mt-8">
+          <div className="bg-app-surface border border-app-border rounded-xl shadow-sm p-6 mt-8">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               {/* Page navigation */}
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Previous</span>
@@ -454,7 +454,7 @@ Published by {{author}} on {{date}}
                       if (page === 'ellipsis') {
                         return (
                           <div key={`ellipsis-${index}`} className="flex items-center justify-center w-10 h-10">
-                            <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                            <MoreHorizontal className="w-4 h-4 text-app-faint" />
                           </div>
                         );
                       }
@@ -466,7 +466,7 @@ Published by {{author}} on {{date}}
                           className={`w-10 h-10 text-sm font-medium rounded-lg transition-all duration-200 ${
                             currentPage === page
                               ? 'bg-blue-600 text-white shadow-md transform scale-105'
-                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
+                              : 'text-app-muted bg-app-surface border border-app-border hover:bg-app-surface hover:border-app-border-strong hover:shadow-sm'
                           }`}
                         >
                           {page}
@@ -479,7 +479,7 @@ Published by {{author}} on {{date}}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-4 h-4" />
@@ -488,7 +488,7 @@ Published by {{author}} on {{date}}
               
               {/* Page info */}
               <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-200">
+                <div className="bg-gradient-to-r from-app-accent/15 to-cyan-500/10 text-blue-700 px-4 py-2 rounded-lg border border-blue-200">
                   <span className="text-sm font-medium">
                     Page {currentPage} of {totalPages}
                   </span>
@@ -518,10 +518,10 @@ Published by {{author}} on {{date}}
           </div>
           <div className="space-y-2">
             {deletedTemplates.map((template) => (
-              <div key={template.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-200">
+              <div key={template.id} className="flex justify-between items-center p-3 bg-app-surface rounded border border-app-border">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{template.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-app-text">{template.name}</p>
+                  <p className="text-xs text-app-faint">
                     Deleted {formatRelativeTime(template.updatedAt)}
                     {template.usage_count !== undefined && (
                       <span className="ml-2">• Used {template.usage_count} times</span>

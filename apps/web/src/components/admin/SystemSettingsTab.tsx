@@ -32,14 +32,14 @@ export default function SystemSettingsTab() {
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#e2e4f0] mb-1">System Settings</h2>
-          <p className="text-[13px] text-[#555870] m-0">Configure application-wide preferences</p>
+          <h2 className="text-lg font-semibold text-app-text mb-1">System Settings</h2>
+          <p className="text-[13px] text-app-faint m-0">Configure application-wide preferences</p>
         </div>
         <button
           className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-lg text-[13px] cursor-pointer transition-all duration-200 ${
             saved
               ? 'bg-emerald-400/15 border-emerald-400/30 text-emerald-400'
-              : 'bg-violet-400/15 border-violet-400/30 text-violet-400'
+              : 'bg-app-accent-muted border-app-accent/30 text-app-accent'
           } disabled:opacity-40 disabled:cursor-not-allowed`}
           onClick={handleSave}
           disabled={saving || Object.keys(localChanges).length === 0}
@@ -49,14 +49,14 @@ export default function SystemSettingsTab() {
       </div>
 
       <div className="flex gap-4 items-start">
-        <nav className="flex flex-col gap-0.5 min-w-[160px] p-1 bg-white/[0.03] rounded-lg border border-white/[0.06]">
+        <nav className="flex flex-col gap-0.5 min-w-[160px] p-1 bg-app-surface rounded-lg border border-app-border">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               className={`flex items-center gap-2 px-3 py-2.5 border-none rounded-md text-[13px] cursor-pointer ${
                 activeSection === id
-                  ? 'bg-violet-400/10 text-violet-400'
-                  : 'bg-transparent text-[#8b8fa8] hover:bg-white/5 hover:text-[#c4c7d9]'
+                  ? 'bg-app-accent-muted text-app-accent'
+                  : 'bg-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-muted'
               }`}
               onClick={() => { setActiveSection(id); setLocalChanges({}); }}
             >
@@ -64,10 +64,10 @@ export default function SystemSettingsTab() {
             </button>
           ))}
         </nav>
-        <div className="flex-1 p-5 bg-white/[0.02] border border-white/[0.06] rounded-[10px]">
+        <div className="flex-1 p-5 bg-app-bg/60 border border-app-border rounded-app-lg">
           {loading || !current ? (
             <div className="flex flex-col gap-3">
-              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[52px] bg-white/[0.04] rounded-lg animate-pulse" />)}
+              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[52px] bg-app-surface rounded-lg animate-pulse" />)}
             </div>
           ) : (
             <>
@@ -86,7 +86,7 @@ export default function SystemSettingsTab() {
 function Field({ label, children, inline }: { label: string; children: React.ReactNode; inline?: boolean }) {
   return (
     <div className={`flex gap-1.5 ${inline ? 'flex-row items-center justify-between' : 'flex-col'}`}>
-      <label className="text-[13px] font-medium text-[#c4c7d9]">{label}</label>
+      <label className="text-[13px] font-medium text-app-muted">{label}</label>
       {children}
     </div>
   );
@@ -98,18 +98,18 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       className={`relative w-10 h-[22px] rounded-[11px] border-none cursor-pointer shrink-0 transition-colors duration-200 ${
-        checked ? 'bg-violet-400' : 'bg-white/10'
+        checked ? 'bg-app-accent' : 'bg-stone-300'
       }`}
       onClick={() => onChange(!checked)}
     >
-      <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+      <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-app-surface transition-transform duration-200 ${
         checked ? 'translate-x-[18px]' : ''
       }`} />
     </button>
   );
 }
 
-const inputClass = "px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none transition-colors duration-150 focus:border-violet-400/50";
+const inputClass = "px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none transition-colors duration-150 focus:border-app-accent/50";
 const inputSmClass = `${inputClass} w-[120px]`;
 
 function GeneralSection({ data, patch }: { data: SystemSettings['general']; patch: (k: string, v: unknown) => void }) {

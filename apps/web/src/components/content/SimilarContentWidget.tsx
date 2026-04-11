@@ -139,56 +139,56 @@ export default function SimilarContentWidget({
 
   return (
     <div
-      className={`rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden ${className}`}
+      className={`rounded-lg border border-app-border bg-app-bg/60 overflow-hidden ${className}`}
     >
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left bg-transparent border-none cursor-pointer hover:bg-white/[0.03] transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left bg-transparent border-none cursor-pointer hover:bg-app-surface transition-colors"
       >
         <span className="flex items-center gap-2 min-w-0">
           <FileWarning size={14} className="text-amber-400/90 shrink-0" />
-          <span className="text-[12px] font-medium text-[#8b8fa8] truncate">
+          <span className="text-[12px] font-medium text-app-muted truncate">
             Similar content
             {count > 0 && (
-              <span className="text-violet-400/90 ml-1">· {count}</span>
+              <span className="text-app-accent/90 ml-1">· {count}</span>
             )}
           </span>
-          {loading && <Loader2 size={12} className="animate-spin text-[#555870] shrink-0" />}
+          {loading && <Loader2 size={12} className="animate-spin text-app-faint shrink-0" />}
         </span>
         <ChevronDown
           size={14}
-          className={`text-[#555870] shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`text-app-faint shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
         />
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 pt-0 border-t border-white/[0.04]">
+        <div className="px-3 pb-3 pt-0 border-t border-app-border">
           {!shouldQuery && (
-            <p className="text-[11px] text-[#555870] m-0 mt-2">
+            <p className="text-[11px] text-app-faint m-0 mt-2">
               Keep typing a title or body — we will suggest possible duplicates.
             </p>
           )}
           {shouldQuery && subtitle && count > 0 && (
-            <p className="text-[10px] text-[#555870] m-0 mb-2">{subtitle}</p>
+            <p className="text-[10px] text-app-faint m-0 mb-2">{subtitle}</p>
           )}
           {error && (
             <p className="text-[11px] text-red-400/90 m-0 mt-1">{error}</p>
           )}
           {shouldQuery && !loading && count === 0 && !error && (
-            <p className="text-[11px] text-[#555870] m-0 mt-1">No close matches found.</p>
+            <p className="text-[11px] text-app-faint m-0 mt-1">No close matches found.</p>
           )}
           <ul className="list-none m-0 p-0 space-y-1.5 max-h-[200px] overflow-y-auto">
             {hits.map((h) => (
               <li key={h.contentId} className="flex items-start justify-between gap-2 text-[12px]">
                 <Link
                   to={`/library/${h.contentId}`}
-                  className="text-violet-400/95 hover:text-violet-300 truncate min-w-0 flex-1"
+                  className="text-app-accent/95 hover:text-app-accent truncate min-w-0 flex-1"
                   title={h.title}
                 >
                   {h.title}
                 </Link>
-                <span className="text-[10px] tabular-nums text-[#555870] shrink-0 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                <span className="text-[10px] tabular-nums text-app-faint shrink-0 bg-app-surface px-1.5 py-0.5 rounded">
                   {h.similarityScore}%
                 </span>
               </li>

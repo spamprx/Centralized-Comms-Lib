@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Save,
@@ -34,6 +34,7 @@ import {
 import type { ContentSearchHit } from '../services/searchService';
 import { useEditorStore } from '../store/editorStore';
 import SimilarContentWidget from '../components/content/SimilarContentWidget';
+import { Surface } from '../components/ui/Surface';
 
 type CitationItem = {
   marker: number;
@@ -170,7 +171,7 @@ export default function EditorLayout() {
     },
     editorProps: {
       attributes: {
-        class: 'min-h-[400px] p-6 bg-white/[0.02] border border-white/5 rounded-xl text-[#e2e4f0] text-[15px] leading-relaxed outline-none box-border',
+        class: 'min-h-[400px] p-6 bg-app-bg/60 border border-app-border/80 rounded-xl text-app-text text-[15px] leading-relaxed outline-none box-border',
       },
     },
   });
@@ -369,20 +370,22 @@ export default function EditorLayout() {
   );
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-screen flex-col bg-app-bg">
       {/* Topbar */}
-      <div className="px-6 py-3 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-none rounded-md text-[13px] cursor-pointer ${
-              showPreview ? 'bg-violet-500/15 text-violet-400' : 'bg-white/5 text-[#8b8fa8]'
+            className={`flex shrink-0 items-center gap-1.5 rounded-app-md px-3.5 py-2 text-[13px] transition-colors ${
+              showPreview
+                ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.25)]'
+                : 'bg-app-bg/50 text-app-muted hover:bg-app-elevated'
             }`}
           >
             <Eye size={16} /> {showPreview ? 'Edit' : 'Preview'}
           </button>
-          <span className="text-white/20">|</span>
-          <span className={`text-[13px] ${saveError ? 'text-red-400' : 'text-[#555870]'}`}>
+          <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
+          <span className={`min-w-0 truncate text-[13px] ${saveError ? 'text-red-300' : 'text-app-faint'}`}>
             {saveError
               ? saveError
               : lastSaved
@@ -391,43 +394,46 @@ export default function EditorLayout() {
           </span>
           {componentNotice && (
             <>
-              <span className="text-white/20">|</span>
-              <span className="text-[13px] text-emerald-400">{componentNotice}</span>
+              <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
+              <span className="hidden truncate text-[13px] text-emerald-300/95 sm:inline">{componentNotice}</span>
             </>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <button
             onClick={openCitationDialog}
-            className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-[13px] cursor-pointer hover:text-violet-300"
+            className="flex items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted transition-colors hover:border-app-accent/30 hover:text-app-accent"
             title="Search references and insert citation"
           >
-            <BookMarked size={16} /> Cite
+            <BookMarked size={16} /> <span className="hidden sm:inline">Cite</span>
           </button>
           <button
             onClick={openSaveComponentModal}
             disabled={!selectedText}
-            className={`flex items-center gap-1.5 px-4 py-2 border rounded-md text-[13px] ${
+            className={`flex items-center gap-1.5 rounded-app-md border px-3 py-2 text-[13px] ${
               selectedText
-                ? 'bg-white/5 border-white/10 text-[#8b8fa8] cursor-pointer hover:text-violet-300'
-                : 'bg-white/[0.02] border-white/[0.06] text-[#555870] cursor-not-allowed'
+                ? 'border-app-border/90 bg-app-bg/45 text-app-muted hover:border-app-accent/30 hover:text-app-accent'
+                : 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint'
             }`}
             title={selectedText ? 'Save selected text as reusable component' : 'Select text in editor first'}
           >
-            <Puzzle size={16} /> Save as Component
+            <Puzzle size={16} /> <span className="hidden md:inline">Save as Component</span>
           </button>
-          <button className="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-md text-[#8b8fa8] text-[13px] cursor-pointer">
+          <button
+            type="button"
+            className="hidden items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted hover:bg-app-elevated lg:flex"
+          >
             <Settings size={16} /> Settings
           </button>
           <button
             onClick={handleSaveDraft}
             disabled={saving}
-            className={`flex items-center gap-1.5 px-4 py-2 border-none rounded-md text-white text-[13px] font-semibold transition-all duration-200 ${
+            className={`flex items-center gap-1.5 rounded-app-md px-4 py-2 text-[13px] font-semibold text-white shadow-app-glow transition-all duration-200 ${
               saving
-                ? 'bg-violet-500/40 cursor-not-allowed opacity-70'
+                ? 'cursor-not-allowed bg-app-accent/35 opacity-70'
                 : lastSaved
-                  ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 cursor-pointer'
-                  : 'bg-gradient-to-br from-violet-500 to-cyan-500 cursor-pointer'
+                  ? 'bg-gradient-to-br from-emerald-500 to-app-accent-2'
+                  : 'bg-gradient-to-br from-app-accent to-app-accent-2'
             }`}
           >
             {saving ? (
@@ -442,51 +448,52 @@ export default function EditorLayout() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 gap-2 overflow-hidden p-2 sm:p-3">
         {/* Insert Panel */}
-        <div className="w-[200px] bg-white/[0.02] border-r border-white/5 p-4 overflow-y-auto">
-          <h3 className="text-[11px] font-semibold text-[#555870] uppercase mb-3">
+        <Surface variant="glass" padding="sm" className="hidden w-[200px] shrink-0 overflow-y-auto sm:block">
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
             Insert Blocks
           </h3>
           <div className="flex flex-col gap-1">
             {insertBlocks.map((block) => (
               <button
                 key={block.label}
-                className="flex items-center gap-2.5 px-3 py-2.5 bg-white/[0.03] border border-white/5 rounded-md text-[#8b8fa8] text-xs cursor-pointer text-left hover:text-[var(--block-color)] transition-colors"
-                style={{ '--block-color': block.color } as React.CSSProperties}
+                type="button"
+                className="flex items-center gap-2.5 rounded-app-md border border-app-border/60 bg-app-bg/35 px-3 py-2.5 text-left text-xs text-app-muted transition-[border-color,background-color,color] hover:border-app-border-strong hover:bg-app-elevated hover:text-[var(--block-color)]"
+                style={{ '--block-color': block.color } as CSSProperties & { '--block-color': string }}
                 onClick={() => block.onClick()}
               >
-                <block.icon size={16} />
+                <block.icon size={16} className="shrink-0 opacity-90" />
                 {block.label}
               </button>
             ))}
           </div>
-        </div>
+        </Surface>
 
         {/* Main Editor */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <Surface variant="default" padding="none" className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Title Input */}
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter title..."
-            className="px-6 py-4 bg-transparent border-none border-b border-white/5 text-[#e2e4f0] text-2xl font-bold outline-none box-border"
+            className="box-border border-b border-app-border/70 bg-transparent px-5 py-4 text-2xl font-bold text-app-text outline-none placeholder:text-app-faint sm:px-6"
           />
 
-          <div className="px-6 pb-3 pt-1">
+          <div className="px-5 pb-3 pt-2 sm:px-6">
             <SimilarContentWidget title={title} bodyHtml={content} contentId={similarCheckContentId} />
           </div>
 
           {/* Editor/Preview Area */}
-          <div className="flex-1 overflow-auto p-6">
+          <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
             {showPreview ? (
-              <div className="bg-white/[0.02] rounded-xl p-8 min-h-full box-border">
-                <h1 className="text-[28px] font-bold text-[#e2e4f0] mb-4">
+              <div className="min-h-full rounded-app-xl border border-app-border/60 bg-app-bg-subtle/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-8">
+                <h1 className="mb-4 text-[28px] font-bold text-app-text">
                   {title || 'Untitled'}
                 </h1>
                 <div
-                  className="tiptap-content text-[15px] text-[#8b8fa8] leading-relaxed"
+                  className="tiptap-content text-[15px] leading-relaxed text-app-muted"
                   dangerouslySetInnerHTML={{
                     __html: content && content !== '<p></p>' ? content : '<p>Start writing to see preview...</p>',
                   }}
@@ -498,20 +505,20 @@ export default function EditorLayout() {
               </div>
             )}
           </div>
-        </div>
+        </Surface>
 
         {/* Properties Panel */}
-        <div className="w-[280px] bg-white/[0.02] border-l border-white/5 p-5 overflow-y-auto">
-          <h3 className="text-[11px] font-semibold text-[#555870] uppercase mb-4">
+        <Surface variant="glass" padding="md" className="hidden w-[280px] shrink-0 overflow-y-auto lg:block">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
             Properties
           </h3>
 
           <div className="flex flex-col gap-4">
             <div>
-              <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
+              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
                 Content Type
               </label>
-              <select className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none box-border">
+              <select className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none box-border">
                 <option>Article</option>
                 <option>Guide</option>
                 <option>Documentation</option>
@@ -520,7 +527,7 @@ export default function EditorLayout() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
+              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
                 Tags
               </label>
               <div className="flex flex-wrap gap-1.5">
@@ -530,15 +537,15 @@ export default function EditorLayout() {
                     <button className="bg-transparent border-none text-violet-400 cursor-pointer p-0 flex">×</button>
                   </span>
                 ))}
-                <button className="px-2.5 py-1 bg-white/5 border border-dashed border-white/20 rounded-xl text-[11px] text-[#555870] cursor-pointer">+ Add</button>
+                <button type="button" className="cursor-pointer rounded-xl border border-dashed border-app-border-strong bg-app-surface px-2.5 py-1 text-[11px] text-app-faint">+ Add</button>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
+              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
                 Visibility
               </label>
-              <select className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none box-border">
+              <select className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none box-border">
                 <option>Public</option>
                 <option>Team Only</option>
                 <option>Private</option>
@@ -546,27 +553,27 @@ export default function EditorLayout() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-[#8b8fa8] mb-1.5 block">
+              <label className="text-xs font-semibold text-app-muted mb-1.5 block">
                 Featured Image
               </label>
-              <div className="h-[120px] bg-white/[0.03] border border-dashed border-white/20 rounded-md flex items-center justify-center text-[#555870] text-xs cursor-pointer">
+              <div className="flex h-[120px] cursor-pointer items-center justify-center rounded-app-md border border-dashed border-app-border-strong bg-app-surface/50 text-xs text-app-faint">
                 Click to upload
               </div>
             </div>
           </div>
-        </div>
+        </Surface>
       </div>
       {showCitationDialog && (
-        <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4">
-          <div className="w-full max-w-[760px] rounded-xl border border-white/10 bg-[#1a1d2e] p-5 max-h-[80vh] overflow-hidden flex flex-col">
-            <h3 className="m-0 text-lg text-[#e2e4f0] font-semibold">Insert Citation</h3>
-            <p className="mt-1 mb-4 text-[12px] text-[#8b8fa8]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[80vh] w-full max-w-[760px] flex-col overflow-hidden rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl">
+            <h3 className="m-0 text-lg text-app-text font-semibold">Insert Citation</h3>
+            <p className="mt-1 mb-4 text-[12px] text-app-muted">
               Search references and insert inline marker with bibliography auto-update.
             </p>
 
             <div className="flex gap-2 mb-3">
               <div className="relative flex-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]" />
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
                 <input
                   value={citationQuery}
                   onChange={(e) => setCitationQuery(e.target.value)}
@@ -577,13 +584,13 @@ export default function EditorLayout() {
                     }
                   }}
                   placeholder="Search references by title, summary, or body…"
-                  className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[13px] text-[#e2e4f0] outline-none"
+                  className="w-full pl-9 pr-3 py-2.5 bg-app-surface border border-app-border rounded-md text-[13px] text-app-text outline-none"
                 />
               </div>
               <select
                 value={citationStyle}
                 onChange={(e) => setCitationStyle(e.target.value as CitationStyle)}
-                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[13px] text-[#e2e4f0]"
+                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-[13px] text-app-text"
               >
                 <option value="APA">APA</option>
                 <option value="IEEE">IEEE</option>
@@ -599,17 +606,17 @@ export default function EditorLayout() {
             </div>
 
             {citationError && <div className="text-[12px] text-red-400 mb-2">{citationError}</div>}
-            <div className="text-[11px] text-[#555870] mb-2">
+            <div className="text-[11px] text-app-faint mb-2">
               Existing citations in this draft: {citationItems.length}
             </div>
 
-            <div className="flex-1 overflow-auto rounded-md border border-white/10 bg-white/[0.02]">
+            <div className="flex-1 overflow-auto rounded-md border border-app-border bg-app-bg/60">
               {citationLoading ? (
-                <div className="p-4 text-[13px] text-[#8b8fa8]">Searching references…</div>
+                <div className="p-4 text-[13px] text-app-muted">Searching references…</div>
               ) : citationResults.length === 0 ? (
-                <div className="p-4 text-[13px] text-[#555870]">No references yet. Try a broader query.</div>
+                <div className="p-4 text-[13px] text-app-faint">No references yet. Try a broader query.</div>
               ) : (
-                <ul className="list-none m-0 p-0 divide-y divide-white/[0.06]">
+                <ul className="list-none m-0 p-0 divide-y divide-app-border">
                   {citationResults.map((hit) => {
                     const sourceTitle =
                       typeof hit.source.title === 'string'
@@ -621,14 +628,14 @@ export default function EditorLayout() {
                       <li key={hit.contentId} className="p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-semibold text-[#e2e4f0] truncate">{sourceTitle}</div>
+                            <div className="text-[13px] font-semibold text-app-text truncate">{sourceTitle}</div>
                             {hit.snippetHtml ? (
                               <div
-                                className="text-[12px] text-[#8b8fa8] mt-1"
+                                className="text-[12px] text-app-muted mt-1"
                                 dangerouslySetInnerHTML={{ __html: hit.snippetHtml }}
                               />
                             ) : (
-                              <div className="text-[12px] text-[#555870] mt-1">No snippet available.</div>
+                              <div className="text-[12px] text-app-faint mt-1">No snippet available.</div>
                             )}
                           </div>
                           <button
@@ -650,7 +657,7 @@ export default function EditorLayout() {
               <button
                 type="button"
                 onClick={() => setShowCitationDialog(false)}
-                className="px-3 py-2 text-[13px] bg-white/5 border border-white/10 rounded-md text-[#8b8fa8]"
+                className="px-3 py-2 text-[13px] bg-app-surface border border-app-border rounded-md text-app-muted"
               >
                 Close
               </button>
@@ -659,15 +666,15 @@ export default function EditorLayout() {
         </div>
       )}
       {showSaveComponentModal && (
-        <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4">
-          <div className="w-full max-w-[520px] rounded-xl border border-white/10 bg-[#1a1d2e] p-5">
-            <h3 className="m-0 text-lg text-[#e2e4f0] font-semibold">Save Selection as Component</h3>
-            <p className="mt-1 mb-4 text-[12px] text-[#8b8fa8]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-[520px] rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl">
+            <h3 className="m-0 text-lg text-app-text font-semibold">Save Selection as Component</h3>
+            <p className="mt-1 mb-4 text-[12px] text-app-muted">
               Create a reusable component from current selection.
             </p>
 
-            <div className="text-[11px] text-[#555870] mb-2">Selection preview</div>
-            <div className="rounded-md border border-white/10 bg-white/[0.03] p-3 text-[12px] text-[#c4c8dc] max-h-[90px] overflow-auto mb-4">
+            <div className="text-[11px] text-app-faint mb-2">Selection preview</div>
+            <div className="rounded-md border border-app-border bg-app-surface p-3 text-[12px] text-app-muted max-h-[90px] overflow-auto mb-4">
               {selectedText || 'No selection'}
             </div>
 
@@ -676,19 +683,19 @@ export default function EditorLayout() {
                 value={componentName}
                 onChange={(e) => setComponentName(e.target.value)}
                 placeholder="Component name"
-                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none"
+                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none"
               />
               <input
                 value={componentKey}
                 onChange={(e) => setComponentKey(e.target.value)}
                 placeholder="component-key"
-                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none"
+                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none"
               />
               <textarea
                 value={componentDescription}
                 onChange={(e) => setComponentDescription(e.target.value)}
                 placeholder="Description (optional)"
-                className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-md text-[#e2e4f0] text-[13px] outline-none min-h-[72px]"
+                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none min-h-[72px]"
               />
               <div className="flex items-center gap-2">
                 <button
@@ -697,7 +704,7 @@ export default function EditorLayout() {
                   className={`px-3 py-2 rounded-md text-[12px] border ${
                     componentMode === 'linked'
                       ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                      : 'bg-white/5 text-[#8b8fa8] border-white/10'
+                      : 'bg-app-surface text-app-muted border-app-border'
                   }`}
                 >
                   Linked (live-sync)
@@ -708,7 +715,7 @@ export default function EditorLayout() {
                   className={`px-3 py-2 rounded-md text-[12px] border ${
                     componentMode === 'detached'
                       ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                      : 'bg-white/5 text-[#8b8fa8] border-white/10'
+                      : 'bg-app-surface text-app-muted border-app-border'
                   }`}
                 >
                   Detached (snapshot)
@@ -723,7 +730,7 @@ export default function EditorLayout() {
               <button
                 type="button"
                 onClick={() => setShowSaveComponentModal(false)}
-                className="px-3 py-2 text-[13px] bg-white/5 border border-white/10 rounded-md text-[#8b8fa8]"
+                className="px-3 py-2 text-[13px] bg-app-surface border border-app-border rounded-md text-app-muted"
               >
                 Cancel
               </button>

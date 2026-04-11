@@ -69,8 +69,8 @@ export default function ChannelBindings({
 
   if (bindings.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-500 text-sm border-2 border-dashed border-gray-300 rounded-lg">
-        <Monitor size={24} className="mx-auto mb-2 text-gray-400" />
+      <div className="p-6 text-center text-app-faint text-sm border-2 border-dashed border-app-border rounded-lg">
+        <Monitor size={24} className="mx-auto mb-2 text-app-faint" />
         <p>No channels bound to this template yet</p>
         <p className="text-xs mt-1">Click "Add Channel" to configure rendering for different platforms</p>
       </div>
@@ -82,35 +82,35 @@ export default function ChannelBindings({
       {bindings.map((binding) => (
         <div
           key={binding.id}
-          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+          className="bg-app-surface border border-app-border rounded-lg p-4 hover:shadow-md transition-shadow"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
               {/* Channel Header */}
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 bg-violet-100 text-violet-600 rounded-lg">
+                <div className="p-2 bg-app-accent-muted text-app-accent rounded-lg">
                   {getChannelIcon(binding.channel.key)}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <h3 className="font-semibold text-app-text flex items-center gap-2">
                     {binding.channel.name}
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    <span className="text-xs text-app-faint bg-app-elevated px-2 py-1 rounded">
                       {binding.channel.key}
                     </span>
                   </h3>
-                  <p className="text-sm text-gray-600">{binding.channel.description}</p>
+                  <p className="text-sm text-app-muted">{binding.channel.description}</p>
                 </div>
               </div>
 
               {/* Configuration Preview */}
-              <div className="bg-gray-50 rounded-lg p-3">
+              <div className="bg-app-surface rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-gray-700">Layout Configuration:</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs font-medium text-app-muted">Layout Configuration:</span>
+                  <span className="text-xs text-app-faint">
                     Created {new Date(binding.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <pre className="text-xs text-gray-600 font-mono overflow-x-auto whitespace-pre-wrap">
+                <pre className="text-xs text-app-muted font-mono overflow-x-auto whitespace-pre-wrap">
                   {formatConfig(binding.layoutConfig)}
                 </pre>
               </div>

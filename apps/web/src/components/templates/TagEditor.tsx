@@ -149,10 +149,10 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
   if (!isEditing) {
     return (
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+        <label className="block text-sm font-medium text-app-muted mb-2">Tags</label>
         <div className="flex flex-wrap gap-2">
           {tags.length === 0 ? (
-            <span className="text-gray-500 text-sm">No tags</span>
+            <span className="text-app-faint text-sm">No tags</span>
           ) : (
             tags.map(tag => (
               <span
@@ -170,7 +170,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
 
   return (
     <div className="mb-6">
-      <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+      <label className="block text-sm font-medium text-app-muted mb-2">Tags</label>
       
       {error && (
         <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
@@ -181,7 +181,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
       {/* Existing Tags */}
       <div className="flex flex-wrap gap-2 mb-3">
         {tags.length === 0 ? (
-          <span className="text-gray-500 text-sm">No tags</span>
+          <span className="text-app-faint text-sm">No tags</span>
         ) : (
           tags.map((tag, index) => (
             <span
@@ -219,7 +219,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
             }}
             placeholder="Type to search tags or add new..."
             disabled={loading}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+            className="flex-1 rounded-lg border border-app-border bg-app-bg/40 px-3 py-2 text-app-text outline-none focus:ring-2 focus:ring-app-accent"
           />
           <button
             onClick={handleAddTag}
@@ -233,7 +233,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
         
         {/* Suggestions Dropdown */}
         {showSuggestions && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div className="absolute z-10 w-full mt-1 bg-app-surface border border-app-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
             {filteredSuggestions.length > 0 ? (
               filteredSuggestions.slice(0, 10).map(tag => (
                 <button
@@ -242,18 +242,18 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
                     setNewTagName(tag.name);
                     setShowSuggestions(false);
                   }}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
+                  className="w-full px-3 py-2 text-left hover:bg-app-elevated flex items-center justify-between"
                 >
                   <span className="text-sm">{tag.name}</span>
-                  <span className="text-xs text-gray-500">{tag.slug}</span>
+                  <span className="text-xs text-app-faint">{tag.slug}</span>
                 </button>
               ))
             ) : newTagName.trim() ? (
-              <div className="px-3 py-2 text-sm text-gray-500">
+              <div className="px-3 py-2 text-sm text-app-faint">
                 No matching tags. Press "Add" to create "{newTagName.trim()}"
               </div>
             ) : (
-              <div className="px-3 py-2 text-sm text-gray-500">
+              <div className="px-3 py-2 text-sm text-app-faint">
                 No available tags to add
               </div>
             )}

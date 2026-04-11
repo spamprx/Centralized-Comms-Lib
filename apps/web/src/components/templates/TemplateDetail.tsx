@@ -288,9 +288,9 @@ Published by {{author}} on {{date}}
       <div className="p-6">
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-8 bg-app-border rounded w-1/4 mb-4"></div>
+            <div className="h-4 bg-app-border rounded w-1/2 mb-2"></div>
+            <div className="h-4 bg-app-border rounded w-3/4"></div>
           </div>
         </div>
       </div>
@@ -299,19 +299,19 @@ Published by {{author}} on {{date}}
 
   return (
     <>
-      <div className="p-6">
+      <div className="mx-auto max-w-6xl px-app-page py-app-page md:px-app-page-lg">
       {/* Clone Banner */}
       {showCloneBanner && cloneInfo && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between rounded-app-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
           <div className="flex items-center">
-            <Copy className="w-5 h-5 text-green-600 mr-3" />
-            <span className="text-green-800 font-medium">
+            <Copy className="mr-3 h-5 w-5 text-emerald-400" />
+            <span className="font-medium text-emerald-100">
               Cloned from "{cloneInfo.originalName}"
             </span>
           </div>
           <button
             onClick={() => setShowCloneBanner(false)}
-            className="text-green-600 hover:text-green-800 transition-colors"
+            className="text-emerald-400 transition-colors hover:text-emerald-200"
           >
             <X className="w-4 h-4" />
           </button>
@@ -321,7 +321,7 @@ Published by {{author}} on {{date}}
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 text-app-muted hover:text-app-text transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Templates
@@ -332,35 +332,35 @@ Published by {{author}} on {{date}}
             <>
               <button
                 onClick={() => setIsEditing(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-app-accent px-4 py-2 text-white transition-colors hover:brightness-110"
               >
                 <Edit className="w-4 h-4" />
                 Edit Template
               </button>
               <button
                 onClick={handleClone}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white transition-colors hover:bg-emerald-500"
               >
                 <Copy className="w-4 h-4" />
                 Clone
               </button>
               <button
                 onClick={() => setShowAddChannelModal(true)}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-violet-600 px-4 py-2 text-white transition-colors hover:bg-violet-500"
               >
                 <Plus className="w-4 h-4" />
                 Add Channel
               </button>
               <button
                 onClick={() => setShowTranslationModal(true)}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-500"
               >
                 <Globe className="w-4 h-4" />
                 Translation Preview
               </button>
               <button
                 onClick={handleDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-500"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -370,14 +370,14 @@ Published by {{author}} on {{date}}
             <>
               <button
                 onClick={handleSave}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white transition-colors hover:bg-emerald-500"
               >
                 <Save className="w-4 h-4" />
                 Save
               </button>
               <button
                 onClick={handleCancel}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 rounded-app-md bg-app-elevated px-4 py-2 text-app-text transition-colors hover:bg-app-surface-hover"
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -388,16 +388,16 @@ Published by {{author}} on {{date}}
       </div>
 
       {versionHistory.length > 0 && (
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-blue-900">Version History ({versionHistory.length} versions)</h3>
+        <div className="mt-6 rounded-app-lg border border-app-border bg-app-surface p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-app-text">Version History ({versionHistory.length} versions)</h3>
             {selectedVersions && (
               <button
                 onClick={() => {
                   setSelectedVersions(null);
                   setLastClickedVersion(null);
                 }}
-                className="text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="text-sm text-app-muted hover:text-app-text transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -405,12 +405,12 @@ Published by {{author}} on {{date}}
           </div>
           <div className="space-y-2">
             {versionHistory.map((version, index) => (
-              <div key={index} className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
+              <div key={index} className="flex items-center justify-between rounded-app-md border border-app-border bg-app-bg/40 p-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-app-text">
                     Version {versionHistory.length - index}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-app-faint">
                     {new Date(version.updatedAt || Date.now()).toLocaleString()}
                   </p>
                 </div>
@@ -428,7 +428,7 @@ Published by {{author}} on {{date}}
                         setLastClickedVersion(version.id);
                       }
                     }}
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center gap-1"
+                    className="flex items-center gap-1 rounded-app-md bg-app-accent px-3 py-1 text-sm text-white transition-colors hover:brightness-110"
                   >
                     <GitCompare className="w-3 h-3" />
                     {lastClickedVersion === version.id ? 'Hide Diff' : 'Show Diff'}
@@ -458,27 +458,27 @@ Published by {{author}} on {{date}}
       )}
 
       {selectedVersions && (
-        <div className="mt-6 bg-indigo-900 border border-indigo-700 rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-white">Version Comparison</h3>
+        <div className="mt-6 rounded-app-lg border border-app-border bg-app-bg-subtle p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-app-text">Version Comparison</h3>
             <button
               onClick={() => {
                 setSelectedVersions(null);
                 setLastClickedVersion(null);
               }}
-              className="text-white hover:text-gray-300 transition-colors"
+              className="text-app-muted transition-colors hover:text-app-text"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
+          <div className="bg-app-bg-subtle rounded-lg p-4 max-h-96 overflow-y-auto">
             <div className="space-y-1">
               {(() => {
                 const { diffs, hasDifferences } = getDiffLines(selectedVersions[0].content, selectedVersions[1].content);
                 
                 if (!hasDifferences) {
                   return (
-                    <div className="text-gray-400 text-center py-8">
+                    <div className="text-app-faint text-center py-8">
                       <p>No differences found between these versions</p>
                     </div>
                   );
@@ -489,13 +489,13 @@ Published by {{author}} on {{date}}
                     diff.type === 'added' ? 'text-green-400' : 
                     diff.type === 'removed' ? 'text-red-400' : 
                     diff.type === 'modified' ? 'text-yellow-400' : 
-                    'text-gray-400'
+                    'text-app-faint'
                   }`}>
                     <span className="text-xs mr-2">Line {diff.line}:</span>
                     <span className="font-mono">
                       {diff.type === 'modified' ? (
                         <>
-                          <span className="line-through text-gray-500">{diff.content}</span>
+                          <span className="line-through text-app-faint">{diff.content}</span>
                           <span className="text-green-400">{diff.content2}</span>
                         </>
                       ) : (
@@ -506,37 +506,37 @@ Published by {{author}} on {{date}}
                 ));
               })()}
             </div>
-            <div className="mt-4 text-center text-sm text-gray-400">
+            <div className="mt-4 text-center text-sm text-app-faint">
               <p>Comparing: {selectedVersions[0].name || 'Current Version'} vs {selectedVersions[1].name}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-amber-50 rounded-lg border border-amber-200 p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="rounded-app-lg border border-app-border bg-app-surface p-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>
             <div className="mb-6">
-              <label className="block text-sm font-medium text-amber-900 mb-2">Name</label>
+              <label className="mb-2 block text-sm font-medium text-app-text">Name</label>
               {isEditing ? (
                 <input
                   type="text"
                   value={editedTemplate?.name || ''}
                   onChange={(e) => setEditedTemplate(prev => prev ? {...prev, name: e.target.value} : null)}
-                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-black"
+                  className="w-full rounded-lg border border-amber-500/40 bg-app-bg/40 px-3 py-2 text-app-text outline-none focus:ring-2 focus:ring-amber-500/60"
                 />
               ) : (
-                <h3 className="text-xl font-semibold text-gray-900">{template?.name}</h3>
+                <h3 className="text-xl font-semibold text-app-text">{template?.name}</h3>
               )}
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <label className="block text-sm font-medium text-app-muted mb-2">Status</label>
               {isEditing ? (
                 <select
                   value={editedTemplate?.status || 'active'}
                   onChange={(e) => setEditedTemplate(prev => prev ? {...prev, status: e.target.value as 'active' | 'draft' | 'archived'} : null)}
-                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-black"
+                  className="w-full rounded-lg border border-amber-500/40 bg-app-bg/40 px-3 py-2 text-app-text outline-none focus:ring-2 focus:ring-amber-500/60"
                 >
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
@@ -544,9 +544,9 @@ Published by {{author}} on {{date}}
                 </select>
               ) : (
                 <span className={`px-2 py-1 text-xs rounded-full ${
-                  template?.status === 'active' ? 'bg-green-100 text-green-800' :
-                  template?.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-gray-100 text-gray-800'
+                  template?.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' :
+                  template?.status === 'draft' ? 'bg-amber-500/20 text-amber-200' :
+                  'bg-app-elevated text-app-text'
                 }`}>
                   {template?.status}
                 </span>
@@ -554,16 +554,16 @@ Published by {{author}} on {{date}}
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label className="block text-sm font-medium text-app-muted mb-2">Description</label>
               {isEditing ? (
                 <textarea
                   value={editedTemplate?.description || ''}
                   onChange={(e) => setEditedTemplate(prev => prev ? {...prev, description: e.target.value} : null)}
                   rows={4}
-                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-black"
+                  className="w-full rounded-lg border border-amber-500/40 bg-app-bg/40 px-3 py-2 text-app-text outline-none focus:ring-2 focus:ring-amber-500/60"
                 />
               ) : (
-                <p className="text-gray-600">{template?.description}</p>
+                <p className="text-app-muted">{template?.description}</p>
               )}
             </div>
 
@@ -574,25 +574,25 @@ Published by {{author}} on {{date}}
               onTagsChange={setTags}
             />
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-app-faint">
               <p>Created: {template?.createdAt}</p>
               <p>Updated: {template?.updatedAt}</p>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Template Content</label>
+            <label className="block text-sm font-medium text-app-muted mb-2">Template Content</label>
             {isEditing ? (
               <textarea
                 value={editedTemplate?.content || ''}
                 onChange={(e) => setEditedTemplate(prev => prev ? {...prev, content: e.target.value} : null)}
                 rows={20}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm text-black"
+                className="w-full rounded-lg border border-app-border bg-app-bg/40 px-3 py-2 font-mono text-sm text-app-text outline-none focus:ring-2 focus:ring-app-accent"
                 placeholder="Enter template content with placeholders like {{title}}, {{content}}, etc."
               />
             ) : (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <pre className="text-sm text-amber-700 whitespace-pre-wrap font-mono">
+              <div className="rounded-app-lg border border-app-border bg-app-bg/50 p-4">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-app-muted">
                   {template?.content}
                 </pre>
               </div>
@@ -602,12 +602,12 @@ Published by {{author}} on {{date}}
       </div>
 
       {/* Channel Bindings Section */}
-      <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
+      <div className="mt-6 bg-app-surface rounded-lg border border-app-border p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Channel Bindings</h3>
+          <h3 className="text-lg font-semibold text-app-text">Channel Bindings</h3>
           <button
             onClick={() => setShowAddChannelModal(true)}
-            className="bg-purple-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-purple-700 transition-colors text-sm"
+            className="flex items-center gap-2 rounded-app-md bg-violet-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-violet-500"
           >
             <Plus className="w-4 h-4" />
             Add Channel

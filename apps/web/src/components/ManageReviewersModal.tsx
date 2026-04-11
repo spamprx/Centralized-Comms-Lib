@@ -108,43 +108,43 @@ export default function ManageReviewersModal({
       onClick={onClose}
     >
       <div
-        className="w-[480px] max-h-[80vh] bg-[#1a1d2e] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
+        className="w-[480px] max-h-[80vh] bg-[#1a1d2e] border border-app-border rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-white/[0.07] flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-app-border flex justify-between items-center">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Users size={18} color="#a78bfa" />
-              <h2 className="text-base font-bold text-[#e2e4f0] m-0">
+              <h2 className="text-base font-bold text-app-text m-0">
                 Manage Reviewers
               </h2>
             </div>
-            <p className="text-xs text-[#555870] m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
+            <p className="text-xs text-app-faint m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
               {contentTitle}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="bg-white/5 border-none rounded-lg p-2 text-[#8b8fa8] cursor-pointer"
+            className="bg-app-surface border-none rounded-lg p-2 text-app-muted cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="px-6 py-3 border-b border-white/5">
+        <div className="px-6 py-3 border-b border-app-border/80">
           <div className="relative">
             <Search
               size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555870]"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search users..."
-              className="w-full py-2.5 pr-3 pl-9 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none box-border"
+              className="w-full py-2.5 pr-3 pl-9 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none box-border"
             />
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function ManageReviewersModal({
               <Loader2 size={24} color="#a78bfa" className="animate-spin" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="p-8 text-center text-[#555870] text-[13px]">
+            <div className="p-8 text-center text-app-faint text-[13px]">
               No users found
             </div>
           ) : (
@@ -167,10 +167,10 @@ export default function ManageReviewersModal({
                   <button
                     key={user.id}
                     onClick={() => toggleUser(user.id)}
-                    className={`flex items-center gap-3 px-3.5 py-3 rounded-[10px] cursor-pointer text-left transition-all duration-150 ${
+                    className={`flex items-center gap-3 px-3.5 py-3 rounded-app-lg cursor-pointer text-left transition-all duration-150 ${
                       isSelected
                         ? 'bg-violet-500/[0.12] border border-violet-500/30'
-                        : 'bg-white/[0.02] border border-white/5'
+                        : 'bg-app-bg/60 border border-app-border/80'
                     }`}
                   >
                     {/* Checkbox */}
@@ -189,7 +189,7 @@ export default function ManageReviewersModal({
                       className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0 ${
                         isSelected
                           ? 'bg-gradient-to-br from-violet-500 to-cyan-500'
-                          : 'bg-gradient-to-br from-gray-700 to-gray-600'
+                          : 'bg-gradient-to-br from-app-bg-subtle to-app-surface'
                       }`}
                     >
                       {(user.displayName || user.email)[0].toUpperCase()}
@@ -197,10 +197,10 @@ export default function ManageReviewersModal({
 
                     {/* User Info */}
                     <div className="flex-1 overflow-hidden">
-                      <div className={`text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap ${isSelected ? 'text-[#e2e4f0]' : 'text-[#c4c7d9]'}`}>
+                      <div className={`text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap ${isSelected ? 'text-app-text' : 'text-app-muted'}`}>
                         {user.displayName || 'No name'}
                       </div>
-                      <div className="text-[11px] text-[#555870] overflow-hidden text-ellipsis whitespace-nowrap">
+                      <div className="text-[11px] text-app-faint overflow-hidden text-ellipsis whitespace-nowrap">
                         {user.email}
                       </div>
                     </div>
@@ -212,14 +212,14 @@ export default function ManageReviewersModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/[0.07] flex justify-between items-center">
-          <span className="text-xs text-[#555870]">
+        <div className="px-6 py-4 border-t border-app-border flex justify-between items-center">
+          <span className="text-xs text-app-faint">
             {selectedIds.size} reviewer{selectedIds.size !== 1 ? 's' : ''} selected
           </span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-[18px] py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#8b8fa8] text-[13px] cursor-pointer"
+              className="px-[18px] py-2.5 bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer"
             >
               Cancel
             </button>

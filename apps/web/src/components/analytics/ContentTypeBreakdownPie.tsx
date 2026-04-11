@@ -9,12 +9,12 @@ interface ContentTypeBreakdownPieProps {
 export function ContentTypeBreakdownPie({ data, loading }: ContentTypeBreakdownPieProps) {
   if (loading) {
     return (
-      <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+      <div className="p-4 bg-app-surface border border-app-border rounded-app-lg">
         <div className="flex items-center gap-2 mb-4">
           <PieChart size={16} />
-          <span className="text-sm font-semibold text-[#e2e4f0]">Content Type Breakdown</span>
+          <span className="text-sm font-semibold text-app-text">Content Type Breakdown</span>
         </div>
-        <div className="h-[140px] bg-white/[0.04] rounded-lg animate-pulse" />
+        <div className="h-[140px] bg-app-surface rounded-lg animate-pulse" />
       </div>
     );
   }
@@ -43,10 +43,10 @@ export function ContentTypeBreakdownPie({ data, loading }: ContentTypeBreakdownP
   });
 
   return (
-    <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
+    <div className="p-4 bg-app-surface border border-app-border rounded-app-lg">
       <div className="flex items-center gap-2 mb-4">
         <PieChart size={16} className="text-emerald-500" />
-        <span className="text-sm font-semibold text-[#e2e4f0]">Content Type Breakdown</span>
+        <span className="text-sm font-semibold text-app-text">Content Type Breakdown</span>
       </div>
       <div className="flex gap-4 items-center">
         <div className="relative w-[120px] h-[120px] shrink-0">
@@ -62,16 +62,16 @@ export function ContentTypeBreakdownPie({ data, loading }: ContentTypeBreakdownP
             <circle cx="50" cy="50" r="25" fill="#1a1d2e" />
           </svg>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-            <span className="block text-lg font-bold text-[#e2e4f0]">{total}</span>
-            <span className="block text-[9px] text-[#555870] uppercase tracking-wide">Total</span>
+            <span className="block text-lg font-bold text-app-text">{total}</span>
+            <span className="block text-[9px] text-app-faint uppercase tracking-wide">Total</span>
           </div>
         </div>
         <div className="flex-1 flex flex-col gap-2">
           {slices.map((slice) => (
             <div key={slice.type} className="flex items-center gap-2 text-xs">
               <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: slice.color }} />
-              <span className="flex-1 text-[#8b8fa8]">{slice.type}</span>
-              <span className="font-semibold text-[#e2e4f0]">{slice.percent.toFixed(0)}%</span>
+              <span className="flex-1 text-app-muted">{slice.type}</span>
+              <span className="font-semibold text-app-text">{slice.percent.toFixed(0)}%</span>
             </div>
           ))}
         </div>

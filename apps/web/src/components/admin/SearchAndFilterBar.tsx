@@ -19,22 +19,22 @@ export default function SearchAndFilterBar({ filters, onFilterChange, groups = [
 
   const clearFilters = () => onFilterChange({ ...filters, role: 'all', status: 'all', group: 'all', search: '' });
 
-  const selectClass = "px-2.5 py-[7px] bg-white/[0.04] border border-white/10 rounded-lg text-[#9094ae] text-[13px] cursor-pointer outline-none";
+  const selectClass = "px-2.5 py-[7px] bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer outline-none";
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex items-center flex-1 min-w-[220px] max-w-[400px]">
-          <Search size={15} className="absolute left-2.5 text-[#555870] pointer-events-none" />
+          <Search size={15} className="absolute left-2.5 text-app-faint pointer-events-none" />
           <input
             type="text"
             placeholder="Search by name or email…"
             value={filters.search ?? ''}
             onChange={e => onFilterChange({ ...filters, search: e.target.value })}
-            className="w-full py-2 pr-2.5 pl-[34px] bg-white/[0.04] border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] outline-none transition-colors duration-150 focus:border-violet-400/50 placeholder:text-[#555870]"
+            className="w-full py-2 pr-2.5 pl-[34px] bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none transition-colors duration-150 focus:border-app-accent/50 placeholder:text-app-faint"
           />
           {filters.search && (
-            <button className="absolute right-2 bg-transparent border-none text-[#555870] cursor-pointer flex p-0.5" onClick={() => onFilterChange({ ...filters, search: '' })}>
+            <button className="absolute right-2 bg-transparent border-none text-app-faint cursor-pointer flex p-0.5" onClick={() => onFilterChange({ ...filters, search: '' })}>
               <X size={13} />
             </button>
           )}
@@ -43,21 +43,21 @@ export default function SearchAndFilterBar({ filters, onFilterChange, groups = [
         <button
           className={`flex items-center gap-1.5 px-3 py-[7px] border rounded-lg text-[13px] cursor-pointer relative transition-all duration-150 ${
             showFilters
-              ? 'bg-violet-400/10 border-violet-400/30 text-violet-400'
-              : 'bg-white/[0.04] border-white/10 text-[#9094ae] hover:bg-violet-400/10 hover:border-violet-400/30 hover:text-violet-400'
+              ? 'bg-app-accent-muted border-app-accent/30 text-app-accent'
+              : 'bg-app-surface border-app-border text-app-muted hover:bg-app-accent-muted hover:border-app-accent/30 hover:text-app-accent'
           }`}
           onClick={() => setShowFilters(v => !v)}
         >
           <SlidersHorizontal size={14} /> Filters
-          {hasActiveFilters && <span className="absolute top-[5px] right-[5px] w-1.5 h-1.5 rounded-full bg-violet-400" />}
+          {hasActiveFilters && <span className="absolute top-[5px] right-[5px] w-1.5 h-1.5 rounded-full bg-app-accent" />}
         </button>
 
         {hasActiveFilters && (
-          <button className="flex items-center gap-1 px-2.5 py-[7px] bg-transparent border-none text-gray-500 text-xs cursor-pointer hover:text-[#e2e4f0]" onClick={clearFilters}><X size={13} /> Clear</button>
+          <button className="flex items-center gap-1 px-2.5 py-[7px] bg-transparent border-none text-app-faint text-xs cursor-pointer hover:text-app-text" onClick={clearFilters}><X size={13} /> Clear</button>
         )}
 
         {totalResults !== undefined && (
-          <span className="ml-auto text-xs text-[#555870]">{loading ? '…' : `${totalResults} result${totalResults !== 1 ? 's' : ''}`}</span>
+          <span className="ml-auto text-xs text-app-faint">{loading ? '…' : `${totalResults} result${totalResults !== 1 ? 's' : ''}`}</span>
         )}
 
         <div>
@@ -79,17 +79,17 @@ export default function SearchAndFilterBar({ filters, onFilterChange, groups = [
       </div>
 
       {showFilters && (
-        <div className="flex gap-5 px-3.5 py-3 bg-white/[0.025] border border-white/[0.07] rounded-lg flex-wrap">
+        <div className="flex gap-5 px-3.5 py-3 bg-app-surface/50 border border-app-border rounded-lg flex-wrap">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold tracking-wide uppercase text-[#555870]">Role</label>
+            <label className="text-[11px] font-semibold tracking-wide uppercase text-app-faint">Role</label>
             <div className="flex gap-1.5 flex-wrap">
               {ROLES.map(role => (
                 <button
                   key={role}
                   className={`px-2.5 py-1 rounded-[20px] border text-xs cursor-pointer capitalize transition-all duration-150 ${
                     filters.role === role || (!filters.role && role === 'all')
-                      ? 'bg-violet-400/15 border-violet-400/40 text-violet-400'
-                      : 'bg-white/5 border-white/[0.08] text-[#8b8fa8] hover:border-white/20 hover:text-[#c4c7d9]'
+                      ? 'bg-app-accent-muted border-app-accent/35 text-app-accent'
+                      : 'bg-app-surface border-app-border text-app-muted hover:border-white/20 hover:text-app-muted'
                   }`}
                   onClick={() => onFilterChange({ ...filters, role })}
                 >
@@ -99,15 +99,15 @@ export default function SearchAndFilterBar({ filters, onFilterChange, groups = [
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold tracking-wide uppercase text-[#555870]">Status</label>
+            <label className="text-[11px] font-semibold tracking-wide uppercase text-app-faint">Status</label>
             <div className="flex gap-1.5 flex-wrap">
               {STATUSES.map(status => (
                 <button
                   key={status}
                   className={`px-2.5 py-1 rounded-[20px] border text-xs cursor-pointer capitalize transition-all duration-150 ${
                     filters.status === status || (!filters.status && status === 'all')
-                      ? 'bg-violet-400/15 border-violet-400/40 text-violet-400'
-                      : 'bg-white/5 border-white/[0.08] text-[#8b8fa8] hover:border-white/20 hover:text-[#c4c7d9]'
+                      ? 'bg-app-accent-muted border-app-accent/35 text-app-accent'
+                      : 'bg-app-surface border-app-border text-app-muted hover:border-white/20 hover:text-app-muted'
                   }`}
                   onClick={() => onFilterChange({ ...filters, status })}
                 >
@@ -118,7 +118,7 @@ export default function SearchAndFilterBar({ filters, onFilterChange, groups = [
           </div>
           {groups.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold tracking-wide uppercase text-[#555870]">Group</label>
+              <label className="text-[11px] font-semibold tracking-wide uppercase text-app-faint">Group</label>
               <select value={filters.group ?? 'all'} onChange={e => onFilterChange({ ...filters, group: e.target.value as any })} className={selectClass}>
                 <option value="all">All groups</option>
                 {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
