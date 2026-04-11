@@ -179,4 +179,22 @@ export class PrismaContentRepository implements ContentRepository {
     });
     return row ? toVersion(row) : null;
   }
+
+  async getVersionWithBodyAtOrBefore(
+    contentId: string,
+    maxVersionNumber: number,
+  ): Promise<ContentVersion | null> {
+    const rows = await this.db.contentVersion.findMany({
+      where: {
+        contentId,
+        versionNumber: { lte: maxVersionNumber },
+      },
+      orderBy: { versionNumber: "desc" },
+      take: 500,
+    });
+    for (const row of rows) {
+      if (row.body != null) return toVersion(row);
+    }
+    return null;
+  }
 }

@@ -13,6 +13,12 @@ import type { FormattingViolation } from "../template/formattingRules.types";
 import { enforceFormattingRules } from "../template/templateFormatting.enforcement";
 import { getFormattingRulesForTemplateId } from "../template/formattingRule.service";
 import { recordSnapshotForVersion } from "./content.snapshot";
+import {
+  buildPlainTextForSnapshotSide,
+  computeWordDiff,
+  sideSummary,
+  type SnapshotWordDiffResult,
+} from "./snapshotWordDiff";
 import { syncContentIndexFromDb } from "../../search/contentSearch.service";
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
@@ -578,5 +584,54 @@ export const contentService = {
 
       return { updated: true, accepted } as const;
     });
+  },
+
+  /**
+   * Word-level diff between two `ContentSnapshot` rows for the same content.
+   * Left/right correspond to `snapshotAId` / `snapshotBId` request order.
+   */
+  async compareSnapshotsWordDiff(
+    contentId: string,
+    snapshotAId: string,
+    snapshotBId: string,
+    requester: { id: string; isAdmin?: boolean } | null,
+  ): Promise<
+    SnapshotWordDiffResult | { notFound: true } | { badRequest: true; error: string }
+  > {
+    const detail = await this.getById(contentId, requester);
+    if (!detail) {
+      return { notFound: true } as const;
+    }
+
+    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    const [sa, sb] = await Promise.all([
+      repos.contentSnapshot.getById(snapshotAId),
+      repos.contentSnapshot.getById(snapshotBId),
+    ]);
+    if (!sa || !sb) {
+      return { notFound: true } as const;
+    }
+    if (sa.contentId !== sb.contentId) {
+      return { badRequest: true, error: "Snapshots belong to different content items" };
+    }
+    if (sa.contentId !== contentId) {
+      return { badRequest: true, error: "Snapshots do not match content id in path" };
+    }
+
+    const [va, vb] = await Promise.all([
+      repos.content.getVersionWithBodyAtOrBefore(contentId, sa.toVersionNumber),
+      repos.content.getVersionWithBodyAtOrBefore(contentId, sb.toVersionNumber),
+    ]);
+
+    const leftPlain = buildPlainTextForSnapshotSide(va).plain;
+    const rightPlain = buildPlainTextForSnapshotSide(vb).plain;
+    const core = computeWordDiff(leftPlain, rightPlain);
+
+    return {
+      contentId,
+      left: sideSummary(sa, va),
+      right: sideSummary(sb, vb),
+      ...core,
+    };
   },
 };

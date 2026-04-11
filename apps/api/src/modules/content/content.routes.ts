@@ -759,4 +759,84 @@ router.get("/:id/versions", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/content/{id}/snapshots/diff:
+ *   post:
+ *     summary: Word-level diff between two content snapshots
+ *     description: |
+ *       Compares plain text derived from each snapshot's document at `toVersionNumber`
+ *       (resolving through versions that omit `body`, e.g. state transitions).
+ *       `left` / `right` match request body `snapshotAId` / `snapshotBId` order.
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - snapshotAId
+ *               - snapshotBId
+ *             properties:
+ *               snapshotAId:
+ *                 type: string
+ *               snapshotBId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Structured word-level diff (segments with op equal|insert|delete)
+ *       400:
+ *         description: Invalid payload or snapshots not scoped to this content
+ *       404:
+ *         description: Content or snapshot not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/:id/snapshots/diff", async (req: AuthRequest, res: Response) => {
+  try {
+    const { snapshotAId, snapshotBId } = req.body as {
+      snapshotAId?: string;
+      snapshotBId?: string;
+    };
+    if (!snapshotAId || !snapshotBId) {
+      res.status(400).json({ error: "snapshotAId and snapshotBId are required" });
+      return;
+    }
+
+    const result = await contentService.compareSnapshotsWordDiff(
+      req.params.id,
+      snapshotAId,
+      snapshotBId,
+      {
+        id: req.user!.id,
+        isAdmin: req.user!.role === "ADMIN",
+      },
+    );
+
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Content or snapshot not found" });
+      return;
+    }
+    if ("badRequest" in result && result.badRequest) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+
+    res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 export default router;
