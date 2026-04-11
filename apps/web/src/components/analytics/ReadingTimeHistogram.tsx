@@ -25,25 +25,48 @@ export function ReadingTimeHistogram({ data, loading }: ReadingTimeHistogramProp
   return (
     <div className="p-4 bg-app-surface border border-app-border rounded-app-lg">
       <div className="flex items-center gap-2 mb-4">
-        <Clock size={16} className="text-amber-500" />
+        <Clock size={16} className="text-blue-500" />
         <span className="text-sm font-semibold text-app-text">Reading Time Distribution</span>
         <span className="text-xs text-app-faint ml-auto">{total.toLocaleString()} reads</span>
       </div>
-      <div className="flex justify-between gap-2 items-end h-[120px] py-2.5">
+      <div className="flex justify-between gap-2 items-end h-[160px]">
         {data.map((bucket, i) => {
           const percentage = (bucket.count / maxValue) * 100;
           const share = ((bucket.count / total) * 100).toFixed(1);
+          
+          // Color gradient based on reading time
+          const colors = [
+            'from-blue-400 to-blue-500',   // 0-1 min - quick readers
+            'from-green-400 to-green-500', // 1-3 min - normal readers  
+            'from-emerald-400 to-emerald-500', // 3-5 min - engaged readers
+            'from-teal-400 to-teal-500',   // 5-10 min - focused readers
+            'from-cyan-400 to-cyan-500',   // 10-15 min - deep readers
+            'from-indigo-400 to-indigo-500', // 15+ min - power readers
+          ];
+          const colorClass = colors[i] || colors[0];
+          
           return (
-            <div key={i} className="flex flex-col items-center flex-1 gap-1.5">
-              <div className="w-full h-20 flex items-end justify-center bg-app-bg/60 rounded">
+            <div key={i} className="flex flex-col items-center flex-1 h-full group">
+              {/* Chart area */}
+              <div className="relative w-full h-20 flex items-end justify-center mb-3">
+                {/* Background track */}
+                <div className="absolute inset-x-0 bottom-0 h-full bg-app-bg/40 rounded-t-lg" />
+                {/* Value bar */}
                 <div
-                  className="w-4/5 rounded-t bg-gradient-to-b from-amber-500 to-amber-500/25 transition-all duration-200 hover:from-amber-400 hover:to-amber-400/25"
+                  className={`relative w-3/4 rounded-t-lg bg-gradient-to-t ${colorClass} transition-all duration-300 group-hover:scale-105 shadow-sm`}
                   style={{ height: `${percentage}%` }}
-                />
+                >
+                  {/* Top highlight */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-white/30 rounded-t-lg" />
+                </div>
               </div>
-              <span className="text-[9px] text-app-faint text-center whitespace-nowrap">{bucket.range}</span>
-              <span className="text-[11px] font-semibold text-app-text">{bucket.count.toLocaleString()}</span>
-              <span className="text-[9px] text-app-faint">{share}%</span>
+              
+              {/* Text labels - separate from chart */}
+              <div className="text-center flex-shrink-0">
+                <span className="text-[9px] font-medium text-app-text block leading-tight">{bucket.range}</span>
+                <span className="text-[11px] font-bold text-app-text block leading-tight">{bucket.count.toLocaleString()}</span>
+                <span className="text-[8px] text-app-faint">{share}%</span>
+              </div>
             </div>
           );
         })}

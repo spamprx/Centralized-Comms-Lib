@@ -6,3 +6,4 @@ export { ReadingTimeHistogram } from './ReadingTimeHistogram';
 export { ContentTypeBreakdownPie } from './ContentTypeBreakdownPie';
 export { AIAnalysisSummaryCard } from './AIAnalysisSummaryCard';
 export { TopContentTable } from './TopContentTable';
+export { EnhancedDateRangePicker } from './EnhancedDateRangePicker';

@@ -19,6 +19,21 @@ export function ContentTypeBreakdownPie({ data, loading }: ContentTypeBreakdownP
     );
   }
 
+  // Check if data is empty
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-4 bg-app-surface border border-app-border rounded-app-lg">
+        <div className="flex items-center gap-2 mb-4">
+          <PieChart size={16} />
+          <span className="text-sm font-semibold text-app-text">Content Type Breakdown</span>
+        </div>
+        <div className="h-[140px] flex items-center justify-center">
+          <span className="text-app-faint">No content data available</span>
+        </div>
+      </div>
+    );
+  }
+
   const total = data.reduce((sum, d) => sum + d.value, 0);
   let cumulativePercent = 0;
 
@@ -71,7 +86,7 @@ export function ContentTypeBreakdownPie({ data, loading }: ContentTypeBreakdownP
             <div key={slice.type} className="flex items-center gap-2 text-xs">
               <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: slice.color }} />
               <span className="flex-1 text-app-muted">{slice.type}</span>
-              <span className="font-semibold text-app-text">{slice.percent.toFixed(0)}%</span>
+              <span className="font-semibold text-app-text">{(slice.percent * 100).toFixed(1)}%</span>
             </div>
           ))}
         </div>

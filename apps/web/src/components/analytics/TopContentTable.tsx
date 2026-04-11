@@ -1,4 +1,4 @@
-import { Trophy, ExternalLink } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import type { TopContentItem } from '../../data/mockAnalyticsData';
 
 interface TopContentTableProps {
@@ -33,10 +33,10 @@ export function TopContentTable({ data, loading }: TopContentTableProps) {
         <span className="text-xs text-app-faint ml-auto">{data.length} items</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse min-w-[700px]">
+        <table className="w-full border-collapse min-w-[500px]">
           <thead>
             <tr>
-              {['Rank', 'Title', 'Author', 'Views', 'Engagement', 'Avg Read Time', ''].map((h, i) => (
+              {['Rank', 'Title', 'Views', 'Engagement'].map((h, i) => (
                 <th key={i} className="px-3 py-2.5 text-left text-[11px] font-semibold tracking-wide uppercase text-app-faint bg-app-bg/60 border-b border-app-border">{h}</th>
               ))}
             </tr>
@@ -52,10 +52,8 @@ export function TopContentTable({ data, loading }: TopContentTableProps) {
                   </span>
                 </td>
                 <td className="px-3 py-3 border-b border-app-border text-[13px]">
-                  <span className="block font-medium text-app-text mb-0.5">{item.title}</span>
-                  <span className="block text-[11px] text-app-faint">{new Date(item.publishedAt).toLocaleDateString()}</span>
+                  <span className="block font-medium text-app-text">{item.title}</span>
                 </td>
-                <td className="px-3 py-3 border-b border-app-border text-[13px] text-app-muted">{item.author}</td>
                 <td className="px-3 py-3 border-b border-app-border text-[13px] font-semibold text-app-text">{item.views.toLocaleString()}</td>
                 <td className="px-3 py-3 border-b border-app-border text-[13px]">
                   <div className="flex items-center gap-2">
@@ -65,12 +63,6 @@ export function TopContentTable({ data, loading }: TopContentTableProps) {
                     />
                     <span className="text-[11px] font-semibold text-app-text min-w-[35px]">{item.engagement}%</span>
                   </div>
-                </td>
-                <td className="px-3 py-3 border-b border-app-border text-[13px] text-app-faint font-mono">{item.avgReadTime}</td>
-                <td className="px-3 py-3 border-b border-app-border text-[13px] w-10 text-center">
-                  <button className="inline-flex items-center justify-center w-7 h-7 bg-app-surface border-none rounded-md text-app-faint cursor-pointer transition-all duration-150 hover:bg-white/10 hover:text-app-text" title="View details">
-                    <ExternalLink size={14} />
-                  </button>
                 </td>
               </tr>
             ))}

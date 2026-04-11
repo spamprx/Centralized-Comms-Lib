@@ -7,9 +7,12 @@ import { ReadingTimeHistogram } from "../components/analytics/ReadingTimeHistogr
 import { ContentTypeBreakdownPie } from "../components/analytics/ContentTypeBreakdownPie";
 import { AIAnalysisSummaryCard } from "../components/analytics/AIAnalysisSummaryCard";
 import { TopContentTable } from "../components/analytics/TopContentTable";
+import { EnhancedDateRangePicker } from "../components/analytics/EnhancedDateRangePicker";
 import { buildAnalyticsCsv, downloadCsv } from "../lib/analyticsCsv";
 import type { KPI } from "../data/mockAnalyticsData";
-import { Button, PageHeader, PageShell, Surface, formInputClass } from "../components/ui";
+import type { DateRange } from "../lib/dateUtils";
+import { formatDateRange } from "../lib/dateUtils";
+import { Button, PageHeader, PageShell, Surface } from "../components/ui";
 
 function KPICardsRow({ kpis }: { kpis: KPI[] }) {
   return (
@@ -41,7 +44,7 @@ function KPICardsRow({ kpis }: { kpis: KPI[] }) {
 }
 
 export default function AnalyticsLayout() {
-  const [dateRange, setDateRange] = useState("30d");
+  const [dateRange, setDateRange] = useState<string | DateRange>("30d");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const {
@@ -58,7 +61,8 @@ export default function AnalyticsLayout() {
 
   const exportFileName = useMemo(() => {
     const stamp = new Date().toISOString().slice(0, 10);
-    return `analytics-dashboard-${dateRange}-${stamp}.csv`;
+    const rangeDisplay = typeof dateRange === 'string' ? dateRange : formatDateRange(dateRange).replace(/\s-\s/g, '-to-');
+    return `analytics-dashboard-${rangeDisplay}-${stamp}.csv`;
   }, [dateRange]);
 
   const handleExportCsv = async () => {
@@ -67,7 +71,7 @@ export default function AnalyticsLayout() {
       setExportError(null);
 
       const csv = buildAnalyticsCsv({
-        dateRange,
+        dateRange: typeof dateRange === 'string' ? dateRange : formatDateRange(dateRange),
         exportedAt: new Date(),
         kpis,
         viewsData,
@@ -115,17 +119,10 @@ export default function AnalyticsLayout() {
         description="Track content performance and engagement."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className={`${formInputClass} w-auto min-w-[10rem] py-2 text-[13px]`}
-              aria-label="Date range"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="14d">Last 14 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-            </select>
+            <EnhancedDateRangePicker
+              value={typeof dateRange === 'string' ? dateRange : 'custom'}
+              onChange={(newValue) => setDateRange(newValue)}
+            />
             <Button
               type="button"
               variant="secondary"
