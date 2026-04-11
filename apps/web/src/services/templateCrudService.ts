@@ -1,0 +1,158 @@
+import { getAuthToken } from './tokenStore';
+
+const API_BASE = import.meta.env.VITE_API_URL;
+
+export type TemplateStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+
+export type TemplateRecord = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: TemplateStatus;
+  draftLayout: unknown;
+  activeLayout: unknown;
+  i18n: unknown;
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+  bindings?: Array<{ id: string; channelId: string; createdAt: string }>;
+};
+
+type ListFilters = {
+  search?: string;
+  status?: TemplateStatus | 'ALL';
+};
+
+export type CreateTemplateInput = {
+  name: string;
+  description?: string;
+  draftLayout?: unknown;
+};
+
+export type UpdateTemplateInput = {
+  name?: string;
+  description?: string | null;
+  slug?: string;
+  status?: TemplateStatus;
+};
+
+export type ChannelRecord = {
+  id: string;
+  name: string;
+  key: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TemplateBindingRecord = {
+  id: string;
+  templateId: string;
+  channelId: string;
+  createdAt: string;
+};
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+    credentials: 'include',
+    ...options,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(err.error || err.message || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
+function matchesFilters(t: TemplateRecord, filters?: ListFilters): boolean {
+  if (!filters) return true;
+  const q = filters.search?.trim().toLowerCase();
+  if (q) {
+    const hay = `${t.name} ${t.slug} ${t.description ?? ''}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (filters.status && filters.status !== 'ALL' && t.status !== filters.status) return false;
+  return true;
+}
+
+export const templateCrudService = {
+  async list(filters?: ListFilters): Promise<TemplateRecord[]> {
+    const rows = await request<TemplateRecord[]>('/templates');
+    return rows.filter((t) => matchesFilters(t, filters));
+  },
+
+  async getById(id: string): Promise<TemplateRecord> {
+    return request<TemplateRecord>(`/templates/${id}`);
+  },
+
+  async create(input: CreateTemplateInput): Promise<TemplateRecord> {
+    return request<TemplateRecord>('/templates', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: input.name,
+        description: input.description ?? null,
+        draftLayout: input.draftLayout ?? null,
+      }),
+    });
+  },
+
+  async update(id: string, input: UpdateTemplateInput): Promise<TemplateRecord> {
+    return request<TemplateRecord>(`/templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async remove(id: string): Promise<void> {
+    await request<{ message: string }>(`/templates/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async clone(id: string): Promise<TemplateRecord> {
+    return request<TemplateRecord>(`/templates/${id}/clone`, {
+      method: 'POST',
+    });
+  },
+
+  async listChannels(): Promise<ChannelRecord[]> {
+    return request<ChannelRecord[]>('/channels');
+  },
+
+  async addChannelBinding(
+    templateId: string,
+    input: { channelId: string; layoutConfig?: unknown },
+  ): Promise<TemplateBindingRecord> {
+    return request<TemplateBindingRecord>(`/templates/${templateId}/bindings`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async removeChannelBinding(templateId: string, bindingId: string): Promise<void> {
+    await request<{ message: string }>(`/templates/${templateId}/bindings/${bindingId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async patchI18n(
+    templateId: string,
+    patch: Record<string, Record<string, string>>,
+  ): Promise<TemplateRecord> {
+    return request<TemplateRecord>(`/templates/${templateId}/i18n`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+  },
+};
+
