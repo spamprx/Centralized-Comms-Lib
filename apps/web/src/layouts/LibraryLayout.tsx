@@ -3,6 +3,8 @@ import { useLibrary } from "../hooks/useLibrary";
 import {
   LibraryFilterBar,
   LibraryFilterChips,
+  LibraryFilterInvalidBanner,
+  LibraryNoResults,
   ContentGrid,
   Pagination,
   SearchResultsList,
@@ -37,12 +39,16 @@ function LibraryPaginatedContent({ items }: { items: ContentItem[] }) {
 export default function LibraryLayout() {
   const {
     contentItems,
+    totalInLibrary,
     tags,
     tagSlugFromMockName,
     authors,
     channels,
     loading,
     filters,
+    effectiveFilters,
+    filterIssues,
+    removeInvalidFilters,
     searchInput,
     setSearchInput,
     patchFilters,
@@ -87,10 +93,23 @@ export default function LibraryLayout() {
       />
 
       <div className="animate-fade-in space-y-6">
+        <LibraryFilterInvalidBanner
+          issues={filterIssues}
+          onRemoveInvalid={removeInvalidFilters}
+        />
+
         <LibraryFilterBar
           searchInput={searchInput}
           onSearchChange={setSearchInput}
           filters={filters}
+          appliedFacetValues={{
+            author: effectiveFilters.author,
+            channel: effectiveFilters.channel,
+            status: effectiveFilters.status,
+            type: effectiveFilters.type,
+            dateFrom: effectiveFilters.dateFrom,
+            dateTo: effectiveFilters.dateTo,
+          }}
           onAuthorChange={(author) => patchFilters({ author })}
           onChannelChange={(channel) => patchFilters({ channel })}
           onStatusChange={(status) => patchFilters({ status })}
@@ -130,9 +149,22 @@ export default function LibraryLayout() {
           unavailable={searchUnavailable}
           error={searchError}
           hits={searchHits}
+          onClearSearch={() => {
+            setSearchInput("");
+            patchFilters({ q: "" });
+          }}
         />
 
-        <LibraryPaginatedContent key={filterKey} items={contentItems} />
+        {contentItems.length > 0 ? (
+          <LibraryPaginatedContent key={filterKey} items={contentItems} />
+        ) : totalInLibrary > 0 ? (
+          <LibraryNoResults
+            hasActiveFilters={
+              hasActiveFilters || searchInput.trim() !== ""
+            }
+            onClearFilters={clearAllFilters}
+          />
+        ) : null}
       </div>
     </PageShell>
   );

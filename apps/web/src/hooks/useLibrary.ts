@@ -4,6 +4,7 @@ import { mockContentItems, mockTags } from '../data/mockLibraryData';
 import type { ContentItem, Tag } from '../data/mockLibraryData';
 import { useDebouncedValue } from './useDebouncedValue';
 import {
+  analyzeLibraryFilters,
   mergeLibraryFilters,
   parseLibrarySearchParams,
   serializeLibrarySearchParams,
@@ -27,7 +28,7 @@ export function useLibrary() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => parseLibrarySearchParams(searchParams), [searchParams]);
 
-  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
+  const [allContentItems, setAllContentItems] = useState<ContentItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +97,7 @@ export function useLibrary() {
   useEffect(() => {
     if (USE_MOCK_DATA) {
       setTimeout(() => {
-        setContentItems(mockContentItems);
+        setAllContentItems(mockContentItems);
         setTags(mockTags);
         setLoading(false);
       }, 200);
@@ -131,34 +132,54 @@ export function useLibrary() {
 
   const authors = useMemo(() => {
     const s = new Set<string>();
-    for (const item of contentItems) s.add(item.author);
+    for (const item of allContentItems) s.add(item.author);
     return [...s].sort((a, b) => a.localeCompare(b));
-  }, [contentItems]);
+  }, [allContentItems]);
 
   const channels = useMemo(() => {
     const s = new Set<string>();
-    for (const item of contentItems) s.add(item.channel);
+    for (const item of allContentItems) s.add(item.channel);
     return [...s].sort((a, b) => a.localeCompare(b));
-  }, [contentItems]);
+  }, [allContentItems]);
+
+  const tagSlugCatalog = useMemo(
+    () => new Set(tags.map((t) => t.name.toLowerCase())),
+    [tags],
+  );
+
+  const filterCatalog = useMemo(
+    () => ({ authors, channels, tagSlugs: tagSlugCatalog }),
+    [authors, channels, tagSlugCatalog],
+  );
+
+  const { effective: effectiveFilters, issues: filterIssues } = useMemo(
+    () => analyzeLibraryFilters(filters, filterCatalog),
+    [filters, filterCatalog],
+  );
 
   const filteredItems = useMemo(() => {
     const q = searchInput.trim().toLowerCase();
-    return contentItems.filter((item) => {
+    return allContentItems.filter((item) => {
       if (q) {
         const inTitle = item.title.toLowerCase().includes(q);
         const inAuthor = item.author.toLowerCase().includes(q);
         if (!inTitle && !inAuthor) return false;
       }
-      if (filters.type !== 'all' && item.type !== filters.type) return false;
-      if (!itemMatchesTagFacet(item.tags, filters.tags)) return false;
-      if (filters.author && item.author !== filters.author) return false;
-      if (filters.channel && item.channel !== filters.channel) return false;
-      if (filters.status !== 'all' && item.status !== filters.status) return false;
-      if (filters.dateFrom && item.createdAt < filters.dateFrom) return false;
-      if (filters.dateTo && item.createdAt > filters.dateTo) return false;
+      if (effectiveFilters.type !== 'all' && item.type !== effectiveFilters.type) return false;
+      if (!itemMatchesTagFacet(item.tags, effectiveFilters.tags)) return false;
+      if (effectiveFilters.author && item.author !== effectiveFilters.author) return false;
+      if (effectiveFilters.channel && item.channel !== effectiveFilters.channel) return false;
+      if (effectiveFilters.status !== 'all' && item.status !== effectiveFilters.status) return false;
+      if (effectiveFilters.dateFrom && item.createdAt < effectiveFilters.dateFrom) return false;
+      if (effectiveFilters.dateTo && item.createdAt > effectiveFilters.dateTo) return false;
       return true;
     });
-  }, [contentItems, searchInput, filters]);
+  }, [allContentItems, searchInput, effectiveFilters]);
+
+  const removeInvalidFilters = useCallback(() => {
+    setSearchInput(effectiveFilters.q);
+    setSearchParams(serializeLibrarySearchParams(effectiveFilters), { replace: true });
+  }, [effectiveFilters, setSearchParams]);
 
   const hasActiveFilters = useMemo(() => {
     const f = filters;
@@ -176,12 +197,16 @@ export function useLibrary() {
 
   return {
     contentItems: filteredItems,
+    totalInLibrary: allContentItems.length,
     tags,
     tagSlugFromMockName,
     authors,
     channels,
     loading,
     filters,
+    effectiveFilters,
+    filterIssues,
+    removeInvalidFilters,
     searchInput,
     setSearchInput,
     patchFilters,

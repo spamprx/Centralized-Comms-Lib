@@ -6,6 +6,11 @@ export type LibraryFilterBarProps = {
   searchInput: string;
   onSearchChange: (value: string) => void;
   filters: LibraryUrlFilters;
+  /** Facet controls use validated values so unknown URL params do not break native selects. */
+  appliedFacetValues: Pick<
+    LibraryUrlFilters,
+    'author' | 'channel' | 'status' | 'type' | 'dateFrom' | 'dateTo'
+  >;
   onAuthorChange: (author: string) => void;
   onChannelChange: (channel: string) => void;
   onStatusChange: (status: string) => void;
@@ -23,6 +28,7 @@ export function LibraryFilterBar({
   searchInput,
   onSearchChange,
   filters,
+  appliedFacetValues,
   onAuthorChange,
   onChannelChange,
   onStatusChange,
@@ -61,7 +67,7 @@ export function LibraryFilterBar({
             Author
           </label>
           <select
-            value={filters.author}
+            value={appliedFacetValues.author}
             onChange={(e) => onAuthorChange(e.target.value)}
             className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
@@ -79,7 +85,7 @@ export function LibraryFilterBar({
             Channel
           </label>
           <select
-            value={filters.channel}
+            value={appliedFacetValues.channel}
             onChange={(e) => onChannelChange(e.target.value)}
             className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
@@ -97,7 +103,7 @@ export function LibraryFilterBar({
             Status
           </label>
           <select
-            value={filters.status}
+            value={appliedFacetValues.status}
             onChange={(e) => onStatusChange(e.target.value)}
             className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
@@ -113,7 +119,7 @@ export function LibraryFilterBar({
             Type
           </label>
           <select
-            value={filters.type}
+            value={appliedFacetValues.type}
             onChange={(e) => onTypeChange(e.target.value)}
             className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
           >
@@ -131,7 +137,7 @@ export function LibraryFilterBar({
           </label>
           <input
             type="date"
-            value={filters.dateFrom}
+            value={appliedFacetValues.dateFrom}
             onChange={(e) => onDateFromChange(e.target.value)}
             className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none box-border"
           />
@@ -143,7 +149,7 @@ export function LibraryFilterBar({
           </label>
           <input
             type="date"
-            value={filters.dateTo}
+            value={appliedFacetValues.dateTo}
             onChange={(e) => onDateToChange(e.target.value)}
             className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none box-border"
           />

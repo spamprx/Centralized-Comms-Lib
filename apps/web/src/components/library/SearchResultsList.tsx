@@ -21,6 +21,7 @@ export type SearchResultsListProps = {
   hits: ContentSearchHit[];
   /** Optional: show a smaller note when search is disabled/unavailable */
   compact?: boolean;
+  onClearSearch?: () => void;
 };
 
 export function SearchResultsList({
@@ -30,6 +31,7 @@ export function SearchResultsList({
   error,
   hits,
   compact = false,
+  onClearSearch,
 }: SearchResultsListProps) {
   const show = q.trim().length > 0;
   if (!show) return null;
@@ -64,8 +66,23 @@ export function SearchResultsList({
 
       {!error && !loading && !unavailable && hits.length === 0 && (
         <div className="px-4 py-8 text-center">
-          <SearchX size={18} className="text-app-faint inline-block mb-2" />
-          <div className="text-[12px] text-app-muted">No results found.</div>
+          <SearchX size={18} className="text-app-faint inline-block mb-2" aria-hidden />
+          <div className="text-[13px] font-medium text-app-text">
+            No matches in the search index
+          </div>
+          <p className="mt-1.5 text-[12px] text-app-muted max-w-sm mx-auto leading-relaxed">
+            Nothing ranked for this query. Try different keywords or clear the search box and use
+            filters on the full library below.
+          </p>
+          {onClearSearch && (
+            <button
+              type="button"
+              onClick={onClearSearch}
+              className="mt-4 text-[12px] font-semibold text-app-accent bg-transparent border-none cursor-pointer hover:underline underline-offset-2"
+            >
+              Clear search
+            </button>
+          )}
         </div>
       )}
 
