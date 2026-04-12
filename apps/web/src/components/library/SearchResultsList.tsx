@@ -1,17 +1,16 @@
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Loader2, SearchX } from 'lucide-react';
 import type { ContentSearchHit } from '../../services/searchService';
+import {
+  plainTitleFromHit,
+  relevancePercentForHit,
+  snippetHtmlFromHit,
+  titleHtmlFromHit,
+} from '../../lib/searchHitDisplay';
+import { Pagination } from './Pagination';
 
-function titleFromSource(source: Record<string, unknown>): string {
-  const t = source.title ?? source.name;
-  if (typeof t === 'string' && t.trim()) return t.trim();
-  return 'Untitled';
-}
-
-function clampScore(score: number): number {
-  if (!Number.isFinite(score)) return 0;
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
+const snippetMarkClass =
+  '[&_mark]:rounded-sm [&_mark]:bg-amber-400/30 [&_mark]:px-0.5 [&_mark]:text-app-text [&_em]:italic';
 
 export type SearchResultsListProps = {
   q: string;
@@ -19,6 +18,10 @@ export type SearchResultsListProps = {
   unavailable: boolean;
   error: string | null;
   hits: ContentSearchHit[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   /** Optional: show a smaller note when search is disabled/unavailable */
   compact?: boolean;
   onClearSearch?: () => void;
@@ -30,11 +33,20 @@ export function SearchResultsList({
   unavailable,
   error,
   hits,
+  total,
+  page,
+  pageSize,
+  onPageChange,
   compact = false,
   onClearSearch,
 }: SearchResultsListProps) {
   const show = q.trim().length > 0;
   if (!show) return null;
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const showPager = !error && !unavailable && total > pageSize;
+  const fromIdx = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const toIdx = total === 0 ? 0 : Math.min(page * pageSize, total);
 
   return (
     <div className="mt-4 rounded-app-lg border border-app-border bg-app-surface overflow-hidden">
@@ -44,12 +56,19 @@ export function SearchResultsList({
             Results for “{q.trim()}”
           </div>
           {!compact && (
-            <div className="text-[11px] text-app-faint mt-0.5">
-              Ranked by relevance{unavailable ? ' (search index unavailable)' : ''}.
+            <div className="text-[11px] text-app-faint mt-0.5 space-x-1">
+              <span>
+                Ranked by relevance{unavailable ? ' (search index unavailable)' : ''}.
+              </span>
+              {!error && !unavailable && !loading && total > 0 && (
+                <span className="text-app-muted">
+                  Showing {fromIdx}–{toIdx} of {total}.
+                </span>
+              )}
             </div>
           )}
         </div>
-        {loading && <Loader2 size={16} className="animate-spin text-app-faint shrink-0" />}
+        {loading && <Loader2 size={16} className="animate-spin text-app-faint shrink-0" aria-label="Loading results" />}
       </div>
 
       {error && (
@@ -87,46 +106,74 @@ export function SearchResultsList({
       )}
 
       {!error && hits.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-app-border">
-          {hits.map((h, idx) => {
-            const title = titleFromSource(h.source);
-            const scorePct = clampScore(h.score);
-            return (
-              <li key={`${h.contentId}:${idx}`} className="px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/library/${h.contentId}`}
-                      className="text-[13px] font-semibold text-app-accent hover:text-app-accent truncate block"
-                      title={title}
-                    >
-                      {title}
-                      <ArrowUpRight size={14} className="inline-block ml-1 opacity-70" />
-                    </Link>
-                    {h.snippetHtml ? (
-                      <div
-                        className="text-[12px] text-app-muted mt-1 leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: h.snippetHtml }}
-                      />
-                    ) : (
-                      <div className="text-[12px] text-app-faint mt-1">
-                        No snippet available.
+        <>
+          <ul className="list-none m-0 p-0 divide-y divide-app-border">
+            {hits.map((h, idx) => {
+              const titlePlain = plainTitleFromHit(h);
+              const titleHtml = titleHtmlFromHit(h);
+              const snippetHtml = snippetHtmlFromHit(h);
+              const relPct = relevancePercentForHit(hits, idx);
+              return (
+                <li key={`${h.contentId}:${idx}`} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to={`/library/${h.contentId}`}
+                        className="text-[13px] font-semibold text-app-accent hover:text-app-accent line-clamp-2"
+                        title={titlePlain}
+                      >
+                        {titleHtml ? (
+                          <span
+                            className={snippetMarkClass}
+                            dangerouslySetInnerHTML={{ __html: titleHtml }}
+                          />
+                        ) : (
+                          titlePlain
+                        )}
+                        <ArrowUpRight size={14} className="inline-block ml-1 opacity-70 shrink-0 align-middle" aria-hidden />
+                      </Link>
+                      {snippetHtml ? (
+                        <div
+                          className={`text-[12px] text-app-muted mt-1.5 leading-relaxed line-clamp-3 ${snippetMarkClass}`}
+                          dangerouslySetInnerHTML={{ __html: snippetHtml }}
+                        />
+                      ) : (
+                        <div className="text-[12px] text-app-faint mt-1.5">
+                          No snippet available.
+                        </div>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right w-[4.5rem]">
+                      <div className="text-[10px] text-app-faint uppercase tracking-wide">Relevance</div>
+                      <div className="text-[12px] font-semibold text-app-text tabular-nums">
+                        {relPct}%
                       </div>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-[10px] text-app-faint uppercase">Score</div>
-                    <div className="text-[12px] font-semibold text-app-text tabular-nums">
-                      {scorePct}
+                      <div
+                        className="mt-1 h-1 rounded-full bg-app-border/80 overflow-hidden"
+                        title={`Blended score on this page: ${typeof h.score === 'number' ? h.score.toFixed(4) : '—'}`}
+                      >
+                        <div
+                          className="h-full rounded-full bg-app-accent/80 transition-[width] duration-300"
+                          style={{ width: `${relPct}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+          {showPager && (
+            <nav className="border-t border-app-border" aria-label="Search results pages">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+              />
+            </nav>
+          )}
+        </>
       )}
     </div>
   );
 }
-

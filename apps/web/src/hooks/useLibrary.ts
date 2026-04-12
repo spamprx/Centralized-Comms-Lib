@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { mockContentItems, mockTags } from '../data/mockLibraryData';
 import type { ContentItem, Tag } from '../data/mockLibraryData';
@@ -10,9 +10,15 @@ import {
   serializeLibrarySearchParams,
   type LibraryUrlFilters,
 } from '../lib/libraryUrlState';
+import { staticSearchLibrary } from '../lib/staticLibrarySearch';
 import { searchContent, type ContentSearchHit } from '../services/searchService';
 
 const USE_MOCK_DATA = true;
+/** Library list is mock → run ranked search locally (no API / Elasticsearch). */
+const USE_STATIC_LIBRARY_SEARCH = USE_MOCK_DATA;
+
+/** Matches API max chunk size per request; broad queries stay bounded server-side (size cap 100). */
+export const LIBRARY_SEARCH_PAGE_SIZE = 10;
 
 function tagSlugFromMockName(name: string): string {
   return name.toLowerCase();
@@ -33,10 +39,13 @@ export function useLibrary() {
   const [loading, setLoading] = useState(true);
 
   const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '');
-  const [searchHits, setSearchHits] = useState<ContentSearchHit[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchUnavailable, setSearchUnavailable] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [remoteSearchHits, setRemoteSearchHits] = useState<ContentSearchHit[]>([]);
+  const [remoteSearchTotal, setRemoteSearchTotal] = useState(0);
+  const [searchPage, setSearchPage] = useState(1);
+  const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
+  const [remoteSearchUnavailable, setRemoteSearchUnavailable] = useState(false);
+  const [remoteSearchError, setRemoteSearchError] = useState<string | null>(null);
+  const prevSearchQRef = useRef<string>('');
 
   useEffect(() => {
     setSearchInput(filters.q);
@@ -57,42 +66,92 @@ export function useLibrary() {
   useEffect(() => {
     const q = filters.q.trim();
     if (!q) {
-      setSearchHits([]);
-      setSearchLoading(false);
-      setSearchUnavailable(false);
-      setSearchError(null);
+      setSearchPage(1);
+      prevSearchQRef.current = '';
+    } else if (prevSearchQRef.current !== q) {
+      prevSearchQRef.current = q;
+      setSearchPage(1);
+    }
+  }, [filters.q]);
+
+  useEffect(() => {
+    if (USE_STATIC_LIBRARY_SEARCH) return;
+
+    const q = filters.q.trim();
+    if (!q) {
+      setRemoteSearchHits([]);
+      setRemoteSearchTotal(0);
+      setRemoteSearchLoading(false);
+      setRemoteSearchUnavailable(false);
+      setRemoteSearchError(null);
       return;
     }
 
     let cancelled = false;
-    setSearchLoading(true);
-    setSearchError(null);
+    setRemoteSearchLoading(true);
+    setRemoteSearchHits([]);
+    setRemoteSearchError(null);
+
+    const from = (searchPage - 1) * LIBRARY_SEARCH_PAGE_SIZE;
 
     (async () => {
       try {
-        const res = await searchContent(q, { size: 12, includeSnippets: true });
+        const res = await searchContent(q, {
+          from,
+          size: LIBRARY_SEARCH_PAGE_SIZE,
+          includeSnippets: true,
+        });
         if (cancelled) return;
         if (res === null) {
-          setSearchUnavailable(true);
-          setSearchHits([]);
+          setRemoteSearchUnavailable(true);
+          setRemoteSearchHits([]);
+          setRemoteSearchTotal(0);
           return;
         }
-        setSearchUnavailable(false);
-        setSearchHits(res.hits ?? []);
+        setRemoteSearchUnavailable(false);
+        const list = res.hits ?? [];
+        const t = typeof res.total === 'number' ? res.total : list.length;
+        setRemoteSearchHits(list);
+        setRemoteSearchTotal(t);
+        const totalPages = Math.max(1, Math.ceil(t / LIBRARY_SEARCH_PAGE_SIZE));
+        setSearchPage((p) => (p > totalPages ? totalPages : p));
       } catch (e) {
         if (cancelled) return;
-        setSearchError(e instanceof Error ? e.message : 'Search failed');
-        setSearchHits([]);
-        setSearchUnavailable(false);
+        setRemoteSearchError(e instanceof Error ? e.message : 'Search failed');
+        setRemoteSearchHits([]);
+        setRemoteSearchTotal(0);
+        setRemoteSearchUnavailable(false);
       } finally {
-        if (!cancelled) setSearchLoading(false);
+        if (!cancelled) setRemoteSearchLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [filters.q]);
+  }, [filters.q, searchPage]);
+
+  const staticSearchFull = useMemo(() => {
+    if (!USE_STATIC_LIBRARY_SEARCH) return [];
+    const q = filters.q.trim();
+    if (!q || !allContentItems.length) return [];
+    return staticSearchLibrary(allContentItems, q);
+  }, [allContentItems, filters.q]);
+
+  const staticSearchPage = useMemo(() => {
+    if (!USE_STATIC_LIBRARY_SEARCH) return { hits: [] as ContentSearchHit[], total: 0 };
+    const total = staticSearchFull.length;
+    const from = (searchPage - 1) * LIBRARY_SEARCH_PAGE_SIZE;
+    const hits = staticSearchFull.slice(from, from + LIBRARY_SEARCH_PAGE_SIZE);
+    return { hits, total };
+  }, [staticSearchFull, searchPage]);
+
+  useEffect(() => {
+    if (!USE_STATIC_LIBRARY_SEARCH) return;
+    const t = staticSearchPage.total;
+    const totalPages = Math.max(1, Math.ceil(t / LIBRARY_SEARCH_PAGE_SIZE));
+    setSearchPage((p) => (p > totalPages ? totalPages : p));
+  }, [USE_STATIC_LIBRARY_SEARCH, staticSearchPage.total]);
 
   useEffect(() => {
     if (USE_MOCK_DATA) {
@@ -213,9 +272,13 @@ export function useLibrary() {
     toggleTag,
     clearAllFilters,
     hasActiveFilters,
-    searchHits,
-    searchLoading,
-    searchUnavailable,
-    searchError,
+    searchHits: USE_STATIC_LIBRARY_SEARCH ? staticSearchPage.hits : remoteSearchHits,
+    searchTotal: USE_STATIC_LIBRARY_SEARCH ? staticSearchPage.total : remoteSearchTotal,
+    searchPage,
+    setSearchPage,
+    searchPageSize: LIBRARY_SEARCH_PAGE_SIZE,
+    searchLoading: USE_STATIC_LIBRARY_SEARCH ? false : remoteSearchLoading,
+    searchUnavailable: USE_STATIC_LIBRARY_SEARCH ? false : remoteSearchUnavailable,
+    searchError: USE_STATIC_LIBRARY_SEARCH ? null : remoteSearchError,
   };
 }

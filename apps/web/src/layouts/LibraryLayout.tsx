@@ -56,6 +56,10 @@ export default function LibraryLayout() {
     clearAllFilters,
     hasActiveFilters,
     searchHits,
+    searchTotal,
+    searchPage,
+    setSearchPage,
+    searchPageSize,
     searchLoading,
     searchUnavailable,
     searchError,
@@ -149,6 +153,10 @@ export default function LibraryLayout() {
           unavailable={searchUnavailable}
           error={searchError}
           hits={searchHits}
+          total={searchTotal}
+          page={searchPage}
+          pageSize={searchPageSize}
+          onPageChange={setSearchPage}
           onClearSearch={() => {
             setSearchInput("");
             patchFilters({ q: "" });
