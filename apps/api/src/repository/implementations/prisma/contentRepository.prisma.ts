@@ -10,6 +10,8 @@ import type {
   VersionChangeType,
   Visibility,
 } from "../../types";
+import { Prisma } from "@prisma/client";
+
 import type { PrismaDb } from "./prismaTypes";
 
 function toContent(row: {
@@ -196,5 +198,28 @@ export class PrismaContentRepository implements ContentRepository {
       if (row.body != null) return toVersion(row);
     }
     return null;
+  }
+
+  async listLatestContentVersionsMaybeReferencingComponentVersion(
+    componentVersionId: string,
+  ): Promise<Array<{ contentVersionId: string; contentId: string; body: TipTapDocument | null }>> {
+    const pattern = `%${componentVersionId}%`;
+    const rows = await this.db.$queryRaw<
+      Array<{ id: string; contentId: string; body: unknown }>
+    >(Prisma.sql`
+      SELECT DISTINCT ON (cv."contentId") cv.id, cv."contentId", cv.body
+      FROM content_versions cv
+      WHERE cv.body IS NOT NULL
+      AND cv.body::text LIKE ${pattern}
+      ORDER BY cv."contentId", cv."versionNumber" DESC
+    `);
+    return rows.map((r) => ({
+      contentVersionId: r.id,
+      contentId: r.contentId,
+      body:
+        r.body != null && typeof r.body === "object" && !Array.isArray(r.body)
+          ? (r.body as TipTapDocument)
+          : null,
+    }));
   }
 }

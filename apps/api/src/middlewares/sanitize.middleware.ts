@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 
-const MAX_PAYLOAD_SIZE = 100 * 1024;
-const MAX_DEPTH = 10;
-const MAX_KEYS = 100;
+/** Large TipTap/JSON documents need a higher ceiling than typical form posts. */
+const MAX_PAYLOAD_SIZE = 15 * 1024 * 1024;
+const MAX_DEPTH = 32;
+const MAX_KEYS = 200_000;
 
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -55,6 +56,69 @@ function containsDangerousPattern(value: string): boolean
     return DANGEROUS_PATTERNS.some((pattern) => pattern.test(value));
 }
 
+/**
+ * JSON request bodies (TipTap docs, etc.) must keep raw string values.
+ * HTML-escaping or trimming strings here corrupts stored JSON and breaks the editor on read.
+ * XSS for rich text is handled when rendering in the client, not by mangling REST payloads.
+ */
+function sanitizeJsonValue(
+    value: unknown,
+    depth = 0,
+    keyCount = { count: 0 },
+): unknown
+{
+    if (depth > MAX_DEPTH)
+    {
+        throw new Error("Payload exceeds maximum nesting depth");
+    }
+
+    if (typeof value === "string")
+    {
+        return stripNullBytes(value);
+    }
+
+    if (Array.isArray(value))
+    {
+        return value.map((item) => sanitizeJsonValue(item, depth + 1, keyCount));
+    }
+
+    if (value !== null && typeof value === "object")
+    {
+        const sanitized: Record<string, unknown> = {};
+
+        for (const [key, val] of Object.entries(value))
+        {
+            keyCount.count++;
+            if (keyCount.count > MAX_KEYS)
+            {
+                throw new Error("Payload exceeds maximum number of keys");
+            }
+
+            if (BLOCKED_KEYS.has(key)) continue;
+
+            const safeKey = stripNullBytes(String(key));
+            sanitized[safeKey] = sanitizeJsonValue(val, depth + 1, keyCount);
+        }
+
+        return sanitized;
+    }
+
+    return value;
+}
+
+/** Strings in query params / headers: strip nulls and escape for safe logging/reflection contexts. */
+function sanitizeUntrustedString(value: string): string
+{
+    let sanitized = stripNullBytes(value);
+
+    if (containsDangerousPattern(sanitized))
+    {
+        throw new Error("Potentially malicious content detected in payload");
+    }
+
+    return escapeHtml(sanitized);
+}
+
 function sanitizeValue(
     value: unknown,
     depth = 0,
@@ -69,14 +133,7 @@ function sanitizeValue(
 
     if (typeof value === "string") 
     {
-        let sanitized = stripNullBytes(value);
-
-        if (containsDangerousPattern(sanitized)) 
-        {
-            throw new Error("Potentially malicious content detected in payload");
-        }
-
-        return escapeHtml(sanitized);
+        return sanitizeUntrustedString(value);
     }
 
     if (Array.isArray(value)) 
@@ -99,7 +156,6 @@ function sanitizeValue(
             // Prototype pollution protection
             if (BLOCKED_KEYS.has(key)) continue;
 
-            // Sanitize the key itself before using it
             const safeKey = escapeHtml(stripNullBytes(String(key)));
             sanitized[safeKey] = sanitizeValue(val, depth + 1, keyCount);
         }
@@ -184,7 +240,7 @@ export const sanitize = (
         if (checkContentType(req, res)) return;
         if (checkPayloadSize(req, res)) return;
 
-        if (req.body   && typeof req.body   === "object") req.body   = sanitizeValue(req.body);
+        if (req.body   && typeof req.body   === "object") req.body   = sanitizeJsonValue(req.body);
         if (req.query  && typeof req.query  === "object") req.query  = sanitizeValue(req.query)  as typeof req.query;
         if (req.params && typeof req.params === "object") req.params = sanitizeValue(req.params) as typeof req.params;
 
