@@ -23,6 +23,7 @@ import {
 import { PageHeader } from '../ui/PageHeader';
 import { PageShell } from '../ui/PageShell';
 import { Surface } from '../ui/Surface';
+import TemplateLayoutEditor from './TemplateLayoutEditor';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
@@ -1042,17 +1043,12 @@ export default function TemplatesPage() {
                   </p>
                 </div>
               </div>
-              <div>
-                <div className="text-app-faint text-[12px]">Draft Layout</div>
-                <pre className="text-[11px] bg-black/20 border border-app-border rounded p-2 overflow-auto max-h-40">
-                  {JSON.stringify(detail.draftLayout, null, 2) || 'null'}
-                </pre>
-              </div>
-              <div>
-                <div className="text-app-faint text-[12px]">Active Layout</div>
-                <pre className="text-[11px] bg-black/20 border border-app-border rounded p-2 overflow-auto max-h-40">
-                  {JSON.stringify(detail.activeLayout, null, 2) || 'null'}
-                </pre>
+              <div className="rounded-lg border border-app-border p-3 bg-black/10">
+                <div className="text-app-faint text-[12px] mb-1">Layout status</div>
+                <p className="text-xs text-app-muted m-0">
+                  {detail.draftLayout != null ? 'Draft layout saved.' : 'No draft layout yet.'}{' '}
+                  {detail.activeLayout != null ? 'Active layout is published.' : 'Nothing active yet.'}
+                </p>
               </div>
             </div>
           ) : (
@@ -1060,6 +1056,20 @@ export default function TemplatesPage() {
           )}
         </Surface>
       </div>
+
+      {detail && templateId ? (
+        <Surface padding="md" className="mt-6">
+          <TemplateLayoutEditor
+            templateId={detail.id}
+            draftLayout={detail.draftLayout}
+            bindingCount={detail.bindings?.length ?? 0}
+            onLayoutSaved={(saved) => {
+              setDetail(saved);
+              setItems((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+            }}
+          />
+        </Surface>
+      ) : null}
       </PageShell>
       {showForm && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
