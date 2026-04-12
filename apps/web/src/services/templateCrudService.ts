@@ -38,6 +38,18 @@ export type UpdateTemplateInput = {
   status?: TemplateStatus;
 };
 
+/** Matches API shared/validation/layoutConfig.ts */
+export type TemplateLayoutRegion = {
+  id: string;
+  type: string;
+  props?: Record<string, unknown>;
+};
+
+export type TemplateLayoutConfig = {
+  version: number;
+  regions: TemplateLayoutRegion[];
+};
+
 export type ChannelRecord = {
   id: string;
   name: string;
@@ -152,6 +164,19 @@ export const templateCrudService = {
     return request<TemplateRecord>(`/templates/${templateId}/i18n`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    });
+  },
+
+  async saveDraftLayout(templateId: string, layout: TemplateLayoutConfig): Promise<TemplateRecord> {
+    return request<TemplateRecord>(`/templates/${templateId}/layout/draft`, {
+      method: 'PATCH',
+      body: JSON.stringify({ layout }),
+    });
+  },
+
+  async activateTemplate(templateId: string): Promise<TemplateRecord> {
+    return request<TemplateRecord>(`/templates/${templateId}/activate`, {
+      method: 'POST',
     });
   },
 };
