@@ -346,14 +346,14 @@ Published by {{author}} on {{date}}
               </button>
               <button
                 onClick={() => setShowAddChannelModal(true)}
-                className="flex items-center gap-2 rounded-app-md bg-violet-600 px-4 py-2 text-white transition-colors hover:bg-violet-500"
+                className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-4 py-2 text-app-text transition-colors hover:bg-app-surface-hover"
               >
                 <Plus className="w-4 h-4" />
                 Add Channel
               </button>
               <button
                 onClick={() => setShowTranslationModal(true)}
-                className="flex items-center gap-2 rounded-app-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-500"
+                className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-surface px-4 py-2 text-app-text transition-colors hover:bg-app-surface-hover"
               >
                 <Globe className="w-4 h-4" />
                 Translation Preview
@@ -607,7 +607,7 @@ Published by {{author}} on {{date}}
           <h3 className="text-lg font-semibold text-app-text">Channel Bindings</h3>
           <button
             onClick={() => setShowAddChannelModal(true)}
-            className="flex items-center gap-2 rounded-app-md bg-violet-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-violet-500"
+            className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-3 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
           >
             <Plus className="w-4 h-4" />
             Add Channel

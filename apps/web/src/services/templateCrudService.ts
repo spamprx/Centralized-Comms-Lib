@@ -45,9 +45,23 @@ export type TemplateLayoutRegion = {
   props?: Record<string, unknown>;
 };
 
+/** One resizable column within a row (side-by-side blocks) */
+export type LayoutCell = {
+  id: string;
+  /** Relative width; rendered as CSS flex-grow */
+  flexGrow: number;
+  region: TemplateLayoutRegion;
+};
+
+export type LayoutRow = {
+  id: string;
+  cells: LayoutCell[];
+};
+
 export type TemplateLayoutConfig = {
   version: number;
-  regions: TemplateLayoutRegion[];
+  /** v2+: rows of cells; legacy flat `regions` is migrated when parsing */
+  rows: LayoutRow[];
 };
 
 export type ChannelRecord = {

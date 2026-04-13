@@ -1,4 +1,4 @@
-import { LayoutGrid, Type, Image as ImageIcon, Braces } from 'lucide-react';
+import { Braces, Image as ImageIcon, Type } from 'lucide-react';
 
 type PalettePick = 'text' | 'media' | 'field';
 
@@ -7,67 +7,72 @@ type TemplateComponentPaletteProps = {
   disabled?: boolean;
 };
 
-/**
- * Visual palette: pick a block type to open its configuration modal before inserting on the canvas.
- */
-export default function TemplateComponentPalette({ onPick, disabled }: TemplateComponentPaletteProps) {
-  const items: Array<{
-    kind: PalettePick;
-    title: string;
-    description: string;
-    icon: typeof Type;
-  }> = [
-    {
-      kind: 'text',
-      title: 'Text',
-      description: 'Rich text with optional section title and placeholder.',
-      icon: Type,
-    },
-    {
-      kind: 'media',
-      title: 'Media',
-      description: 'Image or asset slot with role, alt, and caption.',
-      icon: ImageIcon,
-    },
-    {
-      kind: 'field',
-      title: 'Field',
-      description: 'Merge field for dynamic values at send time.',
-      icon: Braces,
-    },
-  ];
+const BLOCKS: Array<{
+  kind: PalettePick;
+  label: string;
+  description: string;
+  icon: typeof Type;
+  color: string;
+}> = [
+  {
+    kind: 'text',
+    label: 'Text',
+    description: 'Rich text section with optional heading',
+    icon: Type,
+    color: '#8b5cf6',
+  },
+  {
+    kind: 'media',
+    label: 'Media',
+    description: 'Image or asset placeholder slot',
+    icon: ImageIcon,
+    color: '#06b6d4',
+  },
+  {
+    kind: 'field',
+    label: 'Field',
+    description: 'Dynamic merge field token',
+    icon: Braces,
+    color: '#f59e0b',
+  },
+];
 
+export default function TemplateComponentPalette({ onPick, disabled }: TemplateComponentPaletteProps) {
   return (
-    <div className="rounded-xl border border-app-border/90 bg-app-bg-subtle/40 p-3">
-      <div className="mb-3 flex items-center gap-2 border-b border-app-border/60 pb-2">
-        <LayoutGrid size={16} className="text-app-accent/90" />
-        <div>
-          <div className="text-[13px] font-semibold text-app-text">Components</div>
-          <p className="m-0 text-[11px] leading-snug text-app-faint">
-            Choose a block — configure it, then add to the canvas.
+    <div className="rounded-app-lg border border-white/[0.08] bg-app-surface/50 p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-sm sm:p-3.5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-start sm:justify-center sm:py-0.5">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-app-muted">Add blocks</h3>
+          <p className="hidden text-[10px] leading-snug text-app-faint sm:block sm:max-w-[8rem]">
+            Pick a type, then configure in the dialog.
           </p>
         </div>
-      </div>
-      <ul className="m-0 list-none space-y-2 p-0">
-        {items.map(({ kind, title, description, icon: Icon }) => (
-          <li key={kind}>
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
+          {BLOCKS.map((block) => (
             <button
+              key={block.kind}
               type="button"
               disabled={disabled}
-              onClick={() => onPick(kind)}
-              className="flex w-full gap-3 rounded-lg border border-app-border/80 bg-black/15 px-3 py-2.5 text-left transition-colors hover:border-app-accent/35 hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => onPick(block.kind)}
+              title={block.description}
+              className="flex min-h-[3.25rem] flex-1 items-center gap-2.5 rounded-app-md border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left text-xs text-app-text transition-colors hover:border-app-accent/35 hover:bg-app-accent-muted/35 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-[min(100%,11rem)] sm:flex-1 sm:py-2.5"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-app-border/70 bg-app-bg-subtle/90 text-app-muted">
-                <Icon size={18} strokeWidth={1.75} />
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-app-md border border-white/[0.08] bg-app-bg-subtle/80"
+                style={{ color: block.color }}
+              >
+                <block.icon size={16} strokeWidth={1.75} className="opacity-95" />
               </span>
               <span className="min-w-0">
-                <span className="block text-[13px] font-medium text-app-text">{title}</span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-app-faint">{description}</span>
+                <span className="block font-medium text-app-text">{block.label}</span>
+                <span className="mt-0.5 block text-[10px] leading-snug text-app-muted sm:line-clamp-2">
+                  {block.description}
+                </span>
               </span>
             </button>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
