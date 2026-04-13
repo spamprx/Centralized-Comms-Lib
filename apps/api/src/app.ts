@@ -163,7 +163,7 @@ app.post("/dev/reindex", async (_req: Request, res: Response) => {
       res.status(503).json({ error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)" });
       return;
     }
-    const { syncContentIndexFromDb } = await import("./search/contentSearch.service");
+    const { syncContentIndexFromDb } = await import("./intelligence");
     const prisma = getPrismaClient();
     const rows = await prisma.content.findMany({ select: { id: true } });
     let indexed = 0;

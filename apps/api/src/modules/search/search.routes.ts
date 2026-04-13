@@ -5,9 +5,9 @@ import {
   searchContentCached,
   searchContentCheck,
   searchContentCheckByText,
-} from "../../search/contentSearch.service";
+} from "../../intelligence";
 import { parseContentSearchFilters } from "./search.filters";
-import { assertValidQueryVector, type RankBlendWeights } from "../../search/rankBlend";
+import { assertValidQueryVector, type RankBlendWeights } from "../../intelligence/rankBlend";
 
 const router = Router();
 
