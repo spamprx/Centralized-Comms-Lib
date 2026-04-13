@@ -542,8 +542,6 @@ router.get("/ai-insights", authorize("ADMIN"), async (req: AuthRequest, res: Res
   }
 });
 
-<<<<<<< HEAD
-=======
 // ─── CSV Export ─────────────────────────────────────────────────────────────
 
 function escapeCsvField(value: string): string {
@@ -754,5 +752,4 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
   }
 });
 
->>>>>>> Backend
 export default router;

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import type { UserRole } from "../../middlewares/auth.middleware";
+import { authenticate, type AuthRequest, type UserRole } from "../../middlewares/auth.middleware";
 import { authService } from "../../service";
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 const router = Router();

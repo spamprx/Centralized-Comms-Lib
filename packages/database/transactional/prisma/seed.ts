@@ -1403,11 +1403,6 @@ async function main() {
   await seedUserRoles();
   await seedGroups();
   await seedGroupMemberships();
-<<<<<<< HEAD
-  await seedWorkspace();
-  await seedTags();
-  await seedChannels();
-=======
   await seedWorkspaces();
   await seedTags();
   await seedChannels();
@@ -1422,7 +1417,6 @@ async function main() {
   await seedTemplateLayoutSections();
 
   // Content with TipTap bodies
->>>>>>> Backend
   await seedContent();
   await seedContentVersions();
   await seedContentTags();
