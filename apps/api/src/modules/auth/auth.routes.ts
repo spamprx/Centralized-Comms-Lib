@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { authenticate, type AuthRequest, type UserRole } from "../../middlewares/auth.middleware";
+import type { UserRole } from "../../middlewares/auth.middleware";
 import { authService } from "../../service";
-import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
+
 const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -18,27 +18,6 @@ function signToken(payload: { id: string; email: string; role: UserRole }): stri
   });
 }
 
-function setAuthCookie(res: Response, token: string) {
-  const secure = process.env.COOKIE_SECURE === "true";
-  const sameSite = (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none" | undefined) ?? "lax";
-  res.cookie("auth_token", token, {
-    httpOnly: true,
-    secure,
-    sameSite,
-    path: "/",
-    maxAge: 24 * 60 * 60 * 1000,
-  });
-}
-function clearAuthCookie(res: Response) {
-  const secure = process.env.COOKIE_SECURE === "true";
-  const sameSite = (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none" | undefined) ?? "lax";
-  res.clearCookie("auth_token", {
-    httpOnly: true,
-    secure,
-    sameSite,
-    path: "/",
-  });
-}
 /**
  * @openapi
  * /api/v1/auth/register:
@@ -90,10 +69,12 @@ router.post("/register", async (req: Request, res: Response) => {
       res.status(409).json({ error: "Email already registered" });
       return;
     }
-    const token = signToken({ id: result.user.id, email: result.user.email, role: "USER" });
-    setAuthCookie(res, token);
-
-    res.status(201).json({ user: result.user });
+    const token = signToken({
+      id: result.user.id,
+      email: result.user.email,
+      role: "USER",
+    });
+    res.status(201).json({ user: result.user, token });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -150,31 +131,7 @@ router.post("/login", async (req: Request, res: Response) => {
     }
     const { user, role } = result;
     const token = signToken({ id: user.id, email: user.email, role });
-    setAuthCookie(res, token);
-
-    res.status(200).json({ user });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
-
-router.post("/logout", async (req: Request, res: Response) => {
-  clearAuthCookie(res);
-  res.status(200).json({ ok: true });
-});
-
-router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
-    const user = await repos.userRole.getUserById(req.user!.id);
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-    res.status(200).json({ user });
+    res.status(200).json({ user, token });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

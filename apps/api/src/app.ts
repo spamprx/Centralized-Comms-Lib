@@ -1,6 +1,5 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import apiRouter from "./routes";
 import { getPrismaClient, PrismaUnitOfWork } from "./repository";
@@ -26,7 +25,6 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 
 // Interactive OpenAPI documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));

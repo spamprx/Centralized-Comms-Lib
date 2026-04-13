@@ -120,7 +120,7 @@ export const templateService = {
         name,
         slug,
         description: input.description ?? null,
-        authorId: ctx.actorId,  
+        authorId: ctx.actorId,
         draftLayout: input.draftLayout ?? null,
         status: "DRAFT",
         i18n: {},

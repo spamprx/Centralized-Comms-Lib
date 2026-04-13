@@ -1,27 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Save,
-  Eye,
-  Settings,
-  Puzzle,
-  BookMarked,
-  Type,
-  Image,
-  Link as LinkIcon,
   Bold,
   Italic,
+  Underline as UnderlineIcon,
   List,
   ListOrdered,
   Heading1,
   Heading2,
   Loader2,
   Check,
-  History,
+  BookMarked,
+  Link as LinkIcon,
+  Puzzle,
+  Share2,
+  ChevronRight,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import { contentService } from '../services/contentService';
 import { componentService } from '../services/componentService';
@@ -33,10 +32,11 @@ import {
 } from '../services/citationService';
 import type { ContentSearchHit } from '../services/searchService';
 import { useEditorStore } from '../store/editorStore';
+import { useAuth } from '../context/AuthContext';
 import SimilarContentWidget from '../components/content/SimilarContentWidget';
 import CitationSearchDialog from '../components/editor/CitationSearchDialog';
 import ComponentLibraryPanel from '../components/editor/ComponentLibraryPanel';
-import { Surface } from '../components/ui/Surface';
+import SlashCommandMenu from '../components/editor/SlashCommandMenu';
 import {
   emptyReferencesSectionHtml,
   hasBibliographySection,
@@ -54,16 +54,27 @@ type CitationItem = {
   work: CitationWork;
 };
 
+function userInitials(email: string, displayName?: string | null): string {
+  const s = (displayName?.trim() || email || '?').trim();
+  const parts = s.split(/[\s@._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2);
+  }
+  return s.slice(0, 2).toUpperCase() || '?';
+}
+
 export default function EditorLayout() {
+  const { user } = useAuth();
   const { contentId: routeContentId } = useParams<{ contentId: string }>();
   const { draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft } = useEditorStore();
   const [title, setTitle] = useState(draftTitle);
   const [content, setContent] = useState(draftContent || '<p></p>');
-  const [showPreview, setShowPreview] = useState(false);
+  const [mainTab, setMainTab] = useState<'edit' | 'preview'>('edit');
   const [contentId, setContentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState<{ title: string; content: string } | null>(null);
   const [showSaveComponentModal, setShowSaveComponentModal] = useState(false);
   const [componentName, setComponentName] = useState('');
   const [componentKey, setComponentKey] = useState('');
@@ -81,12 +92,18 @@ export default function EditorLayout() {
   const [citationItems, setCitationItems] = useState<CitationItem[]>([]);
   const citationItemsRef = useRef(citationItems);
   citationItemsRef.current = citationItems;
-  const [rightPanelTab, setRightPanelTab] = useState<'properties' | 'library'>('library');
+  const [rightPanelTab, setRightPanelTab] = useState<'library' | 'properties' | 'refs'>('library');
+  const [wordCount, setWordCount] = useState(0);
 
   const persistedContentId = useMemo(
     () => contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null),
     [contentId, routeContentId],
   );
+
+  const dirty = useMemo(() => {
+    if (!savedSnapshot) return true;
+    return title.trim() !== savedSnapshot.title || content !== savedSnapshot.content;
+  }, [title, content, savedSnapshot]);
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) {
@@ -96,22 +113,20 @@ export default function EditorLayout() {
     setSaving(true);
     setSaveError(null);
     try {
-      // Build TipTap JSON from HTML for API
       const bodyDoc = {
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text: content.replace(/<[^>]*>/g, '') || '' }] }],
       };
 
       if (!contentId) {
-        // First save — create a new draft
         const result = await contentService.createDraft(title.trim(), bodyDoc);
         setContentId(result.content.id);
       } else {
-        // Subsequent save — update existing draft
         await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
       }
+      const t = title.trim();
+      setSavedSnapshot({ title: t, content });
       setLastSaved(new Date());
-      // Clear draft from context after successful save
       clearDraft();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
@@ -131,10 +146,10 @@ export default function EditorLayout() {
     setDraftContent(content);
   }, [content, setDraftContent]);
 
-
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
       CitationMarker,
       Link.configure({
         openOnClick: false,
@@ -146,22 +161,36 @@ export default function EditorLayout() {
         },
       }),
       Placeholder.configure({
-        placeholder: 'Start writing your content here...',
+        placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Press / to insert a block' : ''),
       }),
     ],
     content,
-    onUpdate: ({ editor }) => setContent(editor.getHTML()),
-    onSelectionUpdate: ({ editor }) => {
-      const { from, to } = editor.state.selection;
-      const text = from === to ? '' : editor.state.doc.textBetween(from, to, ' ').trim();
+    onUpdate: ({ editor: ed }) => setContent(ed.getHTML()),
+    onSelectionUpdate: ({ editor: ed }) => {
+      const { from, to } = ed.state.selection;
+      const text = from === to ? '' : ed.state.doc.textBetween(from, to, ' ').trim();
       setSelectionText(text);
     },
     editorProps: {
       attributes: {
-        class: 'min-h-[400px] p-6 bg-app-bg/60 border border-app-border/80 rounded-xl text-app-text text-[15px] leading-relaxed outline-none box-border',
+        class:
+          'editor-prose min-h-[360px] px-8 py-6 text-[15px] leading-relaxed text-[var(--editor-doc-text)] outline-none box-border',
       },
     },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    const updateCount = () => {
+      const text = editor.getText().trim();
+      setWordCount(text ? text.split(/\s+/).filter(Boolean).length : 0);
+    };
+    updateCount();
+    editor.on('update', updateCount);
+    return () => {
+      editor.off('update', updateCount);
+    };
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -240,9 +269,7 @@ export default function EditorLayout() {
 
       setShowSaveComponentModal(false);
       setRightPanelTab('library');
-      setComponentNotice(
-        `Saved "${componentName.trim()}" as ${componentMode === 'linked' ? 'linked' : 'detached'} component`,
-      );
+      setComponentNotice(`Saved “${componentName.trim()}” as ${componentMode === 'linked' ? 'linked' : 'snapshot'}`);
       window.setTimeout(() => setComponentNotice(null), 3500);
     } catch (err) {
       setComponentSaveError(err instanceof Error ? err.message : 'Failed to save component');
@@ -265,7 +292,6 @@ export default function EditorLayout() {
     setShowCitationDialog(true);
   }, []);
 
-  /** Re-render bibliography entries when the global citation format changes. */
   useEffect(() => {
     const snapshot = citationItemsRef.current;
     if (snapshot.length === 0) return;
@@ -296,7 +322,7 @@ export default function EditorLayout() {
       return;
     }
     editor.chain().focus().insertContent(emptyReferencesSectionHtml()).run();
-    setReferenceNotice('References block inserted at the cursor. Add citations from the Cite dialog.');
+    setReferenceNotice('References block inserted. Add citations from Cite.');
     window.setTimeout(() => setReferenceNotice(null), 4000);
   }, [editor]);
 
@@ -338,314 +364,432 @@ export default function EditorLayout() {
     [citationMarkerMode, citationStyle, editor],
   );
 
-  const insertBlocks = useMemo(
-    () => [
-      {
-        icon: Heading1,
-        label: 'Heading 1',
-        color: '#8b5cf6',
-        onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
-      },
-      {
-        icon: Heading2,
-        label: 'Heading 2',
-        color: '#06b6d4',
-        onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
-      },
-      { icon: Type, label: 'Paragraph', color: '#f59e0b', onClick: () => editor?.chain().focus().setParagraph().run() },
-      { icon: Bold, label: 'Bold', color: '#10b981', onClick: () => editor?.chain().focus().toggleBold().run() },
-      { icon: Italic, label: 'Italic', color: '#ec4899', onClick: () => editor?.chain().focus().toggleItalic().run() },
-      { icon: List, label: 'Bullet List', color: '#6366f1', onClick: () => editor?.chain().focus().toggleBulletList().run() },
-      { icon: ListOrdered, label: 'Numbered List', color: '#14b8a6', onClick: () => editor?.chain().focus().toggleOrderedList().run() },
-      {
-        icon: LinkIcon,
-        label: 'Link',
-        color: '#a78bfa',
-        onClick: () => {
-          const previousUrl = editor?.getAttributes('link')?.href as string | undefined;
-          const url = window.prompt('Enter URL', previousUrl ?? '');
-          if (!editor) return;
-          if (url === null) return;
-          if (url === '') {
-            editor.chain().focus().extendMarkRange('link').unsetLink().run();
-            return;
-          }
-          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-        },
-      },
-      { icon: BookMarked, label: 'Citation', color: '#22d3ee', onClick: () => openCitationDialog() },
-      { icon: Image, label: 'Image (soon)', color: '#555870', onClick: () => {} },
-    ],
-    [editor, openCitationDialog],
+  const setLink = useCallback(() => {
+    if (!editor) return;
+    const previousUrl = editor.getAttributes('link')?.href as string | undefined;
+    const url = window.prompt('Enter URL', previousUrl ?? '');
+    if (url === null) return;
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  }, [editor]);
+
+  const shareDocument = useCallback(() => {
+    const url = window.location.href;
+    const shareTitle = title.trim() || 'Draft';
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      void navigator.share({ title: shareTitle, url }).catch(() => {
+        void navigator.clipboard.writeText(url);
+      });
+    } else {
+      void navigator.clipboard.writeText(url);
+    }
+  }, [title]);
+
+  const fmtBtn = (active: boolean) =>
+    `flex h-8 min-w-8 items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] px-2 text-[13px] transition-colors ${
+      active
+        ? 'border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] text-[var(--editor-primary)]'
+        : 'border-transparent bg-transparent text-[var(--editor-muted)] hover:bg-[var(--editor-canvas-bg)]'
+    }`;
+
+  const tabChip = (active: boolean) =>
+    `rounded-[6px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+      active
+        ? 'bg-[var(--editor-card-bg)] text-[var(--editor-doc-text)]'
+        : 'text-[var(--editor-muted)] hover:text-[var(--editor-doc-text)]'
+    }`;
+
+  const rightTabs = (
+    <div
+      className="mb-2 flex shrink-0 gap-0.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] p-0.5"
+      role="tablist"
+      aria-label="Side panel"
+    >
+      {(['library', 'properties', 'refs'] as const).map((tab) => (
+        <button
+          key={tab}
+          type="button"
+          role="tab"
+          aria-selected={rightPanelTab === tab}
+          onClick={() => setRightPanelTab(tab)}
+          className={`flex-1 rounded-[6px] px-1.5 py-1.5 text-[11px] font-semibold capitalize ${
+            rightPanelTab === tab
+              ? 'bg-[var(--editor-card-bg)] text-[var(--editor-doc-text)]'
+              : 'text-[var(--editor-faint)] hover:text-[var(--editor-muted)]'
+          }`}
+        >
+          {tab === 'refs' ? 'Refs' : tab}
+        </button>
+      ))}
+    </div>
   );
 
+  const draftLabel = title.trim() || 'Untitled draft';
+  const versionLabel = persistedContentId
+    ? `ID ${persistedContentId.slice(0, 8)}…`
+    : 'New draft';
+
+  const autosaveLabel = saving
+    ? 'Saving…'
+    : saveError
+      ? saveError
+      : !lastSaved
+        ? 'Not saved'
+        : dirty
+          ? 'Unsaved changes'
+          : `Saved ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
   return (
-    <div className="flex h-screen flex-col bg-app-bg">
-      {/* Topbar */}
-      <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
-        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-app-md px-3.5 py-2 text-[13px] transition-colors ${
-              showPreview
-                ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.25)]'
-                : 'bg-app-bg/50 text-app-muted hover:bg-app-elevated'
-            }`}
+    <div className="editor-workspace flex h-screen min-h-0 flex-col">
+      <header className="relative z-20 flex h-[52px] shrink-0 items-center border-b-[0.5px] border-[var(--editor-border)] bg-[var(--editor-topbar-bg)] px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-1 text-[13px] text-[var(--editor-muted)]">
+          <RouterLink
+            to="/library"
+            className="shrink-0 font-medium text-[var(--editor-muted)] no-underline hover:text-[var(--editor-primary)]"
           >
-            <Eye size={16} /> {showPreview ? 'Edit' : 'Preview'}
-          </button>
-          {persistedContentId && (
-            <RouterLink
-              to={`/history/${persistedContentId}`}
-              className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3.5 py-2 text-[13px] text-app-muted transition-colors hover:border-app-accent/30 hover:text-app-accent"
-              title="Version history for this document only"
-            >
-              <History size={16} /> <span className="hidden sm:inline">History</span>
-            </RouterLink>
-          )}
-          <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
-          <span className={`min-w-0 truncate text-[13px] ${saveError ? 'text-red-300' : 'text-app-faint'}`}>
-            {saveError
-              ? saveError
-              : lastSaved
-                ? `Last saved: ${lastSaved.toLocaleTimeString()}`
-                : 'Not saved yet'}
-          </span>
-          {componentNotice && (
-            <>
-              <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
-              <span className="hidden truncate text-[13px] text-emerald-300/95 sm:inline">{componentNotice}</span>
-            </>
-          )}
-          {referenceNotice && (
-            <>
-              <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
-              <span className="hidden truncate text-[13px] text-cyan-300/90 sm:inline">{referenceNotice}</span>
-            </>
-          )}
+            Articles
+          </RouterLink>
+          <ChevronRight size={14} className="shrink-0 text-[var(--editor-faint)]" aria-hidden />
+          <span className="min-w-0 truncate text-[var(--editor-doc-text)]">{draftLabel}</span>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <nav
+            className="pointer-events-auto flex items-center gap-0.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] p-0.5"
+            aria-label="Editor mode"
+          >
+            <button
+              type="button"
+              onClick={() => setMainTab('edit')}
+              className={tabChip(mainTab === 'edit')}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainTab('preview')}
+              className={tabChip(mainTab === 'preview')}
+            >
+              Preview
+            </button>
+            {persistedContentId ? (
+              <RouterLink
+                to={`/history/${persistedContentId}`}
+                className={`${tabChip(false)} no-underline`}
+              >
+                History
+              </RouterLink>
+            ) : (
+              <span
+                className="cursor-not-allowed rounded-[6px] px-3 py-1.5 text-[13px] font-medium text-[var(--editor-faint)]"
+                title="Save the draft first to open version history"
+              >
+                History
+              </span>
+            )}
+          </nav>
+        </div>
+
+        <div className="flex flex-1 items-center justify-end gap-2">
           <button
             type="button"
-            onClick={placeReferencesSectionHere}
-            className="flex items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted transition-colors hover:border-cyan-500/35 hover:text-cyan-300"
-            title="Insert “References” heading and list at the cursor (citations fill this block)"
-          >
-            <ListOrdered size={16} /> <span className="hidden md:inline">Refs block</span>
-          </button>
-          <button
-            onClick={openCitationDialog}
-            className="flex items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted transition-colors hover:border-app-accent/30 hover:text-app-accent"
-            title="Search references — marker is inserted where the cursor is"
-          >
-            <BookMarked size={16} /> <span className="hidden sm:inline">Cite</span>
-          </button>
-          <button
-            onClick={openSaveComponentModal}
-            disabled={!selectedText}
-            className={`flex items-center gap-1.5 rounded-app-md border px-3 py-2 text-[13px] ${
-              selectedText
-                ? 'border-app-border/90 bg-app-bg/45 text-app-muted hover:border-app-accent/30 hover:text-app-accent'
-                : 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint'
-            }`}
-            title={selectedText ? 'Save selected text as reusable component' : 'Select text in editor first'}
-          >
-            <Puzzle size={16} /> <span className="hidden md:inline">Save as Component</span>
-          </button>
-          <button
-            type="button"
-            className="hidden items-center gap-1.5 rounded-app-md border border-app-border/90 bg-app-bg/45 px-3 py-2 text-[13px] text-app-muted hover:bg-app-elevated lg:flex"
-          >
-            <Settings size={16} /> Settings
-          </button>
-          <button
             onClick={handleSaveDraft}
             disabled={saving}
-            className={`flex items-center gap-1.5 rounded-app-md px-4 py-2 text-[13px] font-semibold text-white shadow-app-glow transition-all duration-200 ${
-              saving
-                ? 'cursor-not-allowed bg-app-accent/35 opacity-70'
-                : lastSaved
-                  ? 'bg-gradient-to-br from-emerald-500 to-app-accent-2'
-                  : 'bg-gradient-to-br from-app-accent to-app-accent-2'
-            }`}
+            className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-[var(--editor-primary)] px-3.5 py-2 text-[13px] font-semibold text-[var(--editor-primary-fg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? (
               <Loader2 size={16} className="animate-spin" />
-            ) : lastSaved ? (
+            ) : lastSaved && !dirty ? (
               <Check size={16} />
             ) : (
               <Save size={16} />
             )}
-            {saving ? 'Saving...' : lastSaved ? 'Saved' : 'Save Draft'}
+            {saving ? 'Saving…' : 'Save Draft'}
           </button>
+          <button
+            type="button"
+            onClick={openCitationDialog}
+            className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-transparent bg-transparent px-3 py-2 text-[13px] font-medium text-[var(--editor-muted)] hover:bg-[var(--editor-canvas-bg)]"
+          >
+            <BookMarked size={16} />
+            Cite
+          </button>
+          <button
+            type="button"
+            onClick={shareDocument}
+            className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-transparent bg-transparent px-3 py-2 text-[13px] font-medium text-[var(--editor-muted)] hover:bg-[var(--editor-canvas-bg)]"
+          >
+            <Share2 size={16} />
+            Share
+          </button>
+          <div
+            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] font-semibold text-[var(--editor-primary)]"
+            title={user?.email ?? 'Signed in'}
+          >
+            {user ? userInitials(user.email, user.displayName) : '?'}
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex min-h-0 flex-1 gap-2 overflow-hidden p-2 sm:p-3">
-        {/* Insert Panel */}
-        <Surface variant="glass" padding="sm" className="hidden w-[200px] shrink-0 overflow-y-auto sm:block">
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
-            Insert Blocks
-          </h3>
-          <div className="flex flex-col gap-1">
-            {insertBlocks.map((block) => (
-              <button
-                key={block.label}
-                type="button"
-                className="flex items-center gap-2.5 rounded-app-md border border-app-border/60 bg-app-bg/35 px-3 py-2.5 text-left text-xs text-app-muted transition-[border-color,background-color,color] hover:border-app-border-strong hover:bg-app-elevated hover:text-[var(--block-color)]"
-                style={{ '--block-color': block.color } as CSSProperties & { '--block-color': string }}
-                onClick={() => block.onClick()}
-              >
-                <block.icon size={16} className="shrink-0 opacity-90" />
-                {block.label}
-              </button>
-            ))}
+      {mainTab === 'edit' && (
+        <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b-[0.5px] border-[var(--editor-border)] bg-[var(--editor-topbar-bg)] px-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleBold().run()}
+              className={fmtBtn(!!editor?.isActive('bold'))}
+              title="Bold"
+            >
+              <Bold size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleItalic().run()}
+              className={fmtBtn(!!editor?.isActive('italic'))}
+              title="Italic"
+            >
+              <Italic size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleUnderline().run()}
+              className={fmtBtn(!!editor?.isActive('underline'))}
+              title="Underline"
+            >
+              <UnderlineIcon size={16} strokeWidth={2.25} />
+            </button>
+            <span className="mx-1 h-4 w-px shrink-0 bg-[var(--editor-border)]" aria-hidden />
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+              className={fmtBtn(!!editor?.isActive('heading', { level: 1 }))}
+              title="Heading 1"
+            >
+              <Heading1 size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+              className={fmtBtn(!!editor?.isActive('heading', { level: 2 }))}
+              title="Heading 2"
+            >
+              <Heading2 size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleBulletList().run()}
+              className={fmtBtn(!!editor?.isActive('bulletList'))}
+              title="Bullet list"
+            >
+              <List size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+              className={fmtBtn(!!editor?.isActive('orderedList'))}
+              title="Numbered list"
+            >
+              <ListOrdered size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={setLink}
+              className={fmtBtn(!!editor?.isActive('link'))}
+              title="Link"
+            >
+              <LinkIcon size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor}
+              onClick={openCitationDialog}
+              className={fmtBtn(false)}
+              title="Citation"
+            >
+              <BookMarked size={16} strokeWidth={2.25} />
+            </button>
           </div>
-        </Surface>
+          <span className="shrink-0 tabular-nums text-[13px] text-[var(--editor-faint)]">
+            {wordCount} {wordCount === 1 ? 'word' : 'words'}
+          </span>
+        </div>
+      )}
 
-        {/* Main Editor */}
-        <Surface variant="default" padding="none" className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Title Input */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter title..."
-            className="box-border border-b border-app-border/70 bg-transparent px-5 py-4 text-2xl font-bold text-app-text outline-none placeholder:text-app-faint sm:px-6"
-          />
-
-          <div className="px-5 pb-3 pt-2 sm:px-6">
-            <SimilarContentWidget title={title} bodyHtml={content} contentId={similarCheckContentId} />
-          </div>
-
-          {/* Editor/Preview Area */}
-          <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
-            {showPreview ? (
-              <div className="min-h-full rounded-app-xl border border-app-border/60 bg-app-bg-subtle/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-8">
-                <h1 className="mb-4 text-[28px] font-bold text-app-text">
+      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
+        <div className="editor-canvas-area min-w-0 flex-1 overflow-auto bg-[var(--editor-canvas-bg)] px-6 py-5">
+          <div
+            className="mx-auto max-w-3xl rounded-[var(--editor-radius-card)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)]"
+            style={{ minHeight: 'calc(100% - 8px)' }}
+          >
+            {mainTab === 'preview' ? (
+              <div className="px-8 pb-8 pt-6">
+                <h1 className="m-0 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)]">
                   {title || 'Untitled'}
                 </h1>
-                <div
-                  className="tiptap-content text-[15px] leading-relaxed text-app-muted"
-                  dangerouslySetInnerHTML={{
-                    __html: content && content !== '<p></p>' ? content : '<p>Start writing to see preview...</p>',
-                  }}
-                />
+                {content && content !== '<p></p>' ? (
+                  <div
+                    className="tiptap-content mt-4 text-[15px] leading-relaxed text-[var(--editor-muted)]"
+                    dangerouslySetInnerHTML={{ __html: content }}
+                  />
+                ) : (
+                  <p className="mt-4 text-[15px] text-[var(--editor-faint)]">Nothing to preview yet.</p>
+                )}
               </div>
             ) : (
-              <div className="tiptap-content">
-                <EditorContent editor={editor} />
-              </div>
+              <>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Title"
+                  className="box-border w-full border-b-[0.5px] border-[var(--editor-border)] bg-transparent px-8 pb-3 pt-6 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
+                />
+                <div className="px-8 pb-2 pt-3">
+                  <SimilarContentWidget
+                    title={title}
+                    bodyHtml={content}
+                    contentId={similarCheckContentId}
+                    appearance="neutral"
+                  />
+                </div>
+                <div className="tiptap-content px-0 pb-8">
+                  <EditorContent editor={editor} />
+                </div>
+              </>
             )}
           </div>
-        </Surface>
+        </div>
 
-        {/* Properties + component library */}
-        <Surface
-          variant="glass"
-          padding="md"
-          className="hidden min-h-0 w-[300px] shrink-0 flex-col overflow-hidden lg:flex"
-        >
-          <div
-            className="mb-3 flex shrink-0 gap-1 rounded-app-md border border-app-border/60 bg-app-bg/30 p-1"
-            role="tablist"
-            aria-label="Editor sidebar"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rightPanelTab === 'library'}
-              onClick={() => setRightPanelTab('library')}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
-                rightPanelTab === 'library'
-                  ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
-                  : 'text-app-faint hover:bg-app-elevated hover:text-app-muted'
-              }`}
-            >
-              <Puzzle size={14} />
-              Library
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rightPanelTab === 'properties'}
-              onClick={() => setRightPanelTab('properties')}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
-                rightPanelTab === 'properties'
-                  ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
-                  : 'text-app-faint hover:bg-app-elevated hover:text-app-muted'
-              }`}
-            >
-              <Settings size={14} />
-              Properties
-            </button>
-          </div>
-
-          {rightPanelTab === 'library' ? (
-            <ComponentLibraryPanel editor={editor} />
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
-                Properties
-              </h3>
-
-              <div className="flex flex-col gap-4">
+        <aside className="flex w-[240px] shrink-0 flex-col border-l-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] px-3 py-3">
+          {rightTabs}
+          {rightPanelTab === 'library' && <ComponentLibraryPanel editor={editor} />}
+          {rightPanelTab === 'properties' && (
+            <div className="min-h-0 flex-1 overflow-y-auto text-[12px] text-[var(--editor-muted)]">
+              <div className="flex flex-col gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Content Type</label>
-                  <select className="box-border w-full rounded-md border border-app-border bg-app-surface px-3 py-2.5 text-[13px] text-app-text outline-none">
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Content type</label>
+                  <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
                     <option>Article</option>
                     <option>Guide</option>
                     <option>Documentation</option>
-                    <option>Blog Post</option>
+                    <option>Blog post</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Tags</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['tutorial', 'guide', '2025'].map((tag) => (
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Tags</label>
+                  <div className="flex flex-wrap gap-1">
+                    {['tutorial', 'guide', '2026'].map((tag) => (
                       <span
                         key={tag}
-                        className="flex items-center gap-1 rounded-xl bg-violet-500/15 px-2.5 py-1 text-[11px] text-violet-400"
+                        className="flex items-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-0.5 text-[11px] text-[var(--editor-muted)]"
                       >
                         {tag}
-                        <button
-                          type="button"
-                          className="flex cursor-pointer border-none bg-transparent p-0 text-violet-400"
-                        >
-                          ×
-                        </button>
+                        <span className="cursor-pointer text-[var(--editor-faint)]">×</span>
                       </span>
                     ))}
                     <button
                       type="button"
-                      className="cursor-pointer rounded-xl border border-dashed border-app-border-strong bg-app-surface px-2.5 py-1 text-[11px] text-app-faint"
+                      className="cursor-pointer rounded-[var(--editor-radius-input)] border-[0.5px] border-dashed border-[var(--editor-border)] bg-transparent px-2 py-0.5 text-[11px] text-[var(--editor-faint)]"
                     >
                       + Add
                     </button>
                   </div>
                 </div>
-
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Visibility</label>
-                  <select className="box-border w-full rounded-md border border-app-border bg-app-surface px-3 py-2.5 text-[13px] text-app-text outline-none">
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Visibility</label>
+                  <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
                     <option>Public</option>
-                    <option>Team Only</option>
+                    <option>Team only</option>
                     <option>Private</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-app-muted">Featured Image</label>
-                  <div className="flex h-[120px] cursor-pointer items-center justify-center rounded-app-md border border-dashed border-app-border-strong bg-app-surface/50 text-xs text-app-faint">
-                    Click to upload
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Featured image</label>
+                  <div className="flex h-[100px] cursor-pointer items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] border-dashed border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] text-[var(--editor-faint)]">
+                    Upload
                   </div>
+                </div>
+                <div className="border-t-[0.5px] border-[var(--editor-border)] pt-3">
+                  <button
+                    type="button"
+                    onClick={openSaveComponentModal}
+                    disabled={!selectedText}
+                    className="flex w-full items-center justify-center gap-2 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-2 text-[12px] font-medium text-[var(--editor-doc-text)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Puzzle size={14} />
+                    Save selection as component
+                  </button>
+                  <p className="mt-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
+                    Select text in the document, then save it to the library.
+                  </p>
                 </div>
               </div>
             </div>
           )}
-        </Surface>
+          {rightPanelTab === 'refs' && (
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto text-[12px] text-[var(--editor-muted)]">
+              <button
+                type="button"
+                onClick={placeReferencesSectionHere}
+                className="w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-2 text-left text-[12px] font-medium text-[var(--editor-doc-text)] hover:bg-[var(--editor-canvas-bg)]"
+              >
+                Insert References block
+              </button>
+              <button
+                type="button"
+                onClick={openCitationDialog}
+                className="w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] px-2 py-2 text-[12px] font-medium text-[var(--editor-primary)]"
+              >
+                Add citation…
+              </button>
+              {referenceNotice && (
+                <p className="m-0 text-[11px] text-[var(--editor-muted)]">{referenceNotice}</p>
+              )}
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-faint)]">
+                In this draft ({citationItems.length})
+              </div>
+              <ul className="m-0 list-none space-y-1.5 p-0">
+                {citationItems.map((c) => (
+                  <li
+                    key={`${c.marker}-${c.sourceId}`}
+                    className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-1.5"
+                  >
+                    <span className="font-mono text-[10px] text-[var(--editor-primary)]">[{c.marker}]</span>{' '}
+                    <span className="text-[var(--editor-doc-text)]">{c.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </aside>
       </div>
+
+      <footer className="flex h-[26px] shrink-0 items-center justify-between gap-3 border-t-[0.5px] border-[var(--editor-border)] bg-[var(--editor-status-bg)] px-4 text-[10px] leading-none text-[var(--editor-faint)]">
+        <span className="min-w-0 truncate">
+          {autosaveLabel}
+          {componentNotice ? ` · ${componentNotice}` : ''}
+        </span>
+        <span className="shrink-0 tabular-nums">
+          {wordCount} {wordCount === 1 ? 'word' : 'words'} · {versionLabel}
+        </span>
+        <span className="hidden max-w-[45%] truncate text-right sm:inline">
+          Library panel uses demo data until the components API is wired.
+        </span>
+      </footer>
+
+      <SlashCommandMenu editor={editor} onOpenCitation={openCitationDialog} />
+
       <CitationSearchDialog
         key={citationDialogMountKey}
         open={showCitationDialog}
@@ -659,15 +803,18 @@ export default function EditorLayout() {
         onInsert={applyCitationWithBibliography}
       />
       {showSaveComponentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-[520px] rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl">
-            <h3 className="m-0 text-lg text-app-text font-semibold">Save Selection as Component</h3>
-            <p className="mt-1 mb-4 text-[12px] text-app-muted">
-              Create a reusable component from current selection.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            className="w-full max-w-[520px] rounded-[var(--editor-radius-card)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] p-5 text-[var(--editor-doc-text)]"
+            style={{ color: 'var(--editor-doc-text)' }}
+          >
+            <h3 className="m-0 text-lg font-semibold">Save selection as component</h3>
+            <p className="mb-4 mt-1 text-[12px] text-[var(--editor-muted)]">
+              Create a reusable component from the current selection.
             </p>
 
-            <div className="text-[11px] text-app-faint mb-2">Selection preview</div>
-            <div className="rounded-md border border-app-border bg-app-surface p-3 text-[12px] text-app-muted max-h-[90px] overflow-auto mb-4">
+            <div className="mb-2 text-[11px] text-[var(--editor-faint)]">Selection preview</div>
+            <div className="mb-4 max-h-[90px] overflow-auto rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-canvas-bg)] p-3 text-[12px] text-[var(--editor-muted)]">
               {selectedText || 'No selection'}
             </div>
 
@@ -676,54 +823,52 @@ export default function EditorLayout() {
                 value={componentName}
                 onChange={(e) => setComponentName(e.target.value)}
                 placeholder="Component name"
-                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none"
+                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-doc-text)] outline-none"
               />
               <input
                 value={componentKey}
                 onChange={(e) => setComponentKey(e.target.value)}
                 placeholder="component-key"
-                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none"
+                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-doc-text)] outline-none"
               />
               <textarea
                 value={componentDescription}
                 onChange={(e) => setComponentDescription(e.target.value)}
                 placeholder="Description (optional)"
-                className="px-3 py-2.5 bg-app-surface border border-app-border rounded-md text-app-text text-[13px] outline-none min-h-[72px]"
+                className="min-h-[72px] rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-doc-text)] outline-none"
               />
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setComponentMode('linked')}
-                  className={`px-3 py-2 rounded-md text-[12px] border ${
+                  className={`rounded-[var(--editor-radius-input)] border-[0.5px] px-3 py-2 text-[12px] ${
                     componentMode === 'linked'
-                      ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                      : 'bg-app-surface text-app-muted border-app-border'
+                      ? 'border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] text-[var(--editor-primary)]'
+                      : 'border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[var(--editor-muted)]'
                   }`}
                 >
-                  Linked (live-sync)
+                  Linked
                 </button>
                 <button
                   type="button"
                   onClick={() => setComponentMode('detached')}
-                  className={`px-3 py-2 rounded-md text-[12px] border ${
+                  className={`rounded-[var(--editor-radius-input)] border-[0.5px] px-3 py-2 text-[12px] ${
                     componentMode === 'detached'
-                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                      : 'bg-app-surface text-app-muted border-app-border'
+                      ? 'border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] text-[var(--editor-primary)]'
+                      : 'border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[var(--editor-muted)]'
                   }`}
                 >
-                  Detached (snapshot)
+                  Snapshot
                 </button>
               </div>
-              {componentSaveError && (
-                <div className="text-[12px] text-red-400">{componentSaveError}</div>
-              )}
+              {componentSaveError && <div className="text-[12px] text-red-500">{componentSaveError}</div>}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowSaveComponentModal(false)}
-                className="px-3 py-2 text-[13px] bg-app-surface border border-app-border rounded-md text-app-muted"
+                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-muted)]"
               >
                 Cancel
               </button>
@@ -731,9 +876,9 @@ export default function EditorLayout() {
                 type="button"
                 onClick={handleSaveSelectionAsComponent}
                 disabled={componentSaving}
-                className="px-3 py-2 text-[13px] rounded-md text-white bg-gradient-to-br from-violet-500 to-cyan-500 disabled:opacity-70"
+                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-[var(--editor-primary)] px-3 py-2 text-[13px] font-medium text-[var(--editor-primary-fg)] disabled:opacity-60"
               >
-                {componentSaving ? 'Saving…' : 'Save Component'}
+                {componentSaving ? 'Saving…' : 'Save component'}
               </button>
             </div>
           </div>

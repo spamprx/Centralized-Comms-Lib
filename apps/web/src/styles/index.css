@@ -257,6 +257,90 @@
   .tiptap-content .ProseMirror h2.editor-references-heading + ol {
     @apply mb-6 border-b border-app-border/40 pb-4;
   }
+
+  /**
+   * Content editor workspace: flat surfaces, purple accent, themeable via variables.
+   */
+  .editor-workspace {
+    --editor-canvas-bg: #ececef;
+    --editor-card-bg: #ffffff;
+    --editor-topbar-bg: #f8f8fa;
+    --editor-panel-bg: #f8f8fa;
+    --editor-border: rgba(26, 26, 34, 0.14);
+    --editor-doc-text: #1a1a24;
+    --editor-muted: #5c5f6e;
+    --editor-faint: #8b8f9e;
+    --editor-primary: #534ab7;
+    --editor-primary-fg: #eeedfe;
+    --editor-primary-muted: rgba(83, 74, 183, 0.14);
+    --editor-status-bg: #f0f0f3;
+    --editor-radius-input: 8px;
+    --editor-radius-card: 12px;
+    color-scheme: light;
+    background-color: var(--editor-canvas-bg);
+    color: var(--editor-doc-text);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .editor-workspace {
+      --editor-canvas-bg: #12141c;
+      --editor-card-bg: #1a1d28;
+      --editor-topbar-bg: #161922;
+      --editor-panel-bg: #161922;
+      --editor-border: rgba(255, 255, 255, 0.1);
+      --editor-doc-text: #eceef4;
+      --editor-muted: #9aa0b4;
+      --editor-faint: #6b7084;
+      --editor-primary: #534ab7;
+      --editor-primary-fg: #eeedfe;
+      --editor-primary-muted: rgba(147, 124, 248, 0.18);
+      --editor-status-bg: #14161f;
+      color-scheme: dark;
+    }
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror {
+    color: var(--editor-doc-text);
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror p {
+    @apply text-[15px] leading-relaxed;
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror h1 {
+    @apply text-3xl font-bold;
+    color: var(--editor-doc-text);
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror h2 {
+    @apply text-xl font-semibold;
+    color: var(--editor-doc-text);
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror a {
+    color: var(--editor-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror .citation-marker {
+    color: var(--editor-primary);
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror .citation-marker--chip {
+    border-color: var(--editor-border);
+    background: var(--editor-primary-muted);
+    color: var(--editor-doc-text);
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror .citation-marker--raised,
+  .editor-workspace .tiptap-content .ProseMirror .citation-marker--paren {
+    color: var(--editor-primary);
+  }
+
+  .editor-workspace .tiptap-content .ProseMirror .is-editor-empty:first-child::before {
+    color: var(--editor-faint);
+  }
 }
 
 #root {

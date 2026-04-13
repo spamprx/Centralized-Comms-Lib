@@ -113,7 +113,7 @@ export const contentService = {
         authorId: ctx.actorId,
         changeType: input.aiGenerated ? "AI_GENERATED" : "MANUAL_SAVE",
         title: input.title,
-        metadataSnapshot: { body: input.body ?? null },
+        body: input.body ?? null,
       });
       await repos.audit.append({
         action: "CREATE",

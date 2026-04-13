@@ -38,10 +38,6 @@ function extractToken(req: Request): string | null
     {
         return authHeader.slice(BEARER_PREFIX.length).trim();
     }
-    const cookieToken = (req as any)?.cookies?.auth_token as string | undefined;
-    if (cookieToken) {
-        return cookieToken;
-    }
     return null;
 }
 
