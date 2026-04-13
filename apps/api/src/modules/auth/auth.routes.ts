@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import type { UserRole } from "../../middlewares/auth.middleware";
-import { authenticate, type AuthRequest } from "../../middlewares/auth.middleware";
 import { authService } from "../../service";
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 const router = Router();
@@ -141,7 +140,10 @@ router.post("/login", async (req: Request, res: Response) => {
       res.status(400).json({ error: "email and password are required" });
       return;
     }
-    const result = await authService.login({ email, password });
+    const result = await authService.login(
+      { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
+      { email, password },
+    );
     if ("invalidCredentials" in result) {
       res.status(401).json({ error: "Invalid credentials" });
       return;

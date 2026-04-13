@@ -13,7 +13,18 @@ import type { FormattingViolation } from "../template/formattingRules.types";
 import { enforceFormattingRules } from "../template/templateFormatting.enforcement";
 import { getFormattingRulesForTemplateId } from "../template/formattingRule.service";
 import { recordSnapshotForVersion } from "./content.snapshot";
+import {
+  buildPlainTextForSnapshotSide,
+  computeWordDiff,
+  sideSummary,
+  type SnapshotWordDiffResult,
+} from "./snapshotWordDiff";
 import { syncContentIndexFromDb } from "../../search/contentSearch.service";
+import {
+  collectLinkedComponentVersionIds,
+  isTipTapDoc,
+  refreshLinkedNodesInDocument,
+} from "../component/libraryComponent";
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
@@ -246,9 +257,28 @@ export const contentService = {
       select: { templateId: true },
     });
     const rules = await getFormattingRulesForTemplateId(existingForRules?.templateId);
+
+    let effectiveBody: TipTapDocument | null | undefined = input.body;
+    if (input.body !== undefined && input.body !== null) {
+      const ids = collectLinkedComponentVersionIds(input.body);
+      if (ids.length > 0) {
+        const repos = new PrismaUnitOfWork(prisma).repos();
+        const canonicalByVersionId = new Map<string, TipTapDocument | null>();
+        for (const id of ids) {
+          const ver = await repos.componentRegistry.getVersionById(id);
+          const c =
+            ver?.bodyJson != null && isTipTapDoc(ver.bodyJson)
+              ? (ver.bodyJson as TipTapDocument)
+              : null;
+          canonicalByVersionId.set(id, c);
+        }
+        effectiveBody = refreshLinkedNodesInDocument(input.body, canonicalByVersionId);
+      }
+    }
+
     let violations: FormattingViolation[] = [];
     if (input.body !== undefined) {
-      violations = enforceFormattingRules(input.body, rules);
+      violations = enforceFormattingRules(effectiveBody ?? null, rules);
     }
     if (violations.length > 0) {
       return { invalidFormatting: true, violations };
@@ -272,7 +302,7 @@ export const contentService = {
         authorId: ctx.actorId,
         changeType: "MANUAL_SAVE",
         title: currentTitle,
-        metadataSnapshot: { body: input.body ?? null },
+        body: input.body === undefined ? null : (effectiveBody ?? null),
       });
       await recordSnapshotForVersion(repos, ctx, contentId, version.versionNumber, "MANUAL_SAVE", {
         versionId: version.id,
@@ -291,6 +321,98 @@ export const contentService = {
         aggregateId: contentId,
         eventType: "CONTENT.BODY_SAVED",
         payload: { contentId, versionId: version.id, versionNumber: version.versionNumber },
+      });
+      return { version };
+    });
+    if ("version" in result) {
+      void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+    }
+    return result;
+  },
+
+  /**
+   * Writes a new content version after linked-component propagation (admin).
+   * Re-applies linked sync from the component registry, then formatting rules, without author-only checks.
+   */
+  async savePropagatedBody(
+    ctx: AuditContext,
+    contentId: string,
+    inputBody: TipTapDocument,
+  ): Promise<
+    | { version: ContentVersion }
+    | { notFound: true }
+    | { invalidState: true; state: LifecycleState }
+    | { invalidFormatting: true; violations: FormattingViolation[] }
+  > {
+    const prisma = getPrismaClient();
+    const existingForRules = await prisma.content.findUnique({
+      where: { id: contentId },
+      select: { templateId: true },
+    });
+    const rules = await getFormattingRulesForTemplateId(existingForRules?.templateId);
+
+    let effectiveBody: TipTapDocument = inputBody;
+    const ids = collectLinkedComponentVersionIds(inputBody);
+    if (ids.length > 0) {
+      const repos = new PrismaUnitOfWork(prisma).repos();
+      const canonicalByVersionId = new Map<string, TipTapDocument | null>();
+      for (const id of ids) {
+        const ver = await repos.componentRegistry.getVersionById(id);
+        const c =
+          ver?.bodyJson != null && isTipTapDoc(ver.bodyJson)
+            ? (ver.bodyJson as TipTapDocument)
+            : null;
+        canonicalByVersionId.set(id, c);
+      }
+      effectiveBody = refreshLinkedNodesInDocument(inputBody, canonicalByVersionId);
+    }
+
+    const violations = enforceFormattingRules(effectiveBody, rules);
+    if (violations.length > 0) {
+      return { invalidFormatting: true, violations };
+    }
+
+    const uow = new PrismaUnitOfWork(prisma);
+    const result = await uow.withTransaction(async (repos) => {
+      const content = await repos.content.getById(contentId);
+      if (!content) return { notFound: true } as const;
+      if (content.lifecycleState !== "DRAFT" && content.lifecycleState !== "IN_REVIEW") {
+        return { invalidState: true, state: content.lifecycleState } as const;
+      }
+      const version = await repos.content.createVersion({
+        contentId,
+        authorId: content.authorId,
+        changeType: "MANUAL_SAVE",
+        title: content.title,
+        body: effectiveBody,
+      });
+      await recordSnapshotForVersion(repos, ctx, contentId, version.versionNumber, "MANUAL_SAVE", {
+        versionId: version.id,
+        linkedComponentPropagation: true,
+      });
+      await repos.audit.append({
+        action: "BODY_SAVE",
+        resource: "CONTENT_VERSION",
+        resourceId: version.id,
+        newValue: {
+          contentId,
+          versionNumber: version.versionNumber,
+          linkedComponentPropagation: true,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      await repos.outbox.add({
+        aggregateType: "CONTENT",
+        aggregateId: contentId,
+        eventType: "CONTENT.BODY_SAVED",
+        payload: {
+          contentId,
+          versionId: version.id,
+          versionNumber: version.versionNumber,
+          linkedComponentPropagation: true,
+        },
       });
       return { version };
     });
@@ -578,5 +700,54 @@ export const contentService = {
 
       return { updated: true, accepted } as const;
     });
+  },
+
+  /**
+   * Word-level diff between two `ContentSnapshot` rows for the same content.
+   * Left/right correspond to `snapshotAId` / `snapshotBId` request order.
+   */
+  async compareSnapshotsWordDiff(
+    contentId: string,
+    snapshotAId: string,
+    snapshotBId: string,
+    requester: { id: string; isAdmin?: boolean } | null,
+  ): Promise<
+    SnapshotWordDiffResult | { notFound: true } | { badRequest: true; error: string }
+  > {
+    const detail = await this.getById(contentId, requester);
+    if (!detail) {
+      return { notFound: true } as const;
+    }
+
+    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    const [sa, sb] = await Promise.all([
+      repos.contentSnapshot.getById(snapshotAId),
+      repos.contentSnapshot.getById(snapshotBId),
+    ]);
+    if (!sa || !sb) {
+      return { notFound: true } as const;
+    }
+    if (sa.contentId !== sb.contentId) {
+      return { badRequest: true, error: "Snapshots belong to different content items" };
+    }
+    if (sa.contentId !== contentId) {
+      return { badRequest: true, error: "Snapshots do not match content id in path" };
+    }
+
+    const [va, vb] = await Promise.all([
+      repos.content.getVersionWithBodyAtOrBefore(contentId, sa.toVersionNumber),
+      repos.content.getVersionWithBodyAtOrBefore(contentId, sb.toVersionNumber),
+    ]);
+
+    const leftPlain = buildPlainTextForSnapshotSide(va).plain;
+    const rightPlain = buildPlainTextForSnapshotSide(vb).plain;
+    const core = computeWordDiff(leftPlain, rightPlain);
+
+    return {
+      contentId,
+      left: sideSummary(sa, va),
+      right: sideSummary(sb, vb),
+      ...core,
+    };
   },
 };

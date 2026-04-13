@@ -19,6 +19,8 @@ import {
 } from "./rankBlend";
 import { joinSnippet, sanitizeHighlightFragments } from "./searchSnippets";
 import type {
+   ContentCheckByTextRequest,
+  ContentCheckByTextResponse,
   ContentCheckSearchRequest,
   ContentSearchFilters,
   ContentSearchHit,
@@ -28,12 +30,14 @@ import type {
 } from "./searchTypes";
 
 export type {
+  ContentCheckByTextRequest,
+  ContentCheckByTextResponse,
+  ContentCheckSearchRequest,
   ContentSearchFilters,
   ContentSearchRequest,
   ContentSearchResponse,
   ContentSearchHit,
   FacetBucket,
-  ContentCheckSearchRequest,
 } from "./searchTypes";
 
 function boolFilters(filters: ContentSearchFilters | undefined): estypes.QueryDslQueryContainer[] {
@@ -489,6 +493,151 @@ export async function searchContentCheck(
     score: typeof h._score === "number" ? h._score : 0,
     source: (h._source as Record<string, unknown>) ?? {},
   }));
+
+  return { total, hits };
+}
+
+const CONTENT_CHECK_BODY_MAX_CHARS = Math.max(
+  500,
+  Number(process.env.CONTENT_CHECK_BODY_MAX_CHARS) || 8000,
+);
+const CONTENT_CHECK_MIN_INPUT_LEN = Math.max(
+  3,
+  Number(process.env.CONTENT_CHECK_MIN_INPUT_LEN) || 12,
+);
+const MLT_STOP_WORDS = [
+  "the", "a", "an", "and", "or", "of", "to", "in", "for", "on",
+  "with", "is", "it", "that", "this", "was", "are", "be", "has",
+];
+
+export async function searchContentCheckByText(
+  req: ContentCheckByTextRequest,
+): Promise<ContentCheckByTextResponse | null> {
+  const client = getElasticsearchClient();
+  if (!client) return null;
+  await ensureContentSearchIndex(client);
+
+  const title   = (req.title   ?? "").trim();
+  const summary = (req.summary ?? "").trim();
+  let   body    = (req.body    ?? "").trim();
+
+  const combinedLen = title.length + summary.length + body.length;
+  if (combinedLen < CONTENT_CHECK_MIN_INPUT_LEN) {
+    return {
+      total: 0,
+      hits: [],
+      inputTooShort: true,
+      message: "Not enough information to check for similar content.",
+    };
+  }
+
+  if (body.length > CONTENT_CHECK_BODY_MAX_CHARS) {
+    body = body.slice(0, CONTENT_CHECK_BODY_MAX_CHARS);
+  }
+
+  const filterClauses = boolFilters(req.filters);
+  const size = Math.min(50, Math.max(1, req.size ?? 10));
+  const minScoreRaw =
+    req.minScore ??
+    Math.min(20, Math.max(2, Number(process.env.CONTENT_CHECK_TEXT_MIN_SCORE) || 5));
+
+  const mltClauses: estypes.QueryDslQueryContainer[] = [];
+
+  if (title.length >= 3) {
+    mltClauses.push({
+      more_like_this: {
+        fields: ["title", "title.auto"],
+        like: title,
+        min_term_freq: 1,
+        max_query_terms: 20,
+        minimum_should_match: "30%",
+        boost: 3,
+        stop_words: MLT_STOP_WORDS,
+      },
+    });
+  }
+
+  if (summary.length >= 3) {
+    mltClauses.push({
+      more_like_this: {
+        fields: ["summary"],
+        like: summary,
+        min_term_freq: 1,
+        max_query_terms: 25,
+        minimum_should_match: "25%",
+        boost: 2,
+        stop_words: MLT_STOP_WORDS,
+      },
+    });
+  }
+
+  if (body.length >= 10) {
+    mltClauses.push({
+      more_like_this: {
+        fields: ["bodyPlain", "body"],
+        like: body,
+        min_term_freq: 1,
+        max_query_terms: 35,
+        minimum_should_match: "20%",
+        boost: 1,
+        stop_words: MLT_STOP_WORDS,
+      },
+    });
+  }
+
+  if (mltClauses.length === 0) {
+    return {
+      total: 0,
+      hits: [],
+      inputTooShort: true,
+      message: "Not enough information to check for similar content.",
+    };
+  }
+
+  const res = await client.search({
+    index: CONTENT_INDEX_NAME,
+    size,
+    min_score: minScoreRaw,
+    query: {
+      bool: {
+        filter: filterClauses.length > 0 ? filterClauses : undefined,
+        should: mltClauses,
+        minimum_should_match: 1,
+      },
+    },
+    highlight: {
+      pre_tags: ["<mark>"],
+      post_tags: ["</mark>"],
+      fragment_size: 150,
+      number_of_fragments: 1,
+      fields: { title: {}, summary: {}, bodyPlain: {} },
+    },
+    _source: true,
+  });
+
+  const rawHits = res.hits.hits ?? [];
+
+  const maxRaw = rawHits.reduce(
+    (mx, h) => Math.max(mx, typeof h._score === "number" ? h._score : 0),
+    0,
+  );
+  const k = Math.max(1, maxRaw * 0.35);
+
+  const hits: ContentSearchHit[] = rawHits.map((h: estypes.SearchHit) => {
+    const raw = typeof h._score === "number" ? h._score : 0;
+    const similarity = raw / (raw + k);
+    const mapped = mapHitWithHighlight(h, similarity);
+    return {
+      contentId: mapped.contentId,
+      score: parseFloat(similarity.toFixed(4)),
+      source: mapped.source,
+      highlight: mapped.highlight,
+      snippetHtml: mapped.snippetHtml,
+    };
+  });
+
+  const total =
+    typeof res.hits.total === "number" ? res.hits.total : res.hits.total?.value ?? 0;
 
   return { total, hits };
 }

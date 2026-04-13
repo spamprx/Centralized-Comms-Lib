@@ -35,20 +35,55 @@ export const authService = {
     return result;
   },
 
-  async login(input: {
-    email: string;
-    password: string;
-  }): Promise<
+  async login(
+    ctx: { ipAddress?: string; userAgent?: string },
+    input: {
+      email: string;
+      password: string;
+    },
+  ): Promise<
     | { user: { id: string; email: string; displayName: string; avatarUrl: string | null }; role: "ADMIN" | "USER" }
     | { invalidCredentials: true }
   > {
-    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    const repos = uow.repos();
     const user = await repos.userRole.getUserByEmailWithPassword(input.email);
-    if (!user) return { invalidCredentials: true };
+    if (!user) {
+      await repos.audit.append({
+        action: "LOGIN_FAILED",
+        resource: "USER",
+        resourceId: "unknown",
+        newValue: { email: input.email, reason: "user_not_found" },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { invalidCredentials: true };
+    }
     const valid = await verifyPassword(input.password, user.passwordHash);
-    if (!valid) return { invalidCredentials: true };
+    if (!valid) {
+      await repos.audit.append({
+        action: "LOGIN_FAILED",
+        resource: "USER",
+        resourceId: user.id,
+        newValue: { email: input.email, reason: "invalid_password" },
+        actorId: user.id,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { invalidCredentials: true };
+    }
     const roles = await repos.userRole.listRolesForUser(user.id);
     const isAdmin = roles.some((r) => r.name.toUpperCase() === "ADMIN");
+    await repos.audit.append({
+      action: "LOGIN",
+      resource: "USER",
+      resourceId: user.id,
+      newValue: { email: user.email, role: isAdmin ? "ADMIN" : "USER" },
+      actorId: user.id,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
     const { passwordHash: _, ...safeUser } = user;
     return {
       user: safeUser,

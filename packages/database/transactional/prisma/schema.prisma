@@ -332,6 +332,8 @@ model ComponentVersion {
   componentId String
   component   Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
   version     String
+  /// Canonical TipTap JSON for this version (used for linked inserts + library preview).
+  bodyJson    Json?
   linkRefs    Json      @default("[]")
   propSchema  Json?
   createdAt   DateTime  @default(now())
@@ -370,6 +372,8 @@ model TemplateFormattingRule {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([updatedAt])
+  @@index([rules], type: Gin)
   @@map("template_formatting_rules")
 }
 
