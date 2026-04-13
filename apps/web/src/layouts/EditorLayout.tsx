@@ -16,6 +16,7 @@ import {
   Puzzle,
   Share2,
   ChevronRight,
+  LayoutTemplate,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -37,6 +38,7 @@ import SimilarContentWidget from '../components/content/SimilarContentWidget';
 import CitationSearchDialog from '../components/editor/CitationSearchDialog';
 import ComponentLibraryPanel from '../components/editor/ComponentLibraryPanel';
 import SlashCommandMenu from '../components/editor/SlashCommandMenu';
+import UseTemplateDialog from '../components/editor/UseTemplateDialog';
 import {
   emptyReferencesSectionHtml,
   hasBibliographySection,
@@ -44,6 +46,8 @@ import {
   type CitationMarkerMode,
 } from '../lib/citationMarkers';
 import { CitationMarker, citationMarkLabel } from '../tiptap/CitationMarker';
+import { tipTapDocFromTemplateRecord } from '../lib/templateToTipTapDoc';
+import type { TemplateRecord } from '../services/templateCrudService';
 
 type CitationItem = {
   marker: number;
@@ -94,6 +98,9 @@ export default function EditorLayout() {
   citationItemsRef.current = citationItems;
   const [rightPanelTab, setRightPanelTab] = useState<'library' | 'properties' | 'refs'>('library');
   const [wordCount, setWordCount] = useState(0);
+  const [showUseTemplateDialog, setShowUseTemplateDialog] = useState(false);
+  /** Passed to create draft only for new content (first save) so formatting rules bind to the template. */
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
   const persistedContentId = useMemo(
     () => contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null),
@@ -104,36 +111,6 @@ export default function EditorLayout() {
     if (!savedSnapshot) return true;
     return title.trim() !== savedSnapshot.title || content !== savedSnapshot.content;
   }, [title, content, savedSnapshot]);
-
-  const handleSaveDraft = useCallback(async () => {
-    if (!title.trim()) {
-      setSaveError('Title is required');
-      return;
-    }
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const bodyDoc = {
-        type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: content.replace(/<[^>]*>/g, '') || '' }] }],
-      };
-
-      if (!contentId) {
-        const result = await contentService.createDraft(title.trim(), bodyDoc);
-        setContentId(result.content.id);
-      } else {
-        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
-      }
-      const t = title.trim();
-      setSavedSnapshot({ title: t, content });
-      setLastSaved(new Date());
-      clearDraft();
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
-    } finally {
-      setSaving(false);
-    }
-  }, [title, content, contentId, clearDraft]);
 
   const similarCheckContentId =
     contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null);
@@ -198,6 +175,64 @@ export default function EditorLayout() {
       editor.commands.setContent(content);
     }
   }, [content, editor]);
+
+  const handleSaveDraft = useCallback(async () => {
+    if (!title.trim()) {
+      setSaveError('Title is required');
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const bodyDoc =
+        editor?.getJSON() ?? ({ type: 'doc', content: [{ type: 'paragraph' }] } as const);
+
+      if (!contentId) {
+        const result = await contentService.createDraft(title.trim(), bodyDoc, {
+          templateId: pendingTemplateId ?? undefined,
+        });
+        setContentId(result.content.id);
+        setPendingTemplateId(null);
+      } else {
+        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
+      }
+      const t = title.trim();
+      setSavedSnapshot({ title: t, content: editor?.getHTML() ?? content });
+      setLastSaved(new Date());
+      clearDraft();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
+    } finally {
+      setSaving(false);
+    }
+  }, [title, content, contentId, clearDraft, editor, pendingTemplateId]);
+
+  const applyTemplateRecord = useCallback(
+    (record: TemplateRecord) => {
+      if (!editor) return;
+      const emptyTitle = !title.trim();
+      const editorEmpty = editor.isEmpty;
+      if ((!editorEmpty || !emptyTitle) && !window.confirm('Replace the current title and body with this template?')) {
+        return;
+      }
+      const doc = tipTapDocFromTemplateRecord(record);
+      editor.chain().focus().setContent(doc).run();
+      const html = editor.getHTML();
+      setContent(html);
+      setTitle(record.name.trim() || 'Untitled');
+      const isNew = !persistedContentId;
+      setPendingTemplateId(isNew ? record.id : null);
+      setSavedSnapshot(null);
+      setMainTab('edit');
+      if (!isNew) {
+        setComponentNotice('Body replaced from template. Save draft to persist.');
+        window.setTimeout(() => setComponentNotice(null), 4000);
+      } else {
+        setComponentNotice(null);
+      }
+    },
+    [editor, persistedContentId, title],
+  );
 
   const selectedText = selectionText;
 
@@ -655,14 +690,6 @@ export default function EditorLayout() {
                   placeholder="Title"
                   className="box-border w-full border-b-[0.5px] border-[var(--editor-border)] bg-transparent px-8 pb-3 pt-6 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
                 />
-                <div className="px-8 pb-2 pt-3">
-                  <SimilarContentWidget
-                    title={title}
-                    bodyHtml={content}
-                    contentId={similarCheckContentId}
-                    appearance="neutral"
-                  />
-                </div>
                 <div className="tiptap-content px-0 pb-8">
                   <EditorContent editor={editor} />
                 </div>
@@ -677,6 +704,33 @@ export default function EditorLayout() {
           {rightPanelTab === 'properties' && (
             <div className="min-h-0 flex-1 overflow-y-auto text-[12px] text-[var(--editor-muted)]">
               <div className="flex flex-col gap-3">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowUseTemplateDialog(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-2 text-[12px] font-medium text-[var(--editor-doc-text)] hover:bg-[var(--editor-canvas-bg)]"
+                  >
+                    <LayoutTemplate size={14} strokeWidth={2} />
+                    Use template…
+                  </button>
+                  <p className="mt-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
+                    Load layout from an existing template into this draft.
+                  </p>
+                </div>
+                {user ? (
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--editor-faint)]">
+                      Related drafts
+                    </p>
+                    <SimilarContentWidget
+                      title={title}
+                      bodyHtml={content}
+                      contentId={similarCheckContentId}
+                      appearance="neutral"
+                      className="w-full"
+                    />
+                  </div>
+                ) : null}
                 <div>
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Content type</label>
                   <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
@@ -790,6 +844,13 @@ export default function EditorLayout() {
 
       <SlashCommandMenu editor={editor} onOpenCitation={openCitationDialog} />
 
+      {showUseTemplateDialog ? (
+        <UseTemplateDialog
+          onClose={() => setShowUseTemplateDialog(false)}
+          onSelectTemplate={applyTemplateRecord}
+        />
+      ) : null}
+
       <CitationSearchDialog
         key={citationDialogMountKey}
         open={showCitationDialog}
@@ -805,16 +866,16 @@ export default function EditorLayout() {
       {showSaveComponentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div
-            className="w-full max-w-[520px] rounded-[var(--editor-radius-card)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] p-5 text-[var(--editor-doc-text)]"
+            className="w-full max-w-[520px] rounded-(--editor-radius-card) border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] p-5 text-[var(--editor-doc-text)]"
             style={{ color: 'var(--editor-doc-text)' }}
           >
             <h3 className="m-0 text-lg font-semibold">Save selection as component</h3>
-            <p className="mb-4 mt-1 text-[12px] text-[var(--editor-muted)]">
+            <p className="mb-4 mt-1 text-[12px] text-(--editor-muted)">
               Create a reusable component from the current selection.
             </p>
 
-            <div className="mb-2 text-[11px] text-[var(--editor-faint)]">Selection preview</div>
-            <div className="mb-4 max-h-[90px] overflow-auto rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-canvas-bg)] p-3 text-[12px] text-[var(--editor-muted)]">
+            <div className="mb-2 text-[11px] text-(--editor-faint)">Selection preview</div>
+            <div className="mb-4 max-h-[90px] overflow-auto rounded-(--editor-radius-input) border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-canvas-bg)] p-3 text-[12px] text-[var(--editor-muted)]">
               {selectedText || 'No selection'}
             </div>
 

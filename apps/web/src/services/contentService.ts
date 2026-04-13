@@ -13,6 +13,7 @@ export type Content = {
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
+  templateId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -104,10 +105,19 @@ export const contentService = {
     return request<Content[]>(query ? `/content?${query}` : '/content');
   },
 
-  createDraft: async (title: string, body?: unknown): Promise<{ content: Content }> => {
+  createDraft: async (
+    title: string,
+    body?: unknown,
+    options?: { templateId?: string | null; aiGenerated?: boolean },
+  ): Promise<{ content: Content }> => {
     return request<{ content: Content }>('/content', {
       method: 'POST',
-      body: JSON.stringify({ title, body }),
+      body: JSON.stringify({
+        title,
+        body,
+        templateId: options?.templateId ?? undefined,
+        aiGenerated: options?.aiGenerated,
+      }),
     });
   },
 

@@ -144,7 +144,7 @@ export default function SimilarContentWidget({
 
   return (
     <div
-      className={`overflow-hidden rounded-[var(--editor-radius-input,0.5rem)] border border-[var(--editor-border,rgba(0,0,0,0.12))] bg-[var(--editor-card-bg,transparent)] ${className}`}
+      className={`overflow-hidden rounded-[var(--editor-radius-input,0.5rem)] border-[0.5px] border-[var(--editor-border,rgba(0,0,0,0.12))] bg-[var(--editor-card-bg,transparent)] ${className}`}
     >
       <button
         type="button"
