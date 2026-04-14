@@ -6,7 +6,7 @@ import type {
   ReadingTimeBucket,
   TimeSeriesPoint,
   TopContentItem,
-} from '../data/mockAnalyticsData';
+} from '../types/analytics';
 
 type AnalyticsCsvInput = {
   dateRange: string;

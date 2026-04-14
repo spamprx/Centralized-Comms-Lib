@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { Home, LayoutDashboard, BookOpen, Edit, MessageSquare, Image, Bot, Settings } from "lucide-react";
+import { Home, LayoutDashboard, BookOpen, Edit, MessageSquare, Image, Bot, Settings, BarChart3 } from "lucide-react";
 import type { NavCategory } from "../constants/navigation";
 
 const iconByLabel: Record<string, ReactElement> = {
@@ -10,7 +10,8 @@ const iconByLabel: Record<string, ReactElement> = {
   "Review": <MessageSquare />,
   "Assets": <Image />,
   "AI": <Bot />,
-  "Admin & Analytics": <Settings />,
+  "Admin": <Settings />,
+  "Analytics": <BarChart3 />,
 };
 
 export function getNavIcon(category: NavCategory): ReactElement {

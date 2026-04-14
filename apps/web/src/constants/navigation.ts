@@ -45,10 +45,11 @@ export const navCategories: NavCategory[] = [
     items: [{ path: "/ai-tutor", label: "AI Tutor" }],
   },
   {
-    label: "Admin & Analytics",
-    items: [
-      { path: "/admin", label: "Admin Panel" },
-      { path: "/analytics", label: "Analytics" },
-    ],
+    label: "Admin",
+    items: [{ path: "/admin", label: "Admin Panel" }],
+  },
+  {
+    label: "Analytics",
+    items: [{ path: "/analytics", label: "Analytics" }],
   },
 ];

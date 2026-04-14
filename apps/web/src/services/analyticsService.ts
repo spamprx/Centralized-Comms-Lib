@@ -6,7 +6,7 @@ import type {
   ContentTypeBreakdown,
   TopContentItem,
   AIInsight,
-} from '../data/mockAnalyticsData';
+} from '../types/analytics';
 import type { DateRange } from '../lib/dateUtils';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';

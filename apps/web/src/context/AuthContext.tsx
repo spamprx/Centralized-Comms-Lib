@@ -36,8 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await authService.login(email, password);
     // Store token in cookie via tokenStore (also kept in memory)
     setAuthToken(res.token);
-    // Use the richer user object from the login response (includes displayName)
-    setUser(res.user);
+    // Role is only guaranteed on the JWT — merge so admin UI can gate immediately
+    const payload = decodeTokenPayload();
+    setUser({
+      ...res.user,
+      role: payload?.role ?? res.user.role,
+    });
     setIsAuthenticated(true);
   };
 

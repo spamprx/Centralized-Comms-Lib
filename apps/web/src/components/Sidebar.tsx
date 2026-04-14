@@ -1,14 +1,25 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BookOpen, LogOut, Menu, X } from "lucide-react";
-import { navCategories } from "../constants/navigation";
+import { navCategories, type NavCategory, type NavItem } from "../constants/navigation";
 import { getNavIcon } from "../lib/navIcons";
 import { useAuth } from "../context/AuthContext";
+import { isGlobalAdmin } from "../lib/userRole";
+
+function filterNavForRole(categories: NavCategory[], isAdmin: boolean): NavCategory[] {
+  return categories
+    .map((cat) => ({
+      ...cat,
+      items: cat.items.filter((item: NavItem) => item.path !== "/admin" || isAdmin),
+    }))
+    .filter((cat) => cat.items.length > 0);
+}
 
 export default function Sidebar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
+  const visibleNav = filterNavForRole(navCategories, isGlobalAdmin(user?.role));
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -51,7 +62,7 @@ export default function Sidebar() {
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-1 px-2 pb-2">
-        {navCategories.map((cat) => {
+        {visibleNav.map((cat) => {
           const isSingle = cat.items.length === 1;
           const isOpen = openDropdown === cat.label;
           const icon = getNavIcon(cat);
@@ -153,7 +164,7 @@ export default function Sidebar() {
 
   const mobileNav = (
     <nav className="flex flex-col gap-1 p-3" aria-label="Main">
-      {navCategories.flatMap((cat) =>
+      {visibleNav.flatMap((cat) =>
         cat.items.map((item) => {
           const active = pathname === item.path;
           return (

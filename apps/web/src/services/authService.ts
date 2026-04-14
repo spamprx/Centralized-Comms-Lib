@@ -7,6 +7,8 @@ export type LoginResponse = {
     displayName?: string | null;
     createdAt?: string;
     updatedAt?: string;
+    /** Present when the API includes it; otherwise derive from JWT after login. */
+    role?: string;
   };
   token: string;
 };

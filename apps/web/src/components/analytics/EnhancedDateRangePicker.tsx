@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { DateRange } from '../../lib/dateUtils';
 import { 
   PRESET_RANGES, 
@@ -17,9 +17,23 @@ interface EnhancedDateRangePickerProps {
   value: string;
   onChange: (value: string | DateRange) => void;
   onClose?: () => void;
+  /** Merges onto the trigger button `className` */
+  triggerClassName?: string;
+  triggerStyle?: CSSProperties;
+  /** When set, shown on the trigger instead of the internal preset/custom label */
+  displayLabelOverride?: string;
+  chevronDown?: boolean;
 }
 
-export function EnhancedDateRangePicker({ value, onChange, onClose }: EnhancedDateRangePickerProps) {
+export function EnhancedDateRangePicker({
+  value,
+  onChange,
+  onClose,
+  triggerClassName,
+  triggerStyle,
+  displayLabelOverride,
+  chevronDown,
+}: EnhancedDateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
@@ -181,32 +195,42 @@ export function EnhancedDateRangePicker({ value, onChange, onClose }: EnhancedDa
     );
   };
 
-  const currentDisplay = customRange 
+  const derivedDisplay = customRange
     ? formatDateRange(customRange)
-    : PRESET_RANGES.find(r => r.value === value)?.label || value;
+    : PRESET_RANGES.find((r) => r.value === value)?.label || value;
+  const currentDisplay = displayLabelOverride ?? derivedDisplay;
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e2e4f0] text-[13px] cursor-pointer hover:bg-white/10 transition-colors min-w-[200px] justify-between"
+        style={triggerStyle}
+        className={
+          triggerClassName
+            ? triggerClassName
+            : 'flex min-w-[200px] cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-[#e2e4f0] transition-colors hover:bg-white/10'
+        }
       >
-        <div className="flex items-center gap-2">
-          <Calendar size={14} className="text-[#555870]" />
+        <div className="flex min-w-0 items-center gap-2">
+          <Calendar size={14} className="shrink-0 text-[#555870]" />
           <span className="truncate">{currentDisplay}</span>
         </div>
-        <ChevronRight 
-          size={14} 
-          className={`text-[#555870] transition-transform ${isOpen ? 'rotate-90' : ''}`} 
-        />
+        {chevronDown ? (
+          <ChevronDown
+            size={14}
+            className={`shrink-0 text-[#555870] transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        ) : (
+          <ChevronRight size={14} className={`shrink-0 text-[#555870] transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        )}
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 bg-[#1a1d2e] border border-white/10 rounded-lg shadow-xl z-50 min-w-[400px] max-w-[500px]">
+        <div className="absolute top-full left-0 z-50 mt-2 min-w-[400px] max-w-[500px] rounded-lg border border-white/10 bg-[#1a1d2e]">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <h3 className="text-sm font-semibold text-[#e2e4f0">Select Date Range</h3>
+          <div className="flex items-center justify-between border-b border-white/10 p-4">
+            <h3 className="text-sm font-semibold text-[#e2e4f0]">Select Date Range</h3>
             <button
               type="button"
               onClick={() => {

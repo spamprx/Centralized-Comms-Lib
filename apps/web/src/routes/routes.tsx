@@ -71,10 +71,11 @@ export const routeGroups: RouteGroup[] = [
     routes: [{ path: "/ai-tutor", element: <ProtectedRoute><AITutorPage /></ProtectedRoute> }],
   },
   {
-    label: "Admin & Analytics",
-    routes: [
-      { path: "/admin", element: <ProtectedRoute><AdminPanelPage /></ProtectedRoute> },
-      { path: "/analytics", element: <ProtectedRoute><AnalyticsPage /></ProtectedRoute> },
-    ],
+    label: "Admin",
+    routes: [{ path: "/admin", element: <ProtectedRoute><AdminPanelPage /></ProtectedRoute> }],
+  },
+  {
+    label: "Analytics",
+    routes: [{ path: "/analytics", element: <ProtectedRoute><AnalyticsPage /></ProtectedRoute> }],
   },
 ];

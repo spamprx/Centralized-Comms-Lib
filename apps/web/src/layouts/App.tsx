@@ -7,7 +7,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-app-bg">
-      {isAuthenticated && <Sidebar />}
+      {isAuthenticated ? <Sidebar /> : null}
       <main
         className={`relative min-h-screen w-full transition-[padding] duration-300 ease-out ${
           isAuthenticated ? "app-main-canvas md:pl-16" : ""
