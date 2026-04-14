@@ -4,11 +4,11 @@ import { redisPingMs, searchCacheWritesSkipped } from "../../observability/prome
 
 let client: Redis | null | undefined;
 
-const MAX_CACHE_VALUE_BYTES = parseInt(process.env.SEARCH_CACHE_MAX_VALUE_BYTES ?? "262144", 10);
+const MAX_CACHE_VALUE_BYTES = Number.parseInt(process.env.SEARCH_CACHE_MAX_VALUE_BYTES ?? "262144", 10);
 
 function buildRedisOptions(): RedisOptions {
-  const connectTimeout = parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS ?? "10000", 10);
-  const commandTimeout = parseInt(process.env.REDIS_COMMAND_TIMEOUT_MS ?? "5000", 10);
+  const connectTimeout = Number.parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS ?? "10000", 10);
+  const commandTimeout = Number.parseInt(process.env.REDIS_COMMAND_TIMEOUT_MS ?? "5000", 10);
   return {
     maxRetriesPerRequest: 2,
     lazyConnect: true,
@@ -27,6 +27,9 @@ export function getRedisClient(): Redis | null {
   }
   try {
     client = new Redis(url, buildRedisOptions());
+    // ioredis emits 'error' events even when callers catch promise rejections.
+    // Without a listener, Node treats it as an unhandled error event and can crash/log spam.
+    client.on("error", () => undefined);
     return client;
   } catch {
     client = null;
