@@ -8,67 +8,105 @@ import {
   adminSettingsService,
 } from '../services/adminService';
 import {
-  mockUsers,
-  mockRoles,
-  mockGroups,
-  mockMetrics,
-  mockActivityLogs,
-  mockSettings,
-} from '../data/mockAdminData';
+  apiUserRowToUser,
+  auditEntryToActivityLog,
+  mapApiGroupDetail,
+  mapRoleWithPermissions,
+  uiPermissionToApiPayload,
+  uiStatusToPatchStatus,
+} from '../lib/adminApi';
+import type { ApiAuditEntry, ApiPermission, ApiUserRow } from '../lib/adminApi';
 
-// Enable mock data mode (set to false when backend is ready)
-const USE_MOCK_DATA = true;
+function permKey(resource: string, action: string): string {
+  return `${resource}\0${action.toLowerCase()}`;
+}
+
+async function syncRolePermissions(roleId: string, desired: Role['permissions']): Promise<void> {
+  const existing = (await adminRoleService.getPermissions(roleId)).data;
+  const desiredKeys = new Set(desired.map((d) => permKey(d.resource, d.action)));
+  for (const e of existing) {
+    if (!desiredKeys.has(permKey(e.resource, e.action))) {
+      await adminRoleService.deletePermission(e.id);
+    }
+  }
+  const existingKeys = new Set(existing.map((e) => permKey(e.resource, e.action)));
+  for (const d of desired) {
+    if (!existingKeys.has(permKey(d.resource, d.action))) {
+      await adminRoleService.createPermission(roleId, uiPermissionToApiPayload(d));
+    }
+  }
+}
+
+function applyUserFilters(rows: User[], filters: Partial<UserFilters>): User[] {
+  let out = [...rows];
+  if (filters.search?.trim()) {
+    const q = filters.search.trim().toLowerCase();
+    out = out.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }
+  if (filters.role && filters.role !== 'all') {
+    out = out.filter((u) => u.role === filters.role);
+  }
+  if (filters.status && filters.status !== 'all') {
+    out = out.filter((u) => u.status === filters.status);
+  }
+  const groupFilter = filters.group;
+  if (groupFilter && groupFilter !== 'all') {
+    out = out.filter((u) => u.groups.includes(groupFilter));
+  }
+  const sortBy = filters.sortBy || 'createdAt';
+  const sortOrder = filters.sortOrder || 'desc';
+  out.sort((a, b) => {
+    let aVal: string | number = String(a[sortBy as keyof User] ?? '');
+    let bVal: string | number = String(b[sortBy as keyof User] ?? '');
+    if (sortBy === 'lastActive' || sortBy === 'createdAt') {
+      aVal = new Date(String(aVal)).getTime();
+      bVal = new Date(String(bVal)).getTime();
+    } else {
+      aVal = String(aVal).toLowerCase();
+      bVal = String(bVal).toLowerCase();
+    }
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    if (sortOrder === 'asc') return String(aVal).localeCompare(String(bVal));
+    return String(bVal).localeCompare(String(aVal));
+  });
+  return out;
+}
 
 // ─── Users Hook ───────────────────────────────────────────────────────────────
+
+export type UserFormPayload = {
+  name: string;
+  email: string;
+  roleId: string;
+  status: User['status'];
+  groups: string[];
+  avatar?: string;
+  password?: string;
+};
 
 export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationParams>({ page: 1, limit: 20, total: mockUsers.length });
+  const [pagination, setPagination] = useState<PaginationParams>({ page: 1, limit: 20, total: 0 });
   const [filters, setFilters] = useState<Partial<UserFilters>>(
-    initialFilters ?? { sortBy: 'createdAt', sortOrder: 'desc' }
+    initialFilters ?? { sortBy: 'createdAt', sortOrder: 'desc' },
   );
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (USE_MOCK_DATA) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 300));
-        // Apply filters to mock data
-        let filtered = [...mockUsers];
-        if (filters.search) {
-          const search = filters.search.toLowerCase();
-          filtered = filtered.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
-        }
-        if (filters.role && filters.role !== 'all') {
-          filtered = filtered.filter(u => u.role === filters.role);
-        }
-        if (filters.status && filters.status !== 'all') {
-          filtered = filtered.filter(u => u.status === filters.status);
-        }
-        // Apply sorting
-        const sortBy = filters.sortBy || 'createdAt';
-        const sortOrder = filters.sortOrder || 'desc';
-        filtered.sort((a, b) => {
-          let aVal = a[sortBy as keyof User] as string;
-          let bVal = b[sortBy as keyof User] as string;
-          if (sortBy === 'lastActive' || sortBy === 'createdAt') {
-            aVal = new Date(aVal).toISOString();
-            bVal = new Date(bVal).toISOString();
-          }
-          if (sortOrder === 'asc') return aVal.localeCompare(bVal);
-          return bVal.localeCompare(aVal);
-        });
-        setUsers(filtered);
-        setPagination(p => ({ ...p, total: filtered.length }));
-      } else {
-        const res = await adminUserService.getUsers(filters, pagination);
-        setUsers(res.data);
-        if (res.pagination) setPagination(res.pagination);
-      }
+      const res = await adminUserService.getUsers();
+      const rows = (res.data as unknown as ApiUserRow[]).map(apiUserRowToUser);
+      const filtered = applyUserFilters(rows, filters);
+      const total = filtered.length;
+      const { page, limit } = pagination;
+      const start = (page - 1) * limit;
+      setUsers(filtered.slice(start, start + limit));
+      setPagination((p) => ({ ...p, total }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch users');
     } finally {
@@ -76,76 +114,88 @@ export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
     }
   }, [filters, pagination.page, pagination.limit]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
-  const createUser = async (data: Omit<User, 'id' | 'createdAt' | 'lastActive'>) => {
-    if (USE_MOCK_DATA) {
-      const newUser: User = {
-        ...data,
-        id: String(Date.now()),
-        createdAt: new Date().toISOString(),
-        lastActive: new Date().toISOString(),
-      };
-      setUsers(prev => [newUser, ...prev]);
-      return newUser;
+  const syncUserGroups = async (userId: string, desiredGroupIds: string[]) => {
+    const detail = (await adminUserService.getUserById(userId)).data as unknown as ApiUserRow;
+    const prev = new Set((detail.groups ?? []).map((g) => g.id));
+    const next = new Set(desiredGroupIds);
+    for (const gid of next) {
+      if (!prev.has(gid)) await adminGroupService.addMember(gid, userId);
     }
-    const res = await adminUserService.createUser(data);
-    setUsers(prev => [res.data, ...prev]);
-    return res.data;
+    for (const gid of prev) {
+      if (!next.has(gid)) await adminGroupService.removeMember(gid, userId);
+    }
   };
 
-  const updateUser = async (id: string, data: Partial<User>) => {
-    if (USE_MOCK_DATA) {
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...data } : u));
-      return { id, ...data } as User;
-    }
-    const res = await adminUserService.updateUser(id, data);
-    setUsers(prev => prev.map(u => u.id === id ? res.data : u));
-    return res.data;
+  const createUser = async (data: UserFormPayload) => {
+    if (!data.password?.trim()) throw new Error('Password is required');
+    const rid = data.roleId?.trim();
+    const res = await adminUserService.createUser({
+      email: data.email.trim(),
+      displayName: data.name.trim(),
+      password: data.password,
+      roleId: rid || null,
+    });
+    const created = res.data as unknown as ApiUserRow;
+    await syncUserGroups(created.id, data.groups);
+    await fetchUsers();
+    return apiUserRowToUser((await adminUserService.getUserById(created.id)).data as unknown as ApiUserRow);
+  };
+
+  const updateUser = async (id: string, data: UserFormPayload) => {
+    const isActive = data.status === 'active';
+    await adminUserService.updateUser(id, {
+      displayName: data.name.trim(),
+      email: data.email.trim(),
+      isActive,
+      avatarUrl: data.avatar?.trim() || null,
+      ...(data.roleId?.trim() ? { roleId: data.roleId.trim() } : {}),
+    });
+    await syncUserGroups(id, data.groups);
+    await fetchUsers();
+    return apiUserRowToUser((await adminUserService.getUserById(id)).data as unknown as ApiUserRow);
   };
 
   const deleteUser = async (id: string) => {
-    if (USE_MOCK_DATA) {
-      setUsers(prev => prev.filter(u => u.id !== id));
-      return;
-    }
     await adminUserService.deleteUser(id);
-    setUsers(prev => prev.filter(u => u.id !== id));
+    await fetchUsers();
   };
 
   const bulkDelete = async (ids: string[]) => {
-    if (USE_MOCK_DATA) {
-      setUsers(prev => prev.filter(u => !ids.includes(u.id)));
-      return;
-    }
     await adminUserService.bulkDeleteUsers(ids);
-    setUsers(prev => prev.filter(u => !ids.includes(u.id)));
+    await fetchUsers();
   };
 
   const updateStatus = async (id: string, status: User['status']) => {
-    if (USE_MOCK_DATA) {
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, status } : u));
-      return { id, status } as User;
-    }
-    const res = await adminUserService.updateUserStatus(id, status);
-    setUsers(prev => prev.map(u => u.id === id ? res.data : u));
+    await adminUserService.updateUserStatus(id, uiStatusToPatchStatus(status));
+    await fetchUsers();
   };
 
   return {
-    users, loading, error, pagination, filters,
-    setFilters, setPagination, refetch: fetchUsers,
-    createUser, updateUser, deleteUser, bulkDelete, updateStatus,
+    users,
+    loading,
+    error,
+    pagination,
+    filters,
+    setFilters,
+    setPagination,
+    refetch: fetchUsers,
+    createUser,
+    updateUser,
+    deleteUser,
+    bulkDelete,
+    updateStatus,
   };
 }
 
 // ─── Roles & Groups Hook ──────────────────────────────────────────────────────
 
-const MOCK_ROLES: Role[] = mockRoles;
-const MOCK_GROUPS: Group[] = mockGroups;
-
 export function useAdminRolesAndGroups() {
-  const [roles, setRoles] = useState<Role[]>(MOCK_ROLES);
-  const [groups, setGroups] = useState<Group[]>(MOCK_GROUPS);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,18 +203,28 @@ export function useAdminRolesAndGroups() {
     setLoading(true);
     setError(null);
     try {
-      if (USE_MOCK_DATA) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setRoles(MOCK_ROLES);
-        setGroups(MOCK_GROUPS);
-      } else {
-        const [rolesRes, groupsRes] = await Promise.all([
-          adminRoleService.getRoles(),
-          adminGroupService.getGroups(),
-        ]);
-        setRoles(rolesRes.data);
-        setGroups(groupsRes.data);
-      }
+      const [rolesRes, groupsSummaries, usersRes] = await Promise.all([
+        adminRoleService.getRoles(),
+        adminGroupService.getGroups(),
+        adminUserService.getUsers(),
+      ]);
+      const users = (usersRes.data as unknown as ApiUserRow[]).map(apiUserRowToUser);
+
+      const rolesWithPerms: Role[] = await Promise.all(
+        rolesRes.data.map(async (r) => {
+          const perms = (await adminRoleService.getPermissions(r.id)).data as ApiPermission[];
+          const count = users.filter((u) => u.primaryRoleId === r.id).length;
+          return mapRoleWithPermissions(r, perms, count);
+        }),
+      );
+
+      const groupDetails = await Promise.all(
+        groupsSummaries.data.map(async (g) => (await adminGroupService.getGroupById(g.id)).data),
+      );
+      const mappedGroups = groupDetails.map((g) => mapApiGroupDetail(g));
+
+      setRoles(rolesWithPerms);
+      setGroups(mappedGroups);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load roles/groups');
     } finally {
@@ -172,89 +232,99 @@ export function useAdminRolesAndGroups() {
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   const createRole = async (data: Omit<Role, 'id' | 'userCount' | 'createdAt'>) => {
-    if (USE_MOCK_DATA) {
-      const newRole: Role = {
-        ...data,
-        id: String(Date.now()),
-        userCount: 0,
-        createdAt: new Date().toISOString(),
-      };
-      setRoles(prev => [...prev, newRole]);
-      return newRole;
-    }
-    const res = await adminRoleService.createRole(data);
-    setRoles(prev => [...prev, res.data]);
-    return res.data;
+    const res = await adminRoleService.createRole({
+      name: data.name,
+      description: data.description || null,
+    });
+    await syncRolePermissions(res.data.id, data.permissions);
+    await fetchAll();
+    const perms = (await adminRoleService.getPermissions(res.data.id)).data as ApiPermission[];
+    return mapRoleWithPermissions(res.data, perms, 0);
   };
 
   const updateRole = async (id: string, data: Partial<Role>) => {
-    if (USE_MOCK_DATA) {
-      setRoles(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
-      return { id, ...data } as Role;
+    const patch: { name?: string; description?: string | null } = {};
+    if (data.name !== undefined) patch.name = data.name;
+    if (data.description !== undefined) patch.description = data.description;
+    if (Object.keys(patch).length > 0) {
+      await adminRoleService.updateRole(id, patch);
     }
-    const res = await adminRoleService.updateRole(id, data);
-    setRoles(prev => prev.map(r => r.id === id ? res.data : r));
-    return res.data;
+    if (data.permissions) await syncRolePermissions(id, data.permissions);
+    await fetchAll();
+    const perms = (await adminRoleService.getPermissions(id)).data as ApiPermission[];
+    const row = (await adminRoleService.getRoles()).data.find((r) => r.id === id)!;
+    const usersRes = await adminUserService.getUsers();
+    const users = (usersRes.data as unknown as ApiUserRow[]).map(apiUserRowToUser);
+    const count = users.filter((u) => u.primaryRoleId === id).length;
+    return mapRoleWithPermissions(row, perms, count);
   };
 
   const deleteRole = async (id: string) => {
-    if (USE_MOCK_DATA) {
-      setRoles(prev => prev.filter(r => r.id !== id));
-      return;
-    }
     await adminRoleService.deleteRole(id);
-    setRoles(prev => prev.filter(r => r.id !== id));
+    await fetchAll();
   };
 
   const createGroup = async (data: Omit<Group, 'id' | 'createdAt'>) => {
-    if (USE_MOCK_DATA) {
-      const newGroup: Group = {
-        ...data,
-        id: String(Date.now()),
-        createdAt: new Date().toISOString(),
-      };
-      setGroups(prev => [...prev, newGroup]);
-      return newGroup;
+    const res = await adminGroupService.createGroup({
+      name: data.name,
+      description: data.description || null,
+    });
+    const gid = res.data.id;
+    for (const userId of data.members) {
+      await adminGroupService.addMember(gid, userId);
     }
-    const res = await adminGroupService.createGroup(data);
-    setGroups(prev => [...prev, res.data]);
-    return res.data;
+    await fetchAll();
+    return mapApiGroupDetail((await adminGroupService.getGroupById(gid)).data);
   };
 
   const updateGroup = async (id: string, data: Partial<Group>) => {
-    if (USE_MOCK_DATA) {
-      setGroups(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
-      return { id, ...data } as Group;
+    await adminGroupService.updateGroup(id, {
+      name: data.name,
+      description: data.description !== undefined ? data.description : undefined,
+    });
+    const current = (await adminGroupService.getGroupById(id)).data;
+    const prev = new Set((current.members ?? []).map((m) => m.id));
+    const next = new Set(data.members ?? (current.members ?? []).map((m) => m.id));
+    for (const userId of next) {
+      if (!prev.has(userId)) await adminGroupService.addMember(id, userId);
     }
-    const res = await adminGroupService.updateGroup(id, data);
-    setGroups(prev => prev.map(g => g.id === id ? res.data : g));
-    return res.data;
+    for (const userId of prev) {
+      if (!next.has(userId)) await adminGroupService.removeMember(id, userId);
+    }
+    await fetchAll();
+    return mapApiGroupDetail((await adminGroupService.getGroupById(id)).data);
   };
 
   const deleteGroup = async (id: string) => {
-    if (USE_MOCK_DATA) {
-      setGroups(prev => prev.filter(g => g.id !== id));
-      return;
-    }
     await adminGroupService.deleteGroup(id);
-    setGroups(prev => prev.filter(g => g.id !== id));
+    await fetchAll();
   };
 
   return {
-    roles, groups, loading, error, refetch: fetchAll,
-    createRole, updateRole, deleteRole,
-    createGroup, updateGroup, deleteGroup,
+    roles,
+    groups,
+    loading,
+    error,
+    refetch: fetchAll,
+    createRole,
+    updateRole,
+    deleteRole,
+    createGroup,
+    updateGroup,
+    deleteGroup,
   };
 }
 
 // ─── Monitoring Hook ──────────────────────────────────────────────────────────
 
 export function useAdminMonitoring() {
-  const [metrics, setMetrics] = useState<SystemMetric[]>(MOCK_METRICS);
-  const [logs, setLogs] = useState<ActivityLog[]>(MOCK_LOGS);
+  const [metrics, setMetrics] = useState<SystemMetric[]>([]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -262,23 +332,12 @@ export function useAdminMonitoring() {
     setLoading(true);
     setError(null);
     try {
-      if (USE_MOCK_DATA) {
-        await new Promise(resolve => setTimeout(resolve, 250));
-        // Add some variation to metrics on each fetch
-        setMetrics(MOCK_METRICS.map(m => ({
-          ...m,
-          value: typeof m.value === 'number' ? m.value + Math.floor(Math.random() * 5) - 2 : m.value,
-          changePercent: m.changePercent !== undefined ? m.changePercent + (Math.random() * 2 - 1) : undefined,
-        })));
-        setLogs(MOCK_LOGS);
-      } else {
-        const [metricsRes, logsRes] = await Promise.all([
-          adminMonitoringService.getMetrics(),
-          adminMonitoringService.getActivityLogs({}, { page: 1, limit: 50 }),
-        ]);
-        setMetrics(metricsRes.data);
-        setLogs(logsRes.data);
-      }
+      const [metricsRes, logsRes] = await Promise.all([
+        adminMonitoringService.getMetrics(),
+        adminMonitoringService.getActivityLogs({}, { page: 1, limit: 50 }),
+      ]);
+      setMetrics(metricsRes.data);
+      setLogs((logsRes.data as ApiAuditEntry[]).map(auditEntryToActivityLog));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load monitoring data');
     } finally {
@@ -286,18 +345,17 @@ export function useAdminMonitoring() {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return { metrics, logs, loading, error, refetch: fetchData };
 }
 
-const MOCK_METRICS: SystemMetric[] = mockMetrics;
-const MOCK_LOGS: ActivityLog[] = mockActivityLogs;
-
 // ─── Settings Hook ────────────────────────────────────────────────────────────
 
 export function useAdminSettings() {
-  const [settings, setSettings] = useState<SystemSettings | null>(MOCK_SETTINGS);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,13 +364,8 @@ export function useAdminSettings() {
     setLoading(true);
     setError(null);
     try {
-      if (USE_MOCK_DATA) {
-        await new Promise(resolve => setTimeout(resolve, 150));
-        setSettings(MOCK_SETTINGS);
-      } else {
-        const res = await adminSettingsService.getSettings();
-        setSettings(res.data);
-      }
+      const res = await adminSettingsService.getSettings();
+      setSettings(res.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings');
     } finally {
@@ -320,24 +373,15 @@ export function useAdminSettings() {
     }
   }, []);
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
-  const updateSection = async <K extends keyof SystemSettings>(
-    section: K,
-    data: Partial<SystemSettings[K]>
-  ) => {
+  const updateSection = async <K extends keyof SystemSettings>(section: K, data: Partial<SystemSettings[K]>) => {
     setSaving(true);
     try {
-      if (USE_MOCK_DATA) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setSettings(prev => prev ? {
-          ...prev,
-          [section]: { ...prev[section], ...data },
-        } : null);
-      } else {
-        const res = await adminSettingsService.updateSettings(section, data);
-        setSettings(res.data);
-      }
+      const res = await adminSettingsService.updateSettings(section, data);
+      setSettings(res.data);
     } finally {
       setSaving(false);
     }
@@ -345,5 +389,3 @@ export function useAdminSettings() {
 
   return { settings, loading, saving, error, updateSection, refetch: fetchSettings };
 }
-
-const MOCK_SETTINGS: SystemSettings = mockSettings;

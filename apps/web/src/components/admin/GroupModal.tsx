@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Group } from '../../types/admin';
+import { isAdminActionCancelled } from './adminActionCancelled';
 
 interface GroupModalProps {
   group?: Group | null;
@@ -27,9 +28,11 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
       setFormData({
         name: group.name,
         description: group.description,
-        members: group.members,
-        roles: group.roles,
+        members: [...group.members],
+        roles: [...group.roles],
       });
+    } else {
+      setFormData({ name: '', description: '', members: [], roles: [] });
     }
   }, [group]);
 
@@ -41,6 +44,7 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
       await onSave(formData);
       onClose();
     } catch (err) {
+      if (isAdminActionCancelled(err)) return;
       setError(err instanceof Error ? err.message : 'Failed to save group');
     } finally {
       setLoading(false);
@@ -66,7 +70,7 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm admin-modal-backdrop" onClick={onClose}>
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 backdrop-blur-sm admin-modal-backdrop" onClick={onClose}>
       <div
         className="admin-glass rounded-2xl w-full max-w-[520px] max-h-[90vh] overflow-y-auto shadow-app-soft admin-modal-enter"
         style={{ background: 'rgba(15, 20, 32, 0.92)' }}

@@ -13,8 +13,6 @@ interface SearchAndFilterBarProps {
 const STATUS_CHIPS = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'suspended', label: 'Suspended' },
   { value: 'inactive', label: 'Inactive' },
 ] as const;
 
