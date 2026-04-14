@@ -42,48 +42,16 @@ export default function TemplateDetail({ templateId, onBack, templates, onUpdate
   const [editingBinding, setEditingBinding] = useState<Binding | null>(null);
   const [showTranslationModal, setShowTranslationModal] = useState(false);
 
-  const mockTemplate: Template = {
-    id: `mock_${templateId}`,
-    name: 'Blog Post Template',
-    description: 'Standard blog post layout with header, content, and footer sections.',
-    content: `---
-title: "{{title}}"
-author: "{{author}}"
-date: "{{date}}"
-tags: [{{tags}}]
-
-# {{title}}
-
-Published by {{author}} on {{date}}
-
----
-
-{{content}}
-
----
-*Published on {{date}} by {{author}}*`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    status: 'draft',
-    tags: []
-  };
-
   useEffect(() => {
-    const foundTemplate = templates?.find(t => t.id === templateId) || mockTemplate;
+    const foundTemplate = templates?.find(t => t.id === templateId) || null;
     setTemplate(foundTemplate);
     setEditedTemplate(foundTemplate);
     
     // Initialize tags from template
-    if (foundTemplate.tags) {
-      setTags(foundTemplate.tags);
-    } else {
-      setTags([]);
-    }
+    if (foundTemplate?.tags) setTags(foundTemplate.tags);
+    else setTags([]);
     
-    const savedHistory = localStorage.getItem(`versionHistory_${templateId}`);
-    if (savedHistory) {
-      setVersionHistory(JSON.parse(savedHistory));
-    }
+    setVersionHistory([]);
   }, [templateId, templates]);
 
   // Update editedTemplate when tags change
@@ -123,10 +91,7 @@ Published by {{author}} on {{date}}
   };
 
   const handleBindingUpdated = () => {
-    // Add small delay to ensure localStorage operations complete
-    setTimeout(() => {
-      loadBindings();
-    }, 100);
+    loadBindings();
   };
 
   const handleEditBinding = (binding: Binding) => {
@@ -154,7 +119,6 @@ Published by {{author}} on {{date}}
               updatedAt: new Date().toISOString()
             }];
             setVersionHistory(newHistory);
-            localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
           }
           
           setTemplate(updatedTemplate);
@@ -174,7 +138,6 @@ Published by {{author}} on {{date}}
               updatedAt: new Date().toISOString()
             }];
             setVersionHistory(newHistory);
-            localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
           }
           
           setTemplate(templateToSave);
@@ -188,7 +151,7 @@ Published by {{author}} on {{date}}
         }
       } catch (error) {
         console.error('Failed to update template:', error);
-        // Fallback to localStorage if API fails
+        // Fallback to local in-memory update if API fails
         const templateToSave = {
           ...editedTemplate,
           tags: tags,
@@ -201,7 +164,6 @@ Published by {{author}} on {{date}}
             updatedAt: new Date().toISOString()
           }];
           setVersionHistory(newHistory);
-          localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
         }
         
         setTemplate(templateToSave);
@@ -217,7 +179,6 @@ Published by {{author}} on {{date}}
   const handleDeleteVersion = (versionToDelete: Template) => {
     const newHistory = versionHistory.filter(v => v.id !== versionToDelete.id);
     setVersionHistory(newHistory);
-    localStorage.setItem(`versionHistory_${templateId}`, JSON.stringify(newHistory));
   };
 
   const handleRevert = (oldVersion: Template) => {

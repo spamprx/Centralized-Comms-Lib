@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authService } from "../services/authService";
 import { setAuthToken, decodeTokenPayload } from "../services/tokenStore";
 
@@ -27,10 +27,49 @@ function getUserFromToken(): AuthUser | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // On mount: check cookie for an existing token and derive the user from it
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getUserFromToken());
-  const [isAuthReady] = useState(true);
-  const [user, setUser] = useState<AuthUser | null>(() => getUserFromToken());
+  const initialUser = getUserFromToken();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(initialUser);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreSession() {
+      // First, if we can decode a user from a non-HttpOnly token cookie, set it optimistically
+      // (so UI can render while we confirm with /auth/me).
+      const fromToken = getUserFromToken();
+      if (fromToken && !cancelled) {
+        setUser(fromToken);
+      }
+
+      // Validate via /auth/me even if we can't read a token cookie in JS.
+      // Many setups store auth in an HttpOnly cookie on the API origin.
+      try {
+        const me = await authService.me();
+        if (!cancelled) {
+          if (me.token) setAuthToken(me.token);
+          setUser(me.user);
+          setIsAuthenticated(true);
+          setIsAuthReady(true);
+        }
+        return;
+      } catch {
+        // fallthrough
+      }
+
+      if (!cancelled) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsAuthReady(true);
+      }
+    }
+
+    void restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = async (email: string, password: string) => {
     const res = await authService.login(email, password);

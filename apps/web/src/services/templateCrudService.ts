@@ -17,7 +17,7 @@ export type TemplateRecord = {
   authorId: string;
   createdAt: string;
   updatedAt: string;
-  bindings?: Array<{ id: string; channelId: string; createdAt: string }>;
+  bindings?: Array<{ id: string; channelId: string; createdAt: string; layoutConfig?: unknown }>;
 };
 
 type ListFilters = {
@@ -64,6 +64,7 @@ export type TemplateBindingRecord = {
   templateId: string;
   channelId: string;
   createdAt: string;
+  layoutConfig?: unknown;
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

@@ -24,6 +24,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { PageShell } from '../ui/PageShell';
 import { Surface } from '../ui/Surface';
 import TemplateLayoutEditor from './TemplateLayoutEditor';
+import TemplateChannelPreviews from './TemplateChannelPreviews';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
@@ -47,17 +48,45 @@ function nextCopyName(baseName: string, existing: TemplateRecord[]): string {
   return `${baseName} (Copy ${i})`;
 }
 
-function bindingConfigKey(bindingId: string): string {
-  return `template_binding_config_${bindingId}`;
+function defaultBindingConfigText(): string {
+  return '{\n  "layout": "responsive"\n}';
 }
 
-function readBindingConfig(bindingId: string): string {
-  const raw = localStorage.getItem(bindingConfigKey(bindingId));
-  return raw || '{\n  "layout": "responsive"\n}';
+function stringifyJson(value: unknown): string {
+  try {
+    return JSON.stringify(value ?? {}, null, 2);
+  } catch {
+    return defaultBindingConfigText();
+  }
 }
 
-function writeBindingConfig(bindingId: string, jsonText: string): void {
-  localStorage.setItem(bindingConfigKey(bindingId), jsonText);
+function extractBindingsFromTemplate(detail: TemplateRecord | null): Array<{
+  id: string;
+  channelId: string;
+  createdAt: string;
+  layoutConfig?: unknown;
+}> {
+  if (!detail) return [];
+  const anyDetail = detail as unknown as Record<string, unknown>;
+  const candidates: unknown[] = [
+    anyDetail.bindings,
+    anyDetail.channelBindings,
+    anyDetail.channel_bindings,
+    anyDetail.templateBindings,
+  ];
+  const arr = candidates.find((x) => Array.isArray(x)) as Array<any> | undefined;
+  if (!arr) return [];
+  return arr
+    .map((b) => {
+      if (!b || typeof b !== 'object') return null;
+      const id = String((b as any).id ?? '').trim();
+      const channelId = String((b as any).channelId ?? (b as any).channel_id ?? '').trim();
+      const createdAt = String((b as any).createdAt ?? (b as any).created_at ?? '').trim();
+      const layoutConfig = (b as any).layoutConfig ?? (b as any).layout_config ?? undefined;
+      if (!id || !channelId) return null;
+      return { id, channelId, createdAt, layoutConfig };
+    })
+    .filter(Boolean) as Array<{ id: string; channelId: string; createdAt: string; layoutConfig?: unknown }>;
 }
 
 function normalizeI18n(input: unknown): Record<string, Record<string, string>> {
@@ -156,6 +185,39 @@ export default function TemplatesPage() {
   const [i18nSaving, setI18nSaving] = useState(false);
   const [previewLocale, setPreviewLocale] = useState('en');
 
+  const bindingViews = useMemo(() => {
+    const out: Array<{
+      id: string;
+      channelId: string;
+      channelKey: string;
+      channelName: string;
+      layoutConfigText: string;
+      layoutConfig: unknown;
+    }> = [];
+
+    // API-backed bindings (templateCrudService)
+    for (const b of extractBindingsFromTemplate(detail)) {
+      const channel = channels.find((c) => c.id === b.channelId);
+      const raw = b.layoutConfig ? stringifyJson(b.layoutConfig) : defaultBindingConfigText();
+      let parsed: unknown = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = b.layoutConfig ?? null;
+      }
+      out.push({
+        id: b.id,
+        channelId: b.channelId,
+        channelKey: channel?.key ?? 'channel',
+        channelName: channel?.name ?? b.channelId,
+        layoutConfigText: raw,
+        layoutConfig: parsed,
+      });
+    }
+
+    return out;
+  }, [detail, channels]);
+
   const q = searchParams.get('q') ?? '';
   const status = (searchParams.get('status') as TemplateStatus | 'ALL' | null) ?? 'ALL';
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
@@ -216,6 +278,12 @@ export default function TemplatesPage() {
       cancelled = true;
     };
   }, [templateId]);
+
+  useEffect(() => {
+    // Legacy bindings fetch removed: bindings now come from templateCrudService.getById().
+    // (Kept as an effect placeholder to avoid refactor churn when adding features.)
+    return undefined;
+  }, [detail?.id]);
 
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -435,15 +503,15 @@ export default function TemplatesPage() {
       (c) => !detail?.bindings?.some((b) => b.channelId === c.id),
     );
     setChannelIdInput(firstUnbound?.id ?? '');
-    setChannelConfigInput('{\n  "layout": "responsive"\n}');
+    setChannelConfigInput(defaultBindingConfigText());
     setChannelError(null);
     setShowChannelDialog(true);
   }
 
-  function openEditChannelDialog(bindingId: string, channelId: string) {
-    setEditingBindingId(bindingId);
-    setChannelIdInput(channelId);
-    setChannelConfigInput(readBindingConfig(bindingId));
+  function openEditChannelDialog(binding: NonNullable<TemplateRecord['bindings']>[number]) {
+    setEditingBindingId(binding.id);
+    setChannelIdInput(binding.channelId);
+    setChannelConfigInput(binding.layoutConfig ? stringifyJson(binding.layoutConfig) : defaultBindingConfigText());
     setChannelError(null);
     setShowChannelDialog(true);
   }
@@ -470,21 +538,23 @@ export default function TemplatesPage() {
         if (!existing) throw new Error('Binding not found');
         if (existing.channelId !== channelIdInput) {
           await templateCrudService.removeChannelBinding(detail.id, editingBindingId);
-          const created = await templateCrudService.addChannelBinding(detail.id, {
+          await templateCrudService.addChannelBinding(detail.id, {
             channelId: channelIdInput,
             layoutConfig: JSON.parse(channelConfigInput),
           });
-          writeBindingConfig(created.id, channelConfigInput);
-          localStorage.removeItem(bindingConfigKey(editingBindingId));
         } else {
-          writeBindingConfig(editingBindingId, channelConfigInput);
+          // No PATCH binding endpoint: re-create to persist layoutConfig changes.
+          await templateCrudService.removeChannelBinding(detail.id, editingBindingId);
+          await templateCrudService.addChannelBinding(detail.id, {
+            channelId: channelIdInput,
+            layoutConfig: JSON.parse(channelConfigInput),
+          });
         }
       } else {
-        const created = await templateCrudService.addChannelBinding(detail.id, {
+        await templateCrudService.addChannelBinding(detail.id, {
           channelId: channelIdInput,
           layoutConfig: JSON.parse(channelConfigInput),
         });
-        writeBindingConfig(created.id, channelConfigInput);
       }
 
       const refreshed = await templateCrudService.getById(detail.id);
@@ -505,7 +575,6 @@ export default function TemplatesPage() {
     setMutationError(null);
     try {
       await templateCrudService.removeChannelBinding(detail.id, bindingId);
-      localStorage.removeItem(bindingConfigKey(bindingId));
       const refreshed = await templateCrudService.getById(detail.id);
       setDetail(refreshed);
       setItems((prev) => prev.map((t) => (t.id === refreshed.id ? refreshed : t)));
@@ -549,6 +618,11 @@ export default function TemplatesPage() {
     () => applyI18nFallback(previewSource, previewLocale, i18nData, baseLocale),
     [previewSource, previewLocale, i18nData, baseLocale],
   );
+
+  const layoutForPreview = useMemo(() => {
+    if (!detail) return null;
+    return detail.activeLayout ?? detail.draftLayout ?? null;
+  }, [detail]);
 
   function updateTranslation(key: string, value: string) {
     setI18nData((prev) => ({
@@ -902,7 +976,7 @@ export default function TemplatesPage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => openEditChannelDialog(b.id, b.channelId)}
+                              onClick={() => openEditChannelDialog(b)}
                               className="px-2 py-1 rounded border border-app-border text-xs hover:bg-app-surface-hover"
                             >
                               Edit
@@ -916,11 +990,18 @@ export default function TemplatesPage() {
                           </div>
                         </div>
                         <pre className="mt-2 text-[11px] bg-black/30 border border-app-border rounded p-2 overflow-auto max-h-28">
-                          {readBindingConfig(b.id)}
+                          {b.layoutConfig ? stringifyJson(b.layoutConfig) : defaultBindingConfigText()}
                         </pre>
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-app-border p-3 bg-black/10">
+                <div className="text-app-faint text-[12px] mb-2">Channel previews</div>
+                <div className="max-h-[420px] overflow-auto pr-1">
+                  <TemplateChannelPreviews layout={layoutForPreview} bindings={bindingViews} />
                 </div>
               </div>
               <div className="rounded-lg border border-app-border p-3 bg-black/10">
@@ -1050,6 +1131,17 @@ export default function TemplatesPage() {
                   {detail.activeLayout != null ? 'Active layout is published.' : 'Nothing active yet.'}
                 </p>
               </div>
+
+              <div className="rounded-lg border border-app-border p-3 bg-black/10">
+                <details>
+                  <summary className="cursor-pointer select-none text-app-faint text-[12px]">
+                    Template JSON
+                  </summary>
+                  <pre className="mt-2 text-[11px] bg-black/30 border border-app-border rounded p-2 overflow-auto max-h-64">
+                    {JSON.stringify(detail, null, 2)}
+                  </pre>
+                </details>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-app-faint">Template unavailable.</p>
@@ -1063,6 +1155,7 @@ export default function TemplatesPage() {
             templateId={detail.id}
             draftLayout={detail.draftLayout}
             bindingCount={detail.bindings?.length ?? 0}
+            bindings={bindingViews}
             onLayoutSaved={(saved) => {
               setDetail(saved);
               setItems((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));

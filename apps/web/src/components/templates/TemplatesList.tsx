@@ -127,52 +127,6 @@ Published by {{author}} on {{date}}
       console.log('Template created successfully:', newTemplate);
     } catch (error) {
       console.error('Failed to create template:', error);
-      // Fallback to localStorage if API fails
-      const fallbackTemplate: Template = {
-        id: Date.now().toString(),
-        name: 'New Template',
-        description: 'Click to edit this template - A versatile template for various content types',
-        content: `---
-title: "{{title}}"
-author: "{{author}}"
-date: "{{date}}"
-tags: [{{tags}}]
-
-# {{title}}
-
-Published by {{author}} on {{date}}
-
----
-
-{{content}}
-
----
-*Tags: {{tags}}*
-*Last updated: {{date}}*`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: 'draft',
-        tags: [
-          { id: 'tag_1', name: 'blog', slug: 'blog' },
-          { id: 'tag_2', name: 'content', slug: 'content' },
-          { id: 'tag_3', name: 'markdown', slug: 'markdown' }
-        ],
-        variables: {
-          title: 'The main title or headline',
-          author: 'Content author name',
-          date: 'Publication date',
-          tags: 'Comma-separated tags',
-          content: 'Main body content'
-        },
-        usage_count: 0,
-        last_used: 'Never'
-      };
-      
-      setTemplates((prev) => {
-        const updated = [...prev, fallbackTemplate];
-        localStorage.setItem('templates', JSON.stringify(updated));
-        return updated;
-      });
     }
   };
 
@@ -508,7 +462,6 @@ Published by {{author}} on {{date}}
               onClick={() => {
                 if (confirm('Clear all deleted templates?')) {
                   setTemplates([]);
-                  localStorage.removeItem('deletedTemplates');
                 }
               }}
               className="text-sm text-red-600 hover:text-red-800 transition-colors"

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Lock,
   Mail,
@@ -31,7 +31,22 @@ export default function AuthLayout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const { login, isAuthenticated, isAuthReady } = useAuth();
+
+  const fromPath =
+    (location.state as { from?: { pathname?: string; search?: string } } | null)?.from?.pathname ??
+    "/dashboard";
+  const fromSearch =
+    (location.state as { from?: { pathname?: string; search?: string } } | null)?.from?.search ?? "";
+  const redirectTo = `${fromPath}${fromSearch}`;
+
+  useEffect(() => {
+    // If we already have a valid session (cookie-backed), don't stay on /login.
+    if (isAuthReady && isAuthenticated) {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [isAuthReady, isAuthenticated, navigate, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +59,7 @@ export default function AuthLayout() {
       } else {
         await login(email, password);
       }
-      navigate("/dashboard");
+      navigate(redirectTo, { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

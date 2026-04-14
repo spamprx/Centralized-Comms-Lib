@@ -1,12 +1,15 @@
 import type { TranslationData } from '../types/translation.js';
+import { getAuthToken } from './tokenStore';
 
-const API_BASE = "http://168.144.22.124:8000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 // API request helper
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
   const response = await fetch(`${API_BASE}${url}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,
@@ -30,7 +33,7 @@ export async function getTranslations(templateId: string): Promise<TranslationDa
     });
     
     const apiData = await Promise.race([
-      request<TranslationData>(`api/v1/templates/${templateId}/i18n`),
+      request<TranslationData>(`/templates/${templateId}/i18n`),
       timeoutPromise
     ]);
     

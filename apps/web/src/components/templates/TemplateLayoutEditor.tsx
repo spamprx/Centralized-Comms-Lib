@@ -23,14 +23,11 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import {
   CheckCircle,
-  Eye,
   GripVertical,
   Image as ImageIcon,
   Loader2,
-  Monitor,
   Save,
   Settings2,
-  Smartphone,
   Text,
   Trash2,
 } from 'lucide-react';
@@ -41,6 +38,7 @@ import {
   type TemplateRecord,
 } from '../../services/templateCrudService';
 import TemplateComponentPalette from './TemplateComponentPalette';
+import MultiChannelTemplatePreview from './MultiChannelTemplatePreview';
 import {
   TextBlockModal,
   MediaBlockModal,
@@ -348,6 +346,14 @@ type TemplateLayoutEditorProps = {
   templateId: string;
   draftLayout: unknown;
   bindingCount: number;
+  bindings?: Array<{
+    id: string;
+    channelId: string;
+    channelKey: string;
+    channelName: string;
+    layoutConfigText: string;
+    layoutConfig: unknown;
+  }>;
   onLayoutSaved: (record: TemplateRecord) => void;
 };
 
@@ -368,12 +374,56 @@ export default function TemplateLayoutEditor({
   const [activateError, setActivateError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
-  const [previewBp, setPreviewBp] = useState<'desktop' | 'mobile'>('desktop');
 
   useEffect(() => {
     const parsed = parseTemplateLayout(draftLayout);
     setRegions(parsed?.regions?.length ? parsed.regions : []);
   }, [templateId, draftLayout]);
+
+  function regionPlainText(region: TemplateLayoutRegion): string {
+    if (region.type === REGION_TYPES.field) {
+      const k = String((region.props as { fieldKey?: string } | undefined)?.fieldKey ?? 'field');
+      return `{{${k}}}`;
+    }
+    if (region.type === REGION_TYPES.media) {
+      const caption = String((region.props as { caption?: string } | undefined)?.caption ?? '').trim();
+      const alt = String((region.props as { alt?: string } | undefined)?.alt ?? '').trim();
+      const label = caption || alt || 'image';
+      return `[${label}]`;
+    }
+    if (region.type !== REGION_TYPES.richText) return '';
+    const doc = ensureRichDoc(region.props);
+
+    const out: string[] = [];
+    const walk = (node: any) => {
+      if (!node) return;
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (typeof node !== 'object') return;
+      if (node.type === 'text' && typeof node.text === 'string') {
+        out.push(node.text);
+      } else if (node.type === 'hardBreak') {
+        out.push('\n');
+      }
+      if (Array.isArray(node.content)) walk(node.content);
+      if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'listItem') {
+        out.push('\n');
+      }
+    };
+    walk(doc);
+    return out
+      .join('')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  const smsPreview = useMemo(() => {
+    const chunks = regions.map(regionPlainText).filter((x) => x.trim().length > 0);
+    return chunks.join('\n\n').trim();
+  }, [regions]);
 
   const layoutConfig = useMemo(
     (): TemplateLayoutConfig => ({
@@ -574,7 +624,7 @@ export default function TemplateLayoutEditor({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(220px,260px)_1fr] xl:grid-cols-[minmax(220px,260px)_1fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(220px,260px)_1fr]">
         <TemplateComponentPalette onPick={onPalettePick} disabled={saving || activating} />
 
         <div>
@@ -634,42 +684,10 @@ export default function TemplateLayoutEditor({
             ) : null}
           </div>
         </div>
+      </div>
 
-        <div className="min-w-0 lg:col-span-2 xl:col-span-1">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-[12px] text-app-muted">
-              <Eye size={14} />
-              Live preview
-            </div>
-            <div className="flex rounded-lg border border-app-border p-0.5">
-              <button
-                type="button"
-                onClick={() => setPreviewBp('desktop')}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
-                  previewBp === 'desktop' ? 'bg-app-accent-muted text-app-text' : 'text-app-muted'
-                }`}
-              >
-                <Monitor size={12} /> Desktop
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewBp('mobile')}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
-                  previewBp === 'mobile' ? 'bg-app-accent-muted text-app-text' : 'text-app-muted'
-                }`}
-              >
-                <Smartphone size={12} /> Mobile
-              </button>
-            </div>
-          </div>
-          <div
-            className={`rounded-lg border border-app-border bg-black/20 p-4 ${
-              previewBp === 'mobile' ? 'flex justify-center' : ''
-            }`}
-          >
-            <TemplateLayoutLivePreview regions={regions} breakpoint={previewBp} />
-          </div>
-        </div>
+      <div className="rounded-lg border border-app-border bg-black/10 p-3">
+        <MultiChannelTemplatePreview template={smsPreview} templateReadOnly />
       </div>
 
       <TextBlockModal
@@ -693,6 +711,8 @@ export default function TemplateLayoutEditor({
         onClose={closeBlockModal}
         onSubmit={handleFieldModalSubmit}
       />
+
+      {/* Live preview removed from layout canvas */}
     </div>
   );
 }

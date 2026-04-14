@@ -32,14 +32,26 @@ export function getAuthToken(): string | null {
 
 /** Decode the JWT payload to extract user info (id, email, role).
  *  Does NOT verify the signature — that's the server's job.  */
-export function decodeTokenPayload(): { id: string; email: string; role: string } | null {
+export function decodeTokenPayload(): { id: string; email: string; role?: string } | null {
   const token = getAuthToken();
   if (!token) return null;
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return { id: payload.id, email: payload.email, role: payload.role };
+    // JWT payload is base64url encoded (not standard base64).
+    const base64Url = parts[1] ?? '';
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(padded)) as Record<string, unknown>;
+    const id =
+      String(payload.id ?? payload.userId ?? payload.user_id ?? payload.sub ?? '').trim();
+    const email =
+      String(payload.email ?? payload.userEmail ?? payload.user_email ?? '').trim();
+    const roleRaw = payload.role ?? payload.userRole ?? payload.user_role;
+    const role = typeof roleRaw === 'string' ? roleRaw : undefined;
+
+    if (!id || !email) return null;
+    return { id, email, role };
   } catch {
     return null;
   }
