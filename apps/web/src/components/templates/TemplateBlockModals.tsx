@@ -35,7 +35,7 @@ function ModalChrome({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 p-4">
       <div
         className="w-full max-w-md rounded-app-xl border border-app-border/90 bg-app-bg-subtle/98 p-4 shadow-app-lift"
         role="dialog"

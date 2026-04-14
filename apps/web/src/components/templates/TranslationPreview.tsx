@@ -136,7 +136,7 @@ export default function TranslationPreview({
             <div className="mt-6">
               <button
                 onClick={onClose}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
               >
                 Close
               </button>

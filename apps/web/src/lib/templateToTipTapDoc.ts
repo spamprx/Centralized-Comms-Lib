@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
-import { flattenRegions, parseTemplateLayout } from './templateLayout/layoutConfig';
 import type { TemplateRecord } from '../services/templateCrudService';
+import { flattenRegions, parseTemplateLayout } from './templateLayout/layoutConfig';
 
 function extractRichDoc(props: Record<string, unknown> | undefined): JSONContent | null {
   if (!props || typeof props !== 'object') return null;
@@ -33,7 +33,7 @@ function starterFromName(name: string): JSONContent {
 export function tipTapDocFromTemplateRecord(record: TemplateRecord): JSONContent {
   const layout =
     parseTemplateLayout(record.activeLayout) ?? parseTemplateLayout(record.draftLayout);
-  const regions = flattenRegions(layout);
+  const regions = layout ? flattenRegions(layout) : [];
   if (!regions.length) {
     return starterFromName(record.name);
   }

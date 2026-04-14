@@ -103,11 +103,6 @@ export default function MonitoringTab() {
 
 function MetricCard({ metric, index }: { metric: SystemMetric; index: number }) {
   const numericValue = typeof metric.value === 'number' ? metric.value : parseFloat(String(metric.value));
-  const displayValue = isNaN(numericValue)
-    ? metric.value
-    : Number.isInteger(numericValue)
-    ? numericValue
-    : numericValue.toFixed(2);
 
   const animatedVal = useAnimatedNumber(isNaN(numericValue) ? 0 : numericValue);
   const animatedDisplay = isNaN(numericValue)

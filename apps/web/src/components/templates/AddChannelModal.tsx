@@ -118,7 +118,7 @@ export default function AddChannelModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
       onClick={onClose}
     >
       <div
@@ -169,7 +169,7 @@ export default function AddChannelModal({
                 <select
                   value={selectedChannelId}
                   onChange={(e) => setSelectedChannelId(e.target.value)}
-                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm outline-none focus:border-app-accent/50 transition-colors"
+                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm outline-none focus:border-app-accent/50"
                 >
                   <option value="">Choose a channel...</option>
                   {channels.map((channel) => (
@@ -207,7 +207,7 @@ export default function AddChannelModal({
                   value={layoutConfig}
                   onChange={(e) => handleConfigChange(e.target.value)}
                   rows={8}
-                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm font-mono outline-none focus:border-app-accent/50 transition-colors resize-none"
+                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm font-mono outline-none focus:border-app-accent/50 resize-none"
                   placeholder="Enter layout configuration as JSON..."
                 />
                 {configError && (
@@ -236,12 +236,12 @@ export default function AddChannelModal({
             <button
               onClick={handleSubmit}
               disabled={!selectedChannelId || !!configError || submitting || success || channels.length === 0}
-              className={`flex items-center gap-1.5 px-5 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-5 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold ${
                 success
-                  ? 'bg-gradient-to-br from-emerald-500 to-app-accent-deep cursor-not-allowed'
+                  ? 'bg-emerald-600 cursor-not-allowed'
                   : !selectedChannelId || !!configError || channels.length === 0
                     ? 'bg-app-accent/30 cursor-not-allowed opacity-50'
-                    : 'bg-gradient-to-br from-app-accent to-app-accent-deep cursor-pointer'
+                    : 'bg-app-accent cursor-pointer'
               }`}
             >
               {submitting ? (

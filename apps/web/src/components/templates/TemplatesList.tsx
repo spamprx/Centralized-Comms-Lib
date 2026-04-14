@@ -182,7 +182,7 @@ Published by {{author}} on {{date}}
         <h1 className="text-3xl font-bold text-app-text">Templates</h1>
         <button 
           onClick={handleCreateTemplate}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
           Create Template
@@ -252,9 +252,9 @@ Published by {{author}} on {{date}}
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {paginatedTemplates.map((template) => (
-          <div key={template.id} className="bg-app-surface border border-app-border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+          <div key={template.id} className="bg-app-surface border border-app-border rounded-lg overflow-hidden">
             {/* Header Section */}
-            <div className="relative bg-gradient-to-r from-app-accent/15 to-cyan-500/10 px-4 py-3 border-b border-app-border">
+            <div className="relative border-b border-app-border bg-app-bg-subtle px-4 py-3">
               <div className="text-center">
                 <h3 className="text-lg font-bold text-app-text mb-1">{template.name}</h3>
                 <p className="text-sm text-app-muted mb-2">{template.description}</p>
@@ -330,21 +330,21 @@ Published by {{author}} on {{date}}
                 <div className="flex gap-1">
                   <button 
                     onClick={() => onViewTemplate(template.id)}
-                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
                   >
                     <Eye className="w-4 h-4 mr-1" />
                     View
                   </button>
                   <button 
                     onClick={() => onEditTemplate?.(template.id)}
-                    className="inline-flex items-center px-3 py-2 bg-app-muted text-white text-sm font-medium rounded-lg hover:bg-app-bg-subtle transition-colors"
+                    className="inline-flex items-center px-3 py-2 bg-app-muted text-white text-sm font-medium rounded-lg hover:bg-app-bg-subtle"
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
                   </button>
                   <button 
                     onClick={() => onCloneTemplate?.(template.id)}
-                    className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
                   >
                     <Copy className="w-4 h-4 mr-1" />
                     Clone
@@ -352,7 +352,7 @@ Published by {{author}} on {{date}}
                   <button 
                     onClick={() => onDeleteTemplate?.(template.id)}
                     disabled={deletingId === template.id}
-                    className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {deletingId === template.id ? (
                       <>
@@ -406,7 +406,7 @@ Published by {{author}} on {{date}}
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Previous</span>
@@ -463,10 +463,10 @@ Published by {{author}} on {{date}}
                         <button
                           key={page}
                           onClick={() => setCurrentPage(page as number)}
-                          className={`w-10 h-10 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          className={`w-10 h-10 text-sm font-medium rounded-lg ${
                             currentPage === page
-                              ? 'bg-blue-600 text-white shadow-md transform scale-105'
-                              : 'text-app-muted bg-app-surface border border-app-border hover:bg-app-surface hover:border-app-border-strong hover:shadow-sm'
+                              ? 'border border-blue-600 bg-blue-600 text-white'
+                              : 'text-app-muted bg-app-surface border border-app-border hover:bg-app-surface hover:border-app-border-strong'
                           }`}
                         >
                           {page}
@@ -479,7 +479,7 @@ Published by {{author}} on {{date}}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                  className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-4 h-4" />
@@ -488,7 +488,7 @@ Published by {{author}} on {{date}}
               
               {/* Page info */}
               <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-r from-app-accent/15 to-cyan-500/10 text-blue-700 px-4 py-2 rounded-lg border border-blue-200">
+                <div className="rounded-lg border border-app-border bg-app-bg-subtle px-4 py-2 text-app-text">
                   <span className="text-sm font-medium">
                     Page {currentPage} of {totalPages}
                   </span>
@@ -511,7 +511,7 @@ Published by {{author}} on {{date}}
                   localStorage.removeItem('deletedTemplates');
                 }
               }}
-              className="text-sm text-red-600 hover:text-red-800 transition-colors"
+              className="text-sm text-red-600 hover:text-red-800"
             >
               Clear Trash
             </button>
@@ -531,7 +531,7 @@ Published by {{author}} on {{date}}
                 <div className="flex gap-2">
                   <button
                     onClick={() => onRestoreTemplate?.(template)}
-                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                   >
                     Restore
                   </button>

@@ -22,18 +22,22 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import {
+  Braces,
   CheckCircle,
   Columns2,
+  Columns3,
   Eye,
   GripVertical,
   Image as ImageIcon,
   Loader2,
   Monitor,
+  Plus,
   Save,
   Settings2,
   Smartphone,
   Text,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
   templateCrudService,
@@ -46,12 +50,16 @@ import {
   LAYOUT_VERSION,
   MIN_CELL_FLEX,
   addColumnToRow,
+  addRegionToCell,
   addRowWithRegion,
+  equalizeRowColumns,
   flattenRegions,
-  layoutCellCount,
+  layoutRegionCount,
   mapRegion,
   parseTemplateLayout,
   removeRegionFromRows,
+  previewRowGridTemplateColumns,
+  rowGridTemplateColumns,
 } from '../../lib/templateLayout/layoutConfig';
 import TemplateComponentPalette from './TemplateComponentPalette';
 import {
@@ -190,8 +198,8 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-app-md border border-white/[0.1] bg-gradient-to-b from-white/[0.05] to-app-bg-subtle/55 shadow-app-soft ${
-        isDragging ? 'opacity-80 ring-2 ring-app-accent/40' : 'hover:border-app-accent/20'
+      className={`rounded-app-md border border-app-border bg-app-bg-subtle ${
+        isDragging ? 'opacity-80 ring-1 ring-app-accent/40' : 'hover:border-app-accent/25'
       }`}
     >
       <div className="flex items-center gap-2 border-b border-white/[0.06] bg-black/15 px-3 py-2.5">
@@ -273,7 +281,7 @@ function ColumnResizeHandle({ onPointerDown }: ResizeHandleProps) {
       className="group relative w-3 shrink-0 cursor-col-resize select-none touch-none"
       onPointerDown={onPointerDown}
     >
-      <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-app-border/90 transition-colors group-hover:bg-app-accent/60 group-active:bg-app-accent" />
+      <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-app-border/90 group-hover:bg-app-accent/60 group-active:bg-app-accent" />
     </div>
   );
 }
@@ -282,6 +290,9 @@ type SortableLayoutRowProps = {
   row: LayoutRow;
   onResizePointerDown: (e: React.PointerEvent<HTMLDivElement>, rowId: string, leftCellIndex: number) => void;
   onRequestAddColumn: (rowId: string) => void;
+  /** Stack another block in this column (same grid track, rows stack vertically). */
+  onRequestAddToCell: (rowId: string, cellId: string) => void;
+  onEqualizeColumns: (rowId: string) => void;
   onUpdateDoc: (id: string, doc: JSONContent) => void;
   onConfigure: (id: string) => void;
   onRemove: (id: string) => void;
@@ -291,6 +302,8 @@ function SortableLayoutRow({
   row,
   onResizePointerDown,
   onRequestAddColumn,
+  onRequestAddToCell,
+  onEqualizeColumns,
   onUpdateDoc,
   onConfigure,
   onRemove,
@@ -304,13 +317,15 @@ function SortableLayoutRow({
     transition,
   };
 
+  const gridCols = rowGridTemplateColumns(row.cells);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       data-layout-row
-      className={`rounded-app-lg border border-white/[0.1] bg-gradient-to-b from-white/[0.04] to-app-bg-subtle/55 shadow-app-soft ${
-        isDragging ? 'opacity-80 ring-2 ring-app-accent/40' : 'hover:border-app-accent/20'
+      className={`rounded-app-lg border border-app-border bg-app-bg-subtle ${
+        isDragging ? 'opacity-80 ring-1 ring-app-accent/40' : 'hover:border-app-accent/25'
       }`}
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] bg-black/15 px-2 py-2 sm:px-3">
@@ -323,42 +338,64 @@ function SortableLayoutRow({
         >
           <GripVertical size={16} />
         </button>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">
-          Row · {row.cells.length} column{row.cells.length === 1 ? '' : 's'}
+        <span className="text-[10px] font-medium tabular-nums text-app-faint">
+          Row · {row.cells.length}
         </span>
         <div className="flex-1" />
+        {row.cells.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => onEqualizeColumns(row.id)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.1] bg-black/20 px-2.5 py-1 text-[10px] font-medium text-app-muted hover:border-app-accent/25 hover:text-app-text"
+            title="Equal column widths"
+          >
+            <Columns3 size={12} aria-hidden />
+            Equal
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => onRequestAddColumn(row.id)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-app-accent/35 bg-app-accent-muted/40 px-2.5 py-1 text-[10px] font-medium text-app-accent transition-colors hover:bg-app-accent-muted"
-          title="Add a column beside existing blocks, then pick a block type from the palette"
+          className="inline-flex items-center gap-1.5 rounded-md border border-app-accent/35 bg-app-accent-muted/40 px-2.5 py-1 text-[10px] font-medium text-app-accent hover:bg-app-accent-muted"
+          title="Add a column to this row, then pick a block type"
         >
           <Columns2 size={12} aria-hidden />
-          Add column
+          + Column
         </button>
       </div>
-      <div className="flex min-w-0 flex-row items-stretch gap-0 overflow-x-auto p-2 sm:p-3">
+      <div
+        className="grid min-w-0 items-stretch overflow-x-auto p-2 sm:p-3"
+        style={{ gridTemplateColumns: gridCols }}
+      >
         {row.cells.flatMap((cell, i) => {
           const chunk: React.ReactElement[] = [
-            <div
-              key={cell.id}
-              className="min-w-0 flex-1"
-              style={{ flex: `${cell.flexGrow} 1 0%` }}
-            >
-              <SortableRegionCard
-                region={cell.region}
-                onUpdateDoc={onUpdateDoc}
-                onConfigure={onConfigure}
-                onRemove={onRemove}
-              />
+            <div key={cell.id} className="flex min-w-0 flex-col gap-3">
+              {cell.regions.map((region) => (
+                <SortableRegionCard
+                  key={region.id}
+                  region={region}
+                  onUpdateDoc={onUpdateDoc}
+                  onConfigure={onConfigure}
+                  onRemove={onRemove}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => onRequestAddToCell(row.id, cell.id)}
+                className="flex w-full items-center justify-center gap-1 rounded-app-md border border-dashed border-white/[0.1] bg-black/15 py-1.5 text-[10px] font-medium text-app-faint hover:border-app-accent/35 hover:bg-app-accent-muted/20 hover:text-app-accent"
+              >
+                <Plus size={11} aria-hidden />
+                + Block
+              </button>
             </div>,
           ];
           if (i < row.cells.length - 1) {
             chunk.push(
-              <ColumnResizeHandle
-                key={`${row.id}-resize-${i}`}
-                onPointerDown={(e) => onResizePointerDown(e, row.id, i)}
-              />,
+              <div key={`${row.id}-gutter-${i}`} className="flex min-w-0 items-stretch justify-center">
+                <ColumnResizeHandle
+                  onPointerDown={(e) => onResizePointerDown(e, row.id, i)}
+                />
+              </div>,
             );
           }
           return chunk;
@@ -399,7 +436,7 @@ function ReadOnlyRich({ doc }: { doc: JSONContent }) {
 
 function PreviewRegionCard({ region }: { region: TemplateLayoutRegion }) {
   return (
-    <div className="h-full rounded-app-md border border-white/[0.08] bg-white/[0.03] p-4 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+    <div className="h-full rounded-app-md border border-app-border bg-app-bg-subtle p-4">
       {region.type === REGION_TYPES.richText && <ReadOnlyRich doc={ensureRichDoc(region.props)} />}
       {region.type === REGION_TYPES.media && (
         <div className="space-y-1.5 rounded-app-md border border-dashed border-app-border/70 bg-app-bg-subtle/40 p-4 text-xs text-app-muted">
@@ -439,11 +476,11 @@ export function TemplateLayoutLivePreview({ rows, breakpoint }: PreviewProps) {
   const frame =
     breakpoint === 'mobile' ? 'max-w-[375px] mx-auto border-x border-app-border/60' : 'w-full';
 
-  const totalCells = layoutCellCount({ version: LAYOUT_VERSION, rows });
+  const blockCount = layoutRegionCount({ version: LAYOUT_VERSION, rows });
 
   return (
     <div className={`space-y-4 ${frame}`}>
-      {totalCells === 0 ? (
+      {blockCount === 0 ? (
         <p className="px-2 py-8 text-center text-sm leading-relaxed text-app-muted">
           Nothing to preview yet — add blocks in the editor.
         </p>
@@ -451,20 +488,19 @@ export function TemplateLayoutLivePreview({ rows, breakpoint }: PreviewProps) {
         rows.map((row) => (
           <div
             key={row.id}
-            className={`flex min-w-0 gap-0 ${breakpoint === 'mobile' ? 'flex-col' : 'flex-row'}`}
+            className={`grid min-w-0 gap-2 ${breakpoint === 'mobile' ? 'grid-cols-1' : ''}`}
             data-layout-row
+            style={
+              breakpoint === 'mobile'
+                ? undefined
+                : { gridTemplateColumns: previewRowGridTemplateColumns(row.cells) }
+            }
           >
             {row.cells.map((cell) => (
-              <div
-                key={cell.id}
-                className="min-w-0 p-1"
-                style={
-                  breakpoint === 'mobile'
-                    ? { width: '100%' }
-                    : { flex: `${cell.flexGrow} 1 0%`, maxWidth: '100%' }
-                }
-              >
-                <PreviewRegionCard region={cell.region} />
+              <div key={cell.id} className="flex min-w-0 flex-col gap-2">
+                {cell.regions.map((region) => (
+                  <PreviewRegionCard key={region.id} region={region} />
+                ))}
               </div>
             ))}
           </div>
@@ -501,6 +537,12 @@ type BlockModalState =
   | { flow: 'add'; kind: 'text' | 'media' | 'field' }
   | { flow: 'edit'; kind: 'text' | 'media' | 'field'; regionId: string };
 
+/** Small chooser when adding a column or stacking in a column (not for palette → new row). */
+type BlockKindPickContext =
+  | null
+  | { mode: 'column'; rowId: string }
+  | { mode: 'stack'; rowId: string; cellId: string };
+
 export default function TemplateLayoutEditor({
   templateId,
   draftLayout,
@@ -516,6 +558,9 @@ export default function TemplateLayoutEditor({
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const [appendToRowId, setAppendToRowId] = useState<string | null>(null);
+  /** Next palette add stacks inside this column (same grid track) */
+  const [appendToCell, setAppendToCell] = useState<{ rowId: string; cellId: string } | null>(null);
+  const [blockKindPick, setBlockKindPick] = useState<BlockKindPickContext>(null);
   const [blockModal, setBlockModal] = useState<BlockModalState>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activateError, setActivateError] = useState<string | null>(null);
@@ -543,7 +588,7 @@ export default function TemplateLayoutEditor({
     [rows],
   );
 
-  const regionCount = layoutCellCount({ version: LAYOUT_VERSION, rows });
+  const regionCount = layoutRegionCount({ version: LAYOUT_VERSION, rows });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -623,6 +668,8 @@ export default function TemplateLayoutEditor({
   function closeBlockModal() {
     setBlockModal(null);
     setAppendToRowId(null);
+    setAppendToCell(null);
+    setBlockKindPick(null);
   }
 
   const textModalInitial = useMemo((): Partial<TextBlockFormValues> | undefined => {
@@ -675,7 +722,9 @@ export default function TemplateLayoutEditor({
           doc,
         },
       };
-      if (appendToRowId) {
+      if (appendToCell) {
+        setRows((prev) => addRegionToCell(prev, appendToCell.rowId, appendToCell.cellId, region));
+      } else if (appendToRowId) {
         setRows((prev) => addColumnToRow(prev, appendToRowId, region));
       } else {
         setRows((prev) => addRowWithRegion(prev, region));
@@ -700,7 +749,9 @@ export default function TemplateLayoutEditor({
     if (blockModal.flow === 'add') {
       const id = crypto.randomUUID();
       const region: TemplateLayoutRegion = { id, type: REGION_TYPES.media, props: payload };
-      if (appendToRowId) {
+      if (appendToCell) {
+        setRows((prev) => addRegionToCell(prev, appendToCell.rowId, appendToCell.cellId, region));
+      } else if (appendToRowId) {
         setRows((prev) => addColumnToRow(prev, appendToRowId, region));
       } else {
         setRows((prev) => addRowWithRegion(prev, region));
@@ -722,7 +773,9 @@ export default function TemplateLayoutEditor({
     if (blockModal.flow === 'add') {
       const id = crypto.randomUUID();
       const region: TemplateLayoutRegion = { id, type: REGION_TYPES.field, props: payload };
-      if (appendToRowId) {
+      if (appendToCell) {
+        setRows((prev) => addRegionToCell(prev, appendToCell.rowId, appendToCell.cellId, region));
+      } else if (appendToRowId) {
         setRows((prev) => addColumnToRow(prev, appendToRowId, region));
       } else {
         setRows((prev) => addRowWithRegion(prev, region));
@@ -734,12 +787,21 @@ export default function TemplateLayoutEditor({
   }
 
   function onPalettePick(kind: 'text' | 'media' | 'field') {
+    setBlockKindPick(null);
     setBlockModal({ flow: 'add', kind });
   }
 
   function onRequestAddColumn(rowId: string) {
-    setAppendToRowId(rowId);
+    setBlockKindPick({ mode: 'column', rowId });
   }
+
+  function onRequestAddToCell(rowId: string, cellId: string) {
+    setBlockKindPick({ mode: 'stack', rowId, cellId });
+  }
+
+  const onEqualizeColumns = useCallback((rowId: string) => {
+    setRows((prev) => equalizeRowColumns(prev, rowId));
+  }, []);
 
   const handleSaveDraft = useCallback(async () => {
     setSaving(true);
@@ -782,15 +844,34 @@ export default function TemplateLayoutEditor({
     if (activateRef) activateRef.current = () => activateStable.current();
   }, [saveRef, activateRef]);
 
+  useEffect(() => {
+    if (!blockKindPick) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setBlockKindPick(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [blockKindPick]);
+
+  function confirmBlockKindFromPicker(kind: 'text' | 'media' | 'field') {
+    const ctx = blockKindPick;
+    setBlockKindPick(null);
+    if (!ctx) return;
+    if (ctx.mode === 'column') {
+      setAppendToCell(null);
+      setAppendToRowId(ctx.rowId);
+    } else {
+      setAppendToRowId(null);
+      setAppendToCell({ rowId: ctx.rowId, cellId: ctx.cellId });
+    }
+    setBlockModal({ flow: 'add', kind });
+  }
+
   return (
     <div className={compact ? 'space-y-6' : 'space-y-8'}>
       {!compact && (
-        <header className="space-y-2 border-b border-app-border/40 pb-6">
-          <h3 className="m-0 text-lg font-semibold tracking-tight text-app-text">Layout canvas</h3>
-          <p className="m-0 max-w-3xl text-sm leading-relaxed text-app-muted">
-            Add blocks from the palette, configure each in the dialog, and drag to reorder. Save a draft, then activate
-            when at least one channel is bound.
-          </p>
+        <header className="border-b border-app-border/40 pb-4">
+          <h3 className="m-0 text-base font-semibold tracking-tight text-app-text">Layout</h3>
         </header>
       )}
 
@@ -805,7 +886,7 @@ export default function TemplateLayoutEditor({
         </div>
       )}
 
-      <div className={`flex flex-col ${compact ? 'gap-6' : 'gap-8'}`}>
+      <div className={`flex flex-col ${compact ? 'gap-4' : 'gap-5'}`}>
         <TemplateComponentPalette onPick={onPalettePick} disabled={saving || activating} />
 
         <div
@@ -815,15 +896,15 @@ export default function TemplateLayoutEditor({
         >
           <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto">
             <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">Workspace</span>
-            <div className="flex gap-1 rounded-app-md border border-white/[0.08] bg-black/20 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="flex gap-1 rounded-app-md border border-app-border bg-app-bg-subtle p-1">
               <button
                 type="button"
                 onClick={() => setWorkspaceTab('editor')}
                 aria-pressed={workspaceTab === 'editor'}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-app-md px-4 py-2 text-xs font-medium transition-colors sm:flex-initial sm:px-5 ${
+                className={`flex flex-1 items-center justify-center gap-2 rounded-app-md px-4 py-2 text-xs font-medium sm:flex-initial sm:px-5 ${
                   workspaceTab === 'editor'
-                    ? 'bg-app-accent-muted text-app-accent shadow-[0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-app-accent/25'
-                    : 'text-app-muted hover:bg-white/[0.04] hover:text-app-text'
+                    ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
+                    : 'border border-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-text'
                 }`}
               >
                 <Text size={14} strokeWidth={1.75} aria-hidden />
@@ -833,10 +914,10 @@ export default function TemplateLayoutEditor({
                 type="button"
                 onClick={() => setWorkspaceTab('preview')}
                 aria-pressed={workspaceTab === 'preview'}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-app-md px-4 py-2 text-xs font-medium transition-colors sm:flex-initial sm:px-5 ${
+                className={`flex flex-1 items-center justify-center gap-2 rounded-app-md px-4 py-2 text-xs font-medium sm:flex-initial sm:px-5 ${
                   workspaceTab === 'preview'
-                    ? 'bg-app-accent-muted text-app-accent shadow-[0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-app-accent/25'
-                    : 'text-app-muted hover:bg-white/[0.04] hover:text-app-text'
+                    ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
+                    : 'border border-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-text'
                 }`}
               >
                 <Eye size={14} strokeWidth={1.75} aria-hidden />
@@ -848,14 +929,14 @@ export default function TemplateLayoutEditor({
           {workspaceTab === 'preview' ? (
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
               <span className="text-[10px] text-app-faint sm:mr-1">Width</span>
-              <div className="flex flex-1 gap-1 rounded-app-md border border-white/[0.08] bg-black/20 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:flex-initial">
+              <div className="flex flex-1 gap-1 rounded-app-md border border-app-border bg-app-bg-subtle p-1 sm:flex-initial">
                 <button
                   type="button"
                   onClick={() => setPreviewBp('desktop')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-app-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-initial ${
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-app-md px-3 py-1.5 text-xs font-medium sm:flex-initial ${
                     previewBp === 'desktop'
-                      ? 'bg-app-accent-muted text-app-accent shadow-[0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-app-accent/25'
-                      : 'text-app-muted hover:text-app-text'
+                      ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
+                      : 'border border-transparent text-app-muted hover:text-app-text'
                   }`}
                 >
                   <Monitor size={14} aria-hidden /> Desktop
@@ -863,10 +944,10 @@ export default function TemplateLayoutEditor({
                 <button
                   type="button"
                   onClick={() => setPreviewBp('mobile')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-app-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-initial ${
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-app-md px-3 py-1.5 text-xs font-medium sm:flex-initial ${
                     previewBp === 'mobile'
-                      ? 'bg-app-accent-muted text-app-accent shadow-[0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-app-accent/25'
-                      : 'text-app-muted hover:text-app-text'
+                      ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
+                      : 'border border-transparent text-app-muted hover:text-app-text'
                   }`}
                 >
                   <Smartphone size={14} aria-hidden /> Mobile
@@ -878,41 +959,20 @@ export default function TemplateLayoutEditor({
 
         {workspaceTab === 'editor' ? (
           <div className="min-w-0 flex flex-col gap-0">
-            <div className={`flex items-center gap-2 ${compact ? 'mb-3' : 'mb-4'}`}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-app-md border border-app-accent/30 bg-app-accent-muted/50 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                <Text size={16} strokeWidth={1.75} />
+            <div className={`flex items-center gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
+              <span className="flex h-7 w-7 items-center justify-center rounded-md border border-app-accent/25 bg-app-accent-muted/40 text-app-accent">
+                <Text size={14} strokeWidth={1.75} aria-hidden />
               </span>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-app-accent/95">Sections</div>
-                <p className="m-0 text-xs text-app-muted">
-                  Rows stack vertically; columns sit side by side. Drag the handle on a row to reorder. Resize between
-                  columns.
-                </p>
-              </div>
+              <span className="text-[11px] text-app-faint">
+                Drag rows · resize gutters · <span className="text-app-muted">+ Column</span> splits · dashed + stacks
+              </span>
             </div>
-            {appendToRowId ? (
-              <div className="mb-3 rounded-app-md border border-app-accent/35 bg-app-accent-muted/30 px-3 py-2 text-[11px] text-app-muted">
-                Choose <strong className="text-app-text">Text</strong>, <strong className="text-app-text">Media</strong>, or{' '}
-                <strong className="text-app-text">Field</strong> from the palette to add a column to this row.
-                <button
-                  type="button"
-                  onClick={() => setAppendToRowId(null)}
-                  className="ml-2 text-app-accent underline-offset-2 hover:underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : null}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-4">
                   {rows.length === 0 ? (
-                    <div className="rounded-app-lg border border-dashed border-app-accent/30 bg-app-accent-muted/[0.15] px-6 py-14 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <p className="m-0 text-sm leading-relaxed text-app-muted">
-                        No sections yet. Choose <span className="text-app-text">Text</span>,{' '}
-                        <span className="text-app-text">Media</span>, or <span className="text-app-text">Field</span> in
-                        the palette to add your first block.
-                      </p>
+                    <div className="rounded-app-lg border border-dashed border-app-accent/25 bg-app-accent-muted/10 px-4 py-10 text-center">
+                      <p className="m-0 text-[13px] text-app-faint">Empty — add a block from the bar above.</p>
                     </div>
                   ) : (
                     rows.map((row) => (
@@ -921,6 +981,8 @@ export default function TemplateLayoutEditor({
                         row={row}
                         onResizePointerDown={handleResizePointerDown}
                         onRequestAddColumn={onRequestAddColumn}
+                        onRequestAddToCell={onRequestAddToCell}
+                        onEqualizeColumns={onEqualizeColumns}
                         onUpdateDoc={updateDoc}
                         onConfigure={openConfigure}
                         onRemove={removeRegion}
@@ -937,7 +999,7 @@ export default function TemplateLayoutEditor({
                   type="button"
                   disabled={saving}
                   onClick={handleSaveDraft}
-                  className="inline-flex items-center justify-center gap-2 rounded-app-md border border-app-accent/45 bg-app-accent-muted px-4 py-2.5 text-sm font-medium transition-colors hover:bg-app-accent/20 disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-app-md border border-app-accent/45 bg-app-accent-muted px-4 py-2.5 text-sm font-medium hover:bg-app-accent/20 disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   Save draft layout
@@ -953,7 +1015,7 @@ export default function TemplateLayoutEditor({
                         ? 'Add at least one section before activating'
                         : 'Promote draft layout to active'
                   }
-                  className="inline-flex items-center justify-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/12 px-4 py-2.5 text-sm font-medium text-emerald-100 transition-colors hover:bg-emerald-500/18 disabled:opacity-40"
+                  className="inline-flex items-center justify-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/12 px-4 py-2.5 text-sm font-medium text-emerald-100 hover:bg-emerald-500/18 disabled:opacity-40"
                 >
                   {activating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
                   Activate template
@@ -970,7 +1032,7 @@ export default function TemplateLayoutEditor({
           <div className="min-w-0">
             <div className={`flex flex-wrap items-center gap-3 ${compact ? 'mb-3' : 'mb-4'}`}>
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-app-accent-2/35 bg-app-accent-2/10 text-app-accent-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-app-border bg-app-bg-subtle text-app-accent-2">
                   <Eye size={16} strokeWidth={1.75} />
                 </span>
                 <div className="min-w-0">
@@ -980,7 +1042,7 @@ export default function TemplateLayoutEditor({
               </div>
             </div>
             <div
-              className={`rounded-app-xl border border-white/[0.09] bg-app-bg-subtle/45 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-white/[0.04] ${
+              className={`rounded-app-xl border border-app-border bg-app-bg-subtle p-5 ${
                 previewBp === 'mobile' ? 'flex justify-center' : ''
               }`}
             >
@@ -989,6 +1051,71 @@ export default function TemplateLayoutEditor({
           </div>
         )}
       </div>
+
+      {blockKindPick ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="block-kind-picker-title"
+          onClick={() => setBlockKindPick(null)}
+        >
+          <div
+            className="relative w-full max-w-[320px] rounded-app-xl border border-app-border bg-app-bg-subtle p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setBlockKindPick(null)}
+              className="absolute right-2.5 top-2.5 rounded-app-md p-1.5 text-app-faint hover:bg-white/[0.06] hover:text-app-text"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+            <h4 id="block-kind-picker-title" className="m-0 pr-8 text-sm font-semibold tracking-tight text-app-text">
+              {blockKindPick.mode === 'column' ? 'Add column' : 'Add block in column'}
+            </h4>
+            <p className="mt-1 mb-4 text-[12px] leading-snug text-app-muted">
+              {blockKindPick.mode === 'column'
+                ? 'Pick a block type for the new column.'
+                : 'Pick a block to stack in this column (same grid track).'}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => confirmBlockKindFromPicker('text')}
+                className="flex flex-col items-center gap-1.5 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-[11px] font-medium text-app-text hover:border-app-accent/40 hover:bg-app-accent-muted/30"
+              >
+                <Text size={18} strokeWidth={1.75} className="text-app-accent" aria-hidden />
+                Text
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmBlockKindFromPicker('media')}
+                className="flex flex-col items-center gap-1.5 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-[11px] font-medium text-app-text hover:border-cyan-400/35 hover:bg-cyan-500/10"
+              >
+                <ImageIcon size={18} strokeWidth={1.75} className="text-cyan-300/90" aria-hidden />
+                Media
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmBlockKindFromPicker('field')}
+                className="flex flex-col items-center gap-1.5 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-[11px] font-medium text-app-text hover:border-amber-400/35 hover:bg-amber-500/10"
+              >
+                <Braces size={18} strokeWidth={1.75} className="text-amber-300/90" aria-hidden />
+                Field
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBlockKindPick(null)}
+              className="mt-3 w-full rounded-app-md border border-white/[0.1] py-2 text-[12px] font-medium text-app-muted hover:bg-white/[0.05]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <TextBlockModal
         open={Boolean(blockModal && blockModal.kind === 'text')}

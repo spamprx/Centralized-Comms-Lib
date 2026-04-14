@@ -45,12 +45,13 @@ export type TemplateLayoutRegion = {
   props?: Record<string, unknown>;
 };
 
-/** One resizable column within a row (side-by-side blocks) */
+/** One resizable column within a row (side-by-side with other cells). */
 export type LayoutCell = {
   id: string;
-  /** Relative width; rendered as CSS flex-grow */
+  /** Relative width; rendered as CSS grid `fr` tracks */
   flexGrow: number;
-  region: TemplateLayoutRegion;
+  /** Blocks stacked top → bottom in this column (two+ = “left column, two rows”). */
+  regions: TemplateLayoutRegion[];
 };
 
 export type LayoutRow = {

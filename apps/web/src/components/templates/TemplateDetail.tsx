@@ -311,7 +311,7 @@ Published by {{author}} on {{date}}
           </div>
           <button
             onClick={() => setShowCloneBanner(false)}
-            className="text-emerald-400 transition-colors hover:text-emerald-200"
+            className="text-emerald-400 hover:text-emerald-200"
           >
             <X className="w-4 h-4" />
           </button>
@@ -321,7 +321,7 @@ Published by {{author}} on {{date}}
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-app-muted hover:text-app-text transition-colors"
+          className="flex items-center gap-2 text-app-muted hover:text-app-text"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Templates
@@ -332,35 +332,35 @@ Published by {{author}} on {{date}}
             <>
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2 rounded-app-md bg-app-accent px-4 py-2 text-white transition-colors hover:brightness-110"
+                className="flex items-center gap-2 rounded-app-md bg-app-accent px-4 py-2 text-white"
               >
                 <Edit className="w-4 h-4" />
                 Edit Template
               </button>
               <button
                 onClick={handleClone}
-                className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white transition-colors hover:bg-emerald-500"
+                className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-500"
               >
                 <Copy className="w-4 h-4" />
                 Clone
               </button>
               <button
                 onClick={() => setShowAddChannelModal(true)}
-                className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-4 py-2 text-app-text transition-colors hover:bg-app-surface-hover"
+                className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-4 py-2 text-app-text hover:bg-app-surface-hover"
               >
                 <Plus className="w-4 h-4" />
                 Add Channel
               </button>
               <button
                 onClick={() => setShowTranslationModal(true)}
-                className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-surface px-4 py-2 text-app-text transition-colors hover:bg-app-surface-hover"
+                className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-surface px-4 py-2 text-app-text hover:bg-app-surface-hover"
               >
                 <Globe className="w-4 h-4" />
                 Translation Preview
               </button>
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2 rounded-app-md bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-500"
+                className="flex items-center gap-2 rounded-app-md bg-red-600 px-4 py-2 text-white hover:bg-red-500"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -370,14 +370,14 @@ Published by {{author}} on {{date}}
             <>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white transition-colors hover:bg-emerald-500"
+                className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-500"
               >
                 <Save className="w-4 h-4" />
                 Save
               </button>
               <button
                 onClick={handleCancel}
-                className="flex items-center gap-2 rounded-app-md bg-app-elevated px-4 py-2 text-app-text transition-colors hover:bg-app-surface-hover"
+                className="flex items-center gap-2 rounded-app-md bg-app-elevated px-4 py-2 text-app-text hover:bg-app-surface-hover"
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -397,7 +397,7 @@ Published by {{author}} on {{date}}
                   setSelectedVersions(null);
                   setLastClickedVersion(null);
                 }}
-                className="text-sm text-app-muted hover:text-app-text transition-colors"
+                className="text-sm text-app-muted hover:text-app-text"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -428,14 +428,14 @@ Published by {{author}} on {{date}}
                         setLastClickedVersion(version.id);
                       }
                     }}
-                    className="flex items-center gap-1 rounded-app-md bg-app-accent px-3 py-1 text-sm text-white transition-colors hover:brightness-110"
+                    className="flex items-center gap-1 rounded-app-md bg-app-accent px-3 py-1 text-sm text-white"
                   >
                     <GitCompare className="w-3 h-3" />
                     {lastClickedVersion === version.id ? 'Hide Diff' : 'Show Diff'}
                   </button>
                   <button
                     onClick={() => handleRevert(version)}
-                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                   >
                     Revert
                   </button>
@@ -445,7 +445,7 @@ Published by {{author}} on {{date}}
                         handleDeleteVersion(version);
                       }
                     }}
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
                   >
                     <Trash2 className="w-3 h-3" />
                     Delete
@@ -466,7 +466,7 @@ Published by {{author}} on {{date}}
                 setSelectedVersions(null);
                 setLastClickedVersion(null);
               }}
-              className="text-app-muted transition-colors hover:text-app-text"
+              className="text-app-muted hover:text-app-text"
             >
               <X className="w-4 h-4" />
             </button>
@@ -607,7 +607,7 @@ Published by {{author}} on {{date}}
           <h3 className="text-lg font-semibold text-app-text">Channel Bindings</h3>
           <button
             onClick={() => setShowAddChannelModal(true)}
-            className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-3 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
+            className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-3 py-1.5 text-sm text-app-text hover:bg-app-surface-hover"
           >
             <Plus className="w-4 h-4" />
             Add Channel

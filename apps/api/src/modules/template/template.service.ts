@@ -1,11 +1,13 @@
-import { randomUUID } from "crypto";
-
 import { getPrismaClient, PrismaUnitOfWork, type Repositories } from "../../repository";
 import type { Template, TemplateBinding, TemplateStatus, TemplateWithBindings } from "../../repository/types";
 import type { LayoutPhase } from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
 import { mergeI18n, parseI18nPatch, type I18nStrings } from "../../shared/validation/i18nPatch";
-import { parseAndValidateLayoutConfig } from "../../shared/validation/layoutConfig";
+import {
+  flattenRegions,
+  parseAndValidateLayoutConfig,
+  regenerateLayoutIds,
+} from "../../shared/validation/layoutConfig";
 import { workspaceService } from "../workspace/workspace.service";
 
 function slugify(name: string): string {
@@ -14,7 +16,6 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 }
-
 function deepCloneJson<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
@@ -27,19 +28,6 @@ function flattenI18nForRows(strings: I18nStrings): Array<{ locale: string; key: 
     }
   }
   return rows;
-}
-
-function regenerateRegionIds(layout: unknown): unknown {
-  const parsed = parseAndValidateLayoutConfig(layout);
-  if (!parsed) return layout;
-  return {
-    ...parsed,
-    regions: parsed.regions.map((r) => ({
-      ...r,
-      id: randomUUID(),
-      props: r.props ? deepCloneJson(r.props) : undefined,
-    })),
-  };
 }
 
 async function uniqueTemplateSlug(
@@ -280,9 +268,9 @@ export const templateService = {
 
       const name = await allocateUniqueCloneName(repos, workspaceId, src.name);
       const slug = await uniqueTemplateSlug(repos, workspaceId, name);
-      const draftLayout = src.draftLayout != null ? regenerateRegionIds(deepCloneJson(src.draftLayout)) : null;
+      const draftLayout = src.draftLayout != null ? regenerateLayoutIds(deepCloneJson(src.draftLayout)) : null;
       const activeLayout =
-        src.activeLayout != null ? regenerateRegionIds(deepCloneJson(src.activeLayout)) : null;
+        src.activeLayout != null ? regenerateLayoutIds(deepCloneJson(src.activeLayout)) : null;
       const i18n = deepCloneJson(src.i18n) as I18nStrings;
 
       const created = await repos.template.create({
@@ -429,7 +417,7 @@ export const templateService = {
       if (!layout) {
         return { invalid: true, message: "Draft layout failed schema validation" } as const;
       }
-      if (layout.regions.length < 1) {
+      if (flattenRegions(layout).length < 1) {
         return { invalid: true, message: "Layout must declare at least one region" } as const;
       }
       if (current.bindings.length < 1) {

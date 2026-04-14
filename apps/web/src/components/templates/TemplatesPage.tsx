@@ -1,28 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Calendar,
+  CheckCircle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CheckCircle,
   Clock,
   Code2,
   Copy,
   FileText,
+  Fingerprint,
   Globe,
   Info,
   Layout,
   LayoutTemplate,
   Link2,
   Loader2,
+  Mail,
+  Monitor,
   Pencil,
   Plus,
+  Radio,
   Save,
   Search,
+  Smartphone,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
+import { authService } from '../../services/authService';
+import { decodeTokenPayload } from '../../services/tokenStore';
 import {
   templateCrudService,
   type ChannelRecord,
@@ -33,12 +41,24 @@ import {
 } from '../../services/templateCrudService';
 import { PageHeader } from '../ui/PageHeader';
 import { PageShell } from '../ui/PageShell';
-import { layoutCellCount } from '../../lib/templateLayout/layoutConfig';
+import { layoutRegionCount } from '../../lib/templateLayout/layoutConfig';
 import TemplateLayoutEditor, { parseTemplateLayout } from './TemplateLayoutEditor';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 const CHANNEL_LAYOUT_PRESETS = ['responsive', 'fluid', 'fixed', 'stacked'] as const;
+
+function channelKeyVisual(key: string): {
+  Icon: typeof Monitor;
+  iconWrap: string;
+} {
+  const k = key.toLowerCase();
+  const shell = 'border border-app-border bg-app-bg-subtle text-app-muted';
+  if (k.includes('email') || k === 'mail') return { Icon: Mail, iconWrap: shell };
+  if (k.includes('mobile') || k.includes('ios') || k.includes('android')) return { Icon: Smartphone, iconWrap: shell };
+  if (k.includes('web') || k.includes('site') || k.includes('www')) return { Icon: Monitor, iconWrap: shell };
+  return { Icon: Radio, iconWrap: shell };
+}
 
 function parseChannelLayoutConfig(text: string): Record<string, unknown> | null {
   try {
@@ -101,8 +121,8 @@ function ChannelBindingConfigSummary({ configText }: { configText: string }) {
 
   if (!parsed) {
     return (
-      <div className="rounded-md border border-amber-400/35 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-100/95">
-        Config isn&apos;t valid JSON. Use <strong>Edit</strong> to fix it.
+      <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-2 text-[10px] leading-snug text-amber-100/90">
+        <span className="font-medium">Invalid JSON.</span> Open <strong>Edit</strong> to fix the binding config.
       </div>
     );
   }
@@ -110,36 +130,41 @@ function ChannelBindingConfigSummary({ configText }: { configText: string }) {
   const layout = typeof parsed.layout === 'string' ? parsed.layout : null;
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
         {layout != null ? (
-          <span className="inline-flex items-center rounded-full border border-app-accent/35 bg-app-accent-muted/50 px-2 py-0.5 text-[10px] font-medium text-app-accent">
-            Layout: {layout}
+          <span className="inline-flex items-center rounded-lg border border-app-accent/30 bg-app-accent-muted/40 px-2 py-0.5 text-[10px] font-medium text-app-accent">
+            {layout}
           </span>
         ) : null}
         {typeof parsed.mediaHandling === 'string' ? (
-          <span className="inline-flex items-center rounded-full border border-white/[0.1] bg-white/[0.04] px-2 py-0.5 text-[10px] text-app-muted">
-            Media: {parsed.mediaHandling}
+          <span className="inline-flex items-center rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] text-app-muted">
+            Media · {parsed.mediaHandling}
           </span>
         ) : null}
         {Array.isArray(parsed.fields) && parsed.fields.length > 0 ? (
-          <span className="text-[10px] text-app-muted">{parsed.fields.length} field(s)</span>
+          <span className="rounded-lg border border-white/[0.06] bg-black/20 px-2 py-0.5 text-[10px] text-app-muted">
+            {parsed.fields.length} field{parsed.fields.length === 1 ? '' : 's'}
+          </span>
         ) : null}
       </div>
       {entries.length > 0 ? (
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-2 rounded-md border border-white/[0.06] bg-black/20 px-2 py-1.5 text-left text-[10px] text-app-muted transition-colors hover:border-white/[0.1] hover:bg-black/25"
+          className="flex w-full items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-left text-[10px] text-app-muted hover:border-white/[0.12] hover:bg-white/[0.04]"
         >
-          <span>{open ? 'Hide' : 'View'} details{entries.length > 0 ? ` (${entries.length} propert${entries.length === 1 ? 'y' : 'ies'})` : ''}</span>
-          <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+          <span>
+            {open ? 'Hide' : 'View'} full config
+            {entries.length > 0 ? ` · ${entries.length}` : ''}
+          </span>
+          <ChevronDown size={14} className={`shrink-0 opacity-70 ${open ? 'rotate-180' : ''}`} aria-hidden />
         </button>
       ) : null}
       {open ? (
-        <dl className="space-y-2 rounded-md border border-white/[0.06] bg-black/25 p-2 text-[10px]">
+        <dl className="space-y-2 rounded-lg border border-white/[0.06] bg-black/30 p-2.5 text-[10px]">
           {entries.map(([k, v]) => (
-            <div key={k} className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-2 gap-y-0.5">
+            <div key={k} className="grid grid-cols-[minmax(0,6.5rem)_1fr] gap-x-2 gap-y-0.5">
               <dt className="font-medium text-app-faint">{k}</dt>
               <dd className="min-w-0 text-app-muted">{renderConfigValue(v)}</dd>
             </div>
@@ -275,6 +300,12 @@ export default function TemplatesPage() {
   const [channelJsonAdvancedOpen, setChannelJsonAdvancedOpen] = useState(false);
   const [i18nExpandDraftJson, setI18nExpandDraftJson] = useState(false);
   const [i18nExpandActiveJson, setI18nExpandActiveJson] = useState(false);
+  const [sessionUser, setSessionUser] = useState<{
+    id: string;
+    email: string;
+    displayName?: string | null;
+  } | null>(null);
+  const [copiedMeta, setCopiedMeta] = useState<string | null>(null);
 
   const q = searchParams.get('q') ?? '';
   const status = (searchParams.get('status') as TemplateStatus | 'ALL' | null) ?? 'ALL';
@@ -359,6 +390,26 @@ export default function TemplatesPage() {
     if (!templateId) return;
     setMobileWorkspace('layout');
     setSidebarTab('info');
+  }, [templateId]);
+
+  useEffect(() => {
+    if (!templateId) {
+      setSessionUser(null);
+      return;
+    }
+    let cancelled = false;
+    authService
+      .me()
+      .then((r) => {
+        if (!cancelled) setSessionUser(r.user);
+      })
+      .catch(() => {
+        const p = decodeTokenPayload();
+        if (!cancelled && p) setSessionUser({ id: p.id, email: p.email, displayName: null });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [templateId]);
 
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
@@ -578,6 +629,16 @@ export default function TemplatesPage() {
       setMutating(false);
     }
   }
+
+  const copyTemplateMeta = useCallback(async (value: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedMeta(key);
+      window.setTimeout(() => setCopiedMeta(null), 1800);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }, []);
 
   function openAddChannelDialog() {
     setEditingBindingId(null);
@@ -819,25 +880,21 @@ export default function TemplatesPage() {
       {hasTemplateSelected ? (
         /* Full-height editor — same shell rhythm as content editor */
         <div className="relative flex h-screen flex-col overflow-hidden bg-app-bg">
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_0%_-10%,rgba(147,124,248,0.09),transparent_55%),radial-gradient(ellipse_90%_60%_at_100%_100%,rgba(45,212,191,0.05),transparent_50%)]"
-            aria-hidden
-          />
-          <header className="relative z-20 shrink-0 border-b border-white/[0.08] bg-[linear-gradient(180deg,rgba(18,22,32,0.92)_0%,rgba(10,13,20,0.88)_100%)] px-4 py-3 shadow-[0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:px-6">
+          <header className="relative z-20 shrink-0 border-b border-app-border bg-app-bg-subtle px-4 py-3 sm:px-6">
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                 <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] leading-tight">
                   <Link
                     to={templatesListHref}
-                    className="group flex shrink-0 items-center gap-1 rounded-app-md border border-transparent px-2 py-1.5 text-app-muted transition-colors hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-app-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/35"
+                    className="group flex shrink-0 items-center gap-1 rounded-app-md border border-transparent px-2 py-1.5 text-app-muted hover:border-app-border hover:bg-app-surface-hover hover:text-app-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/35"
                   >
-                    <ChevronLeft size={15} className="shrink-0 transition-transform group-hover:-translate-x-0.5" aria-hidden />
+                    <ChevronLeft size={15} className="shrink-0" aria-hidden />
                     <span className="hidden sm:inline">All templates</span>
                     <span className="sm:hidden">List</span>
                   </Link>
                   <ChevronRight size={13} className="shrink-0 text-app-faint" aria-hidden />
                   {detailLoading ? (
-                    <span className="h-4 w-36 max-w-[50vw] animate-pulse rounded-md bg-app-border/50" aria-hidden />
+                    <span className="h-4 w-36 max-w-[50vw] rounded-md bg-app-border/50" aria-hidden />
                   ) : detail ? (
                     <span
                       className="min-w-0 truncate font-semibold tracking-tight text-app-text"
@@ -866,7 +923,7 @@ export default function TemplatesPage() {
 
                 {detail && !detailLoading && (
                   <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
-                    <div className="flex items-center gap-1 rounded-app-md border border-white/[0.08] bg-white/[0.03] p-0.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+                    <div className="flex items-center gap-1 rounded-app-md border border-app-border bg-app-bg-subtle p-0.5">
                       <button
                         type="button"
                         title="Clone this template"
@@ -874,7 +931,7 @@ export default function TemplatesPage() {
                           setCloneTarget(detail);
                           setMutationError(null);
                         }}
-                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-app-muted transition-colors hover:bg-white/[0.06] hover:text-app-text"
+                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-app-muted hover:bg-app-surface-hover hover:text-app-text"
                       >
                         <Copy size={14} />
                         <span className="hidden md:inline">Clone</span>
@@ -883,7 +940,7 @@ export default function TemplatesPage() {
                         type="button"
                         title="Edit name and description"
                         onClick={() => openEditForm(detail)}
-                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-app-muted transition-colors hover:bg-white/[0.06] hover:text-app-text"
+                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-app-muted hover:bg-app-surface-hover hover:text-app-text"
                       >
                         <Pencil size={14} />
                         <span className="hidden md:inline">Details</span>
@@ -897,7 +954,7 @@ export default function TemplatesPage() {
                       title="Save layout draft"
                       onClick={() => saveDraftRef.current?.()}
                       disabled={layoutSaving || detailLoading}
-                      className={`flex items-center gap-1.5 rounded-app-md border px-3.5 py-2 text-[13px] font-medium transition-colors ${
+                      className={`flex items-center gap-1.5 rounded-app-md border px-3.5 py-2 text-[13px] font-medium ${
                         layoutSaving
                           ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-70'
                           : 'border-app-border/90 bg-app-bg/45 text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted hover:text-app-accent'
@@ -915,12 +972,12 @@ export default function TemplatesPage() {
                       }
                       onClick={() => activateDraftRef.current?.()}
                       disabled={layoutActivating || (detail?.bindings?.length ?? 0) < 1}
-                      className={`flex items-center gap-1.5 rounded-app-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-150 ${
+                      className={`flex items-center gap-1.5 rounded-app-md border px-3 py-1.5 text-[12px] font-semibold ${
                         layoutActivating
-                          ? 'cursor-not-allowed bg-emerald-500/10 text-emerald-300/50 opacity-70'
+                          ? 'cursor-not-allowed border-emerald-500/20 bg-emerald-500/10 text-emerald-300/50 opacity-70'
                           : (detail?.bindings?.length ?? 0) < 1
-                            ? 'cursor-not-allowed border border-app-border/60 bg-app-bg/30 text-app-faint opacity-50'
-                            : 'bg-linear-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] hover:from-emerald-400 hover:to-emerald-500'
+                            ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-50'
+                            : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20'
                       }`}
                     >
                       {layoutActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
@@ -930,32 +987,25 @@ export default function TemplatesPage() {
                 )}
               </div>
 
-              <AnimatePresence mode="popLayout">
-                {(layoutSaving || layoutActivating || cloneBanner || mutationError) && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="flex flex-wrap gap-x-4 gap-y-1 border-t border-app-border/40 pt-2 text-[11px] sm:text-[12px]"
-                  >
-                    {(layoutSaving || layoutActivating) && (
-                      <span className="text-app-faint">
-                        {layoutSaving ? 'Saving draft…' : 'Activating template…'}
-                      </span>
-                    )}
-                    {cloneBanner && (
-                      <span className="text-emerald-300/95">Cloned from &quot;{cloneBanner}&quot;</span>
-                    )}
-                    {mutationError && <span className="text-red-300">{mutationError}</span>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {(layoutSaving || layoutActivating || cloneBanner || mutationError) ? (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-app-border/40 pt-2 text-[11px] sm:text-[12px]">
+                  {(layoutSaving || layoutActivating) && (
+                    <span className="text-app-faint">
+                      {layoutSaving ? 'Saving draft…' : 'Activating template…'}
+                    </span>
+                  )}
+                  {cloneBanner && (
+                    <span className="text-emerald-300/95">Cloned from &quot;{cloneBanner}&quot;</span>
+                  )}
+                  {mutationError && <span className="text-red-300">{mutationError}</span>}
+                </div>
+              ) : null}
             </div>
           </header>
 
           {/* Mobile / tablet: switch metadata vs layout (mirrors content editor split) */}
           <div
-            className="relative z-10 flex shrink-0 gap-1 border-b border-white/[0.07] bg-app-bg-subtle/40 px-2 py-2 backdrop-blur-sm xl:hidden"
+            className="relative z-10 flex shrink-0 gap-1 border-b border-app-border bg-app-bg-subtle px-2 py-2 xl:hidden"
             role="tablist"
             aria-label="Editor workspace"
           >
@@ -966,10 +1016,10 @@ export default function TemplatesPage() {
               aria-controls="template-meta-panel"
               id="tab-workspace-template"
               onClick={() => setMobileWorkspace('template')}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-app-md py-2 text-[12px] font-medium transition-colors ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-app-md border border-transparent py-2 text-[12px] font-medium ${
                 mobileWorkspace === 'template'
-                  ? 'bg-app-accent-muted/70 text-app-accent shadow-none ring-1 ring-app-accent/30'
-                  : 'text-app-faint hover:bg-white/[0.04] hover:text-app-muted'
+                  ? 'border-app-accent/35 bg-app-accent-muted/70 text-app-accent'
+                  : 'text-app-faint hover:bg-app-surface-hover hover:text-app-muted'
               }`}
             >
               <Info size={15} aria-hidden />
@@ -982,10 +1032,10 @@ export default function TemplatesPage() {
               aria-controls="template-layout-panel"
               id="tab-workspace-layout"
               onClick={() => setMobileWorkspace('layout')}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-app-md py-2 text-[12px] font-medium transition-colors ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-app-md border border-transparent py-2 text-[12px] font-medium ${
                 mobileWorkspace === 'layout'
-                  ? 'bg-app-accent-muted/70 text-app-accent shadow-none ring-1 ring-app-accent/30'
-                  : 'text-app-faint hover:bg-white/[0.04] hover:text-app-muted'
+                  ? 'border-app-accent/35 bg-app-accent-muted/70 text-app-accent'
+                  : 'text-app-faint hover:bg-app-surface-hover hover:text-app-muted'
               }`}
             >
               <LayoutTemplate size={15} aria-hidden />
@@ -1000,33 +1050,34 @@ export default function TemplatesPage() {
               id="template-meta-panel"
               role="tabpanel"
               aria-labelledby="tab-workspace-template"
-              className={`order-1 flex w-full shrink-0 flex-col overflow-hidden border-r border-white/[0.08] bg-[linear-gradient(180deg,rgba(14,17,26,0.92)_0%,rgba(10,13,20,0.88)_100%)] shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-md md:w-64 lg:w-[17rem] ${
+              className={`order-1 flex w-full shrink-0 flex-col overflow-hidden border-r border-app-border bg-app-bg-subtle md:w-[17.5rem] lg:w-[19rem] ${
                 mobileWorkspace === 'template' ? 'flex' : 'hidden'
               } xl:flex`}
             >
-              <div className="flex shrink-0 flex-col gap-3 border-b border-white/[0.08] px-3 pb-3 pt-3 sm:px-3.5">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">Template</p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-app-muted/90">Overview, channels, and copy.</p>
-                </div>
-                <nav className="flex flex-col gap-1" role="tablist" aria-label="Template details sections">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-white/[0.07] px-2.5 pb-2.5 pt-2.5 sm:px-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">Inspector</p>
+                <nav
+                  className="flex w-full gap-1"
+                  role="tablist"
+                  aria-label="Template details sections"
+                >
                   {(
                     [
                       {
                         id: 'info' as const,
                         label: 'Overview',
-                        hint: 'Metadata & status',
+                        hint: 'Status & identifiers',
                         icon: Info,
                       },
                       {
                         id: 'channels' as const,
-                        label: 'Channel bindings',
-                        hint: 'Where this template runs',
+                        label: 'Channels',
+                        hint: 'Where this template is used',
                         icon: Link2,
                       },
                       {
                         id: 'i18n' as const,
-                        label: 'Translations',
+                        label: 'i18n',
                         hint: 'Locales & strings',
                         icon: Globe,
                       },
@@ -1036,29 +1087,25 @@ export default function TemplatesPage() {
                       key={id}
                       type="button"
                       role="tab"
+                      title={hint}
                       aria-selected={sidebarTab === id}
                       onClick={() => setSidebarTab(id)}
-                      className={`group flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                      className={`relative flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center ${
                         sidebarTab === id
-                          ? 'border-app-accent/35 bg-app-accent-muted/80 text-app-text shadow-[0_0_0_1px_rgba(147,124,248,0.12)]'
-                          : 'border-transparent bg-white/[0.02] text-app-muted hover:border-white/[0.08] hover:bg-white/[0.05]'
+                          ? 'border-app-accent/45 bg-app-accent-muted/70 text-app-text'
+                          : 'border-transparent bg-app-bg text-app-muted hover:border-app-border hover:bg-app-surface-hover'
                       }`}
                     >
                       <span
-                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
                           sidebarTab === id
-                            ? 'border-app-accent/40 bg-app-accent-muted/50 text-app-accent'
-                            : 'border-white/[0.08] bg-black/25 text-app-faint group-hover:text-app-muted'
+                            ? 'border-app-accent/40 bg-black/25 text-app-accent'
+                            : 'border-white/[0.08] bg-black/20 text-app-faint'
                         }`}
                       >
                         <Icon size={15} strokeWidth={1.75} aria-hidden />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[12px] font-semibold leading-tight tracking-tight">{label}</span>
-                        <span className="mt-0.5 block text-[10px] leading-snug text-app-faint group-hover:text-app-muted">
-                          {hint}
-                        </span>
-                      </span>
+                      <span className="w-full truncate text-[10px] font-semibold leading-tight">{label}</span>
                     </button>
                   ))}
                 </nav>
@@ -1079,33 +1126,150 @@ export default function TemplatesPage() {
                     {sidebarTab === 'info' && (
                       <div className="flex flex-col gap-4">
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">Summary</p>
+                          <div className="flex items-center gap-2">
+                            <Sparkles size={14} className="text-app-accent/85" aria-hidden />
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">About</p>
+                          </div>
                           {detail.description ? (
-                            <p className="mt-1.5 leading-relaxed text-app-muted">{detail.description}</p>
+                            <p className="mt-2 leading-relaxed text-[12px] text-app-muted">{detail.description}</p>
                           ) : (
-                            <p className="mt-1.5 text-[11px] italic text-app-faint">No description.</p>
+                            <p className="mt-2 text-[11px] italic text-app-faint">No description yet. Use Details in the header to add one.</p>
                           )}
                         </div>
-                        <div className="space-y-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 shadow-app-soft ring-1 ring-white/[0.03]">
-                          <div>
-                            <div className="text-[10px] text-app-faint">Owner</div>
-                            <div className="truncate font-mono text-[11px] text-app-text">{detail.authorId ?? '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-app-faint">Slug</div>
-                            <div className="truncate font-mono text-[11px] text-app-text">{detail.slug ?? '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-app-faint">Updated</div>
-                            <div className="tabular-nums text-[11px] text-app-text">
-                              {new Date(detail.updatedAt).toLocaleString()}
+
+                        <div className="rounded-2xl border border-app-border bg-app-bg p-3.5">
+                          <p className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-app-faint">
+                            <Fingerprint size={14} className="text-emerald-400/75" aria-hidden />
+                            Template record
+                          </p>
+                          <div className="space-y-3.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] text-app-faint">Status</p>
+                                <p className="mt-1">
+                                  <span
+                                    className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                      detail.status === 'ACTIVE'
+                                        ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
+                                        : detail.status === 'DRAFT'
+                                          ? 'border-amber-400/35 bg-amber-500/12 text-amber-200'
+                                          : 'border-zinc-500/35 bg-zinc-500/10 text-zinc-300'
+                                    }`}
+                                  >
+                                    {detail.status}
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] text-app-faint">Layout</p>
+                                <p className="mt-1 text-[11px] text-app-muted">
+                                  {detail.draftLayout != null ? (
+                                    <span className="text-app-text">Draft saved</span>
+                                  ) : (
+                                    <span className="text-app-faint">No draft</span>
+                                  )}
+                                  <span className="text-app-faint"> · </span>
+                                  {detail.activeLayout != null ? (
+                                    <span className="text-emerald-300/90">Published</span>
+                                  ) : (
+                                    <span>Not active</span>
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-app-faint">Layout</div>
-                            <div className="text-[11px] text-app-text">
-                              {detail.draftLayout != null ? 'Draft saved' : 'No draft'} &middot;{' '}
-                              {detail.activeLayout != null ? 'Active' : 'Not published'}
+
+                            <div>
+                              <p className="text-[10px] text-app-faint">Author</p>
+                              <p className="mt-1 text-[12px] text-app-text">
+                                {sessionUser && detail.authorId === sessionUser.id ? (
+                                  <span className="font-medium text-emerald-300/95">You</span>
+                                ) : (
+                                  <code
+                                    className="rounded-md bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-app-muted"
+                                    title={detail.authorId}
+                                  >
+                                    {detail.authorId ?? '—'}
+                                  </code>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div>
+                                <p className="flex items-center gap-1 text-[10px] text-app-faint">
+                                  <Calendar size={12} aria-hidden />
+                                  Created
+                                </p>
+                                <p className="mt-1 tabular-nums text-[11px] text-app-muted">
+                                  {new Date(detail.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="flex items-center gap-1 text-[10px] text-app-faint">
+                                  <Clock size={12} aria-hidden />
+                                  Updated
+                                </p>
+                                <p className="mt-1 tabular-nums text-[11px] text-app-muted">
+                                  {new Date(detail.updatedAt).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] text-app-faint">Workspace</p>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <code className="min-w-0 flex-1 truncate rounded-md bg-white/[0.05] px-2 py-1 font-mono text-[10px] text-app-muted">
+                                  {detail.workspaceId}
+                                </code>
+                                <button
+                                  type="button"
+                                  title="Copy workspace ID"
+                                  onClick={() => copyTemplateMeta(detail.workspaceId, 'ws')}
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/30 hover:text-app-accent"
+                                >
+                                  {copiedMeta === 'ws' ? <CheckCircle size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] text-app-faint">Slug</p>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <code className="min-w-0 flex-1 truncate rounded-md bg-white/[0.05] px-2 py-1 font-mono text-[10px] text-app-text">
+                                  {detail.slug ?? '—'}
+                                </code>
+                                {detail.slug ? (
+                                  <button
+                                    type="button"
+                                    title="Copy slug"
+                                    onClick={() => copyTemplateMeta(detail.slug, 'slug')}
+                                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/30 hover:text-app-accent"
+                                  >
+                                    {copiedMeta === 'slug' ? (
+                                      <CheckCircle size={14} className="text-emerald-400" />
+                                    ) : (
+                                      <Copy size={14} />
+                                    )}
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] text-app-faint">Template ID</p>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <code className="min-w-0 flex-1 truncate rounded-md bg-white/[0.05] px-2 py-1 font-mono text-[10px] text-app-muted">
+                                  {detail.id}
+                                </code>
+                                <button
+                                  type="button"
+                                  title="Copy template ID"
+                                  onClick={() => copyTemplateMeta(detail.id, 'id')}
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/30 hover:text-app-accent"
+                                >
+                                  {copiedMeta === 'id' ? <CheckCircle size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1114,62 +1278,109 @@ export default function TemplatesPage() {
 
                     {sidebarTab === 'channels' && (
                       <div className="flex flex-col gap-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">Bindings</p>
-                            <p className="mt-0.5 text-[11px] text-app-muted">
-                              {detail.bindings?.length ?? 0} channel{(detail.bindings?.length ?? 0) === 1 ? '' : 's'}{' '}
-                              linked
-                            </p>
+                        <div className="rounded-2xl border border-app-border bg-app-bg p-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
+                                Delivery
+                              </p>
+                              <p className="mt-2 text-[10px] text-app-faint">
+                                <span className="font-medium text-app-muted">{detail.bindings?.length ?? 0}</span>{' '}
+                                bound
+                                {(detail.bindings?.length ?? 0) === 1 ? '' : 's'}
+                              </p>
+                            </div>
                           </div>
                           <button
                             type="button"
                             onClick={openAddChannelDialog}
                             disabled={channelsLoading}
-                            className="shrink-0 rounded-lg border border-app-accent/35 bg-app-accent-muted/50 px-2.5 py-1 text-[10px] font-medium text-app-accent transition-colors hover:bg-app-accent-muted disabled:opacity-50"
+                            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-app-accent/40 bg-app-accent-muted/50 py-2.5 text-[12px] font-semibold text-app-accent hover:bg-app-accent-muted disabled:cursor-not-allowed disabled:opacity-45"
                           >
-                            + Add channel
+                            {channelsLoading ? (
+                              <Loader2 size={16} className="animate-spin" aria-hidden />
+                            ) : (
+                              <Plus size={16} strokeWidth={2.25} aria-hidden />
+                            )}
+                            Add channel binding
                           </button>
                         </div>
+
                         {!detail.bindings || detail.bindings.length === 0 ? (
-                          <p className="rounded-lg border border-dashed border-white/[0.1] bg-black/15 px-3 py-4 text-center text-[11px] leading-relaxed text-app-faint">
-                            No channels yet. Bind at least one to activate this template.
-                          </p>
+                          <div className="rounded-2xl border border-dashed border-white/[0.12] bg-black/25 px-4 py-8 text-center">
+                            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.1] bg-white/[0.04] text-app-faint">
+                              <Link2 size={20} strokeWidth={1.5} aria-hidden />
+                            </div>
+                            <p className="text-[12px] font-medium text-app-muted">No channels linked yet</p>
+                            <p className="mx-auto mt-1.5 max-w-[14rem] text-[11px] leading-relaxed text-app-faint">
+                              Add at least one channel before you can activate this template.
+                            </p>
+                          </div>
                         ) : (
-                          <ul className="flex list-none flex-col gap-2.5 p-0">
+                          <ul className="flex list-none flex-col gap-3 p-0">
                             {detail.bindings.map((b) => {
                               const channel = channels.find((c) => c.id === b.channelId);
+                              const ck = channel?.key ?? 'channel';
+                              const { Icon, iconWrap } = channelKeyVisual(ck);
                               return (
                                 <li
                                   key={b.id}
-                                  className="rounded-xl border border-white/[0.08] bg-black/20 p-3 ring-1 ring-white/[0.03]"
+                                  className="group overflow-hidden rounded-2xl border border-app-border bg-app-bg"
                                 >
-                                  <div className="mb-2 flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <div className="truncate text-[12px] font-medium text-app-text">
-                                        {channel?.name ?? b.channelId}
-                                      </div>
-                                      <div className="mt-0.5 font-mono text-[10px] text-app-faint">{channel?.key ?? 'channel'}</div>
+                                  <div className="flex items-start gap-3 p-3.5">
+                                    <div
+                                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconWrap}`}
+                                    >
+                                      <Icon size={20} strokeWidth={1.65} aria-hidden />
                                     </div>
-                                    <div className="flex shrink-0 gap-1">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="truncate text-[13px] font-semibold text-app-text">
+                                          {channel?.name ?? 'Channel'}
+                                        </span>
+                                        <span className="rounded-md border border-white/[0.1] bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-app-faint">
+                                          {ck}
+                                        </span>
+                                      </div>
+                                      {channel?.description ? (
+                                        <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-app-muted">
+                                          {channel.description}
+                                        </p>
+                                      ) : null}
+                                      <p className="mt-2 text-[9px] font-medium uppercase tracking-[0.14em] text-app-faint">
+                                        Linked{' '}
+                                        {new Date(b.createdAt).toLocaleDateString(undefined, {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric',
+                                        })}
+                                      </p>
+                                    </div>
+                                    <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-start">
                                       <button
                                         type="button"
                                         onClick={() => openEditChannelDialog(b.id, b.channelId)}
-                                        className="rounded-md border border-white/[0.1] px-2 py-1 text-[10px] text-app-muted transition-colors hover:bg-white/[0.06]"
+                                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/[0.1] text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/40 hover:text-app-accent"
+                                        title="Edit binding"
                                       >
-                                        Edit
+                                        <Pencil size={15} strokeWidth={1.75} aria-hidden />
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => removeBinding(b.id)}
-                                        className="rounded-md border border-red-400/25 px-2 py-1 text-[10px] text-red-300 transition-colors hover:bg-red-500/10"
+                                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-red-400/20 text-red-300/90 hover:bg-red-500/15"
                                         title="Remove binding"
                                       >
-                                        Remove
+                                        <Trash2 size={15} strokeWidth={1.75} aria-hidden />
                                       </button>
                                     </div>
                                   </div>
-                                  <ChannelBindingConfigSummary configText={readBindingConfig(b.id)} />
+                                  <div className="border-t border-white/[0.06] bg-black/25 px-3.5 py-3">
+                                    <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-app-faint">
+                                      Rendering options
+                                    </p>
+                                    <ChannelBindingConfigSummary configText={readBindingConfig(b.id)} />
+                                  </div>
                                 </li>
                               );
                             })}
@@ -1204,7 +1415,7 @@ export default function TemplatesPage() {
                               key={loc}
                               type="button"
                               onClick={() => setLocaleTab(loc)}
-                              className={`rounded border px-1.5 py-0.5 text-[10px] transition-colors ${
+                              className={`rounded border px-1.5 py-0.5 text-[10px] ${
                                 localeTab === loc
                                   ? 'border-app-accent/50 bg-app-accent-muted text-app-accent'
                                   : 'border-app-border/70 hover:bg-app-surface-hover'
@@ -1273,7 +1484,7 @@ export default function TemplatesPage() {
                           type="button"
                           onClick={saveLocaleTranslations}
                           disabled={i18nSaving || !detail}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-app-border/70 bg-app-surface/40 py-1.5 text-[11px] text-app-muted transition-colors hover:bg-app-surface-hover disabled:opacity-50"
+                          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-app-border/70 bg-app-surface/40 py-1.5 text-[11px] text-app-muted hover:bg-app-surface-hover disabled:opacity-50"
                         >
                           {i18nSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
                           Save {localeTab}
@@ -1312,19 +1523,19 @@ export default function TemplatesPage() {
                               <button
                                 type="button"
                                 onClick={() => setI18nExpandDraftJson((x) => !x)}
-                                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-app-muted transition-colors hover:bg-white/[0.04]"
+                                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-app-muted hover:bg-white/[0.04]"
                               >
                                 <span>
                                   Draft layout
                                   {draftLayoutParsed
-                                    ? ` · v${draftLayoutParsed.version} · ${layoutCellCount(draftLayoutParsed)} blocks`
+                                    ? ` · v${draftLayoutParsed.version} · ${layoutRegionCount(draftLayoutParsed)} blocks`
                                     : detail?.draftLayout == null
                                       ? ' · none'
                                       : ' · unparsed'}
                                 </span>
                                 <ChevronDown
                                   size={14}
-                                  className={`shrink-0 transition-transform ${i18nExpandDraftJson ? 'rotate-180' : ''}`}
+                                  className={`shrink-0 ${i18nExpandDraftJson ? 'rotate-180' : ''}`}
                                   aria-hidden
                                 />
                               </button>
@@ -1351,19 +1562,19 @@ export default function TemplatesPage() {
                               <button
                                 type="button"
                                 onClick={() => setI18nExpandActiveJson((x) => !x)}
-                                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-app-muted transition-colors hover:bg-white/[0.04]"
+                                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-app-muted hover:bg-white/[0.04]"
                               >
                                 <span>
                                   Active layout
                                   {activeLayoutParsed
-                                    ? ` · v${activeLayoutParsed.version} · ${layoutCellCount(activeLayoutParsed)} blocks`
+                                    ? ` · v${activeLayoutParsed.version} · ${layoutRegionCount(activeLayoutParsed)} blocks`
                                     : detail?.activeLayout == null
                                       ? ' · none'
                                       : ' · unparsed'}
                                 </span>
                                 <ChevronDown
                                   size={14}
-                                  className={`shrink-0 transition-transform ${i18nExpandActiveJson ? 'rotate-180' : ''}`}
+                                  className={`shrink-0 ${i18nExpandActiveJson ? 'rotate-180' : ''}`}
                                   aria-hidden
                                 />
                               </button>
@@ -1420,7 +1631,7 @@ export default function TemplatesPage() {
                   <p className="max-w-xs text-sm text-red-200">{detailError}</p>
                 </div>
               ) : detail ? (
-                <div className="flex-1 overflow-y-auto bg-[radial-gradient(ellipse_90%_55%_at_50%_0%,rgba(147,124,248,0.045),transparent_65%)] px-4 py-5 sm:px-6">
+                <div className="flex-1 overflow-y-auto bg-app-bg px-4 py-5 sm:px-6">
                   <TemplateLayoutEditor
                     templateId={detail.id}
                     draftLayout={detail.draftLayout}
@@ -1450,13 +1661,9 @@ export default function TemplatesPage() {
           />
           <div className="mb-5 space-y-2">
             {cloneBanner && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-app-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
-              >
+              <div className="rounded-app-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
                 Cloned from &quot;{cloneBanner}&quot;.
-              </motion.div>
+              </div>
             )}
             {mutationError && (
               <div className="rounded-app-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-200">
@@ -1467,7 +1674,7 @@ export default function TemplatesPage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="min-w-0">
-              <div className="mb-5 rounded-app-lg border border-white/[0.08] bg-app-surface/50 p-4 shadow-app-soft ring-1 ring-white/[0.04] backdrop-blur-sm sm:p-5">
+              <div className="mb-5 rounded-app-lg border border-app-border bg-app-surface/50 p-4 sm:p-5">
                 <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
                   <div className="min-w-[min(100%,220px)] flex-1">
                     <label htmlFor="templates-search" className="mb-1.5 block text-xs font-medium text-app-muted">
@@ -1492,7 +1699,7 @@ export default function TemplatesPage() {
                         placeholder="Name, slug, description…"
                         title="Search templates"
                         autoComplete="off"
-                        className="w-full rounded-app-md border border-app-border bg-app-bg-subtle py-2.5 pl-9 pr-3 text-sm outline-none transition-colors focus:border-app-accent/45 focus:ring-1 focus:ring-app-accent/25"
+                        className="w-full rounded-app-md border border-app-border bg-app-bg-subtle py-2.5 pl-9 pr-3 text-sm outline-none focus:border-app-accent/45 focus:ring-1 focus:ring-app-accent/25"
                       />
                     </div>
                   </div>
@@ -1547,7 +1754,7 @@ export default function TemplatesPage() {
                     <button
                       type="button"
                       onClick={openCreateForm}
-                      className="flex w-full items-center justify-center gap-2 rounded-app-md border-transparent bg-gradient-to-br from-app-accent to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_20px_-4px_rgba(147,124,248,0.5)] transition-all duration-200 hover:brightness-110 hover:shadow-[0_6px_28px_-4px_rgba(147,124,248,0.55)] active:scale-[0.98] sm:w-auto"
+                      className="flex w-full items-center justify-center gap-2 rounded-app-md border border-app-accent/50 bg-app-accent-muted px-4 py-2.5 text-sm font-semibold text-app-accent sm:w-auto"
                     >
                       <Plus size={15} aria-hidden /> New template
                     </button>
@@ -1560,17 +1767,17 @@ export default function TemplatesPage() {
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="overflow-hidden rounded-2xl border border-app-border/70 bg-app-surface/50">
                       <div className="flex items-center gap-5 px-6 py-4 pl-6">
-                        <div className="absolute left-0 h-full w-[3px] animate-pulse rounded-l-2xl bg-app-border/60" aria-hidden />
-                        <div className="mt-0.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-app-border" />
+                        <div className="absolute left-0 h-full w-[3px] rounded-l-2xl bg-app-border/60" aria-hidden />
+                        <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-app-border" />
                         <div className="flex-1 space-y-2.5">
                           <div className="flex items-center justify-between gap-4">
-                            <div className="h-[15px] w-1/2 animate-pulse rounded-md bg-app-border" />
-                            <div className="h-5 w-14 animate-pulse rounded-full bg-app-border/60" />
+                            <div className="h-[15px] w-1/2 rounded-md bg-app-border" />
+                            <div className="h-5 w-14 rounded-full bg-app-border/60" />
                           </div>
-                          <div className="h-3 w-3/4 animate-pulse rounded-md bg-app-border/50" />
+                          <div className="h-3 w-3/4 rounded-md bg-app-border/50" />
                           <div className="flex gap-3 pt-0.5">
-                            <div className="h-3 w-20 animate-pulse rounded-full bg-app-border/40" />
-                            <div className="h-3 w-16 animate-pulse rounded-full bg-app-border/40" />
+                            <div className="h-3 w-20 rounded-full bg-app-border/40" />
+                            <div className="h-3 w-16 rounded-full bg-app-border/40" />
                           </div>
                         </div>
                       </div>
@@ -1593,32 +1800,29 @@ export default function TemplatesPage() {
                   <button
                     type="button"
                     onClick={() => setSearchParams({})}
-                    className="mt-6 rounded-xl border border-app-border/80 bg-app-surface/60 px-4 py-2 text-[13px] font-medium text-app-muted transition-colors hover:border-app-accent/35 hover:bg-app-accent-muted hover:text-app-accent"
+                    className="mt-6 rounded-xl border border-app-border/80 bg-app-surface/60 px-4 py-2 text-[13px] font-medium text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted hover:text-app-accent"
                   >
                     Clear filters
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {pageRows.map((t, index) => (
-                    <motion.div
+                  {pageRows.map((t) => (
+                    <div
                       key={t.id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.32, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
                       onClick={() =>
                         navigate(`/templates/${t.id}`, { state: { listSearch: location.search } })
                       }
-                      className="group relative flex cursor-pointer overflow-hidden rounded-2xl border border-white/[0.08] bg-app-surface/50 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] transition-all duration-250 hover:-translate-y-0.5 hover:border-app-accent/40 hover:bg-white/[0.05] hover:shadow-app-lift"
+                      className="group relative flex cursor-pointer overflow-hidden rounded-2xl border border-app-border bg-app-surface/50 hover:border-app-accent/35 hover:bg-app-surface-hover"
                     >
                       {/* Status accent left strip */}
                       <div
-                        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-2xl transition-opacity duration-200 group-hover:opacity-100 ${
+                        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-2xl ${
                           t.status === 'ACTIVE'
-                            ? 'bg-gradient-to-b from-emerald-400 to-emerald-600/40 opacity-80'
+                            ? 'bg-emerald-500/70'
                             : t.status === 'DRAFT'
-                              ? 'bg-gradient-to-b from-amber-400 to-amber-600/40 opacity-60'
-                              : 'bg-gradient-to-b from-zinc-500 to-zinc-700/40 opacity-40'
+                              ? 'bg-amber-500/70'
+                              : 'bg-zinc-500/60'
                         }`}
                         aria-hidden
                       />
@@ -1638,7 +1842,7 @@ export default function TemplatesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                              <div className="text-[15px] font-semibold leading-tight tracking-tight text-app-text transition-colors duration-150 group-hover:text-app-accent">
+                              <div className="text-[15px] font-semibold leading-tight tracking-tight text-app-text group-hover:text-app-accent">
                                 {t.name}
                               </div>
                               {t.slug && (
@@ -1684,11 +1888,11 @@ export default function TemplatesPage() {
                       </div>
 
                       {/* Hover action buttons */}
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 transition-all duration-150 group-hover:opacity-100">
+                      <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openEditForm(t); }}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-app-border/80 bg-app-bg/80 text-app-faint backdrop-blur-sm transition-colors hover:border-app-accent/40 hover:text-app-accent"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-app-border bg-app-bg text-app-faint hover:border-app-accent/40 hover:text-app-accent"
                           title="Edit template"
                         >
                           <Pencil size={12} />
@@ -1696,7 +1900,7 @@ export default function TemplatesPage() {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setCloneTarget(t); setMutationError(null); }}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-app-border/80 bg-app-bg/80 text-app-faint backdrop-blur-sm transition-colors hover:border-app-accent/40 hover:text-app-accent"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-app-border bg-app-bg text-app-faint hover:border-app-accent/40 hover:text-app-accent"
                           title="Clone template"
                         >
                           <Copy size={12} />
@@ -1704,13 +1908,13 @@ export default function TemplatesPage() {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(t); setMutationError(null); }}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-red-400/25 bg-app-bg/80 text-app-faint backdrop-blur-sm transition-colors hover:border-red-400/50 hover:text-red-400"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-red-400/25 bg-app-bg text-app-faint hover:border-red-400/50 hover:text-red-400"
                           title="Delete template"
                         >
                           <Trash2 size={12} />
                         </button>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
 
                   <div className="mt-5 flex items-center justify-between px-1 text-xs text-app-faint">
@@ -1729,7 +1933,7 @@ export default function TemplatesPage() {
                           })
                         }
                         disabled={currentPage <= 1}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-app-border text-app-muted transition-colors hover:bg-app-surface-hover disabled:opacity-40"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-app-border text-app-muted hover:bg-app-surface-hover disabled:opacity-40"
                       >
                         <ChevronLeft size={14} />
                       </button>
@@ -1746,7 +1950,7 @@ export default function TemplatesPage() {
                           })
                         }
                         disabled={currentPage >= pageCount}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-app-border text-app-muted transition-colors hover:bg-app-surface-hover disabled:opacity-40"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-app-border text-app-muted hover:bg-app-surface-hover disabled:opacity-40"
                       >
                         <ChevronRight size={14} />
                       </button>
@@ -1759,13 +1963,10 @@ export default function TemplatesPage() {
             <div className="hidden lg:block">
               <div className="sticky top-6 space-y-4">
                 {/* Quick-start card */}
-                <div className="overflow-hidden rounded-app-xl border border-app-border/80 bg-app-surface/50 shadow-app-soft backdrop-blur-md">
-                  {/* Gradient banner */}
-                  <div className="relative h-20 bg-[radial-gradient(ellipse_120%_120%_at_10%_-20%,rgba(147,124,248,0.35),transparent_60%),radial-gradient(ellipse_80%_80%_at_90%_110%,rgba(45,212,191,0.18),transparent_55%)]">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-app-lg border border-white/[0.12] bg-app-bg/60 shadow-app-soft backdrop-blur-sm">
-                        <LayoutTemplate className="h-6 w-6 text-app-accent" strokeWidth={1.5} />
-                      </div>
+                <div className="overflow-hidden rounded-app-xl border border-app-border bg-app-surface/50">
+                  <div className="flex h-20 items-center justify-center border-b border-app-border bg-app-bg-subtle">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-app-lg border border-app-border bg-app-bg">
+                      <LayoutTemplate className="h-6 w-6 text-app-accent" strokeWidth={1.5} />
                     </div>
                   </div>
 
@@ -1789,7 +1990,7 @@ export default function TemplatesPage() {
                 ).map(({ icon: Icon, label, desc }) => (
                   <div
                     key={label}
-                    className="flex gap-3 rounded-app-lg border border-app-border/60 bg-app-surface/30 p-4 backdrop-blur-sm"
+                    className="flex gap-3 rounded-app-lg border border-app-border bg-app-surface/30 p-4"
                   >
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-app-border/60 bg-app-bg/60">
                       <Icon className="h-4 w-4 text-app-accent/80" strokeWidth={1.75} />
@@ -1808,13 +2009,8 @@ export default function TemplatesPage() {
 
       {/* Modals */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="w-full max-w-lg rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl"
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="m-0 text-base font-semibold text-app-text">
                 {formMode === 'create' ? 'New Template' : 'Edit Template'}
@@ -1904,24 +2100,19 @@ export default function TemplatesPage() {
                   type="button"
                   disabled={mutating}
                   onClick={onSubmitForm}
-                  className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm transition-colors hover:bg-app-accent/20 disabled:opacity-50"
+                  className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm hover:bg-app-accent/20 disabled:opacity-50"
                 >
                   {mutating ? 'Saving…' : formMode === 'create' ? 'Create' : 'Save'}
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="w-full max-w-md rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl"
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
             <h3 className="m-0 text-base font-semibold text-app-text">Delete Template</h3>
             <p className="mt-2 text-sm text-app-muted">
               Are you sure you want to delete{' '}
@@ -1940,23 +2131,18 @@ export default function TemplatesPage() {
                 type="button"
                 disabled={mutating}
                 onClick={confirmDelete}
-                className="rounded-lg border border-red-400/40 bg-red-500/15 px-3.5 py-2 text-sm text-red-200 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                className="rounded-lg border border-red-400/40 bg-red-500/15 px-3.5 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50"
               >
                 {mutating ? 'Deleting…' : 'Delete'}
               </button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {cloneTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="w-full max-w-md rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl"
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
             <h3 className="m-0 text-base font-semibold text-app-text">Clone Template</h3>
             <p className="mt-2 text-sm text-app-muted">
               Create a deep copy of{' '}
@@ -1975,23 +2161,18 @@ export default function TemplatesPage() {
                 type="button"
                 disabled={mutating}
                 onClick={confirmClone}
-                className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm transition-colors hover:bg-app-accent/20 disabled:opacity-50"
+                className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm hover:bg-app-accent/20 disabled:opacity-50"
               >
                 {mutating ? 'Cloning…' : 'Clone'}
               </button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {showChannelDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="w-full max-w-lg rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 p-5 shadow-app-lift backdrop-blur-xl"
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="m-0 text-base font-semibold text-app-text">
                 {editingBindingId ? 'Edit Channel Binding' : 'Add Channel Binding'}
@@ -2083,7 +2264,7 @@ export default function TemplatesPage() {
                   <button
                     type="button"
                     onClick={() => setChannelJsonAdvancedOpen((o) => !o)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-app-bg-subtle/80 px-3 py-2 text-left text-[12px] text-app-muted transition-colors hover:border-app-accent/30 hover:bg-app-accent-muted/20"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-app-bg-subtle/80 px-3 py-2 text-left text-[12px] text-app-muted hover:border-app-accent/30 hover:bg-app-accent-muted/20"
                   >
                     <span className="flex items-center gap-2">
                       <Code2 size={15} className="text-app-accent" aria-hidden />
@@ -2091,7 +2272,7 @@ export default function TemplatesPage() {
                     </span>
                     <ChevronDown
                       size={16}
-                      className={`shrink-0 transition-transform ${channelJsonAdvancedOpen ? 'rotate-180' : ''}`}
+                      className={`shrink-0 ${channelJsonAdvancedOpen ? 'rotate-180' : ''}`}
                       aria-hidden
                     />
                   </button>
@@ -2125,30 +2306,27 @@ export default function TemplatesPage() {
                   type="button"
                   disabled={mutating}
                   onClick={submitChannelDialog}
-                  className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm transition-colors hover:bg-app-accent/20 disabled:opacity-50"
+                  className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm hover:bg-app-accent/20 disabled:opacity-50"
                 >
                   {mutating ? 'Saving…' : editingBindingId ? 'Update Binding' : 'Add Binding'}
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {channelToast && (
         <div className="fixed bottom-4 right-4 z-70">
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4 }}
-            className={`max-w-sm rounded-xl border px-4 py-2.5 text-sm shadow-app-lift ${
+          <div
+            className={`max-w-sm rounded-xl border px-4 py-2.5 text-sm ${
               channelToast.type === 'error'
                 ? 'border-red-400/40 bg-red-500/15 text-red-100'
                 : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
             }`}
           >
             {channelToast.message}
-          </motion.div>
+          </div>
         </div>
       )}
     </>

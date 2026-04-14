@@ -82,7 +82,7 @@ export default function ChannelBindings({
       {bindings.map((binding) => (
         <div
           key={binding.id}
-          className="bg-app-surface border border-app-border rounded-lg p-4 hover:shadow-md transition-shadow"
+          className="bg-app-surface border border-app-border rounded-lg p-4"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -120,7 +120,7 @@ export default function ChannelBindings({
             <div className="flex gap-2 ml-4">
               <button
                 onClick={() => onEditBinding?.(binding)}
-                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                 title="Edit binding"
               >
                 <Edit size={14} />
@@ -128,7 +128,7 @@ export default function ChannelBindings({
               <button
                 onClick={() => handleDeleteBinding(binding.id)}
                 disabled={deletingId === binding.id}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
                 title="Remove binding"
               >
                 {deletingId === binding.id ? (

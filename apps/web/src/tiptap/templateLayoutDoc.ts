@@ -33,7 +33,7 @@ export const LayoutRowNode = Node.create({
 export const LayoutCellNode = Node.create({
   name: 'layoutCell',
   group: 'layoutCell',
-  content: 'region',
+  content: 'region+',
   isolating: true,
   addAttributes() {
     return {
@@ -192,7 +192,7 @@ export function layoutConfigToTipTapDoc(config: TemplateLayoutConfig): JSONConte
     content: row.cells.map((cell) => ({
       type: 'layoutCell',
       attrs: { cellId: cell.id, flexGrow: cell.flexGrow },
-      content: [regionToDocNodes(cell.region)],
+      content: cell.regions.map((region) => regionToDocNodes(region)),
     })),
   }));
 
@@ -263,13 +263,16 @@ export function tipTapDocToLayoutConfig(doc: JSONContent): TemplateLayoutConfig 
         continue;
       const cellId = String((cellNode.attrs as { cellId?: string })?.cellId ?? crypto.randomUUID());
       const flexGrow = Number((cellNode.attrs as { flexGrow?: number })?.flexGrow);
-      const inner = cellNode.content[0];
-      const region = docNodeToRegion(inner);
-      if (!region) continue;
+      const regions: TemplateLayoutRegion[] = [];
+      for (const inner of cellNode.content) {
+        const region = docNodeToRegion(inner);
+        if (region) regions.push(region);
+      }
+      if (regions.length === 0) continue;
       cells.push({
         id: cellId,
         flexGrow: Number.isFinite(flexGrow) && flexGrow > 0 ? flexGrow : 1,
-        region,
+        regions,
       });
     }
 
