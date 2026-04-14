@@ -18,13 +18,12 @@ import {
   Link2,
   Loader2,
   Mail,
-  Monitor,
+  MessageCircle,
   Pencil,
   Plus,
   Radio,
   Save,
   Search,
-  Smartphone,
   Sparkles,
   Trash2,
   X,
@@ -50,14 +49,15 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 const CHANNEL_LAYOUT_PRESETS = ['responsive', 'fluid', 'fixed', 'stacked'] as const;
 
 function channelKeyVisual(key: string): {
-  Icon: typeof Monitor;
+  Icon: typeof Radio;
   iconWrap: string;
 } {
   const k = key.toLowerCase();
   const shell = 'border border-app-border bg-app-bg-subtle text-app-muted';
   if (k.includes('email') || k === 'mail') return { Icon: Mail, iconWrap: shell };
-  if (k.includes('mobile') || k.includes('ios') || k.includes('android')) return { Icon: Smartphone, iconWrap: shell };
-  if (k.includes('web') || k.includes('site') || k.includes('www')) return { Icon: Monitor, iconWrap: shell };
+  if (k.includes('whatsapp') || k.includes('wa')) return { Icon: MessageCircle, iconWrap: shell };
+  if (k.includes('sms') || k.includes('text')) return { Icon: MessageCircle, iconWrap: shell };
+  if (k.includes('push') || k.includes('notification')) return { Icon: Radio, iconWrap: shell };
   return { Icon: Radio, iconWrap: shell };
 }
 
@@ -277,8 +277,13 @@ export default function TemplatesPage() {
     name: '',
     description: '',
     status: 'DRAFT' as TemplateStatus,
+    channelId: '',
   });
-  const [formErrors, setFormErrors] = useState<{ name?: string; description?: string }>({});
+  const [formErrors, setFormErrors] = useState<{
+    name?: string;
+    description?: string;
+    channelId?: string;
+  }>({});
   const [formServerError, setFormServerError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<TemplateRecord | null>(null);
@@ -437,6 +442,7 @@ export default function TemplatesPage() {
         name: detail.name,
         description: detail.description ?? '',
         status: detail.status,
+        channelId: detail.bindings?.[0]?.channelId ?? '',
       });
       setFormErrors({});
       setMutationError(null);
@@ -461,6 +467,13 @@ export default function TemplatesPage() {
     }
     setI18nError(null);
   }, [detail]);
+
+  useEffect(() => {
+    if (!detail) return;
+    if (sidebarTab === 'channels' && (detail.bindings?.length ?? 0) >= 1) {
+      setSidebarTab('info');
+    }
+  }, [detail, sidebarTab]);
 
   useEffect(() => {
     if (!detail) return;
@@ -529,18 +542,22 @@ export default function TemplatesPage() {
     };
   }, []);
 
-  function validateForm(data: typeof formData): { name?: string; description?: string } {
-    const next: { name?: string; description?: string } = {};
+  function validateForm(
+    data: typeof formData,
+    mode: 'create' | 'edit',
+  ): { name?: string; description?: string; channelId?: string } {
+    const next: { name?: string; description?: string; channelId?: string } = {};
     const name = data.name.trim();
     if (!name) next.name = 'Name is required';
     else if (name.length > 200) next.name = 'Name must be 200 characters or fewer';
     if (data.description.length > 1000) next.description = 'Description must be 1000 characters or fewer';
+    if (mode === 'create' && !data.channelId) next.channelId = 'Please select a channel';
     return next;
   }
 
   function openCreateForm() {
     setFormMode('create');
-    setFormData({ name: '', description: '', status: 'DRAFT' });
+    setFormData({ name: '', description: '', status: 'DRAFT', channelId: '' });
     setFormErrors({});
     setFormServerError(null);
     setMutationError(null);
@@ -553,6 +570,7 @@ export default function TemplatesPage() {
       name: t.name,
       description: t.description ?? '',
       status: t.status,
+      channelId: t.bindings?.[0]?.channelId ?? '',
     });
     setFormErrors({});
     setFormServerError(null);
@@ -563,12 +581,14 @@ export default function TemplatesPage() {
 
   function applyBackendValidation(errorMessage: string): boolean {
     const msg = errorMessage.toLowerCase();
-    const next: { name?: string; description?: string } = {};
+    const next: { name?: string; description?: string; channelId?: string } = {};
 
     if (msg.includes('name')) {
       next.name = errorMessage;
     } else if (msg.includes('description')) {
       next.description = errorMessage;
+    } else if (msg.includes('channel')) {
+      next.channelId = errorMessage;
     } else {
       return false;
     }
@@ -578,7 +598,7 @@ export default function TemplatesPage() {
   }
 
   async function onSubmitForm() {
-    const errors = validateForm(formData);
+    const errors = validateForm(formData, formMode);
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -592,7 +612,14 @@ export default function TemplatesPage() {
           description: formData.description.trim(),
         };
         const created = await templateCrudService.create(payload);
-        setItems((prev) => [created, ...prev]);
+        const binding = await templateCrudService.addChannelBinding(created.id, {
+          channelId: formData.channelId,
+        });
+        const createdWithBinding: TemplateRecord = {
+          ...created,
+          bindings: [binding],
+        };
+        setItems((prev) => [createdWithBinding, ...prev]);
         setShowForm(false);
         navigate(`/templates/${created.id}`, { state: { listSearch: location.search } });
       } else if (detail) {
@@ -680,6 +707,10 @@ export default function TemplatesPage() {
   }, []);
 
   function openAddChannelDialog() {
+    if (detail?.bindings && detail.bindings.length >= 1) {
+      setMutationError('This template is already bound to a channel.');
+      return;
+    }
     setEditingBindingId(null);
     const firstUnbound = channels.find(
       (c) => !detail?.bindings?.some((b) => b.channelId === c.id),
@@ -700,6 +731,10 @@ export default function TemplatesPage() {
 
   async function submitChannelDialog() {
     if (!detail) return;
+    if (!editingBindingId && detail.bindings && detail.bindings.length >= 1) {
+      setChannelError('This template can only be bound to one channel.');
+      return;
+    }
     if (!channelIdInput) {
       setChannelError('Please select a channel.');
       return;
@@ -1125,12 +1160,16 @@ export default function TemplatesPage() {
                         hint: 'Status & identifiers',
                         icon: Info,
                       },
-                      {
-                        id: 'channels' as const,
-                        label: 'Channels',
-                        hint: 'Where this template is used',
-                        icon: Link2,
-                      },
+                      ...((detail?.bindings?.length ?? 0) >= 1
+                        ? ([] as const)
+                        : ([
+                            {
+                              id: 'channels' as const,
+                              label: 'Channels',
+                              hint: 'Where this template is used',
+                              icon: Link2,
+                            },
+                          ] as const)),
                       {
                         id: 'i18n' as const,
                         label: 'i18n',
@@ -1232,6 +1271,23 @@ export default function TemplatesPage() {
                                   )}
                                 </p>
                               </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] text-app-faint">Bound channel</p>
+                              {(() => {
+                                const binding = detail.bindings?.[0];
+                                if (!binding) return <p className="mt-1 text-[11px] text-app-faint">—</p>;
+                                const channel = channels.find((c) => c.id === binding.channelId);
+                                return (
+                                  <p className="mt-1 text-[12px] text-app-text">
+                                    <span className="font-semibold">{channel?.name ?? 'Channel'}</span>{' '}
+                                    <span className="text-app-faint">
+                                      ({channel?.key ?? binding.channelId})
+                                    </span>
+                                  </p>
+                                );
+                              })()}
                             </div>
 
                             <div>
@@ -2112,6 +2168,35 @@ export default function TemplatesPage() {
                 />
                 {formErrors.name && <p className="mt-1 text-xs text-red-300">{formErrors.name}</p>}
               </div>
+              {formMode === 'create' && (
+                <div>
+                  <label className="mb-1 block text-[12px] text-app-muted">Bound channel</label>
+                  <select
+                    value={formData.channelId}
+                    title="Select channel to bind"
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, channelId: e.target.value }));
+                      if (formErrors.channelId)
+                        setFormErrors((prev) => ({ ...prev, channelId: undefined }));
+                      if (formServerError) setFormServerError(null);
+                    }}
+                    className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm outline-none"
+                    disabled={channelsLoading}
+                  >
+                    <option value="">
+                      {channelsLoading ? 'Loading channels…' : 'Select a channel'}
+                    </option>
+                    {channels.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.key})
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.channelId && (
+                    <p className="mt-1 text-xs text-red-300">{formErrors.channelId}</p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="mb-1 block text-[12px] text-app-muted">Description</label>
                 <textarea

@@ -186,11 +186,9 @@ router.get("/content", async (req: AuthRequest, res: Response) => {
       weights,
     });
     if (raw === null) {
-      res
-        .status(503)
-        .json({
-          error: "Search index unavailable (Elasticsearch not configured)",
-        });
+      res.status(503).json({
+        error: "Search index unavailable (Elasticsearch not configured)",
+      });
       return;
     }
     res.status(200).json(raw);

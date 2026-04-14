@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { getPrismaClient } from "../repository";
 
 // Global roles only — carried in the JWT.
 // FUTURE: Content-scoped roles (AUTHOR, CO_AUTHOR, REVIEWER) live on the content record in the DB and are enforced in Service Layer (Object-Level Authorization).
@@ -50,7 +51,7 @@ export const authenticate = (
   res: Response,
   next: NextFunction,
 ): void => {
-  try {
+  (async () => {
     const token = extractToken(req);
 
     if (!token) {
@@ -58,25 +59,37 @@ export const authenticate = (
       return;
     }
 
-    const decoded = jwt.verify(
-      token,
-      JWT_SECRET,
-      JWT_VERIFY_OPTIONS,
-    ) as JwtPayload;
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS) as JwtPayload;
+    } catch (err) {
+      if (err instanceof jwt.TokenExpiredError) {
+        res.status(401).json({ error: "Token has expired" });
+        return;
+      }
+      if (err instanceof jwt.JsonWebTokenError) {
+        res.status(401).json({ error: "Invalid token" });
+        return;
+      }
+      next(err);
+      return;
+    }
+
+    // Prevent downstream FK crashes (eg content.authorId) if the DB was reset
+    // but the client is still holding an old JWT.
+    const user = await getPrismaClient().user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true },
+    });
+    if (!user) {
+      res.status(401).json({ error: "User not found for token" });
+      return;
+    }
+
     req.user = decoded;
 
     next();
-  } catch (err) {
-    if (err instanceof jwt.TokenExpiredError) {
-      res.status(401).json({ error: "Token has expired" });
-      return;
-    }
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ error: "Invalid token" });
-      return;
-    }
-    next(err);
-  }
+  })().catch(next);
 };
 
 // Global role-based access control — always use after authenticate.

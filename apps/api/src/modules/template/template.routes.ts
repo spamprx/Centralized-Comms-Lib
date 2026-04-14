@@ -196,11 +196,9 @@ router.get("/:id/i18n", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "Not allowed to manage translations for this template",
-        });
+      res.status(403).json({
+        error: "Not allowed to manage translations for this template",
+      });
       return;
     }
     if ("ok" in result && result.ok) {
@@ -266,11 +264,9 @@ router.get("/:id/i18n/resolve", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "Not allowed to access translations for this template",
-        });
+      res.status(403).json({
+        error: "Not allowed to access translations for this template",
+      });
       return;
     }
     if ("ok" in result && result.ok) {
@@ -335,11 +331,9 @@ router.patch("/:id/i18n", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "Not allowed to manage translations for this template",
-        });
+      res.status(403).json({
+        error: "Not allowed to manage translations for this template",
+      });
       return;
     }
     if ("ok" in result && result.ok) {

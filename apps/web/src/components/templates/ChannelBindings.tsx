@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit, Trash2, Monitor, Smartphone, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, Mail, Loader2, AlertCircle, MessageCircle, Radio } from 'lucide-react';
 import { channelService, type Binding } from '../../services';
 
 interface ChannelBindingsProps {
@@ -36,14 +36,15 @@ export default function ChannelBindings({
 
   const getChannelIcon = (channelKey: string) => {
     switch (channelKey.toLowerCase()) {
-      case 'web':
-        return <Monitor size={16} />;
-      case 'mobile':
-        return <Smartphone size={16} />;
       case 'email':
         return <Mail size={16} />;
+      case 'whatsapp':
+      case 'sms':
+        return <MessageCircle size={16} />;
+      case 'push':
+        return <Radio size={16} />;
       default:
-        return <Monitor size={16} />;
+        return <Radio size={16} />;
     }
   };
 
@@ -70,7 +71,7 @@ export default function ChannelBindings({
   if (bindings.length === 0) {
     return (
       <div className="p-6 text-center text-app-faint text-sm border-2 border-dashed border-app-border rounded-lg">
-        <Monitor size={24} className="mx-auto mb-2 text-app-faint" />
+        <Radio size={24} className="mx-auto mb-2 text-app-faint" />
         <p>No channels bound to this template yet</p>
         <p className="text-xs mt-1">Click "Add Channel" to configure rendering for different platforms</p>
       </div>

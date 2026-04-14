@@ -323,9 +323,8 @@ async function seedTags() {
 
 async function seedChannels() {
   const channels = [
-    { name: "Web", key: "web", description: "Browser / responsive surfaces" },
     { name: "Email", key: "email", description: "Email clients" },
-    { name: "Mobile", key: "mobile", description: "Native / in-app surfaces" },
+    { name: "WhatsApp", key: "whatsapp", description: "WhatsApp messages" },
     { name: "SMS", key: "sms", description: "SMS text messages" },
     { name: "Push Notification", key: "push", description: "Mobile and browser push notifications" },
   ];
@@ -514,14 +513,11 @@ async function seedTemplateTranslations() {
 
 async function seedTemplateChannelBindings() {
   const bindings: { key: string; templateKey: string; channelKey: string }[] = [
-    { key: "blogWeb", templateKey: "blogPost", channelKey: "web" },
-    { key: "blogEmail", templateKey: "blogPost", channelKey: "email" },
-    { key: "blogMobile", templateKey: "blogPost", channelKey: "mobile" },
-    { key: "annWeb", templateKey: "announcement", channelKey: "web" },
-    { key: "annEmail", templateKey: "announcement", channelKey: "email" },
-    { key: "annPush", templateKey: "announcement", channelKey: "push" },
-    { key: "policyWeb", templateKey: "policyDoc", channelKey: "web" },
-    { key: "nlEmail", templateKey: "emailNewsletter", channelKey: "email" },
+    // One channel per template (enforced by API + UI)
+    { key: "blogBound", templateKey: "blogPost", channelKey: "email" },
+    { key: "annBound", templateKey: "announcement", channelKey: "push" },
+    { key: "policyBound", templateKey: "policyDoc", channelKey: "email" },
+    { key: "nlBound", templateKey: "emailNewsletter", channelKey: "email" },
   ];
 
   for (const b of bindings) {

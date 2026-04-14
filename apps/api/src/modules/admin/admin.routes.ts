@@ -1421,12 +1421,10 @@ router.get(
     try {
       const format = ((req.query.format as string) || "").toLowerCase();
       if (format !== "csv" && format !== "json") {
-        res
-          .status(400)
-          .json({
-            error:
-              "format query parameter is required and must be 'csv' or 'json'",
-          });
+        res.status(400).json({
+          error:
+            "format query parameter is required and must be 'csv' or 'json'",
+        });
         return;
       }
 

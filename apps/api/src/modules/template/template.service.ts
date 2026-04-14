@@ -433,8 +433,9 @@ export const templateService = {
         i18n,
       });
 
-      for (const b of src.bindings) {
-        await repos.template.createBinding(created.id, b.channelId);
+      const firstBinding = src.bindings[0];
+      if (firstBinding) {
+        await repos.template.createBinding(created.id, firstBinding.channelId);
       }
 
       const translationRows =
@@ -794,6 +795,12 @@ export const templateService = {
       if (!channel) return { notFound: true } as const;
 
       const existing = await repos.template.listBindings(templateId);
+      if (existing.length >= 1) {
+        return {
+          invalid: true,
+          message: "Template is already bound to a channel",
+        } as const;
+      }
       if (existing.some((b) => b.channelId === channelId)) {
         return { conflict: true } as const;
       }

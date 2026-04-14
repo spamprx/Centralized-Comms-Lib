@@ -392,12 +392,10 @@ router.post(
         bodyJson !== null &&
         !isTipTapDoc(bodyJson)
       ) {
-        res
-          .status(400)
-          .json({
-            error:
-              "bodyJson must be a valid TipTap document (type: 'doc', content: array)",
-          });
+        res.status(400).json({
+          error:
+            "bodyJson must be a valid TipTap document (type: 'doc', content: array)",
+        });
         return;
       }
       const ctx = auditContext(req);
@@ -625,11 +623,9 @@ router.post(
         .repos()
         .componentRegistry.getComponentById(versionRecord.componentId);
       if (!componentRecord || componentRecord.key !== componentKey.trim()) {
-        res
-          .status(400)
-          .json({
-            error: "componentKey does not match this component version",
-          });
+        res.status(400).json({
+          error: "componentKey does not match this component version",
+        });
         return;
       }
 

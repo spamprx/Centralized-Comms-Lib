@@ -75,12 +75,10 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error:
-            "Only the content author or an admin can submit a review request",
-        });
+      res.status(403).json({
+        error:
+          "Only the content author or an admin can submit a review request",
+      });
       return;
     }
     if ("invalidState" in result && result.invalidState) {
@@ -174,11 +172,9 @@ router.get("/content/:contentId", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "You do not have access to review requests for this content",
-        });
+      res.status(403).json({
+        error: "You do not have access to review requests for this content",
+      });
       return;
     }
     res.status(200).json(result.requests);
@@ -241,11 +237,9 @@ router.post("/requests/:id/assign", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "Only the review requester or an admin can assign reviewers",
-        });
+      res.status(403).json({
+        error: "Only the review requester or an admin can assign reviewers",
+      });
       return;
     }
     res.status(201).json(result);
@@ -324,12 +318,9 @@ router.post(
         return;
       }
       if ("forbidden" in result && result.forbidden) {
-        res
-          .status(403)
-          .json({
-            error:
-              "Only the assigned reviewer or an admin can record a decision",
-          });
+        res.status(403).json({
+          error: "Only the assigned reviewer or an admin can record a decision",
+        });
         return;
       }
       if ("alreadyCompleted" in result && result.alreadyCompleted) {
@@ -384,11 +375,9 @@ router.post(
         return;
       }
       if ("forbidden" in result && result.forbidden) {
-        res
-          .status(403)
-          .json({
-            error: "Only the assigned reviewer can roll back this decision",
-          });
+        res.status(403).json({
+          error: "Only the assigned reviewer can roll back this decision",
+        });
         return;
       }
 
@@ -456,12 +445,10 @@ router.post(
         return;
       }
       if ("forbidden" in result && result.forbidden) {
-        res
-          .status(403)
-          .json({
-            error:
-              "Only the assigned reviewer or an admin can comment on this assignment",
-          });
+        res.status(403).json({
+          error:
+            "Only the assigned reviewer or an admin can comment on this assignment",
+        });
         return;
       }
       if ("comment" in result) res.status(201).json(result.comment);

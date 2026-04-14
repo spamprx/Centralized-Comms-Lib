@@ -171,11 +171,9 @@ app.post("/dev/reindex", async (_req: Request, res: Response) => {
       await import("@comms-lib/db-elasticsearch");
     const esClient = getElasticsearchClient();
     if (!esClient) {
-      res
-        .status(503)
-        .json({
-          error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)",
-        });
+      res.status(503).json({
+        error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)",
+      });
       return;
     }
     const { syncContentIndexFromDb } = await import("./intelligence");

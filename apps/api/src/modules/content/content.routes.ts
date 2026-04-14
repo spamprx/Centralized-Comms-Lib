@@ -245,12 +245,10 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
       contentType: contentType ?? undefined,
     });
     if ("invalidFormatting" in result && result.invalidFormatting) {
-      res
-        .status(422)
-        .json({
-          error: "Formatting rule violations",
-          violations: result.violations,
-        });
+      res.status(422).json({
+        error: "Formatting rule violations",
+        violations: result.violations,
+      });
       return;
     }
     res.status(201).json(result);
@@ -492,12 +490,10 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("invalidFormatting" in result && result.invalidFormatting) {
-      res
-        .status(422)
-        .json({
-          error: "Formatting rule violations",
-          violations: result.violations,
-        });
+      res.status(422).json({
+        error: "Formatting rule violations",
+        violations: result.violations,
+      });
       return;
     }
     if ("version" in result) res.status(200).json(result.version);
@@ -570,11 +566,9 @@ router.post(
         return;
       }
       if ("forbidden" in result && result.forbidden) {
-        res
-          .status(403)
-          .json({
-            error: "Only the content author or an admin can transition state",
-          });
+        res.status(403).json({
+          error: "Only the content author or an admin can transition state",
+        });
         return;
       }
       if ("invalidTransition" in result && result.invalidTransition) {
@@ -1291,11 +1285,9 @@ router.post("/:id/delete", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "Only the content author or an admin can delete content",
-        });
+      res.status(403).json({
+        error: "Only the content author or an admin can delete content",
+      });
       return;
     }
     if ("invalidTransition" in result && result.invalidTransition) {
@@ -1370,11 +1362,9 @@ router.patch("/:id/visibility", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res
-        .status(403)
-        .json({
-          error: "Only the content author or an admin can change visibility",
-        });
+      res.status(403).json({
+        error: "Only the content author or an admin can change visibility",
+      });
       return;
     }
     if ("content" in result) res.status(200).json(result.content);

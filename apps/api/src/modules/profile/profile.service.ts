@@ -26,25 +26,28 @@ export const profileService = {
     };
   } | null> {
     const prisma = getPrismaClient();
-    const [user, roles, contentCreated, totalViews, following] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, displayName: true, email: true, avatarUrl: true },
-      }),
-      prisma.userRole.findMany({
-        where: { userId },
-        include: { role: { select: { name: true } } },
-      }),
-      prisma.content.count({ where: { authorId: userId } }),
-      prisma.contentView.count({
-        where: {
-          content: { authorId: userId },
-        },
-      }),
-      prisma.contentBookmark.count({ where: { userId } }),
-    ]);
+    const [user, roles, contentCreated, totalViews, following] =
+      await Promise.all([
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, displayName: true, email: true, avatarUrl: true },
+        }),
+        prisma.userRole.findMany({
+          where: { userId },
+          include: { role: { select: { name: true } } },
+        }),
+        prisma.content.count({ where: { authorId: userId } }),
+        prisma.contentView.count({
+          where: {
+            content: { authorId: userId },
+          },
+        }),
+        prisma.contentBookmark.count({ where: { userId } }),
+      ]);
     if (!user) return null;
-    const role = roles.some((r: { role: { name: string } }) => r.role.name.toUpperCase() === "ADMIN")
+    const role = roles.some(
+      (r: { role: { name: string } }) => r.role.name.toUpperCase() === "ADMIN",
+    )
       ? "System Admin"
       : "Content Manager";
     return {
@@ -78,7 +81,9 @@ export const profileService = {
             ? input.displayName.trim()
             : undefined,
         email:
-          typeof input.email === "string" ? input.email.trim().toLowerCase() : undefined,
+          typeof input.email === "string"
+            ? input.email.trim().toLowerCase()
+            : undefined,
       });
       await repos.audit.append({
         action: "UPDATE",
@@ -102,7 +107,10 @@ export const profileService = {
     });
   },
 
-  async listActivity(userId: string, limit = 12): Promise<ProfileActivityItem[]> {
+  async listActivity(
+    userId: string,
+    limit = 12,
+  ): Promise<ProfileActivityItem[]> {
     const prisma = getPrismaClient();
     const [published, commented, created] = await Promise.all([
       prisma.content.findMany({
@@ -137,13 +145,19 @@ export const profileService = {
         contentTitle: p.title,
         timestamp: p.updatedAt,
       })),
-      ...commented.map((c: { id: string; createdAt: Date; content: { id: string; title: string } }) => ({
-        id: `commented-${c.id}`,
-        type: "COMMENTED" as const,
-        contentId: c.content.id,
-        contentTitle: c.content.title,
-        timestamp: c.createdAt,
-      })),
+      ...commented.map(
+        (c: {
+          id: string;
+          createdAt: Date;
+          content: { id: string; title: string };
+        }) => ({
+          id: `commented-${c.id}`,
+          type: "COMMENTED" as const,
+          contentId: c.content.id,
+          contentTitle: c.content.title,
+          timestamp: c.createdAt,
+        }),
+      ),
       ...created.map((c: { id: string; title: string; createdAt: Date }) => ({
         id: `created-${c.id}-${c.createdAt.toISOString()}`,
         type: "CREATED" as const,
@@ -153,10 +167,15 @@ export const profileService = {
       })),
     ];
 
-    return rows.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit);
+    return rows
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, limit);
   },
 
-  async listBookmarks(userId: string, query?: string): Promise<
+  async listBookmarks(
+    userId: string,
+    query?: string,
+  ): Promise<
     Array<{
       id: string;
       contentId: string;
@@ -193,17 +212,22 @@ export const profileService = {
       },
       take: 50,
     });
-    return items.map((item: {
-      id: string;
-      contentId: string;
-      createdAt: Date;
-      content: { title: string; contentType: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT" };
-    }) => ({
-      id: item.id,
-      contentId: item.contentId,
-      title: item.content.title,
-      contentType: item.content.contentType,
-      savedAt: item.createdAt,
-    }));
+    return items.map(
+      (item: {
+        id: string;
+        contentId: string;
+        createdAt: Date;
+        content: {
+          title: string;
+          contentType: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
+        };
+      }) => ({
+        id: item.id,
+        contentId: item.contentId,
+        title: item.content.title,
+        contentType: item.content.contentType,
+        savedAt: item.createdAt,
+      }),
+    );
   },
 };
