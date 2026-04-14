@@ -14,7 +14,6 @@ import {
   BookMarked,
   Link as LinkIcon,
   Puzzle,
-  Share2,
   ChevronRight,
   LayoutTemplate,
 } from 'lucide-react';
@@ -46,6 +45,7 @@ import {
   type CitationMarkerMode,
 } from '../lib/citationMarkers';
 import { CitationMarker, citationMarkLabel } from '../tiptap/CitationMarker';
+import { ComponentReference } from '../tiptap/ComponentReference';
 import { tipTapDocFromTemplateRecord } from '../lib/templateToTipTapDoc';
 import type { TemplateRecord } from '../services/templateCrudService';
 
@@ -96,7 +96,10 @@ export default function EditorLayout() {
   const [citationItems, setCitationItems] = useState<CitationItem[]>([]);
   const citationItemsRef = useRef(citationItems);
   citationItemsRef.current = citationItems;
-  const [rightPanelTab, setRightPanelTab] = useState<'library' | 'properties' | 'refs'>('library');
+  const [rightPanelTab, setRightPanelTab] = useState<'library' | 'properties' | 'similar' | 'refs'>(
+    'library',
+  );
+  const [libraryCatalogSource, setLibraryCatalogSource] = useState<'loading' | 'api' | 'demo'>('loading');
   const [wordCount, setWordCount] = useState(0);
   const [showUseTemplateDialog, setShowUseTemplateDialog] = useState(false);
   /** Passed to create draft only for new content (first save) so formatting rules bind to the template. */
@@ -128,6 +131,7 @@ export default function EditorLayout() {
       StarterKit,
       Underline,
       CitationMarker,
+      ComponentReference,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -411,18 +415,6 @@ export default function EditorLayout() {
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
 
-  const shareDocument = useCallback(() => {
-    const url = window.location.href;
-    const shareTitle = title.trim() || 'Draft';
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      void navigator.share({ title: shareTitle, url }).catch(() => {
-        void navigator.clipboard.writeText(url);
-      });
-    } else {
-      void navigator.clipboard.writeText(url);
-    }
-  }, [title]);
-
   const fmtBtn = (active: boolean) =>
     `flex h-8 min-w-8 items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] px-2 text-[13px] transition-colors ${
       active
@@ -443,20 +435,26 @@ export default function EditorLayout() {
       role="tablist"
       aria-label="Side panel"
     >
-      {(['library', 'properties', 'refs'] as const).map((tab) => (
+      {(['library', 'properties', 'similar', 'refs'] as const).map((tab) => (
         <button
           key={tab}
           type="button"
           role="tab"
           aria-selected={rightPanelTab === tab}
           onClick={() => setRightPanelTab(tab)}
-          className={`flex-1 rounded-[6px] px-1.5 py-1.5 text-[11px] font-semibold capitalize ${
+          className={`flex-1 rounded-[6px] px-1 py-1.5 text-[10px] font-semibold leading-tight ${
             rightPanelTab === tab
               ? 'bg-[var(--editor-card-bg)] text-[var(--editor-doc-text)]'
               : 'text-[var(--editor-faint)] hover:text-[var(--editor-muted)]'
           }`}
         >
-          {tab === 'refs' ? 'Refs' : tab}
+          {tab === 'refs'
+            ? 'Refs'
+            : tab === 'properties'
+              ? 'Props'
+              : tab === 'similar'
+                ? 'Similar'
+                : 'Library'}
         </button>
       ))}
     </div>
@@ -544,7 +542,7 @@ export default function EditorLayout() {
             )}
             {saving ? 'Saving…' : 'Save Draft'}
           </button>
-          <button
+          {/* <button
             type="button"
             onClick={openCitationDialog}
             className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-transparent bg-transparent px-3 py-2 text-[13px] font-medium text-[var(--editor-muted)] hover:bg-[var(--editor-canvas-bg)]"
@@ -559,7 +557,7 @@ export default function EditorLayout() {
           >
             <Share2 size={16} />
             Share
-          </button>
+          </button> */}
           <div
             className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] font-semibold text-[var(--editor-primary)]"
             title={user?.email ?? 'Signed in'}
@@ -700,7 +698,28 @@ export default function EditorLayout() {
 
         <aside className="flex w-[240px] shrink-0 flex-col border-l-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] px-3 py-3">
           {rightTabs}
-          {rightPanelTab === 'library' && <ComponentLibraryPanel editor={editor} />}
+          {rightPanelTab === 'library' && (
+            <ComponentLibraryPanel editor={editor} onCatalogSourceChange={setLibraryCatalogSource} />
+          )}
+          {rightPanelTab === 'similar' && user ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-[12px] text-[var(--editor-muted)]">
+              <p className="m-0 shrink-0 text-[11px] leading-snug text-[var(--editor-faint)]">
+                Suggestions update as you edit the title or body. Indexed drafts use search; otherwise we match
+                against your other titles.
+              </p>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <SimilarContentWidget
+                  title={title}
+                  bodyHtml={content}
+                  contentId={similarCheckContentId}
+                  appearance="neutral"
+                  className="w-full"
+                  defaultExpanded
+                  listMaxHeightClassName="max-h-[min(52vh,440px)]"
+                />
+              </div>
+            </div>
+          ) : null}
           {rightPanelTab === 'properties' && (
             <div className="min-h-0 flex-1 overflow-y-auto text-[12px] text-[var(--editor-muted)]">
               <div className="flex flex-col gap-3">
@@ -717,21 +736,7 @@ export default function EditorLayout() {
                     Load layout from an existing template into this draft.
                   </p>
                 </div>
-                {user ? (
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--editor-faint)]">
-                      Related drafts
-                    </p>
-                    <SimilarContentWidget
-                      title={title}
-                      bodyHtml={content}
-                      contentId={similarCheckContentId}
-                      appearance="neutral"
-                      className="w-full"
-                    />
-                  </div>
-                ) : null}
-                <div>
+                {/* <div>
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Content type</label>
                   <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
                     <option>Article</option>
@@ -739,7 +744,7 @@ export default function EditorLayout() {
                     <option>Documentation</option>
                     <option>Blog post</option>
                   </select>
-                </div>
+                </div> */}
                 <div>
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Tags</label>
                   <div className="flex flex-wrap gap-1">
@@ -838,7 +843,11 @@ export default function EditorLayout() {
           {wordCount} {wordCount === 1 ? 'word' : 'words'} · {versionLabel}
         </span>
         <span className="hidden max-w-[45%] truncate text-right sm:inline">
-          Library panel uses demo data until the components API is wired.
+          {libraryCatalogSource === 'loading'
+            ? 'Loading component catalog…'
+            : libraryCatalogSource === 'api'
+              ? 'Component catalog from API (seeded components in DB).'
+              : 'Component catalog: offline fallback (API unreachable).'}
         </span>
       </footer>
 

@@ -1,12 +1,32 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/core';
 import { Copy, Link2, Search, X } from 'lucide-react';
-import type { ComponentRecord } from '../../services/componentService';
+import {
+  componentService,
+  type ComponentLibraryEntry,
+} from '../../services/componentService';
 import { mockEditorComponents } from '../../data/mockEditorComponents';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
-function insertFragmentForComponent(mode: 'linked' | 'detached', comp: ComponentRecord): JSONContent {
+function filterMockCatalog(q: string): ComponentLibraryEntry[] {
+  const s = q.trim().toLowerCase();
+  if (!s) return mockEditorComponents;
+  return mockEditorComponents.filter(
+    (c) =>
+      c.key.toLowerCase().includes(s) ||
+      c.name.toLowerCase().includes(s) ||
+      (c.description?.toLowerCase().includes(s) ?? false),
+  );
+}
+
+function isInsertableTipTapDoc(json: unknown): json is JSONContent {
+  if (!json || typeof json !== 'object') return false;
+  const o = json as Record<string, unknown>;
+  return o.type === 'doc' && Array.isArray(o.content);
+}
+
+function insertFragmentForComponent(mode: 'linked' | 'detached', comp: ComponentLibraryEntry): JSONContent {
   const badge = mode === 'linked' ? 'Linked' : 'Snapshot';
   return {
     type: 'paragraph',
@@ -27,29 +47,84 @@ function insertFragmentForComponent(mode: 'linked' | 'detached', comp: Component
   };
 }
 
+function deepCloneJson<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v)) as T;
+}
+
+/**
+ * **Snapshot** — embed a frozen copy of the component version’s TipTap document (no live link).
+ * **Linked** — insert a `componentReference` node that stores `componentVersionId`; on save the API
+ * replaces it with the latest canonical blocks from the registry.
+ */
+function insertFromLibrary(editor: Editor | null, mode: 'linked' | 'detached', comp: ComponentLibraryEntry) {
+  if (!editor) return;
+
+  if (mode === 'detached') {
+    const raw = comp.latestVersion?.bodyJson;
+    if (raw != null && isInsertableTipTapDoc(raw)) {
+      editor.chain().focus().insertContent(deepCloneJson(raw)).run();
+      return;
+    }
+    editor.chain().focus().insertContent(insertFragmentForComponent('detached', comp)).run();
+    return;
+  }
+
+  // linked
+  const vid = comp.latestVersion?.id;
+  if (vid) {
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'componentReference',
+        attrs: {
+          componentVersionId: vid,
+          componentKey: comp.key,
+          componentName: comp.name,
+          mode: 'linked',
+        },
+      })
+      .run();
+    return;
+  }
+
+  editor.chain().focus().insertContent(insertFragmentForComponent('linked', comp)).run();
+}
+
 type ComponentLibraryPanelProps = {
   editor: Editor | null;
+  onCatalogSourceChange?: (source: 'loading' | 'api' | 'demo') => void;
 };
 
-export default function ComponentLibraryPanel({ editor }: ComponentLibraryPanelProps) {
+export default function ComponentLibraryPanel({ editor, onCatalogSourceChange }: ComponentLibraryPanelProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 280);
+  const [items, setItems] = useState<ComponentLibraryEntry[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const items = useMemo(() => {
-    const q = debouncedQuery.trim().toLowerCase();
-    if (!q) return mockEditorComponents;
-    return mockEditorComponents.filter(
-      (c) =>
-        c.key.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        (c.description?.toLowerCase().includes(q) ?? false),
-    );
-  }, [debouncedQuery]);
+  const refresh = useCallback(async () => {
+    onCatalogSourceChange?.('loading');
+    setLoading(true);
+    setLoadError(null);
+    const q = debouncedQuery.trim();
+    try {
+      const data = q ? await componentService.search(q) : await componentService.list();
+      setItems(data);
+      onCatalogSourceChange?.('api');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to load components';
+      setLoadError(msg);
+      setItems(filterMockCatalog(debouncedQuery));
+      onCatalogSourceChange?.('demo');
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedQuery, onCatalogSourceChange]);
 
-  const insert = (mode: 'linked' | 'detached', comp: ComponentRecord) => {
-    if (!editor) return;
-    editor.chain().focus().insertContent(insertFragmentForComponent(mode, comp)).run();
-  };
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -79,12 +154,20 @@ export default function ComponentLibraryPanel({ editor }: ComponentLibraryPanelP
         ) : null}
       </div>
 
+      {loadError ? (
+        <p className="m-0 rounded-[var(--editor-radius-input)] border-[0.5px] border-amber-500/35 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-900 dark:text-amber-100/90">
+          API: {loadError}. Showing offline catalog.
+        </p>
+      ) : null}
+
+      {loading ? (
+        <p className="m-0 text-[11px] text-[var(--editor-faint)]">Loading components…</p>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-y-auto rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)]">
-        {items.length === 0 ? (
+        {!loading && items.length === 0 ? (
           <div className="p-3 text-[12px] text-[var(--editor-faint)]">
-            {mockEditorComponents.length > 0
-              ? 'No components match your search.'
-              : 'No components in the library.'}
+            {query.trim() ? 'No components match your search.' : 'No components in the library.'}
           </div>
         ) : (
           <ul className="m-0 list-none divide-y divide-[var(--editor-border)] p-0">
@@ -94,9 +177,7 @@ export default function ComponentLibraryPanel({ editor }: ComponentLibraryPanelP
                   <div className="truncate text-[12px] font-semibold text-[var(--editor-doc-text)]">
                     {comp.name}
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-[var(--editor-muted)]">
-                    {comp.key}
-                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-[var(--editor-muted)]">{comp.key}</div>
                   {comp.description ? (
                     <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[var(--editor-muted)]">
                       {comp.description}
@@ -107,9 +188,9 @@ export default function ComponentLibraryPanel({ editor }: ComponentLibraryPanelP
                   <button
                     type="button"
                     disabled={!editor}
-                    onClick={() => insert('linked', comp)}
+                    onClick={() => insertFromLibrary(editor, 'linked', comp)}
                     className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-transparent px-2 py-1.5 text-[11px] font-medium text-[var(--editor-primary)] transition-colors hover:bg-[var(--editor-primary-muted)] disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Insert linked usage"
+                    title="Insert live link to this component version (body refreshes from the library on save)"
                   >
                     <Link2 size={12} strokeWidth={2.25} />
                     Linked
@@ -117,9 +198,9 @@ export default function ComponentLibraryPanel({ editor }: ComponentLibraryPanelP
                   <button
                     type="button"
                     disabled={!editor}
-                    onClick={() => insert('detached', comp)}
+                    onClick={() => insertFromLibrary(editor, 'detached', comp)}
                     className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-transparent bg-[var(--editor-primary)] px-2 py-1.5 text-[11px] font-medium text-[var(--editor-primary-fg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Insert snapshot copy"
+                    title="Insert a frozen copy of this version (edits here do not change the library)"
                   >
                     <Copy size={12} strokeWidth={2.25} />
                     Snapshot

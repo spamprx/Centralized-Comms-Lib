@@ -37,6 +37,10 @@ export type SimilarContentWidgetProps = {
   className?: string;
   /** Muted chrome for the document editor (no warning-styled icon). */
   appearance?: 'default' | 'neutral';
+  /** Open the list by default (e.g. dedicated side panel). */
+  defaultExpanded?: boolean;
+  /** Override max height for the hits list (Tailwind class). */
+  listMaxHeightClassName?: string;
 };
 
 /**
@@ -49,11 +53,13 @@ export default function SimilarContentWidget({
   contentId,
   className = '',
   appearance = 'default',
+  defaultExpanded = false,
+  listMaxHeightClassName = 'max-h-[200px]',
 }: SimilarContentWidgetProps) {
   const debouncedTitle = useDebounced(title, 450);
   const debouncedBody = useDebounced(bodyHtml, 450);
 
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hits, setHits] = useState<DisplayHit[]>([]);
@@ -70,9 +76,10 @@ export default function SimilarContentWidget({
     return rows;
   }, [authorId]);
 
-  const plainLen = htmlToPlainText(debouncedBody).length;
-  const shouldQuery =
-    debouncedTitle.trim().length >= 3 || plainLen >= 24;
+  const plainBodyDebounced = htmlToPlainText(debouncedBody).trim();
+  const plainLen = plainBodyDebounced.length;
+  /** Match title threshold so short phrases in the body (e.g. a product name) still trigger a check. */
+  const shouldQuery = debouncedTitle.trim().length >= 3 || plainLen >= 3;
 
   const run = useCallback(async () => {
     if (!shouldQuery) {
@@ -194,7 +201,7 @@ export default function SimilarContentWidget({
             <p
               className={`m-0 mt-2 text-[11px] ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'}`}
             >
-              Keep typing a title or body — we will suggest possible duplicates.
+              Type at least 3 characters in the title or body — we will suggest possible duplicates.
             </p>
           )}
           {shouldQuery && subtitle && count > 0 && (
@@ -214,7 +221,7 @@ export default function SimilarContentWidget({
               No close matches found.
             </p>
           )}
-          <ul className="m-0 max-h-[200px] list-none space-y-1.5 overflow-y-auto p-0">
+          <ul className={`m-0 list-none space-y-1.5 overflow-y-auto p-0 ${listMaxHeightClassName}`}>
             {hits.map((h) => (
               <li key={h.contentId} className="flex items-start justify-between gap-2 text-[12px]">
                 <Link

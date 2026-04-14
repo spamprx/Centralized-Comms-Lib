@@ -1,20 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
-import type { TemplateLayoutConfig, TemplateRecord } from '../services/templateCrudService';
-
-function parseTemplateLayout(raw: unknown): TemplateLayoutConfig | null {
-  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const o = raw as Record<string, unknown>;
-  if (typeof o.version !== 'number' || !Number.isInteger(o.version) || o.version < 1) return null;
-  if (!Array.isArray(o.regions)) return null;
-  for (const r of o.regions) {
-    if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
-    const reg = r as Record<string, unknown>;
-    if (typeof reg.id !== 'string' || !reg.id.trim()) return null;
-    if (typeof reg.type !== 'string' || !reg.type.trim()) return null;
-    if (reg.props != null && (typeof reg.props !== 'object' || Array.isArray(reg.props))) return null;
-  }
-  return o as unknown as TemplateLayoutConfig;
-}
+import { flattenRegions, parseTemplateLayout } from './templateLayout/layoutConfig';
+import type { TemplateRecord } from '../services/templateCrudService';
 
 function extractRichDoc(props: Record<string, unknown> | undefined): JSONContent | null {
   if (!props || typeof props !== 'object') return null;
@@ -47,12 +33,13 @@ function starterFromName(name: string): JSONContent {
 export function tipTapDocFromTemplateRecord(record: TemplateRecord): JSONContent {
   const layout =
     parseTemplateLayout(record.activeLayout) ?? parseTemplateLayout(record.draftLayout);
-  if (!layout?.regions?.length) {
+  const regions = flattenRegions(layout);
+  if (!regions.length) {
     return starterFromName(record.name);
   }
 
   const merged: JSONContent[] = [];
-  for (const region of layout.regions) {
+  for (const region of regions) {
     if (region.type === 'richText') {
       const props = region.props as Record<string, unknown> | undefined;
       const doc = extractRichDoc(props);

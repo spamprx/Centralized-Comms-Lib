@@ -13,15 +13,38 @@ type SlashItem = {
   run: (editor: Editor, range: { from: number; to: number }) => void;
 };
 
+/**
+ * Slash commands in any block with inline content (paragraph, heading, list item paragraph, …).
+ * Uses the last `/` before the cursor in that block so `/` works mid-line, not only at block start.
+ */
 function slashRange(editor: Editor): { from: number; to: number; query: string } | null {
   const { state } = editor;
   const { $from } = state.selection;
-  if (!$from.parent.isTextblock) return null;
-  const start = $from.start();
+  if (!editor.isEditable) return null;
+
+  let d = $from.depth;
+  while (d > 0 && !$from.node(d).inlineContent) d -= 1;
+  if (d === 0) return null;
+
+  const blockStart = $from.start(d);
   const end = $from.pos;
-  const text = state.doc.textBetween(start, end, '\n', '\ufffc');
-  if (!text.startsWith('/')) return null;
-  return { from: start, to: end, query: text.slice(1).toLowerCase() };
+  if (end <= blockStart) return null;
+
+  const text = state.doc.textBetween(blockStart, end, '\n', '\ufffc');
+  const slashIdx = text.lastIndexOf('/');
+  if (slashIdx < 0) return null;
+
+  const charBefore = slashIdx === 0 ? '' : text[slashIdx - 1];
+  if (charBefore && !/\s/.test(charBefore)) return null;
+
+  const tail = text.slice(slashIdx + 1);
+  if (/\s/.test(tail)) return null;
+
+  return {
+    from: blockStart + slashIdx,
+    to: end,
+    query: tail.toLowerCase(),
+  };
 }
 
 export default function SlashCommandMenu({ editor, onOpenCitation }: SlashCommandMenuProps) {
@@ -33,6 +56,14 @@ export default function SlashCommandMenu({ editor, onOpenCitation }: SlashComman
 
   const items = useMemo<SlashItem[]>(
     () => [
+      {
+        id: 'slash',
+        label: 'Insert "/" character',
+        keywords: ['slash', '/', 'forward', 'solidus', 'literal'],
+        run: (ed, r) => {
+          ed.chain().focus().deleteRange(r).insertContent('/').run();
+        },
+      },
       {
         id: 'h1',
         label: 'Heading 1',
@@ -234,6 +265,10 @@ export default function SlashCommandMenu({ editor, onOpenCitation }: SlashComman
       role="listbox"
       aria-label="Insert block"
     >
+      <div className="border-b border-[var(--editor-border)] px-2.5 py-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
+        Type <span className="font-mono text-[var(--editor-muted)]">/</span> in a paragraph or heading to open this
+        menu. 
+      </div>
       {filtered.length === 0 ? (
         <div className="px-2.5 py-2 text-[var(--editor-faint)]">No matching blocks</div>
       ) : (

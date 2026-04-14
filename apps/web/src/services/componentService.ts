@@ -25,10 +25,21 @@ export type ComponentRecord = {
   updatedAt: string;
 };
 
+/** Component row plus latest version (for library UI + snapshot insert). */
+export type ComponentLibraryEntry = ComponentRecord & {
+  latestVersion: {
+    id: string;
+    version: string;
+    bodyJson: unknown | null;
+  } | null;
+};
+
 type CreateComponentVersionPayload = {
   version: string;
   linkRefs?: unknown;
   propSchema?: unknown;
+  /** Canonical TipTap JSON for snapshot / library insert (optional). */
+  bodyJson?: unknown;
 };
 
 function joinApiUrl(endpoint: string): string {
@@ -72,16 +83,16 @@ export const componentService = {
     });
   },
 
-  list: async (): Promise<ComponentRecord[]> => {
-    return request<ComponentRecord[]>('/components');
+  list: async (): Promise<ComponentLibraryEntry[]> => {
+    return request<ComponentLibraryEntry[]>('/components');
   },
 
   /** Server-side filter on key, name, and description (substring). Empty query returns all. */
-  search: async (q: string): Promise<ComponentRecord[]> => {
+  search: async (q: string): Promise<ComponentLibraryEntry[]> => {
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     const suffix = params.toString();
-    return request<ComponentRecord[]>(suffix ? `/components/search?${suffix}` : '/components/search');
+    return request<ComponentLibraryEntry[]>(suffix ? `/components/search?${suffix}` : '/components/search');
   },
 
   createVersion: async (
