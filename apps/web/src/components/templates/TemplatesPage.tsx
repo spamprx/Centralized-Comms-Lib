@@ -35,14 +35,15 @@ import {
   templateCrudService,
   type ChannelRecord,
   type CreateTemplateInput,
+  type TemplateI18nTable,
   type TemplateRecord,
   type TemplateStatus,
   type UpdateTemplateInput,
 } from '../../services/templateCrudService';
 import { PageHeader } from '../ui/PageHeader';
 import { PageShell } from '../ui/PageShell';
-import { layoutRegionCount } from '../../lib/templateLayout/layoutConfig';
-import TemplateLayoutEditor, { parseTemplateLayout } from './TemplateLayoutEditor';
+import { layoutRegionCount, parseTemplateLayout } from '../../lib/templateLayout/layoutConfig';
+import TemplateLayoutEditor from './TemplateLayoutEditor';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
@@ -292,6 +293,9 @@ export default function TemplatesPage() {
   const [channelError, setChannelError] = useState<string | null>(null);
   const [channelToast, setChannelToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [i18nData, setI18nData] = useState<Record<string, Record<string, string>>>({});
+  const [i18nKeysFromService, setI18nKeysFromService] = useState<string[]>([]);
+  const [i18nRequiredLocales, setI18nRequiredLocales] = useState<string[]>(['en']);
+  const [i18nDefaultLocale, setI18nDefaultLocale] = useState('en');
   const [localeTab, setLocaleTab] = useState('en');
   const [newLocaleCode, setNewLocaleCode] = useState('');
   const [i18nError, setI18nError] = useState<string | null>(null);
@@ -444,6 +448,9 @@ export default function TemplatesPage() {
     if (!detail) return;
     const norm = normalizeI18n(detail.i18n);
     setI18nData(norm);
+    setI18nKeysFromService([]);
+    setI18nRequiredLocales(['en']);
+    setI18nDefaultLocale('en');
     const locales = Object.keys(norm);
     if (locales.length > 0) {
       setLocaleTab((prev) => (locales.includes(prev) ? prev : locales[0]));
@@ -453,6 +460,38 @@ export default function TemplatesPage() {
       setPreviewLocale('en');
     }
     setI18nError(null);
+  }, [detail]);
+
+  useEffect(() => {
+    if (!detail) return;
+    let cancelled = false;
+    templateCrudService
+      .getI18nTable(detail.id)
+      .then((table: TemplateI18nTable) => {
+        if (cancelled) return;
+        setI18nDefaultLocale(table.defaultLocale || 'en');
+        const required = table.requiredLocales.length > 0 ? table.requiredLocales : ['en'];
+        setI18nRequiredLocales(required);
+        setI18nKeysFromService(table.keys ?? []);
+        const nextData = normalizeI18n(table.translations);
+        for (const locale of required) {
+          if (!nextData[locale]) nextData[locale] = {};
+        }
+        setI18nData(nextData);
+        const locales = Object.keys(nextData);
+        if (locales.length > 0) {
+          setLocaleTab((prev) => (locales.includes(prev) ? prev : locales[0]));
+          setPreviewLocale((prev) => (locales.includes(prev) ? prev : table.defaultLocale || locales[0]));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setI18nKeysFromService([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [detail]);
 
   useEffect(() => {
@@ -732,14 +771,15 @@ export default function TemplatesPage() {
     }
   }
 
-  const baseLocale = i18nData.en ? 'en' : Object.keys(i18nData)[0] ?? 'en';
+  const baseLocale = i18nData[i18nDefaultLocale] ? i18nDefaultLocale : Object.keys(i18nData)[0] ?? 'en';
   const baseKeys = useMemo(() => {
     const set = new Set<string>([
+      ...i18nKeysFromService,
       ...Object.keys(i18nData[baseLocale] ?? {}),
       ...extractTemplateKeys(detail),
     ]);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [i18nData, baseLocale, detail]);
+  }, [i18nData, baseLocale, detail, i18nKeysFromService]);
   const selectedBundle = i18nData[localeTab] ?? {};
   const missingCount = baseKeys.filter((k) => !selectedBundle[k]?.trim()).length;
   const draftLayoutParsed = useMemo(() => parseTemplateLayout(detail?.draftLayout ?? null), [detail?.draftLayout]);
@@ -798,6 +838,22 @@ export default function TemplatesPage() {
 
   const channelMediaHandling =
     typeof channelFormParsed?.mediaHandling === 'string' ? channelFormParsed.mediaHandling : '';
+
+  const layoutPreviewChannels = useMemo(() => {
+    if (!detail?.bindings?.length) return [];
+    return detail.bindings.map((b) => {
+      const ch = channels.find((c) => c.id === b.channelId);
+      const raw = readBindingConfig(b.id);
+      const parsed = parseChannelLayoutConfig(raw);
+      return {
+        bindingId: b.id,
+        channelId: b.channelId,
+        channelName: ch?.name ?? 'Channel',
+        channelKey: ch?.key ?? 'channel',
+        layoutConfig: parsed,
+      };
+    });
+  }, [channels, detail?.bindings]);
 
   const mergeChannelConfig = useCallback((updates: Record<string, unknown | undefined | null>) => {
     setChannelConfigInput((prev) => {
@@ -1422,6 +1478,7 @@ export default function TemplatesPage() {
                               }`}
                             >
                               {loc}
+                              {i18nRequiredLocales.includes(loc) ? ' *' : ''}
                             </button>
                           ))}
                           <div className="flex items-center gap-1">
@@ -1441,6 +1498,11 @@ export default function TemplatesPage() {
                             </button>
                           </div>
                         </div>
+                        <p className="text-[10px] text-app-faint">
+                          Default locale: <span className="font-medium text-app-muted">{i18nDefaultLocale}</span>. Missing
+                          values in other locales fall back to this locale at render time. Required locales:{' '}
+                          <span className="font-medium text-app-muted">{i18nRequiredLocales.join(', ')}</span>.
+                        </p>
                         {i18nError && (
                           <div className="rounded border border-red-400/30 bg-red-500/5 px-2 py-1 text-[10px] text-red-200">
                             {i18nError}
@@ -1636,6 +1698,7 @@ export default function TemplatesPage() {
                     templateId={detail.id}
                     draftLayout={detail.draftLayout}
                     bindingCount={detail.bindings?.length ?? 0}
+                    previewChannels={layoutPreviewChannels}
                     onLayoutSaved={(saved) => {
                       setDetail(saved);
                       setItems((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));

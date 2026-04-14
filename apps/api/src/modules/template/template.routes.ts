@@ -161,6 +161,116 @@ router.post("/:id/clone", async (req: AuthRequest, res: Response) => {
 /**
  * @openapi
  * /api/v1/templates/{id}/i18n:
+ *   get:
+ *     summary: Get backend-extracted localisable keys and translation table
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     responses:
+ *       200:
+ *         description: Translation table for manage-translations UI
+ *       403:
+ *         description: Not owner/admin for this template
+ *       404:
+ *         description: Template not found
+ */
+router.get("/:id/i18n", async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await templateService.getI18nTable(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Not allowed to manage translations for this template" });
+      return;
+    }
+    if ("ok" in result && result.ok) {
+      res.status(200).json(result.table);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/templates/{id}/i18n/resolve:
+ *   get:
+ *     summary: Resolve one i18n key for locale with server-side default-locale fallback
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *       - in: query
+ *         name: locale
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Resolved value and fallback metadata
+ *       400:
+ *         description: Missing query params
+ *       403:
+ *         description: Not owner/admin for this template
+ *       404:
+ *         description: Template not found
+ */
+router.get("/:id/i18n/resolve", async (req: AuthRequest, res: Response) => {
+  try {
+    const locale = typeof req.query.locale === "string" ? req.query.locale : "";
+    const key = typeof req.query.key === "string" ? req.query.key : "";
+    const result = await templateService.resolveI18nValue(auditContext(req), {
+      templateId: req.params.id,
+      locale,
+      key,
+    });
+    if ("invalid" in result && result.invalid) {
+      res.status(400).json({ error: result.message });
+      return;
+    }
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Not allowed to access translations for this template" });
+      return;
+    }
+    if ("ok" in result && result.ok) {
+      res.status(200).json(result.resolved);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/templates/{id}/i18n:
  *   patch:
  *     summary: Merge per-locale string maps into the template
  *     tags:
@@ -204,6 +314,10 @@ router.patch("/:id/i18n", async (req: AuthRequest, res: Response) => {
     }
     if ("invalid" in result && result.invalid) {
       res.status(400).json({ error: result.message });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Not allowed to manage translations for this template" });
       return;
     }
     if ("ok" in result && result.ok) {

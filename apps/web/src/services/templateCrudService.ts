@@ -81,6 +81,23 @@ export type TemplateBindingRecord = {
   createdAt: string;
 };
 
+export type TemplateI18nTable = {
+  templateId: string;
+  defaultLocale: string;
+  requiredLocales: string[];
+  keys: string[];
+  translations: Record<string, Record<string, string>>;
+};
+
+export type TemplateI18nResolvedValue = {
+  templateId: string;
+  key: string;
+  locale: string;
+  value: string | null;
+  sourceLocale: string | null;
+  usedFallback: boolean;
+};
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -180,6 +197,21 @@ export const templateCrudService = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     });
+  },
+
+  async getI18nTable(templateId: string): Promise<TemplateI18nTable> {
+    return request<TemplateI18nTable>(`/templates/${templateId}/i18n`);
+  },
+
+  async resolveI18nValue(
+    templateId: string,
+    input: { locale: string; key: string },
+  ): Promise<TemplateI18nResolvedValue> {
+    const qs = new URLSearchParams({
+      locale: input.locale,
+      key: input.key,
+    });
+    return request<TemplateI18nResolvedValue>(`/templates/${templateId}/i18n/resolve?${qs.toString()}`);
   },
 
   async saveDraftLayout(templateId: string, layout: TemplateLayoutConfig): Promise<TemplateRecord> {

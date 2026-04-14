@@ -17,12 +17,12 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { EditorContent, useEditor } from '@tiptap/react';
-import type { JSONContent } from '@tiptap/core';
+import type { Editor, JSONContent } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import {
-  Braces,
+  ChevronDown,
   CheckCircle,
   Columns2,
   Columns3,
@@ -31,13 +31,12 @@ import {
   Image as ImageIcon,
   Loader2,
   Monitor,
+  Mail,
   Plus,
   Save,
   Settings2,
   Smartphone,
-  Text,
   Trash2,
-  X,
 } from 'lucide-react';
 import {
   templateCrudService,
@@ -61,7 +60,6 @@ import {
   previewRowGridTemplateColumns,
   rowGridTemplateColumns,
 } from '../../lib/templateLayout/layoutConfig';
-import TemplateComponentPalette from './TemplateComponentPalette';
 import {
   TextBlockModal,
   MediaBlockModal,
@@ -71,9 +69,7 @@ import {
   type FieldBlockFormValues,
 } from './TemplateBlockModals';
 
-export { LAYOUT_VERSION, parseTemplateLayout } from '../../lib/templateLayout/layoutConfig';
-
-export const REGION_TYPES = {
+const REGION_TYPES = {
   richText: 'richText',
   media: 'media',
   field: 'field',
@@ -107,9 +103,10 @@ type RichTextEditorProps = {
   initialDoc: JSONContent;
   placeholder: string;
   onDocChange: (doc: JSONContent) => void;
+  onEditorReady?: (editor: Editor | null) => void;
 };
 
-function RichTextEditor({ initialDoc, placeholder, onDocChange }: RichTextEditorProps) {
+function RichTextEditor({ initialDoc, placeholder, onDocChange, onEditorReady }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -135,6 +132,11 @@ function RichTextEditor({ initialDoc, placeholder, onDocChange }: RichTextEditor
       },
     },
   });
+
+  useEffect(() => {
+    onEditorReady?.(editor ?? null);
+    return () => onEditorReady?.(null);
+  }, [editor, onEditorReady]);
 
   return <EditorContent editor={editor} />;
 }
@@ -193,6 +195,33 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
     region.type === REGION_TYPES.media
       ? String((region.props as { caption?: string } | undefined)?.caption ?? '')
       : '';
+  const [editorRef, setEditorRef] = useState<Editor | null>(null);
+  const [showFieldPopover, setShowFieldPopover] = useState(false);
+  const [showMediaPopover, setShowMediaPopover] = useState(false);
+  const [fieldTokenInput, setFieldTokenInput] = useState('firstName');
+  const [mediaTokenInput, setMediaTokenInput] = useState('avatarImage');
+
+  const insertToken = useCallback(
+    (token: string) => {
+      if (!editorRef) return;
+      editorRef.chain().focus().insertContent(token).run();
+    },
+    [editorRef],
+  );
+
+  const insertFieldTokenFromPopover = useCallback(() => {
+    const key = fieldTokenInput.trim();
+    if (!key) return;
+    insertToken(`{{${key}}}`);
+    setShowFieldPopover(false);
+  }, [fieldTokenInput, insertToken]);
+
+  const insertMediaTokenFromPopover = useCallback(() => {
+    const key = mediaTokenInput.trim();
+    if (!key) return;
+    insertToken(`<${key}>`);
+    setShowMediaPopover(false);
+  }, [mediaTokenInput, insertToken]);
 
   return (
     <div
@@ -238,12 +267,77 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
       </div>
       <div className="p-4">
         {region.type === REGION_TYPES.richText && (
-          <RichTextEditor
-            key={`${region.id}-${editorPlaceholder}`}
-            initialDoc={doc}
-            placeholder={editorPlaceholder}
-            onDocChange={(d) => onUpdateDoc(region.id, d)}
-          />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-app-md border border-app-border/60 bg-app-bg-subtle/50 p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMediaPopover(false);
+                  setShowFieldPopover((v) => !v);
+                }}
+                className="rounded border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
+              >
+                Add field token
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFieldPopover(false);
+                  setShowMediaPopover((v) => !v);
+                }}
+                className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
+              >
+                Add media token
+              </button>
+              {showFieldPopover ? (
+                <div className="w-full max-w-[340px] rounded border border-amber-400/30 bg-black/25 p-2.5">
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-app-faint">Field key</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={fieldTokenInput}
+                      onChange={(e) => setFieldTokenInput(e.target.value)}
+                      placeholder="firstName"
+                      className="flex-1 rounded border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text"
+                    />
+                    <button
+                      type="button"
+                      onClick={insertFieldTokenFromPopover}
+                      className="rounded border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
+                    >
+                      Insert
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {showMediaPopover ? (
+                <div className="w-full max-w-[340px] rounded border border-cyan-400/30 bg-black/25 p-2.5">
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-app-faint">Media key</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={mediaTokenInput}
+                      onChange={(e) => setMediaTokenInput(e.target.value)}
+                      placeholder="avatarImage"
+                      className="flex-1 rounded border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text"
+                    />
+                    <button
+                      type="button"
+                      onClick={insertMediaTokenFromPopover}
+                      className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
+                    >
+                      Insert
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <RichTextEditor
+              key={`${region.id}-${editorPlaceholder}`}
+              initialDoc={doc}
+              placeholder={editorPlaceholder}
+              onDocChange={(d) => onUpdateDoc(region.id, d)}
+              onEditorReady={setEditorRef}
+            />
+          </div>
         )}
         {region.type === REGION_TYPES.media && (
           <div className="space-y-2">
@@ -357,7 +451,7 @@ function SortableLayoutRow({
           type="button"
           onClick={() => onRequestAddColumn(row.id)}
           className="inline-flex items-center gap-1.5 rounded-md border border-app-accent/35 bg-app-accent-muted/40 px-2.5 py-1 text-[10px] font-medium text-app-accent hover:bg-app-accent-muted"
-          title="Add a column to this row, then pick a block type"
+          title="Add a new column block in this row"
         >
           <Columns2 size={12} aria-hidden />
           + Column
@@ -435,9 +529,11 @@ function ReadOnlyRich({ doc }: { doc: JSONContent }) {
 }
 
 function PreviewRegionCard({ region }: { region: TemplateLayoutRegion }) {
+  const richDoc = ensureRichDoc(region.props);
+  const richDocKey = `${region.id}:${JSON.stringify(richDoc)}`;
   return (
     <div className="h-full rounded-app-md border border-app-border bg-app-bg-subtle p-4">
-      {region.type === REGION_TYPES.richText && <ReadOnlyRich doc={ensureRichDoc(region.props)} />}
+      {region.type === REGION_TYPES.richText && <ReadOnlyRich key={richDocKey} doc={richDoc} />}
       {region.type === REGION_TYPES.media && (
         <div className="space-y-1.5 rounded-app-md border border-dashed border-app-border/70 bg-app-bg-subtle/40 p-4 text-xs text-app-muted">
           <div className="text-[10px] uppercase tracking-wide text-app-faint">
@@ -469,6 +565,62 @@ function PreviewRegionCard({ region }: { region: TemplateLayoutRegion }) {
         </div>
       )}
     </div>
+  );
+}
+
+function extractTextFromDoc(doc: JSONContent): string {
+  const parts: string[] = [];
+  const walk = (node: JSONContent | null | undefined) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'text' && typeof node.text === 'string') {
+      parts.push(node.text);
+      return;
+    }
+    if (node.type === 'hardBreak') {
+      parts.push('\n');
+      return;
+    }
+    const isBlock = node.type === 'paragraph' || node.type === 'heading' || node.type === 'blockquote';
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child) => walk(child as JSONContent));
+      if (isBlock) parts.push('\n');
+    }
+  };
+  walk(doc);
+  return parts.join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function InlineTemplateText({ text }: { text: string }) {
+  const pieces = text.split(/(\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\})/g);
+  return (
+    <>
+      {pieces.map((p, i) =>
+        /^\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}$/.test(p) ? (
+          <span
+            key={`${p}-${i}`}
+            className="mx-0.5 inline-flex items-center rounded-[4px] border border-[rgba(124,111,247,0.2)] bg-[rgba(124,111,247,0.15)] px-1.5 py-0.5 font-mono text-[13px] text-[#9d94f5]"
+          >
+            {p}
+          </span>
+        ) : (
+          <span key={`${p}-${i}`}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function highlightJsonHtml(raw: string): string {
+  const esc = (s: string) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  return esc(raw).replace(
+    /"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:\s*)?("([^"\\]*(?:\\.[^"\\]*)*)")?/g,
+    (_m, keyText: string, sep: string | undefined, quotedVal: string | undefined) => {
+      const key = `<span style="color:#9d94f5">"${esc(keyText)}"</span>`;
+      if (!sep) return key;
+      const s = `<span style="color:rgba(255,255,255,0.3)">${esc(sep)}</span>`;
+      if (!quotedVal) return `${key}${s}`;
+      return `${key}${s}<span style="color:#1D9E75">${esc(quotedVal)}</span>`;
+    },
   );
 }
 
@@ -530,18 +682,19 @@ type TemplateLayoutEditorProps = {
   onSavingChange?: (saving: boolean) => void;
   /** Called whenever activating state changes */
   onActivatingChange?: (activating: boolean) => void;
+  previewChannels?: Array<{
+    bindingId: string;
+    channelId: string;
+    channelName: string;
+    channelKey: string;
+    layoutConfig?: Record<string, unknown> | null;
+  }>;
 };
 
 type BlockModalState =
   | null
   | { flow: 'add'; kind: 'text' | 'media' | 'field' }
   | { flow: 'edit'; kind: 'text' | 'media' | 'field'; regionId: string };
-
-/** Small chooser when adding a column or stacking in a column (not for palette → new row). */
-type BlockKindPickContext =
-  | null
-  | { mode: 'column'; rowId: string }
-  | { mode: 'stack'; rowId: string; cellId: string };
 
 export default function TemplateLayoutEditor({
   templateId,
@@ -553,6 +706,7 @@ export default function TemplateLayoutEditor({
   activateRef,
   onSavingChange,
   onActivatingChange,
+  previewChannels = [],
 }: TemplateLayoutEditorProps) {
   const [rows, setRows] = useState<LayoutRow[]>([]);
   const rowsRef = useRef(rows);
@@ -560,13 +714,14 @@ export default function TemplateLayoutEditor({
   const [appendToRowId, setAppendToRowId] = useState<string | null>(null);
   /** Next palette add stacks inside this column (same grid track) */
   const [appendToCell, setAppendToCell] = useState<{ rowId: string; cellId: string } | null>(null);
-  const [blockKindPick, setBlockKindPick] = useState<BlockKindPickContext>(null);
   const [blockModal, setBlockModal] = useState<BlockModalState>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activateError, setActivateError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [previewBp, setPreviewBp] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewBindingId, setPreviewBindingId] = useState<string>('');
+  const [previewFieldJson, setPreviewFieldJson] = useState<string>('{}');
   /** Full-width editor vs full-width preview — avoids splitting horizontal space */
   const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'preview'>('editor');
 
@@ -589,6 +744,140 @@ export default function TemplateLayoutEditor({
   );
 
   const regionCount = layoutRegionCount({ version: LAYOUT_VERSION, rows });
+
+  const previewTokens = useMemo(() => {
+    const field = new Set<string>();
+    const fieldPattern = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+
+    const walkDoc = (node: JSONContent | null | undefined) => {
+      if (!node || typeof node !== 'object') return;
+      const t = node.type;
+      if (t === 'text' && typeof node.text === 'string') {
+        const text = node.text;
+        let m: RegExpExecArray | null;
+        fieldPattern.lastIndex = 0;
+        while ((m = fieldPattern.exec(text)) !== null) field.add(m[1]);
+      }
+      if (Array.isArray(node.content)) {
+        node.content.forEach((child) => walkDoc(child as JSONContent));
+      }
+    };
+
+    rows.forEach((row) => {
+      row.cells.forEach((cell) => {
+        cell.regions.forEach((region) => {
+          if (region.type === REGION_TYPES.field) {
+            const key = String((region.props as { fieldKey?: string } | undefined)?.fieldKey ?? '').trim();
+            if (key) field.add(key);
+          }
+          if (region.type === REGION_TYPES.richText) {
+            const doc = ensureRichDoc(region.props);
+            walkDoc(doc);
+          }
+        });
+      });
+    });
+
+    return {
+      field: Array.from(field).sort((a, b) => a.localeCompare(b)),
+    };
+  }, [rows]);
+
+  const previewFieldValues = useMemo((): Record<string, string> => {
+    try {
+      const parsed = JSON.parse(previewFieldJson) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+      const out: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          out[key] = String(value);
+        }
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  }, [previewFieldJson]);
+
+  const previewFieldJsonError = useMemo(() => {
+    try {
+      const parsed = JSON.parse(previewFieldJson) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return 'Field values must be a JSON object like {"firstName":"Praneeth"}';
+      }
+      return null;
+    } catch {
+      return 'Invalid JSON format.';
+    }
+  }, [previewFieldJson]);
+
+  const previewFieldJsonHighlighted = useMemo(() => highlightJsonHtml(previewFieldJson), [previewFieldJson]);
+
+  const selectedPreviewChannel = useMemo(
+    () => previewChannels.find((c) => c.bindingId === previewBindingId) ?? previewChannels[0] ?? null,
+    [previewChannels, previewBindingId],
+  );
+
+  const resolvedPreviewRows = useMemo((): LayoutRow[] => {
+    const applyTokens = (node: JSONContent): JSONContent => {
+      const cloned: JSONContent = { ...node };
+      if (cloned.type === 'text' && typeof cloned.text === 'string') {
+        let next = cloned.text;
+        next = next.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (match, key: string) => {
+          const value = previewFieldValues[key];
+          return value?.trim() ? value : match;
+        });
+        cloned.text = next;
+      }
+      if (Array.isArray(cloned.content)) {
+        cloned.content = cloned.content.map((child) => applyTokens(child as JSONContent));
+      }
+      return cloned;
+    };
+
+    return rows.map((row) => ({
+      ...row,
+      cells: row.cells.map((cell) => ({
+        ...cell,
+        regions: cell.regions.map((region) => {
+          if (region.type !== REGION_TYPES.richText) return region;
+          const doc = ensureRichDoc(region.props);
+          const resolvedDoc = applyTokens(doc);
+          return { ...region, props: { ...(region.props ?? {}), doc: resolvedDoc } };
+        }),
+      })),
+    }));
+  }, [previewFieldValues, rows]);
+
+  useEffect(() => {
+    setPreviewFieldJson((prev) => {
+      let base: Record<string, unknown> = {};
+      try {
+        const parsed = JSON.parse(prev) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          base = parsed as Record<string, unknown>;
+        }
+      } catch {
+        /* ignore malformed */
+      }
+      const next: Record<string, string> = {};
+      previewTokens.field.forEach((key) => {
+        const existing = base[key];
+        next[key] = typeof existing === 'string' ? existing : '';
+      });
+      return JSON.stringify(next, null, 2);
+    });
+  }, [previewTokens.field]);
+
+  useEffect(() => {
+    if (!previewChannels.length) {
+      setPreviewBindingId('');
+      return;
+    }
+    if (!previewBindingId || !previewChannels.some((c) => c.bindingId === previewBindingId)) {
+      setPreviewBindingId(previewChannels[0].bindingId);
+    }
+  }, [previewBindingId, previewChannels]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -669,8 +958,20 @@ export default function TemplateLayoutEditor({
     setBlockModal(null);
     setAppendToRowId(null);
     setAppendToCell(null);
-    setBlockKindPick(null);
   }
+
+  const createDefaultRichTextRegion = useCallback((): TemplateLayoutRegion => {
+    const id = crypto.randomUUID();
+    return {
+      id,
+      type: REGION_TYPES.richText,
+      props: {
+        sectionTitle: '',
+        editorPlaceholder: 'Write section content...',
+        doc: emptyDoc(),
+      },
+    };
+  }, []);
 
   const textModalInitial = useMemo((): Partial<TextBlockFormValues> | undefined => {
     if (!blockModal || blockModal.kind !== 'text' || blockModal.flow !== 'edit') return undefined;
@@ -786,17 +1087,32 @@ export default function TemplateLayoutEditor({
     closeBlockModal();
   }
 
-  function onPalettePick(kind: 'text' | 'media' | 'field') {
-    setBlockKindPick(null);
-    setBlockModal({ flow: 'add', kind });
+  const addRichTextRegion = useCallback(
+    (target?: { rowId?: string; cellId?: string }) => {
+      const region = createDefaultRichTextRegion();
+      if (target?.rowId && target?.cellId) {
+        setRows((prev) => addRegionToCell(prev, target.rowId!, target.cellId!, region));
+        return;
+      }
+      if (target?.rowId) {
+        setRows((prev) => addColumnToRow(prev, target.rowId!, region));
+        return;
+      }
+      setRows((prev) => addRowWithRegion(prev, region));
+    },
+    [createDefaultRichTextRegion],
+  );
+
+  function onPaletteAdd() {
+    addRichTextRegion();
   }
 
   function onRequestAddColumn(rowId: string) {
-    setBlockKindPick({ mode: 'column', rowId });
+    addRichTextRegion({ rowId });
   }
 
   function onRequestAddToCell(rowId: string, cellId: string) {
-    setBlockKindPick({ mode: 'stack', rowId, cellId });
+    addRichTextRegion({ rowId, cellId });
   }
 
   const onEqualizeColumns = useCallback((rowId: string) => {
@@ -844,29 +1160,6 @@ export default function TemplateLayoutEditor({
     if (activateRef) activateRef.current = () => activateStable.current();
   }, [saveRef, activateRef]);
 
-  useEffect(() => {
-    if (!blockKindPick) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setBlockKindPick(null);
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [blockKindPick]);
-
-  function confirmBlockKindFromPicker(kind: 'text' | 'media' | 'field') {
-    const ctx = blockKindPick;
-    setBlockKindPick(null);
-    if (!ctx) return;
-    if (ctx.mode === 'column') {
-      setAppendToCell(null);
-      setAppendToRowId(ctx.rowId);
-    } else {
-      setAppendToRowId(null);
-      setAppendToCell({ rowId: ctx.rowId, cellId: ctx.cellId });
-    }
-    setBlockModal({ flow: 'add', kind });
-  }
-
   return (
     <div className={compact ? 'space-y-6' : 'space-y-8'}>
       {!compact && (
@@ -886,90 +1179,83 @@ export default function TemplateLayoutEditor({
         </div>
       )}
 
-      <div className={`flex flex-col ${compact ? 'gap-4' : 'gap-5'}`}>
-        <TemplateComponentPalette onPick={onPalettePick} disabled={saving || activating} />
-
-        <div
-          className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
-          role="toolbar"
-          aria-label="Editor workspace"
-        >
-          <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">Workspace</span>
-            <div className="flex gap-1 rounded-app-md border border-app-border bg-app-bg-subtle p-1">
+      <div className="flex min-h-[680px] flex-col overflow-hidden rounded-[12px] border border-white/[0.07] bg-[#0d0f18]">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.07] px-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 items-center rounded-full border border-white/[0.09] bg-white/[0.05] p-0.5">
               <button
                 type="button"
                 onClick={() => setWorkspaceTab('editor')}
-                aria-pressed={workspaceTab === 'editor'}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-app-md px-4 py-2 text-xs font-medium sm:flex-initial sm:px-5 ${
-                  workspaceTab === 'editor'
-                    ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
-                    : 'border border-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-text'
+                className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-150 ease-in ${
+                  workspaceTab === 'editor' ? 'bg-[#7C6FF7] text-white' : 'bg-transparent text-app-muted hover:text-app-text'
                 }`}
               >
-                <Text size={14} strokeWidth={1.75} aria-hidden />
                 Editor
               </button>
               <button
                 type="button"
                 onClick={() => setWorkspaceTab('preview')}
-                aria-pressed={workspaceTab === 'preview'}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-app-md px-4 py-2 text-xs font-medium sm:flex-initial sm:px-5 ${
-                  workspaceTab === 'preview'
-                    ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
-                    : 'border border-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-text'
+                className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-150 ease-in ${
+                  workspaceTab === 'preview' ? 'bg-[#7C6FF7] text-white' : 'bg-transparent text-app-muted hover:text-app-text'
                 }`}
               >
-                <Eye size={14} strokeWidth={1.75} aria-hidden />
                 Preview
               </button>
             </div>
+            {workspaceTab === 'preview' ? (
+              <>
+                <span className="h-5 w-px bg-white/[0.09]" />
+                <div className="flex items-center gap-2 text-[12px] text-app-muted">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]" />
+                  Live preview
+                </div>
+              </>
+            ) : null}
           </div>
-
-          {workspaceTab === 'preview' ? (
-            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-              <span className="text-[10px] text-app-faint sm:mr-1">Width</span>
-              <div className="flex flex-1 gap-1 rounded-app-md border border-app-border bg-app-bg-subtle p-1 sm:flex-initial">
-                <button
-                  type="button"
-                  onClick={() => setPreviewBp('desktop')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-app-md px-3 py-1.5 text-xs font-medium sm:flex-initial ${
-                    previewBp === 'desktop'
-                      ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
-                      : 'border border-transparent text-app-muted hover:text-app-text'
-                  }`}
-                >
-                  <Monitor size={14} aria-hidden /> Desktop
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewBp('mobile')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-app-md px-3 py-1.5 text-xs font-medium sm:flex-initial ${
-                    previewBp === 'mobile'
-                      ? 'border border-app-accent/30 bg-app-accent-muted text-app-accent'
-                      : 'border border-transparent text-app-muted hover:text-app-text'
-                  }`}
-                >
-                  <Smartphone size={14} aria-hidden /> Mobile
-                </button>
-              </div>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {workspaceTab === 'preview' ? (
+              <>
+                <div className="flex h-8 items-center rounded-full border border-white/[0.09] bg-white/[0.05] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewBp('desktop')}
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-150 ease-in ${
+                      previewBp === 'desktop' ? 'bg-white text-[#0d0f18]' : 'bg-transparent text-app-muted hover:text-app-text'
+                    }`}
+                  >
+                    <Monitor size={13} /> Desktop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewBp('mobile')}
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-150 ease-in ${
+                      previewBp === 'mobile' ? 'bg-white text-[#0d0f18]' : 'bg-transparent text-app-muted hover:text-app-text'
+                    }`}
+                  >
+                    <Smartphone size={13} /> Mobile
+                  </button>
+                </div>
+                <span className="h-5 w-px bg-white/[0.09]" />
+              </>
+            ) : null}
+            <button
+              type="button"
+              onClick={onPaletteAdd}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-white/[0.12] bg-transparent px-3 text-[13px] font-medium text-app-muted transition-all duration-150 ease-in hover:border-white/[0.14] hover:text-app-text"
+            >
+              <Plus size={14} /> Add block
+            </button>
+          </div>
         </div>
 
         {workspaceTab === 'editor' ? (
           <div className="min-w-0 flex flex-col gap-0">
-            <div className={`flex items-center gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
-              <span className="flex h-7 w-7 items-center justify-center rounded-md border border-app-accent/25 bg-app-accent-muted/40 text-app-accent">
-                <Text size={14} strokeWidth={1.75} aria-hidden />
-              </span>
-              <span className="text-[11px] text-app-faint">
-                Drag rows · resize gutters · <span className="text-app-muted">+ Column</span> splits · dashed + stacks
-              </span>
+            <div className="border-b border-white/[0.07] px-4 py-2 text-[12px] text-app-faint">
+              Drag rows, resize gutters, use <span className="text-app-muted">+ Column</span>, and stack blocks with dashed +.
             </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-4">
+                <div className="space-y-4 px-4 pb-4">
                   {rows.length === 0 ? (
                     <div className="rounded-app-lg border border-dashed border-app-accent/25 bg-app-accent-muted/10 px-4 py-10 text-center">
                       <p className="m-0 text-[13px] text-app-faint">Empty — add a block from the bar above.</p>
@@ -994,7 +1280,7 @@ export default function TemplateLayoutEditor({
             </DndContext>
 
             {!compact && (
-              <div className="mt-8 flex flex-col gap-4 border-t border-app-border/50 pt-8 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="mt-4 flex flex-col gap-4 border-t border-app-border/50 px-4 pb-6 pt-6 sm:flex-row sm:flex-wrap sm:items-center">
                 <button
                   type="button"
                   disabled={saving}
@@ -1029,93 +1315,129 @@ export default function TemplateLayoutEditor({
             )}
           </div>
         ) : (
-          <div className="min-w-0">
-            <div className={`flex flex-wrap items-center gap-3 ${compact ? 'mb-3' : 'mb-4'}`}>
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-app-border bg-app-bg-subtle text-app-accent-2">
-                  <Eye size={16} strokeWidth={1.75} />
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-app-accent-2/95">Live preview</div>
-                  <p className="m-0 text-xs text-app-muted">Read-only. Use Width to compare desktop and mobile.</p>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-auto bg-[#0a0c14] px-4 py-5">
+              <div
+                className={`mx-auto overflow-hidden rounded-[12px] border border-white/[0.09] bg-[#12141e] transition-all duration-300 ease-in ${
+                  previewBp === 'mobile' ? 'w-[375px]' : 'w-[640px]'
+                }`}
+              >
+                <div className="flex h-8 items-center justify-between border-b border-white/[0.07] bg-white/[0.03] px-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                  </div>
+                  <span className="text-[12px] text-app-muted">Email preview</span>
+                  <span className="w-7" />
+                </div>
+                <div className="space-y-2 p-8">
+                  {resolvedPreviewRows.length === 0 ? (
+                    <div className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] p-4 text-[14px] text-app-muted">
+                      Add blocks to start previewing.
+                    </div>
+                  ) : (
+                    resolvedPreviewRows.map((row) => (
+                      <div
+                        key={row.id}
+                        className="grid gap-2"
+                        style={{ gridTemplateColumns: previewBp === 'mobile' ? '1fr' : previewRowGridTemplateColumns(row.cells) }}
+                      >
+                        {row.cells.map((cell) => (
+                          <div key={cell.id} className="space-y-2">
+                            {cell.regions.map((region) => {
+                              const doc = ensureRichDoc(region.props);
+                              const text = extractTextFromDoc(doc);
+                              return (
+                                <div
+                                  key={region.id}
+                                  className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[14px] leading-[1.6] text-white/85"
+                                >
+                                  {text ? <InlineTemplateText text={text} /> : <span className="text-app-faint">Empty block</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
+              <p className="mt-3 text-center text-[11px] text-app-muted">
+                Read-only · use field values below to test variable substitution
+              </p>
             </div>
-            <div
-              className={`rounded-app-xl border border-app-border bg-app-bg-subtle p-5 ${
-                previewBp === 'mobile' ? 'flex justify-center' : ''
-              }`}
-            >
-              <TemplateLayoutLivePreview rows={rows} breakpoint={previewBp} />
+
+            <div className="grid h-[180px] shrink-0 grid-cols-2 gap-4 border-t border-white/[0.07] bg-[#12141e] p-4">
+              <div className="min-w-0">
+                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">Preview channel</label>
+                <div className="relative flex h-9 items-center justify-between rounded-[8px] border border-white/[0.1] bg-white/[0.05] px-3 text-[13px]">
+                  <span className="inline-flex items-center gap-2 text-app-text">
+                    <Mail size={13} className="text-app-muted" />
+                    {selectedPreviewChannel ? `${selectedPreviewChannel.channelName} (${selectedPreviewChannel.channelKey})` : 'No channel'}
+                  </span>
+                  <ChevronDown size={14} className="text-app-muted" />
+                  <select
+                    value={previewBindingId}
+                    onChange={(e) => setPreviewBindingId(e.target.value)}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    disabled={previewChannels.length < 1}
+                  >
+                    {previewChannels.length < 1 ? (
+                      <option value="">No channel bindings</option>
+                    ) : (
+                      previewChannels.map((ch) => (
+                        <option key={ch.bindingId} value={ch.bindingId}>
+                          {ch.channelName} ({ch.channelKey})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div className="mt-2 inline-flex items-center gap-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[11px] text-app-muted">
+                  <Eye size={11} />
+                  Layout: {String(selectedPreviewChannel?.layoutConfig?.layout ?? 'responsive')}
+                </div>
+              </div>
+
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">Field values</label>
+                  <span className="rounded-[4px] bg-white/[0.07] px-1.5 py-0.5 font-mono text-[11px] text-app-muted">JSON</span>
+                </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[11px] text-app-muted">Available:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {previewTokens.field.map((key) => (
+                      <span
+                        key={key}
+                        className="rounded-[4px] border border-[rgba(124,111,247,0.2)] bg-[rgba(124,111,247,0.12)] px-2 py-0.5 font-mono text-[11px] text-[#9d94f5]"
+                      >
+                        {`{{${key}}}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="relative h-[90px] overflow-hidden rounded-[8px] border border-white/[0.09] bg-[#0d0f18]">
+                  <pre
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12px] leading-[1.6] text-white/30"
+                    dangerouslySetInnerHTML={{ __html: previewFieldJsonHighlighted }}
+                  />
+                  <textarea
+                    value={previewFieldJson}
+                    onChange={(e) => setPreviewFieldJson(e.target.value)}
+                    placeholder={'{\n  "firstName": "Praneeth"\n}'}
+                    className="absolute inset-0 h-full w-full resize-none bg-transparent px-3 py-2 font-mono text-[12px] leading-[1.6] text-transparent caret-white outline-none"
+                  />
+                </div>
+                {previewFieldJsonError ? <p className="mt-1 text-[11px] text-amber-200/85">{previewFieldJsonError}</p> : null}
+              </div>
             </div>
           </div>
         )}
       </div>
-
-      {blockKindPick ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="block-kind-picker-title"
-          onClick={() => setBlockKindPick(null)}
-        >
-          <div
-            className="relative w-full max-w-[320px] rounded-app-xl border border-app-border bg-app-bg-subtle p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setBlockKindPick(null)}
-              className="absolute right-2.5 top-2.5 rounded-app-md p-1.5 text-app-faint hover:bg-white/[0.06] hover:text-app-text"
-              aria-label="Close"
-            >
-              <X size={16} />
-            </button>
-            <h4 id="block-kind-picker-title" className="m-0 pr-8 text-sm font-semibold tracking-tight text-app-text">
-              {blockKindPick.mode === 'column' ? 'Add column' : 'Add block in column'}
-            </h4>
-            <p className="mt-1 mb-4 text-[12px] leading-snug text-app-muted">
-              {blockKindPick.mode === 'column'
-                ? 'Pick a block type for the new column.'
-                : 'Pick a block to stack in this column (same grid track).'}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => confirmBlockKindFromPicker('text')}
-                className="flex flex-col items-center gap-1.5 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-[11px] font-medium text-app-text hover:border-app-accent/40 hover:bg-app-accent-muted/30"
-              >
-                <Text size={18} strokeWidth={1.75} className="text-app-accent" aria-hidden />
-                Text
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmBlockKindFromPicker('media')}
-                className="flex flex-col items-center gap-1.5 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-[11px] font-medium text-app-text hover:border-cyan-400/35 hover:bg-cyan-500/10"
-              >
-                <ImageIcon size={18} strokeWidth={1.75} className="text-cyan-300/90" aria-hidden />
-                Media
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmBlockKindFromPicker('field')}
-                className="flex flex-col items-center gap-1.5 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-[11px] font-medium text-app-text hover:border-amber-400/35 hover:bg-amber-500/10"
-              >
-                <Braces size={18} strokeWidth={1.75} className="text-amber-300/90" aria-hidden />
-                Field
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setBlockKindPick(null)}
-              className="mt-3 w-full rounded-app-md border border-white/[0.1] py-2 text-[12px] font-medium text-app-muted hover:bg-white/[0.05]"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       <TextBlockModal
         open={Boolean(blockModal && blockModal.kind === 'text')}
