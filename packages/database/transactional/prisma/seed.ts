@@ -15,6 +15,19 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+/** Minimal TipTap JSON for editor library snapshot inserts / previews. */
+function seedTipTapDoc(line: string): Prisma.InputJsonValue {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: line }],
+      },
+    ],
+  };
+}
+
 // ── Resolved ID maps ────────────────────────────────────────────────────────
 
 let userIds: Record<string, string> = {};
@@ -606,36 +619,43 @@ async function seedComponentVersions() {
     version: string;
     linkRefs: Prisma.InputJsonValue;
     propSchema: Prisma.InputJsonValue;
+    bodyJson: Prisma.InputJsonValue;
   }[] = [
     {
       key: "heroV1", componentKey: "heroImage", version: "1.0.0",
       linkRefs: [],
       propSchema: { type: "object", properties: { src: { type: "string" }, alt: { type: "string" }, overlayText: { type: "string" } } },
+      bodyJson: seedTipTapDoc("Hero Image — version 1.0.0 (seeded component body)."),
     },
     {
       key: "heroV2", componentKey: "heroImage", version: "2.0.0",
       linkRefs: ["hero-image@1.0.0"],
       propSchema: { type: "object", properties: { src: { type: "string" }, alt: { type: "string" }, overlayText: { type: "string" }, gradient: { type: "boolean" } } },
+      bodyJson: seedTipTapDoc("Hero Image — version 2.0.0 (seeded component body)."),
     },
     {
       key: "authorCardV1", componentKey: "authorCard", version: "1.0.0",
       linkRefs: [],
       propSchema: { type: "object", properties: { name: { type: "string" }, bio: { type: "string" }, avatarUrl: { type: "string" } } },
+      bodyJson: seedTipTapDoc("Author Card — version 1.0.0 (seeded component body)."),
     },
     {
       key: "ctaV1", componentKey: "ctaButton", version: "1.0.0",
       linkRefs: [],
       propSchema: { type: "object", properties: { label: { type: "string" }, href: { type: "string" }, variant: { type: "string", enum: ["primary", "secondary", "outline"] } } },
+      bodyJson: seedTipTapDoc("CTA Button — version 1.0.0 (seeded component body)."),
     },
     {
       key: "codeSnippetV1", componentKey: "codeSnippet", version: "1.0.0",
       linkRefs: [],
       propSchema: { type: "object", properties: { code: { type: "string" }, language: { type: "string" }, showLineNumbers: { type: "boolean" } } },
+      bodyJson: seedTipTapDoc("Code Snippet — version 1.0.0 (seeded component body)."),
     },
     {
       key: "legalFooterV1", componentKey: "legalFooter", version: "1.0.0",
       linkRefs: [],
       propSchema: { type: "object", properties: { companyName: { type: "string" }, year: { type: "number" } } },
+      bodyJson: seedTipTapDoc("Legal Footer — version 1.0.0 (seeded component body)."),
     },
   ];
 
@@ -643,8 +663,15 @@ async function seedComponentVersions() {
     const cid = componentIds[v.componentKey];
     const row = await prisma.componentVersion.upsert({
       where: { componentId_version: { componentId: cid, version: v.version } },
-      update: {},
-      create: { id: randomUUID(), componentId: cid, version: v.version, linkRefs: v.linkRefs, propSchema: v.propSchema },
+      update: { linkRefs: v.linkRefs, propSchema: v.propSchema, bodyJson: v.bodyJson },
+      create: {
+        id: randomUUID(),
+        componentId: cid,
+        version: v.version,
+        linkRefs: v.linkRefs,
+        propSchema: v.propSchema,
+        bodyJson: v.bodyJson,
+      },
     });
     componentVersionIds[v.key] = row.id;
   }
