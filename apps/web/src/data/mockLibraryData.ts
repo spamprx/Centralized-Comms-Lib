@@ -9,6 +9,7 @@ export interface ContentItem {
   channel: string;
   status: 'draft' | 'review' | 'published';
   views: number;
+  likes?: number;
   createdAt: string;
   thumbnail?: string;
   tags: string[];

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLibrary } from "../hooks/useLibrary";
 import {
   LibraryFilterBar,
@@ -13,14 +13,33 @@ import { serializeLibrarySearchParams } from "../lib/libraryUrlState";
 import { PageHeader, PageShell } from "../components/ui";
 import type { ContentItem } from "../data/mockLibraryData";
 
-function LibraryPaginatedContent({ items }: { items: ContentItem[] }) {
+const LIBRARY_PAGE_SIZE_STORAGE_KEY = "library.itemsPerPage";
+
+function readStoredItemsPerPage(): number {
+  if (!globalThis.window) return 10;
+  const raw = globalThis.window.localStorage.getItem(LIBRARY_PAGE_SIZE_STORAGE_KEY);
+  const n = raw ? Number(raw) : Number.NaN;
+  if (n === 5 || n === 10 || n === 20) return n;
+  return 10;
+}
+
+function LibraryPaginatedContent({
+  items,
+  itemsPerPage,
+}: Readonly<{
+  items: ContentItem[];
+  itemsPerPage: number;
+}>) {
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 9;
   const totalPages = Math.ceil(items.length / itemsPerPage);
   const paginatedItems = items.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   return (
     <>
@@ -37,6 +56,7 @@ function LibraryPaginatedContent({ items }: { items: ContentItem[] }) {
 }
 
 export default function LibraryLayout() {
+  const [itemsPerPage, setItemsPerPage] = useState(() => readStoredItemsPerPage());
   const {
     contentItems,
     totalInLibrary,
@@ -64,6 +84,14 @@ export default function LibraryLayout() {
     searchUnavailable,
     searchError,
   } = useLibrary();
+
+  useEffect(() => {
+    try {
+      globalThis.window?.localStorage.setItem(LIBRARY_PAGE_SIZE_STORAGE_KEY, String(itemsPerPage));
+    } catch {
+      // ignore (e.g., disabled storage)
+    }
+  }, [itemsPerPage]);
 
   const filterKey = useMemo(
     () => `${serializeLibrarySearchParams(filters).toString()}|${searchInput}`,
@@ -106,6 +134,9 @@ export default function LibraryLayout() {
           searchInput={searchInput}
           onSearchChange={setSearchInput}
           filters={filters}
+          enableAdvancedFacets={true}
+          pageSize={itemsPerPage}
+          onPageSizeChange={setItemsPerPage}
           appliedFacetValues={{
             author: effectiveFilters.author,
             channel: effectiveFilters.channel,
@@ -132,6 +163,7 @@ export default function LibraryLayout() {
             filters={filters}
             searchDisplay={searchInput.trim() || filters.q.trim()}
             tagCatalog={tags}
+            enableAdvancedFacets={true}
             onRemoveSearch={() => {
               setSearchInput("");
               patchFilters({ q: "" });
@@ -163,16 +195,26 @@ export default function LibraryLayout() {
           }}
         />
 
-        {contentItems.length > 0 ? (
-          <LibraryPaginatedContent key={filterKey} items={contentItems} />
-        ) : totalInLibrary > 0 ? (
-          <LibraryNoResults
-            hasActiveFilters={
-              hasActiveFilters || searchInput.trim() !== ""
-            }
-            onClearFilters={clearAllFilters}
-          />
-        ) : null}
+        {(() => {
+          if (contentItems.length > 0) {
+            return (
+              <LibraryPaginatedContent
+                key={filterKey}
+                items={contentItems}
+                itemsPerPage={itemsPerPage}
+              />
+            );
+          }
+          if (totalInLibrary > 0) {
+            return (
+              <LibraryNoResults
+                hasActiveFilters={hasActiveFilters || searchInput.trim() !== ""}
+                onClearFilters={clearAllFilters}
+              />
+            );
+          }
+          return null;
+        })()}
       </div>
     </PageShell>
   );

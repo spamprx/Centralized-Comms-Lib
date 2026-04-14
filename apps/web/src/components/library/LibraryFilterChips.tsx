@@ -14,6 +14,8 @@ export type LibraryFilterChipsProps = {
   /** Reflects the search box (may be ahead of debounced URL `q`). */
   searchDisplay: string;
   tagCatalog: Tag[];
+  /** When false, hide chips for facets that aren't supported by the backend yet. */
+  enableAdvancedFacets?: boolean;
   onRemoveSearch: () => void;
   onRemoveTag: (slug: string) => void;
   onRemoveAuthor: () => void;
@@ -29,6 +31,7 @@ export function LibraryFilterChips({
   filters,
   searchDisplay,
   tagCatalog,
+  enableAdvancedFacets = true,
   onRemoveSearch,
   onRemoveTag,
   onRemoveAuthor,
@@ -38,7 +41,7 @@ export function LibraryFilterChips({
   onRemoveDateFrom,
   onRemoveDateTo,
   onClearAll,
-}: LibraryFilterChipsProps) {
+}: Readonly<LibraryFilterChipsProps>) {
   const chips: { key: string; label: string; className: string; onRemove: () => void }[] = [];
 
   if (searchDisplay.trim()) {
@@ -50,13 +53,15 @@ export function LibraryFilterChips({
     });
   }
 
-  for (const slug of filters.tags) {
-    chips.push({
-      key: `tag:${slug}`,
-      label: `Tag: ${tagLabelForSlug(slug, tagCatalog)}`,
-      className: 'bg-fuchsia-500/12 text-fuchsia-300 border border-fuchsia-500/22',
-      onRemove: () => onRemoveTag(slug),
-    });
+  if (enableAdvancedFacets) {
+    for (const slug of filters.tags) {
+      chips.push({
+        key: `tag:${slug}`,
+        label: `Tag: ${tagLabelForSlug(slug, tagCatalog)}`,
+        className: 'bg-fuchsia-500/12 text-fuchsia-300 border border-fuchsia-500/22',
+        onRemove: () => onRemoveTag(slug),
+      });
+    }
   }
 
   if (filters.author.trim()) {
@@ -68,7 +73,7 @@ export function LibraryFilterChips({
     });
   }
 
-  if (filters.channel.trim()) {
+  if (enableAdvancedFacets && filters.channel.trim()) {
     chips.push({
       key: 'channel',
       label: `Channel: ${filters.channel}`,
@@ -86,7 +91,7 @@ export function LibraryFilterChips({
     });
   }
 
-  if (filters.type !== 'all') {
+  if (enableAdvancedFacets && filters.type !== 'all') {
     chips.push({
       key: 'type',
       label: `Type: ${filters.type}`,
@@ -95,7 +100,7 @@ export function LibraryFilterChips({
     });
   }
 
-  if (filters.dateFrom) {
+  if (enableAdvancedFacets && filters.dateFrom) {
     chips.push({
       key: 'from',
       label: `From: ${filters.dateFrom}`,
@@ -104,7 +109,7 @@ export function LibraryFilterChips({
     });
   }
 
-  if (filters.dateTo) {
+  if (enableAdvancedFacets && filters.dateTo) {
     chips.push({
       key: 'to',
       label: `To: ${filters.dateTo}`,

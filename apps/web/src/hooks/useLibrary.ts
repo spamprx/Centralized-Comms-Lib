@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { mockContentItems, mockTags } from '../data/mockLibraryData';
 import type { ContentItem, Tag } from '../data/mockLibraryData';
 import { useDebouncedValue } from './useDebouncedValue';
 import {
@@ -12,9 +11,10 @@ import {
 } from '../lib/libraryUrlState';
 import { staticSearchLibrary } from '../lib/staticLibrarySearch';
 import { searchContent, type ContentSearchHit } from '../services/searchService';
+import { contentService, type Content } from '../services/contentService';
 
-const USE_MOCK_DATA = true;
-/** Library list is mock → run ranked search locally (no API / Elasticsearch). */
+const USE_MOCK_DATA = false;
+/** When mock data is disabled, search uses the real API/Elasticsearch path. */
 const USE_STATIC_LIBRARY_SEARCH = USE_MOCK_DATA;
 
 /** Matches API max chunk size per request; broad queries stay bounded server-side (size cap 100). */
@@ -28,6 +28,37 @@ function itemMatchesTagFacet(itemTags: string[], selected: string[]): boolean {
   if (selected.length === 0) return true;
   const lower = itemTags.map((t) => t.toLowerCase());
   return selected.some((s) => lower.includes(s.toLowerCase()));
+}
+
+function mapApiContentToLibraryItem(c: Content): ContentItem {
+  const type: ContentItem['type'] =
+    c.contentType === 'VIDEO'
+      ? 'video'
+      : c.contentType === 'PODCAST'
+        ? 'podcast'
+        : c.contentType === 'DOCUMENT'
+          ? 'document'
+          : 'article';
+  const channel = c.templateId ? 'Template' : 'Freeform';
+  const status: ContentItem['status'] =
+    c.lifecycleState === 'PUBLISHED'
+      ? 'published'
+      : c.lifecycleState === 'IN_REVIEW'
+        ? 'review'
+        : 'draft';
+
+  return {
+    id: c.id,
+    title: c.title,
+    type,
+    author: c.author?.displayName || (c.authorId ? 'Unknown user' : 'Unknown'),
+    channel,
+    status,
+    views: c.viewsCount ?? 0,
+    likes: c.likesCount ?? 0,
+    createdAt: c.updatedAt ?? c.createdAt,
+    tags: [],
+  };
 }
 
 export function useLibrary() {
@@ -110,8 +141,12 @@ export function useLibrary() {
         }
         setRemoteSearchUnavailable(false);
         const list = res.hits ?? [];
-        const t = typeof res.total === 'number' ? res.total : list.length;
-        setRemoteSearchHits(list);
+        const publishedHits = list.filter((h) => h?.source?.lifecycleState === 'PUBLISHED');
+        // Search can include non-published items; library should only show PUBLISHED.
+        // Since we don't have a server-side "published-only" search query yet, keep totals consistent
+        // with what we actually display.
+        const t = publishedHits.length;
+        setRemoteSearchHits(publishedHits);
         setRemoteSearchTotal(t);
         const totalPages = Math.max(1, Math.ceil(t / LIBRARY_SEARCH_PAGE_SIZE));
         setSearchPage((p) => (p > totalPages ? totalPages : p));
@@ -155,12 +190,26 @@ export function useLibrary() {
 
   useEffect(() => {
     if (USE_MOCK_DATA) {
-      setTimeout(() => {
-        setAllContentItems(mockContentItems);
-        setTags(mockTags);
-        setLoading(false);
-      }, 200);
+      setLoading(false);
+      return;
     }
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const rows = await contentService.list({ lifecycleState: 'PUBLISHED', limit: 200, offset: 0 });
+        if (cancelled) return;
+        setAllContentItems(rows.map(mapApiContentToLibraryItem));
+        // Tags are returned per-content via `/content/:id` today; keep catalog empty until
+        // the API exposes a tags list endpoint.
+        setTags([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const patchFilters = useCallback(
@@ -211,10 +260,45 @@ export function useLibrary() {
     [authors, channels, tagSlugCatalog],
   );
 
-  const { effective: effectiveFilters, issues: filterIssues } = useMemo(
+  const { effective: effectiveFiltersBase, issues: filterIssuesBase } = useMemo(
     () => analyzeLibraryFilters(filters, filterCatalog),
     [filters, filterCatalog],
   );
+
+  // Now that contentType is stored in DB, the Type facet is supported in DB-backed mode again.
+  // Keep tags/channel/date facets disabled until the API exposes them.
+  const { effectiveFilters, filterIssues } = useMemo(() => {
+    if (USE_MOCK_DATA) {
+      return { effectiveFilters: effectiveFiltersBase, filterIssues: filterIssuesBase };
+    }
+    const extraIssues = [...filterIssuesBase];
+    const next = { ...effectiveFiltersBase };
+
+    if (next.channel.trim()) {
+      extraIssues.push({
+        code: 'unsupported_channel',
+        message: 'Channel filter is not supported for DB-backed library yet. It was ignored.',
+      });
+      next.channel = '';
+    }
+    if (next.tags.length > 0) {
+      extraIssues.push({
+        code: 'unsupported_tags',
+        message: 'Tag filters are not supported for DB-backed library yet. They were ignored.',
+      });
+      next.tags = [];
+    }
+    if (next.dateFrom || next.dateTo) {
+      extraIssues.push({
+        code: 'unsupported_dates',
+        message: 'Date range filters are not supported for DB-backed library yet. They were ignored.',
+      });
+      next.dateFrom = '';
+      next.dateTo = '';
+    }
+
+    return { effectiveFilters: next, filterIssues: extraIssues };
+  }, [effectiveFiltersBase, filterIssuesBase]);
 
   const filteredItems = useMemo(() => {
     const q = searchInput.trim().toLowerCase();

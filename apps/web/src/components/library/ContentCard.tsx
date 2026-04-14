@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, FileText, Video, Mic, File } from "lucide-react";
+import { ArrowUpRight, FileText, Video, Mic, File, ThumbsUp } from "lucide-react";
 import type { ContentItem } from "../../data/mockLibraryData";
 
 const typeIcons = {
@@ -88,6 +88,10 @@ export function ContentCard({ item }: ContentCardProps) {
             {item.type === "video" || item.type === "article"
               ? `${item.views.toLocaleString()} views`
               : "New"}
+          </span>
+          <span className="flex items-center gap-1 text-[11px] text-app-faint">
+            <ThumbsUp size={14} className={item.likes ? "text-app-accent" : ""} />
+            {(item.likes ?? 0).toLocaleString()}
           </span>
           <div className="relative min-h-[1.25rem] shrink-0 text-right">
             <span className="text-[11px] text-app-faint transition-opacity duration-300 group-hover/card:opacity-0">
