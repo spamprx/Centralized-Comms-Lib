@@ -1,5 +1,7 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
+import { hashPassword } from "../../utils/hash";
+import { getSettingsSnapshot, mergeSettingsSection } from "./adminSettings.defaults";
 
 export const adminService = {
   // ── Roles ─────────────────────────────────────────────────────────────────
@@ -241,6 +243,149 @@ export const adminService = {
     return repos.userRole.listUsers();
   },
 
+  async listUsersWithAssociations() {
+    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    const users = await repos.userRole.listUsers();
+    return Promise.all(
+      users.map(async (u) => {
+        const roles = await repos.userRole.listRolesForUser(u.id);
+        const groups = await repos.userRole.listGroupsForUser(u.id);
+        return { ...u, roles, groups };
+      }),
+    );
+  },
+
+  async createUser(
+    ctx: AuditContext,
+    input: { email: string; displayName: string; password: string; roleId?: string | null },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getUserByEmail(input.email);
+      if (existing) return { conflict: true } as const;
+      const passwordHash = await hashPassword(input.password);
+      const user = await repos.userRole.createUser({
+        email: input.email,
+        displayName: input.displayName,
+        passwordHash,
+        avatarUrl: null,
+      });
+      if (input.roleId) {
+        await repos.userRole.assignRole(user.id, input.roleId, ctx.actorId);
+      }
+      await repos.audit.append({
+        action: "CREATE",
+        resource: "USER",
+        resourceId: user.id,
+        newValue: { email: input.email, displayName: input.displayName, roleId: input.roleId },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { user } as const;
+    });
+  },
+
+  async updateUser(
+    ctx: AuditContext,
+    id: string,
+    input: {
+      displayName?: string;
+      email?: string;
+      isActive?: boolean;
+      avatarUrl?: string | null;
+      roleId?: string | null;
+    },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getUserById(id);
+      if (!existing) return { notFound: true } as const;
+      const updated = await repos.userRole.updateUser(id, {
+        ...(input.displayName !== undefined && { displayName: input.displayName }),
+        ...(input.email !== undefined && { email: input.email }),
+        ...(input.isActive !== undefined && { isActive: input.isActive }),
+        ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
+      });
+      if (input.roleId) {
+        const current = await repos.userRole.listRolesForUser(id);
+        for (const r of current) {
+          await repos.userRole.removeRole(id, r.id);
+        }
+        await repos.userRole.assignRole(id, input.roleId, ctx.actorId);
+      }
+      await repos.audit.append({
+        action: "UPDATE",
+        resource: "USER",
+        resourceId: id,
+        oldValue: { email: existing.email, displayName: existing.displayName, isActive: existing.isActive },
+        newValue: {
+          email: input.email ?? existing.email,
+          displayName: input.displayName ?? existing.displayName,
+          isActive: input.isActive ?? existing.isActive,
+          roleId: input.roleId ?? undefined,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { user: updated } as const;
+    });
+  },
+
+  async deactivateUser(ctx: AuditContext, id: string) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.userRole.getUserById(id);
+      if (!existing) return { notFound: true } as const;
+      await repos.userRole.deleteUser(id);
+      await repos.audit.append({
+        action: "UPDATE",
+        resource: "USER",
+        resourceId: id,
+        oldValue: { isActive: existing.isActive },
+        newValue: { isActive: false, note: "deactivated via admin" },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { ok: true } as const;
+    });
+  },
+
+  async bulkDeactivateUsers(ctx: AuditContext, ids: string[]) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    await uow.withTransaction(async (repos) => {
+      for (const id of ids) {
+        const existing = await repos.userRole.getUserById(id);
+        if (!existing) continue;
+        await repos.userRole.deleteUser(id);
+        await repos.audit.append({
+          action: "UPDATE",
+          resource: "USER",
+          resourceId: id,
+          oldValue: { isActive: existing.isActive },
+          newValue: { isActive: false },
+          actorId: ctx.actorId,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
+      }
+    });
+    return { count: ids.length } as const;
+  },
+
+  async resetUserPassword(_ctx: AuditContext, id: string) {
+    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    const user = await repos.userRole.getUserById(id);
+    if (!user) return { notFound: true } as const;
+    return { emailSent: false, message: "Password reset email is not configured in this environment." } as const;
+  },
+
   async getUserById(id: string) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     const user = await repos.userRole.getUserById(id);
@@ -399,5 +544,13 @@ export const adminService = {
   }) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     return repos.audit.list(filters);
+  },
+
+  getSettings() {
+    return getSettingsSnapshot();
+  },
+
+  patchSettingsSection(section: string, patch: Record<string, unknown>) {
+    return mergeSettingsSection(section as Parameters<typeof mergeSettingsSection>[0], patch);
   },
 };

@@ -198,7 +198,7 @@ router.get("/content/:contentId/metrics", async (req: AuthRequest, res: Response
  *       403:
  *         description: Not admin
  */
-router.get("/aggregate", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/aggregate", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const range = parseDateRange(req.query.from, req.query.to);
     if ("error" in range) {
@@ -252,7 +252,7 @@ router.get("/aggregate", authorize("ADMIN"), async (req: AuthRequest, res: Respo
  *       200:
  *         description: KPI array
  */
-router.get("/kpis", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/kpis", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -305,7 +305,7 @@ router.get("/kpis", authorize("ADMIN"), async (req: AuthRequest, res: Response) 
  *       200:
  *         description: Points over time
  */
-router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/views", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
     const range = (req.query.range as string) || "30d";
@@ -350,7 +350,7 @@ router.get("/views", authorize("ADMIN"), async (req: AuthRequest, res: Response)
  *       200:
  *         description: Engagement rows
  */
-router.get("/engagement", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/engagement", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const range = (req.query.range as string) || "7d";
     const days = parseInt(range) || 7;
@@ -391,7 +391,7 @@ router.get("/engagement", authorize("ADMIN"), async (req: AuthRequest, res: Resp
  *       200:
  *         description: Bucket counts
  */
-router.get("/reading-time", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/reading-time", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     // In production, calculate from actual reading analytics
     res.status(200).json([
@@ -422,7 +422,7 @@ router.get("/reading-time", authorize("ADMIN"), async (req: AuthRequest, res: Re
  *       200:
  *         description: Type segments
  */
-router.get("/content-types", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/content-types", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
 
@@ -459,7 +459,7 @@ router.get("/content-types", authorize("ADMIN"), async (req: AuthRequest, res: R
  *       200:
  *         description: Ranked items
  */
-router.get("/top-content", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/top-content", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
     const limit = parseInt(req.query.limit as string) || 10;
@@ -505,7 +505,7 @@ router.get("/top-content", authorize("ADMIN"), async (req: AuthRequest, res: Res
  *       200:
  *         description: Insights list
  */
-router.get("/ai-insights", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+router.get("/ai-insights", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     // In production, generate insights using AI/ML based on analytics data
     res.status(200).json([

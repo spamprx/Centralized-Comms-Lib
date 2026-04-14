@@ -131,6 +131,29 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
     return rows.map(toUser);
   }
 
+  async updateUser(
+    id: string,
+    input: { displayName?: string; email?: string; isActive?: boolean; avatarUrl?: string | null },
+  ): Promise<User> {
+    const row = await this.db.user.update({
+      where: { id },
+      data: {
+        ...(input.displayName !== undefined && { displayName: input.displayName }),
+        ...(input.email !== undefined && { email: input.email }),
+        ...(input.isActive !== undefined && { isActive: input.isActive }),
+        ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
+      },
+    });
+    return toUser(row);
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await this.db.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
   async createRole(input: CreateRoleInput): Promise<Role> {
     const row = await this.db.role.create({
       data: {

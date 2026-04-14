@@ -533,7 +533,7 @@ router.delete("/users/:userId/roles/:roleId", authorize("ADMIN"), async (req: Au
  */
 router.get("/users", async (req: AuthRequest, res: Response) => {
   try {
-    const users = await adminService.listUsers();
+    const users = await adminService.listUsersWithAssociations();
     res.status(200).json(users);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -576,6 +576,157 @@ router.get("/users/:id", async (req: AuthRequest, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
+});
+
+router.post("/users", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, displayName, password, roleId } = req.body as {
+      email?: string;
+      displayName?: string;
+      password?: string;
+      roleId?: string | null;
+    };
+    if (!email?.trim() || !displayName?.trim() || !password) {
+      res.status(400).json({ error: "email, displayName, and password are required" });
+      return;
+    }
+    const result = await adminService.createUser(auditContext(req), {
+      email: email.trim(),
+      displayName: displayName.trim(),
+      password,
+      roleId: roleId ?? null,
+    });
+    if ("conflict" in result && result.conflict) {
+      res.status(409).json({ error: "User with this email already exists" });
+      return;
+    }
+    const full = await adminService.getUserById(result.user.id);
+    res.status(201).json(full ?? result.user);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/users/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { displayName, email, isActive, avatarUrl, roleId } = req.body as {
+      displayName?: string;
+      email?: string;
+      isActive?: boolean;
+      avatarUrl?: string | null;
+      roleId?: string | null;
+    };
+    const result = await adminService.updateUser(auditContext(req), req.params.id, {
+      displayName,
+      email,
+      isActive,
+      avatarUrl,
+      roleId,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    const full = await adminService.getUserById(req.params.id);
+    res.status(200).json(full ?? result.user);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/users/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.deactivateUser(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    res.status(200).json({ deactivated: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/users/bulk-delete", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body as { ids?: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: "ids array is required" });
+      return;
+    }
+    const out = await adminService.bulkDeactivateUsers(auditContext(req), ids);
+    res.status(200).json(out);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/users/:id/status", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const { status } = req.body as { status?: string };
+    if (!status) {
+      res.status(400).json({ error: "status is required" });
+      return;
+    }
+    const active = status === "active" || status === "pending";
+    const result = await adminService.updateUser(auditContext(req), req.params.id, {
+      isActive: active,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    const full = await adminService.getUserById(req.params.id);
+    res.status(200).json(full ?? result.user);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/users/:id/reset-password", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await adminService.resetUserPassword(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/settings", authorize("ADMIN"), (_req: AuthRequest, res: Response) => {
+  try {
+    res.status(200).json(adminService.getSettings());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/settings/:section", authorize("ADMIN"), (req: AuthRequest, res: Response) => {
+  try {
+    const merged = adminService.patchSettingsSection(req.params.section, req.body ?? {});
+    res.status(200).json(merged);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("Unknown settings section")) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/settings/test-email", authorize("ADMIN"), (_req: AuthRequest, res: Response) => {
+  res.status(200).json({ success: false, message: "Outbound email is not configured." });
 });
 
 // ── Groups ──────────────────────────────────────────────────────────────────

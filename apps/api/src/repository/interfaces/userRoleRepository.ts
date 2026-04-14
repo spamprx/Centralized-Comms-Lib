@@ -16,6 +16,11 @@ export interface UserRoleRepository {
   getUserByEmail(email: string): Promise<User | null>;
   getUserByEmailWithPassword(email: string): Promise<UserWithPassword | null>;
   listUsers(): Promise<User[]>;
+  updateUser(
+    id: string,
+    input: { displayName?: string; email?: string; isActive?: boolean; avatarUrl?: string | null },
+  ): Promise<User>;
+  deleteUser(id: string): Promise<void>;
 
   createRole(input: CreateRoleInput): Promise<Role>;
   getRoleById(id: string): Promise<Role | null>;
