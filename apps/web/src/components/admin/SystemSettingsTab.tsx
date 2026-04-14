@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { Save, Globe, Lock, Bell, HardDrive } from 'lucide-react';
+import { Save, Globe, Lock, Bell, HardDrive, RotateCcw } from 'lucide-react';
 import { useAdminSettings } from '../../hooks/useAdmin';
 import type { SystemSettings } from '../../types/admin';
 
 type Section = keyof SystemSettings;
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType }[] = [
-  { id: 'general',       label: 'General',      icon: Globe      },
+  { id: 'general',       label: 'General',       icon: Globe      },
   { id: 'security',      label: 'Security',      icon: Lock       },
   { id: 'notifications', label: 'Notifications', icon: Bell       },
-  { id: 'storage',       label: 'Storage',       icon: HardDrive  },
+  { id: 'storage',       label: 'Storage',        icon: HardDrive  },
 ];
 
 export default function SystemSettingsTab() {
@@ -18,6 +18,8 @@ export default function SystemSettingsTab() {
   const [localChanges, setLocalChanges] = useState<Record<string, unknown>>({});
   const [saved, setSaved] = useState(false);
 
+  const isDirty = Object.keys(localChanges).length > 0;
+
   const handleSave = async () => {
     await updateSection(activeSection, localChanges as any);
     setLocalChanges({});
@@ -25,49 +27,97 @@ export default function SystemSettingsTab() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleDiscard = () => {
+    setLocalChanges({});
+  };
+
   const patch = (key: string, value: unknown) => setLocalChanges(prev => ({ ...prev, [key]: value }));
   const current = settings ? { ...settings[activeSection], ...localChanges } : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold text-app-text mb-1">System Settings</h2>
           <p className="text-[13px] text-app-faint m-0">Configure application-wide preferences</p>
         </div>
         <button
-          className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-lg text-[13px] cursor-pointer transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-2 admin-glass-button rounded-xl text-[13px] font-medium transition-all duration-200 ${
             saved
-              ? 'bg-emerald-400/15 border-emerald-400/30 text-emerald-400'
-              : 'bg-app-accent-muted border-app-accent/30 text-app-accent'
+              ? 'text-emerald-400 !border-emerald-400/30 !bg-emerald-400/10'
+              : 'text-app-accent'
           } disabled:opacity-40 disabled:cursor-not-allowed`}
           onClick={handleSave}
-          disabled={saving || Object.keys(localChanges).length === 0}
+          disabled={saving || !isDirty}
         >
           <Save size={13} />{saving ? 'Saving…' : saved ? 'Saved!' : 'Save changes'}
         </button>
       </div>
 
-      <div className="flex gap-4 items-start">
-        <nav className="flex flex-col gap-0.5 min-w-[160px] p-1 bg-app-surface rounded-lg border border-app-border">
-          {SECTIONS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              className={`flex items-center gap-2 px-3 py-2.5 border-none rounded-md text-[13px] cursor-pointer ${
-                activeSection === id
-                  ? 'bg-app-accent-muted text-app-accent'
-                  : 'bg-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-muted'
-              }`}
-              onClick={() => { setActiveSection(id); setLocalChanges({}); }}
-            >
-              <Icon size={14} /> {label}
-            </button>
-          ))}
+      {/* Unsaved changes bar */}
+      {isDirty && (
+        <div className="admin-unsaved-bar">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+          <span className="text-[13px] text-amber-300/90 flex-1">You have unsaved changes</span>
+          <button
+            className="flex items-center gap-1 px-2.5 py-1 bg-transparent border border-amber-400/20 rounded-lg text-amber-400 text-[12px] cursor-pointer hover:bg-amber-400/10"
+            onClick={handleDiscard}
+          >
+            <RotateCcw size={11} /> Discard
+          </button>
+          <button
+            className="flex items-center gap-1 px-2.5 py-1 bg-app-accent-muted border border-app-accent/30 rounded-lg text-app-accent text-[12px] cursor-pointer hover:bg-app-accent/20"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            <Save size={11} /> Save
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-5 items-start">
+        {/* Vertical icon tab rail */}
+        <nav className="flex flex-col gap-1 shrink-0">
+          {SECTIONS.map(({ id, label, icon: Icon }) => {
+            const isActive = activeSection === id;
+            return (
+              <button
+                key={id}
+                className={`relative flex items-center justify-center w-11 h-11 border-none rounded-xl cursor-pointer transition-all duration-200 group/tab ${
+                  isActive
+                    ? 'bg-app-accent-muted text-app-accent'
+                    : 'bg-transparent text-app-faint hover:bg-app-surface-hover hover:text-app-muted'
+                }`}
+                onClick={() => { setActiveSection(id); setLocalChanges({}); }}
+                title={label}
+              >
+                <Icon size={18} />
+                {/* Glowing underline for active */}
+                {isActive && (
+                  <div
+                    className="absolute bottom-0.5 left-2 right-2 h-[2px] rounded-full bg-app-accent"
+                    style={{ boxShadow: '0 0 6px rgba(147, 124, 248, 0.4)' }}
+                  />
+                )}
+                {/* Tooltip */}
+                <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-app-elevated text-app-text text-[11px] font-medium whitespace-nowrap opacity-0 pointer-events-none translate-x-1 group-hover/tab:opacity-100 group-hover/tab:translate-x-0 transition-all duration-150 z-10 shadow-app-soft">
+                  {label}
+                </div>
+              </button>
+            );
+          })}
         </nav>
-        <div className="flex-1 p-5 bg-app-bg/60 border border-app-border rounded-app-lg">
+
+        {/* Content */}
+        <div className="flex-1 p-5 admin-glass rounded-xl" style={{ background: 'rgba(15, 20, 32, 0.5)' }}>
+          {/* Section label */}
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-app-faint mb-4">
+            {SECTIONS.find(s => s.id === activeSection)?.label}
+          </div>
+
           {loading || !current ? (
             <div className="flex flex-col gap-3">
-              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[52px] bg-app-surface rounded-lg animate-pulse" />)}
+              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[56px] rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }} />)}
             </div>
           ) : (
             <>
@@ -83,88 +133,118 @@ export default function SystemSettingsTab() {
   );
 }
 
-function Field({ label, children, inline }: { label: string; children: React.ReactNode; inline?: boolean }) {
+// ─── Floating Label Field ─────────────────────────────────────────────
+
+function FloatField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className={`flex gap-1.5 ${inline ? 'flex-row items-center justify-between' : 'flex-col'}`}>
-      <label className="text-[13px] font-medium text-app-muted">{label}</label>
+    <div className="admin-float-field">
       {children}
+      <label>{label}</label>
     </div>
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+// ─── Inline Toggle Field ──────────────────────────────────────────────
+
+function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      className={`relative w-10 h-[22px] rounded-[11px] border-none cursor-pointer shrink-0 transition-colors duration-200 ${
-        checked ? 'bg-app-accent' : 'bg-stone-300'
-      }`}
-      onClick={() => onChange(!checked)}
-    >
-      <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-app-surface transition-transform duration-200 ${
-        checked ? 'translate-x-[18px]' : ''
-      }`} />
-    </button>
+    <div className="flex items-center justify-between py-3 border-b border-white/[0.04] last:border-b-0">
+      <span className="text-[13px] font-medium text-app-muted">{label}</span>
+      <button
+        role="switch"
+        aria-checked={checked}
+        className="admin-toggle"
+        onClick={() => onChange(!checked)}
+      >
+        <span className="admin-toggle-knob" />
+      </button>
+    </div>
   );
 }
 
-const inputClass = "px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none transition-colors duration-150 focus:border-app-accent/50";
-const inputSmClass = `${inputClass} w-[120px]`;
+// ─── Shared input classes ─────────────────────────────────────────────
+
+const inputClass =
+  'w-full px-3 py-3 bg-app-surface border border-app-border rounded-xl text-app-text text-[13px] outline-none transition-all duration-200 focus:border-app-accent/40 focus:shadow-[0_0_0_3px_rgba(147,124,248,0.06)] placeholder-transparent';
+const inputSmClass = `${inputClass} w-[140px]`;
+
+// ─── Section Components ───────────────────────────────────────────────
 
 function GeneralSection({ data, patch }: { data: SystemSettings['general']; patch: (k: string, v: unknown) => void }) {
   return (
-    <div className="flex flex-col gap-4">
-      <Field label="Application Name"><input className={inputClass} value={data.appName} onChange={e => patch('appName', e.target.value)} /></Field>
-      <Field label="Support Email"><input className={inputClass} type="email" value={data.supportEmail} onChange={e => patch('supportEmail', e.target.value)} /></Field>
-      <Field label="Max Users per Group"><input className={inputSmClass} type="number" value={data.maxUsersPerGroup} onChange={e => patch('maxUsersPerGroup', +e.target.value)} /></Field>
-      <Field label="Maintenance Mode" inline><Toggle checked={data.maintenanceMode} onChange={v => patch('maintenanceMode', v)} /></Field>
-      <Field label="Allow Public Registration" inline><Toggle checked={data.allowRegistration} onChange={v => patch('allowRegistration', v)} /></Field>
+    <div className="flex flex-col gap-5">
+      <FloatField label="Application Name">
+        <input className={inputClass} value={data.appName} onChange={e => patch('appName', e.target.value)} placeholder=" " />
+      </FloatField>
+      <FloatField label="Support Email">
+        <input className={inputClass} type="email" value={data.supportEmail} onChange={e => patch('supportEmail', e.target.value)} placeholder=" " />
+      </FloatField>
+      <FloatField label="Max Users per Group">
+        <input className={inputSmClass} type="number" value={data.maxUsersPerGroup} onChange={e => patch('maxUsersPerGroup', +e.target.value)} placeholder=" " />
+      </FloatField>
+
+      <div className="border-t border-white/[0.04] pt-3 mt-1">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-app-faint mb-2">Toggles</div>
+        <ToggleField label="Maintenance Mode" checked={data.maintenanceMode} onChange={v => patch('maintenanceMode', v)} />
+        <ToggleField label="Allow Public Registration" checked={data.allowRegistration} onChange={v => patch('allowRegistration', v)} />
+      </div>
     </div>
   );
 }
 
 function SecuritySection({ data, patch }: { data: SystemSettings['security']; patch: (k: string, v: unknown) => void }) {
   return (
-    <div className="flex flex-col gap-4">
-      <Field label="Require MFA" inline><Toggle checked={data.mfaRequired} onChange={v => patch('mfaRequired', v)} /></Field>
-      <Field label="Session Timeout (minutes)"><input className={inputSmClass} type="number" value={data.sessionTimeoutMinutes} onChange={e => patch('sessionTimeoutMinutes', +e.target.value)} /></Field>
-      <Field label="Minimum Password Length"><input className={inputSmClass} type="number" value={data.passwordMinLength} onChange={e => patch('passwordMinLength', +e.target.value)} /></Field>
-      <Field label="Require Special Characters" inline><Toggle checked={data.passwordRequireSpecialChars} onChange={v => patch('passwordRequireSpecialChars', v)} /></Field>
-      <Field label="Max Login Attempts"><input className={inputSmClass} type="number" value={data.maxLoginAttempts} onChange={e => patch('maxLoginAttempts', +e.target.value)} /></Field>
+    <div className="flex flex-col gap-5">
+      <ToggleField label="Require MFA" checked={data.mfaRequired} onChange={v => patch('mfaRequired', v)} />
+      <FloatField label="Session Timeout (minutes)">
+        <input className={inputSmClass} type="number" value={data.sessionTimeoutMinutes} onChange={e => patch('sessionTimeoutMinutes', +e.target.value)} placeholder=" " />
+      </FloatField>
+      <FloatField label="Minimum Password Length">
+        <input className={inputSmClass} type="number" value={data.passwordMinLength} onChange={e => patch('passwordMinLength', +e.target.value)} placeholder=" " />
+      </FloatField>
+      <ToggleField label="Require Special Characters" checked={data.passwordRequireSpecialChars} onChange={v => patch('passwordRequireSpecialChars', v)} />
+      <FloatField label="Max Login Attempts">
+        <input className={inputSmClass} type="number" value={data.maxLoginAttempts} onChange={e => patch('maxLoginAttempts', +e.target.value)} placeholder=" " />
+      </FloatField>
     </div>
   );
 }
 
 function NotificationsSection({ data, patch }: { data: SystemSettings['notifications']; patch: (k: string, v: unknown) => void }) {
   return (
-    <div className="flex flex-col gap-4">
-      <Field label="Email Notifications" inline><Toggle checked={data.emailNotifications} onChange={v => patch('emailNotifications', v)} /></Field>
-      <Field label="Slack Webhook URL"><input className={inputClass} value={data.slackWebhookUrl} onChange={e => patch('slackWebhookUrl', e.target.value)} placeholder="https://hooks.slack.com/…" /></Field>
-      <Field label="Alert on Failed Login" inline><Toggle checked={data.alertOnFailedLogin} onChange={v => patch('alertOnFailedLogin', v)} /></Field>
-      <Field label="Digest Frequency">
+    <div className="flex flex-col gap-5">
+      <ToggleField label="Email Notifications" checked={data.emailNotifications} onChange={v => patch('emailNotifications', v)} />
+      <FloatField label="Slack Webhook URL">
+        <input className={inputClass} value={data.slackWebhookUrl} onChange={e => patch('slackWebhookUrl', e.target.value)} placeholder=" " />
+      </FloatField>
+      <ToggleField label="Alert on Failed Login" checked={data.alertOnFailedLogin} onChange={v => patch('alertOnFailedLogin', v)} />
+      <FloatField label="Digest Frequency">
         <select className={inputClass} value={data.digestFrequency} onChange={e => patch('digestFrequency', e.target.value)}>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="never">Never</option>
         </select>
-      </Field>
+      </FloatField>
     </div>
   );
 }
 
 function StorageSection({ data, patch }: { data: SystemSettings['storage']; patch: (k: string, v: unknown) => void }) {
   return (
-    <div className="flex flex-col gap-4">
-      <Field label="Storage Provider">
+    <div className="flex flex-col gap-5">
+      <FloatField label="Storage Provider">
         <select className={inputClass} value={data.storageProvider} onChange={e => patch('storageProvider', e.target.value)}>
           <option value="local">Local</option>
           <option value="s3">Amazon S3</option>
           <option value="gcs">Google Cloud Storage</option>
         </select>
-      </Field>
-      <Field label="Max File Size (MB)"><input className={inputSmClass} type="number" value={data.maxFileSizeMb} onChange={e => patch('maxFileSizeMb', +e.target.value)} /></Field>
-      <Field label="Allowed File Types"><input className={inputClass} value={data.allowedFileTypes.join(', ')} onChange={e => patch('allowedFileTypes', e.target.value.split(',').map(s => s.trim()))} placeholder="pdf, jpg, png…" /></Field>
+      </FloatField>
+      <FloatField label="Max File Size (MB)">
+        <input className={inputSmClass} type="number" value={data.maxFileSizeMb} onChange={e => patch('maxFileSizeMb', +e.target.value)} placeholder=" " />
+      </FloatField>
+      <FloatField label="Allowed File Types">
+        <input className={inputClass} value={data.allowedFileTypes.join(', ')} onChange={e => patch('allowedFileTypes', e.target.value.split(',').map(s => s.trim()))} placeholder=" " />
+      </FloatField>
     </div>
   );
 }

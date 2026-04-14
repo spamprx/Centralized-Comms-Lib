@@ -189,6 +189,342 @@
     animation: app-shimmer 1.2s ease-in-out;
   }
 
+   /* ─── Admin Panel: Obsidian Glass Utilities ──────────────────────────── */
+
+  .admin-glass {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .admin-glass-button {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+  }
+
+  .admin-glass-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 0 20px rgba(147, 124, 248, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .admin-btn-lift {
+    transition: all 0.15s ease;
+  }
+
+  .admin-btn-lift:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .admin-noise {
+    position: relative;
+  }
+
+  .admin-noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 128px 128px;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  /* Status dots */
+  .admin-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .admin-status-dot--active {
+    background: #34d399;
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+    animation: admin-pulse-dot 2s ease-in-out infinite;
+  }
+
+  .admin-status-dot--pending {
+    background: #fbbf24;
+    box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
+  }
+
+  .admin-status-dot--suspended {
+    background: #f87171;
+    box-shadow: 0 0 4px rgba(248, 113, 113, 0.35);
+  }
+
+  .admin-status-dot--inactive {
+    background: #6b7280;
+  }
+
+  @keyframes admin-pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(52, 211, 153, 0.5); }
+    50% { opacity: 0.6; box-shadow: 0 0 12px rgba(52, 211, 153, 0.7); }
+  }
+
+  /* Staggered row entrance — applied via inline style --row-index */
+  .admin-row-enter {
+    animation: admin-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--row-index, 0) * 30ms);
+  }
+
+  @keyframes admin-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Floating label input */
+  .admin-float-field {
+    position: relative;
+  }
+
+  .admin-float-field input,
+  .admin-float-field textarea,
+  .admin-float-field select {
+    padding-top: 1.25rem;
+  }
+
+  .admin-float-field label {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--color-app-faint, #5a6178);
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    transform-origin: left center;
+  }
+
+  .admin-float-field textarea ~ label {
+    top: 1rem;
+    transform: translateY(0);
+  }
+
+  .admin-float-field input:focus ~ label,
+  .admin-float-field input:not(:placeholder-shown) ~ label,
+  .admin-float-field textarea:focus ~ label,
+  .admin-float-field textarea:not(:placeholder-shown) ~ label,
+  .admin-float-field select:focus ~ label,
+  .admin-float-field select:valid ~ label {
+    top: 0.35rem;
+    transform: translateY(0) scale(0.8);
+    color: var(--color-app-accent, #937cf8);
+  }
+
+  /* iOS-style toggle */
+  .admin-toggle {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .admin-toggle[aria-checked="true"] {
+    background-color: var(--color-app-accent, #937cf8);
+  }
+
+  .admin-toggle .admin-toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .admin-toggle[aria-checked="true"] .admin-toggle-knob {
+    transform: translateX(20px);
+  }
+
+  /* Modal entrance */
+  .admin-modal-enter {
+    animation: admin-modal-scale-in 0.12s ease-out both;
+  }
+
+  @keyframes admin-modal-scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .admin-modal-backdrop {
+    animation: admin-backdrop-fade 0.15s ease-out both;
+  }
+
+  @keyframes admin-backdrop-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Card hover glow */
+  .admin-card-hover {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .admin-card-hover:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.02), 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Gradient border card (for KPI cards) */
+  .admin-gradient-border {
+    position: relative;
+    background: var(--color-app-bg-subtle, #0c0f16);
+    border-radius: 1rem;
+    padding: 1px;
+  }
+
+  .admin-gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      var(--gradient-from, rgba(147, 124, 248, 0.4)),
+      var(--gradient-to, rgba(45, 212, 191, 0.2))
+    );
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+  }
+
+  .admin-gradient-border > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Recency progress bar */
+  .admin-recency-bar {
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .admin-recency-bar-fill {
+    height: 100%;
+    border-radius: 1px;
+    background: var(--color-app-accent, #937cf8);
+    transition: width 0.5s ease;
+  }
+
+  /* Unsaved changes bar */
+  .admin-unsaved-bar {
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: admin-fade-up 0.25s ease both;
+  }
+
+  /* Timeline connector for activity log */
+  .admin-timeline-item {
+    position: relative;
+    padding-left: 2rem;
+  }
+
+  .admin-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 20px;
+    bottom: -12px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .admin-timeline-item:last-child::before {
+    display: none;
+  }
+
+  .admin-timeline-dot {
+    position: absolute;
+    left: 0;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid;
+    background: var(--color-app-bg, #080a0f);
+  }
+
+  /* Pill toggle switcher */
+  .admin-pill-toggle {
+    position: relative;
+    display: inline-flex;
+    gap: 0;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .admin-pill-toggle-indicator {
+    position: absolute;
+    top: 3px;
+    height: calc(100% - 6px);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    transition: left 0.25s cubic-bezier(0.22, 1, 0.36, 1), width 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 0;
+  }
+
+  .admin-pill-toggle button {
+    position: relative;
+    z-index: 1;
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    color: var(--color-app-muted, #8f96ad);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 7px;
+    transition: color 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .admin-pill-toggle button[data-active="true"] {
+    color: var(--color-app-text, #eceef4);
+  }
+
   .tiptap-content .ProseMirror {
     @apply whitespace-pre-wrap outline-none;
   }

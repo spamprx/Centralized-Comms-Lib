@@ -11,7 +11,7 @@ interface RoleModalProps {
 const RESOURCES = ['users', 'roles', 'content', 'reports', 'settings', 'analytics', 'groups'];
 const ACTIONS = ['create', 'read', 'update', 'delete', 'manage'] as const;
 
-const inputClass = "w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] outline-none transition-colors duration-150 focus:border-app-accent/50 resize-y";
+const inputClass = "w-full px-3 py-3 bg-app-surface border border-app-border rounded-xl text-app-text text-[13px] outline-none transition-all duration-200 focus:border-app-accent/40 focus:shadow-[0_0_0_3px_rgba(147,124,248,0.06)] resize-y placeholder-transparent";
 
 export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
   const [formData, setFormData] = useState({
@@ -67,41 +67,45 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#1a1d29] border border-app-border rounded-xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto shadow-[0_20px_60px_rgba(0,0,0,0.4)]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-5 border-b border-app-border">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm admin-modal-backdrop" onClick={onClose}>
+      <div
+        className="admin-glass rounded-2xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto shadow-app-soft admin-modal-enter"
+        style={{ background: 'rgba(15, 20, 32, 0.92)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
           <h2 className="m-0 text-lg font-semibold text-app-text">{role ? 'Edit Role' : 'Create Role'}</h2>
-          <button className="bg-transparent border-none text-app-faint cursor-pointer p-1 flex rounded hover:bg-app-surface-hover hover:text-app-text" onClick={onClose}><X size={18} /></button>
+          <button className="bg-transparent border-none text-app-faint cursor-pointer p-1.5 flex rounded-lg hover:bg-app-surface-hover hover:text-app-text transition-colors" onClick={onClose}><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
-          {error && <div className="bg-red-400/10 border border-red-400/30 rounded-lg p-3 text-red-400 text-[13px] mb-4">{error}</div>}
+          {error && <div className="bg-red-400/10 border border-red-400/25 rounded-xl p-3 text-red-400 text-[13px] mb-4">{error}</div>}
 
-          <div className="mb-5">
-            <label className="block text-[13px] font-medium text-app-muted mb-2">Role Name</label>
-            <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Content Manager" required className={inputClass} />
+          <div className="mb-5 admin-float-field">
+            <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder=" " required className={inputClass} />
+            <label>Role Name</label>
           </div>
 
-          <div className="mb-5">
-            <label className="block text-[13px] font-medium text-app-muted mb-2">Description</label>
-            <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the role's purpose..." rows={3} required className={inputClass} />
+          <div className="mb-5 admin-float-field">
+            <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder=" " rows={3} required className={inputClass} />
+            <label>Description</label>
           </div>
 
           <div className="mb-5">
             <label className="block text-[13px] font-medium text-app-muted mb-2">Permissions</label>
-            <div className="border border-app-border rounded-lg overflow-hidden">
-              <div className="grid grid-cols-[120px_repeat(5,1fr)] gap-px bg-app-surface px-3 py-2.5 text-[11px] font-semibold uppercase text-app-faint tracking-wide">
+            <div className="admin-glass rounded-xl overflow-hidden">
+              <div className="grid grid-cols-[120px_repeat(5,1fr)] gap-px px-3 py-2.5 text-[11px] font-semibold uppercase text-app-faint tracking-wide border-b border-white/[0.04]">
                 <span>Resource</span>
                 {ACTIONS.map(action => (
                   <span key={action} className="flex items-center justify-center text-center">{action}</span>
                 ))}
               </div>
               {RESOURCES.map((resource, i) => (
-                <div key={resource} className={`grid grid-cols-[120px_repeat(5,1fr)] gap-px px-3 py-2 items-center ${i % 2 === 0 ? 'bg-app-surface' : 'bg-app-bg/60'}`}>
+                <div key={resource} className={`grid grid-cols-[120px_repeat(5,1fr)] gap-px px-3 py-2.5 items-center transition-colors duration-100 hover:bg-app-surface-hover ${i < RESOURCES.length - 1 ? 'border-b border-white/[0.03]' : ''}`}>
                   <span className="text-xs font-medium text-app-muted capitalize">{resource}</span>
                   {ACTIONS.map(action => (
                     <label key={action} className="flex items-center justify-center">
-                      <input type="checkbox" checked={hasPermission(resource, action)} onChange={() => togglePermission(resource, action)} className="accent-teal-600 cursor-pointer w-4 h-4" />
+                      <input type="checkbox" checked={hasPermission(resource, action)} onChange={() => togglePermission(resource, action)} className="accent-app-accent cursor-pointer w-4 h-4" />
                     </label>
                   ))}
                 </div>
@@ -109,11 +113,15 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
             </div>
           </div>
 
-          <div className="flex gap-2.5 justify-end mt-6 pt-5 border-t border-app-border">
-            <button type="button" className="px-5 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer transition-all duration-150 hover:bg-app-surface-hover hover:text-app-text" onClick={onClose}>
+          <div className="flex gap-2.5 justify-end mt-6 pt-5 border-t border-white/[0.06]">
+            <button type="button" className="px-5 py-2.5 admin-glass-button rounded-xl text-app-muted text-[13px]" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="px-5 py-2.5 bg-app-accent-muted border border-app-accent/30 rounded-lg text-app-accent text-[13px] font-medium cursor-pointer transition-all duration-150 hover:bg-app-accent/20 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
+            <button
+              type="submit"
+              className="px-5 py-2.5 bg-app-accent-muted border border-app-accent/30 rounded-xl text-app-accent text-[13px] font-medium cursor-pointer admin-btn-lift transition-all duration-150 hover:bg-app-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               {loading ? 'Saving...' : (role ? 'Update Role' : 'Create Role')}
             </button>
           </div>

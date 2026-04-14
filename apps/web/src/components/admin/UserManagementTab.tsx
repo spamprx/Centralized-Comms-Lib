@@ -40,18 +40,23 @@ export default function UserManagementTab() {
   if (error) return (
     <div className="flex flex-col items-center gap-3 p-12 text-red-400 text-sm">
       <p>⚠ {error}</p>
-      <button onClick={refetch} className="px-4 py-1.5 bg-app-elevated border border-app-border rounded-md text-app-text cursor-pointer">Retry</button>
+      <button onClick={refetch} className="px-4 py-1.5 admin-glass-button rounded-lg text-app-text">Retry</button>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold text-app-text mb-1">Users</h2>
           <p className="text-[13px] text-app-faint m-0">Manage accounts, roles, and permissions</p>
         </div>
-        <button className="flex items-center gap-1.5 px-3.5 py-2 bg-app-accent-muted border border-app-accent/30 rounded-lg text-app-accent text-[13px] font-medium cursor-pointer hover:bg-app-accent/20" onClick={() => setShowInviteModal(true)}><Plus size={14} /> Invite user</button>
+        <button
+          className="flex items-center gap-1.5 px-3.5 py-2 admin-glass-button rounded-xl text-app-accent text-[13px] font-medium"
+          onClick={() => setShowInviteModal(true)}
+        >
+          <Plus size={14} /> Invite user
+        </button>
       </div>
 
       <SearchAndFilterBar 
@@ -74,9 +79,23 @@ export default function UserManagementTab() {
 
       {pagination.total > pagination.limit && (
         <div className="flex items-center justify-center gap-4 pt-2">
-          <button className="px-3.5 py-1.5 bg-app-surface border border-app-border rounded-md text-app-muted text-[13px] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" disabled={pagination.page === 1} onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}>← Prev</button>
-          <span className="text-[13px] text-app-faint">Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}</span>
-          <button className="px-3.5 py-1.5 bg-app-surface border border-app-border rounded-md text-app-muted text-[13px] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)} onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}>Next →</button>
+          <button
+            className="px-4 py-2 admin-glass-button rounded-lg text-app-muted text-[13px] disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={pagination.page === 1}
+            onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+          >
+            ← Prev
+          </button>
+          <span className="text-[13px] text-app-faint">
+            Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}
+          </span>
+          <button
+            className="px-4 py-2 admin-glass-button rounded-lg text-app-muted text-[13px] disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
+            onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+          >
+            Next →
+          </button>
         </div>
       )}
 
@@ -98,7 +117,7 @@ export default function UserManagementTab() {
       )}
 
       {showPasswordResetToast && (
-        <div className="fixed bottom-6 right-6 bg-[#1a1d29] border border-emerald-400/30 rounded-lg px-5 py-3 text-emerald-400 text-[13px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] animate-[slideIn_0.3s_ease-out]">
+        <div className="fixed bottom-6 right-6 admin-glass rounded-xl px-5 py-3 text-emerald-400 text-[13px] shadow-app-soft admin-modal-enter">
           <span>✓ Password reset email sent</span>
         </div>
       )}

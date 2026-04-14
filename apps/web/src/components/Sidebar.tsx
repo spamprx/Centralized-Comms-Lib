@@ -64,9 +64,8 @@ export default function Sidebar() {
                 key={cat.label}
                 to={item.path}
                 title={item.label}
-                className={`group ${iconSlotBase} ${iconSlotIdle} focus-visible:outline-offset-2 ${
-                  active ? iconSlotActive : ""
-                }`}
+                className={`group ${iconSlotBase} ${iconSlotIdle} focus-visible:outline-offset-2 ${active ? iconSlotActive : ""
+                  }`}
               >
                 {active ? (
                   <span
@@ -89,9 +88,8 @@ export default function Sidebar() {
                 aria-haspopup="true"
                 onClick={() => setOpenDropdown(isOpen ? null : cat.label)}
                 title={cat.label}
-                className={`group ${iconSlotBase} w-full ${iconSlotIdle} focus-visible:outline-offset-2 ${
-                  isOpen ? iconSlotActive : ""
-                }`}
+                className={`group ${iconSlotBase} w-full ${iconSlotIdle} focus-visible:outline-offset-2 ${isOpen ? iconSlotActive : ""
+                  }`}
               >
                 {isOpen ? (
                   <span
@@ -122,11 +120,10 @@ export default function Sidebar() {
                           role="menuitem"
                           to={item.path}
                           onClick={() => setOpenDropdown(null)}
-                          className={`block px-4 py-2.5 text-sm transition-colors hover:bg-app-surface-hover hover:text-app-text ${
-                            active
+                          className={`block px-4 py-2.5 text-sm transition-colors hover:bg-app-surface-hover hover:text-app-text ${active
                               ? "bg-app-accent-muted font-medium text-app-accent-hover"
                               : "text-app-muted"
-                          }`}
+                            }`}
                         >
                           {item.label}
                         </Link>
@@ -164,11 +161,10 @@ export default function Sidebar() {
               key={`${cat.label}-${item.path}`}
               to={item.path}
               onClick={() => setMobileOpen(false)}
-              className={`rounded-app-md px-3 py-2.5 text-sm font-medium transition-all ${
-                active
+              className={`rounded-app-md px-3 py-2.5 text-sm font-medium transition-all ${active
                   ? "bg-app-accent-muted text-app-accent-hover shadow-app-soft"
                   : "text-app-muted hover:bg-app-surface-hover hover:text-app-text"
-              }`}
+                }`}
             >
               {item.label}
             </Link>
