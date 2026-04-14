@@ -1,31 +1,47 @@
-// Token store using cookies for persistence and in-memory cache for fast access.
+// Token store using sessionStorage for persistence and in-memory cache for fast access.
+// This keeps the session intact across refreshes, but clears on tab/browser close.
 // The JWT payload contains user info (id, email, role), so no separate user storage is needed.
 
 let _token: string | null = null;
 
-/** Parse a cookie value by name from document.cookie */
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
+const STORAGE_KEY = 'auth_token';
+
+function canUseSessionStorage(): boolean {
+  try {
+    return !!globalThis.window?.sessionStorage;
+  } catch {
+    return false;
+  }
 }
 
-/** Store the token in a cookie and in-memory cache */
+/** Store the token in sessionStorage and in-memory cache */
 export function setAuthToken(token: string | null) {
   _token = token;
-  if (token) {
-    document.cookie = `auth_token=${encodeURIComponent(token)}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`;
-  } else {
+  if (canUseSessionStorage()) {
+    try {
+      if (token) globalThis.window!.sessionStorage.setItem(STORAGE_KEY, token);
+      else globalThis.window!.sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore (storage disabled)
+    }
+  }
+
+  // Backward-compat cleanup: if an older build set a cookie, clear it.
+  if (token === null) {
     document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
   }
 }
 
-/** Get the token — from memory first, then fall back to cookie */
+/** Get the token — from memory first, then fall back to sessionStorage */
 export function getAuthToken(): string | null {
   if (_token) return _token;
-  // Restore from cookie on first access (e.g. after page refresh)
-  const cookieToken = getCookie('auth_token');
-  if (cookieToken) {
-    _token = cookieToken;
+  if (canUseSessionStorage()) {
+    try {
+      const stored = globalThis.window!.sessionStorage.getItem(STORAGE_KEY);
+      if (stored) _token = stored;
+    } catch {
+      // ignore
+    }
   }
   return _token;
 }

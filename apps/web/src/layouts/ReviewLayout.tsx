@@ -6,6 +6,7 @@ import { contentService } from '../services/contentService';
 import { adminUserService } from '../services/adminService';
 import { useReviewStore } from '../store/reviewStore';
 import { Surface } from '../components/ui/Surface';
+import TipTapReadonly from '../components/editor/TipTapReadonly';
 
 const screeningData = {
   score: 85,
@@ -25,7 +26,7 @@ type ReviewItem = {
   submittedAt: string;
   status: string;
   contentId: string;
-  contentBody?: string;
+  contentBody?: unknown;
   requestedBy: string;
   verdict?: 'APPROVED' | 'DENIED';
   savedComment?: string;
@@ -149,7 +150,7 @@ export default function ReviewLayout() {
       try {
         setLoadingContent(true);
         const details = await contentService.getById(selectedItem.contentId);
-        let bodyText = `${selectedItem.title}\n\nThis content is pending your review.`;
+        let bodyDoc: unknown = null;
 
         const versions = details.versions;
         if (versions && versions.length > 0) {
@@ -161,31 +162,18 @@ export default function ReviewLayout() {
             : null;
 
           if (versionWithBody) {
-            const body = (versionWithBody as unknown as { body?: { type: string; content: unknown[] } })?.body;
-            if (body && typeof body === 'object' && 'content' in body) {
-              const extractText = (node: unknown): string => {
-                if (!node || typeof node !== 'object') return '';
-                const n = node as { type?: string; text?: string; content?: unknown[] };
-                if (n.type === 'text' && n.text) return n.text;
-                if (Array.isArray(n.content)) return n.content.map(extractText).join('');
-                return '';
-              };
-              const paragraphs = (body.content as unknown[]).map(extractText).filter(Boolean);
-              if (paragraphs.length > 0) {
-                bodyText = paragraphs.join('\n\n');
-              }
-            }
+            bodyDoc = (versionWithBody as unknown as { body?: unknown })?.body ?? null;
           }
         }
 
         setSelectedItem((prev) =>
           prev && prev.contentId === selectedItem.contentId
-            ? { ...prev, contentBody: bodyText }
+            ? { ...prev, contentBody: bodyDoc }
             : prev
         );
       } catch {
         setSelectedItem((prev) =>
-          prev ? { ...prev, contentBody: 'Unable to load content.' } : prev
+          prev ? { ...prev, contentBody: null } : prev
         );
       } finally {
         setLoadingContent(false);
@@ -461,9 +449,21 @@ export default function ReviewLayout() {
               <div className="h-px bg-app-elevated mb-6" />
 
               {/* Content body */}
-              <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[15px] leading-relaxed text-app-muted">
-                {selectedItem?.contentBody || 'Loading content...'}
-              </pre>
+              {selectedItem?.contentBody &&
+              typeof selectedItem.contentBody === 'object' &&
+              selectedItem.contentBody !== null &&
+              'type' in (selectedItem.contentBody as Record<string, unknown>) ? (
+                <div className="tiptap-content">
+                  <TipTapReadonly
+                    doc={selectedItem.contentBody as any}
+                    className="ProseMirror text-[15px] leading-relaxed text-app-muted outline-none"
+                  />
+                </div>
+              ) : (
+                <p className="m-0 text-[13px] leading-relaxed text-app-faint">
+                  {loadingContent ? 'Loading content…' : 'No body captured for this submission.'}
+                </p>
+              )}
             </Surface>
           )}
         </div>

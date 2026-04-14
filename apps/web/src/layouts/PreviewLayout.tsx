@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Monitor, Smartphone, Tablet, ChevronLeft, Share2, Download } from 'lucide-react';
 import { Surface } from '../components/ui/Surface';
+import { contentService } from '../services/contentService';
+import TipTapReadonly from '../components/editor/TipTapReadonly';
 
 const channels = [
   { id: 'web', name: 'Web', icon: Monitor },
@@ -8,26 +11,14 @@ const channels = [
   { id: 'tablet', name: 'Tablet', icon: Tablet },
 ];
 
-const mockContent = {
-  title: 'Getting Started with Our Platform',
-  sections: [
-    { type: 'heading', content: 'Welcome to the Platform' },
-    {
-      type: 'paragraph',
-      content:
-        'This is a preview of your content. You can see how it will appear across different channels and devices.',
-    },
-    { type: 'list', items: ['Easy to use interface', 'Powerful features', 'Great support'] },
-    {
-      type: 'paragraph',
-      content:
-        'Use the channel switcher above to see how your content adapts to different screen sizes and formats.',
-    },
-  ],
-};
-
 export default function PreviewLayout() {
+  const { contentId } = useParams<{ contentId: string }>();
+  const navigate = useNavigate();
   const [activeChannel, setActiveChannel] = useState('web');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [title, setTitle] = useState('Preview');
+  const [bodyDoc, setBodyDoc] = useState<unknown>(null);
 
   const getPreviewWidth = () => {
     switch (activeChannel) {
@@ -40,12 +31,53 @@ export default function PreviewLayout() {
     }
   };
 
+  useEffect(() => {
+    if (!contentId) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    void (async () => {
+      try {
+        const details = await contentService.getById(contentId);
+        if (cancelled) return;
+        setTitle(details.content.title || 'Untitled');
+        const bodyVersions = (details.versions ?? []).filter(
+          (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+        );
+        if (bodyVersions.length === 0) {
+          setBodyDoc(null);
+        } else {
+          const latestWithBody = bodyVersions.reduce((prev, curr) =>
+            curr.versionNumber > prev.versionNumber ? curr : prev,
+          );
+          setBodyDoc(latestWithBody.body ?? null);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setLoadError(e instanceof Error ? e.message : 'Failed to load content');
+        setTitle('Unable to load');
+        setBodyDoc(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  const hasTipTapDoc = useMemo(
+    () => bodyDoc && typeof bodyDoc === 'object' && bodyDoc !== null && 'type' in (bodyDoc as Record<string, unknown>),
+    [bodyDoc],
+  );
+
   return (
     <div className="flex h-screen min-h-0 flex-col bg-app-bg">
       <header className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <button
             type="button"
+            onClick={() => navigate(-1)}
             className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-app-elevated hover:text-app-text"
             aria-label="Back"
           >
@@ -53,7 +85,7 @@ export default function PreviewLayout() {
           </button>
           <h1 className="m-0 shrink-0 text-sm font-semibold text-app-text sm:text-base">Preview</h1>
           <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
-          <span className="min-w-0 truncate text-[13px] text-app-muted">{mockContent.title}</span>
+          <span className="min-w-0 truncate text-[13px] text-app-muted">{title}</span>
         </div>
 
         <div className="flex rounded-app-lg border border-app-border/80 bg-app-bg/40 p-1">
@@ -100,39 +132,25 @@ export default function PreviewLayout() {
               }`}
             >
               <div className="bg-gradient-to-br from-app-accent to-app-accent-2 px-6 py-6 text-white sm:px-8 sm:py-8">
-                <h1 className="mb-2 text-2xl font-bold">{mockContent.title}</h1>
+                <h1 className="mb-2 text-2xl font-bold">{title}</h1>
                 <p className="m-0 text-[13px] text-white/85">Last updated: March 11, 2026</p>
               </div>
 
               <div className="p-6 sm:p-8">
-                {mockContent.sections.map((section, index) => {
-                  if (section.type === 'heading') {
-                    return (
-                      <h2 key={index} className="mb-4 text-xl font-semibold text-app-text">
-                        {section.content}
-                      </h2>
-                    );
-                  }
-                  if (section.type === 'paragraph') {
-                    return (
-                      <p key={index} className="mb-4 text-[15px] leading-relaxed text-app-muted">
-                        {section.content}
-                      </p>
-                    );
-                  }
-                  if (section.type === 'list') {
-                    return (
-                      <ul key={index} className="mb-4 ml-5 list-disc p-0 marker:text-app-accent">
-                        {section.items?.map((item, i) => (
-                          <li key={i} className="mb-2 text-[15px] leading-relaxed text-app-muted">
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                    );
-                  }
-                  return null;
-                })}
+                {loadError ? (
+                  <p className="m-0 text-sm text-red-300">{loadError}</p>
+                ) : loading ? (
+                  <p className="m-0 text-sm text-app-faint">Loading preview…</p>
+                ) : hasTipTapDoc ? (
+                  <div className="tiptap-content">
+                    <TipTapReadonly
+                      doc={bodyDoc as any}
+                      className="ProseMirror text-app-muted leading-relaxed outline-none"
+                    />
+                  </div>
+                ) : (
+                  <p className="m-0 text-sm text-app-faint">No saved body found for this item.</p>
+                )}
               </div>
 
               <div className="border-t border-app-border/80 bg-app-surface/50 px-6 py-4 sm:px-8">

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMyContent } from '../hooks/useMyContent';
 import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send, MessageCircle, History } from 'lucide-react';
 import { contentService } from '../services/contentService';
@@ -32,8 +32,25 @@ export default function MyContentLayout() {
   const { contentItems, stats, loading, searchQuery, setSearchQuery, statusFilter, setStatusFilter, refreshContent } = useMyContent();
   const [sortBy, setSortBy] = useState('lastModified');
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [reviewModalItem, setReviewModalItem] = useState<{ id: string; title: string } | null>(null);
   const [feedbackModalItem, setFeedbackModalItem] = useState<{ id: string; title: string } | null>(null);
+  const navigate = useNavigate();
+
+  const sortedItems = useMemo(() => {
+    const items = [...contentItems];
+    switch (sortBy) {
+      case 'createdAt':
+        return items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      case 'title':
+        return items.sort((a, b) => a.title.localeCompare(b.title));
+      case 'views':
+        return items.sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+      case 'lastModified':
+      default:
+        return items.sort((a, b) => +new Date(b.lastModified) - +new Date(a.lastModified));
+    }
+  }, [contentItems, sortBy]);
 
   const handleSubmitForReview = async (itemId: string) => {
     setSubmittingId(itemId);
@@ -44,6 +61,31 @@ export default function MyContentLayout() {
       console.error('Failed to submit for review:', err);
     } finally {
       setSubmittingId(null);
+    }
+  };
+
+  const handleDelete = async (itemId: string, title: string) => {
+    const ok = globalThis.window?.confirm(`Delete "${title}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await contentService.delete(itemId);
+      await refreshContent();
+    } catch (err) {
+      console.error('Failed to delete content:', err);
+    }
+  };
+
+  const handleCreateContent = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const r = await contentService.createDraft('Untitled draft', undefined, { contentType: 'ARTICLE' });
+      await refreshContent();
+      navigate(`/editor/${r.content.id}`);
+    } catch (err) {
+      console.error('Failed to create content:', err);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -67,39 +109,26 @@ export default function MyContentLayout() {
       <PageHeader
         title="My content"
         description="Manage and track everything you own."
+        actions={
+          <button
+            type="button"
+            onClick={() => void handleCreateContent()}
+            disabled={creating}
+            className={`inline-flex h-10 items-center justify-center rounded-app-lg border border-app-accent/35 bg-app-accent-muted px-4 py-2.5 text-[13px] font-semibold text-app-accent shadow-sm transition-colors hover:bg-app-accent/20 ${
+              creating ? 'cursor-not-allowed opacity-70' : ''
+            }`}
+            title="Create a new draft"
+          >
+            {creating ? 'Creating…' : 'Create content'}
+          </button>
+        }
       />
 
       <div className="animate-fade-in space-y-6">
-      {/* Stats Cards */}
-      <div className="flex flex-wrap gap-4">
-        {stats.map((stat, i) => (
-          <Surface
-            key={i}
-            padding="sm"
-            className="min-w-[160px] flex-1 transition-transform duration-200 hover:-translate-y-0.5"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-app-faint">{stat.label}</span>
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-app-md"
-                style={{ background: `${stat.color}22`, color: stat.color }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  {stat.icon === 'content' && <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /></>}
-                  {stat.icon === 'published' && <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>}
-                  {stat.icon === 'review' && <><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></>}
-                  {stat.icon === 'views' && <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>}
-                </svg>
-              </div>
-            </div>
-            <div className="text-2xl font-bold tracking-tight text-app-text">{stat.value}</div>
-          </Surface>
-        ))}
-      </div>
-
-      {/* Search & Filter */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative min-w-[250px] flex-1">
+      {/* Filters + compact stats row */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-[260px] flex-1">
           <input
             type="text"
             value={searchQuery}
@@ -107,30 +136,75 @@ export default function MyContentLayout() {
             placeholder="Search your content..."
             className={`${formInputClass} py-2.5 text-[13px]`}
           />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`${formSelectClass} w-auto min-w-[10rem] py-2.5 text-[13px]`}
+            aria-label="Filter by status"
+          >
+            <option value="all">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="in_review">In Review</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className={`${formSelectClass} w-auto min-w-[11rem] py-2.5 text-[13px]`}
+            aria-label="Sort by"
+          >
+            <option value="lastModified">Last Modified</option>
+            <option value="createdAt">Date Created</option>
+            <option value="views">Most Views</option>
+            <option value="title">Title A-Z</option>
+          </select>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className={`${formSelectClass} w-auto min-w-[10rem] py-2.5 text-[13px]`}
-          aria-label="Filter by status"
-        >
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option>
-          <option value="in_review">In Review</option>
-          <option value="published">Published</option>
-          <option value="archived">Archived</option>
-        </select>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className={`${formSelectClass} w-auto min-w-[11rem] py-2.5 text-[13px]`}
-          aria-label="Sort by"
-        >
-          <option value="lastModified">Last Modified</option>
-          <option value="createdAt">Date Created</option>
-          <option value="views">Most Views</option>
-          <option value="title">Title A-Z</option>
-        </select>
+
+        <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+          {stats.map((stat) => (
+            <Surface
+              key={stat.label}
+              padding="sm"
+              className="min-w-[150px] flex-1 lg:flex-none lg:min-w-[170px]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-app-faint">
+                    {stat.label}
+                  </div>
+                  <div className="text-[16px] font-bold tracking-tight text-app-text">
+                    {stat.value}
+                  </div>
+                </div>
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-app-md"
+                  style={{ background: `${stat.color}22`, color: stat.color }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {stat.icon === 'content' ? <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /> : null}
+                    {stat.icon === 'published' ? (
+                      <>
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </>
+                    ) : null}
+                    {stat.icon === 'review' ? (
+                      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                    ) : null}
+                    {stat.icon === 'views' ? (
+                      <>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    ) : null}
+                  </svg>
+                </div>
+              </div>
+            </Surface>
+          ))}
+        </div>
       </div>
 
       {/* Content Table */}
@@ -148,7 +222,7 @@ export default function MyContentLayout() {
             </tr>
           </thead>
           <tbody>
-            {contentItems.map((item) => {
+            {sortedItems.map((item) => {
               const TypeIcon = typeIcons[item.type];
               return (
                 <tr key={item.id} className="border-b border-app-border/60 transition-colors hover:bg-app-surface/40">
@@ -230,13 +304,28 @@ export default function MyContentLayout() {
                       >
                         <History size={14} />
                       </Link>
-                      <button type="button" className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text" title="Edit">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/editor/${item.id}`)}
+                        className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                        title="Edit"
+                      >
                         <Edit2 size={14} />
                       </button>
-                      <button type="button" className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text" title="View">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/preview/${item.id}`)}
+                        className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                        title="View"
+                      >
                         <Eye size={14} />
                       </button>
-                      <button type="button" className="rounded-app-md p-1.5 text-red-400 transition-colors hover:bg-red-500/10" title="Delete">
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(item.id, item.title)}
+                        className="rounded-app-md p-1.5 text-red-400 transition-colors hover:bg-red-500/10"
+                        title="Delete"
+                      >
                         <Trash2 size={14} />
                       </button>
                     </div>

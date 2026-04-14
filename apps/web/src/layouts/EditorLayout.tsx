@@ -38,6 +38,7 @@ import CitationSearchDialog from '../components/editor/CitationSearchDialog';
 import ComponentLibraryPanel from '../components/editor/ComponentLibraryPanel';
 import SlashCommandMenu from '../components/editor/SlashCommandMenu';
 import UseTemplateDialog from '../components/editor/UseTemplateDialog';
+import TipTapReadonly from '../components/editor/TipTapReadonly';
 import {
   emptyReferencesSectionHtml,
   hasBibliographySection,
@@ -46,7 +47,8 @@ import {
 } from '../lib/citationMarkers';
 import { CitationMarker, citationMarkLabel } from '../tiptap/CitationMarker';
 import { ComponentReference } from '../tiptap/ComponentReference';
-import { tipTapDocFromTemplateRecord } from '../lib/templateToTipTapDoc';
+import { layoutConfigToTipTapDoc, templateLayoutDocExtensions } from '../tiptap/templateLayoutDoc';
+import { parseTemplateLayout } from '../lib/templateLayout/layoutConfig';
 import type { TemplateRecord } from '../services/templateCrudService';
 
 type CitationItem = {
@@ -104,6 +106,9 @@ export default function EditorLayout() {
   const [showUseTemplateDialog, setShowUseTemplateDialog] = useState(false);
   /** Passed to create draft only for new content (first save) so formatting rules bind to the template. */
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const [contentType, setContentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>('ARTICLE');
+  const [lifecycleState, setLifecycleState] = useState<'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT');
+  const hydratedIdRef = useRef<string | null>(null);
 
   const persistedContentId = useMemo(
     () => contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null),
@@ -132,6 +137,7 @@ export default function EditorLayout() {
       Underline,
       CitationMarker,
       ComponentReference,
+      ...templateLayoutDocExtensions,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -158,7 +164,87 @@ export default function EditorLayout() {
           'editor-prose min-h-[360px] px-8 py-6 text-[15px] leading-relaxed text-[var(--editor-doc-text)] outline-none box-border',
       },
     },
-  });
+  }, []);
+
+  // When opening an existing content item (`/editor/:contentId`), hydrate the editor from the latest saved body.
+  // Without this, the editor starts blank and a "Save Draft" would create a new content item, making it look
+  // like history was lost after a restore.
+  useEffect(() => {
+    const id = routeContentId && routeContentId !== 'new' ? routeContentId : null;
+    if (!id) return;
+    if (!editor) return;
+    // Always hydrate when the route id changes; the editor store may contain a previous draft.
+    if (hydratedIdRef.current === id) return;
+
+    let cancelled = false;
+    setSaveError(null);
+    setContentId(id);
+
+    void (async () => {
+      try {
+        const details = await contentService.getById(id);
+        if (cancelled) return;
+
+        const nextTitle = details.content.title || 'Untitled';
+        const nextType = details.content.contentType ?? 'ARTICLE';
+        const nextLifecycle = details.content.lifecycleState ?? 'DRAFT';
+        const bodyVersions = (details.versions ?? []).filter(
+          (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+        );
+        const latestWithBody =
+          bodyVersions.length > 0
+            ? bodyVersions.reduce((prev, curr) => (curr.versionNumber > prev.versionNumber ? curr : prev))
+            : null;
+        const doc = latestWithBody?.body ?? ({ type: 'doc', content: [{ type: 'paragraph' }] } as const);
+
+        setTitle(nextTitle);
+        setContentType(nextType);
+        setLifecycleState(nextLifecycle);
+        editor.commands.setContent(doc as any);
+        const html = editor.getHTML();
+        setContent(html);
+        setSavedSnapshot({ title: nextTitle.trim(), content: html });
+        setLastSaved(new Date());
+        hydratedIdRef.current = id;
+      } catch (e) {
+        if (cancelled) return;
+        setSaveError(e instanceof Error ? e.message : 'Failed to load content');
+      } finally {
+        // no-op
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routeContentId, editor]);
+
+  const isPublished = lifecycleState === 'PUBLISHED';
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(!isPublished);
+  }, [editor, isPublished]);
+
+  const handleConvertToDraft = useCallback(async () => {
+    const id = persistedContentId;
+    if (!id) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const updated = await contentService.transitionState(id, 'DRAFT');
+      setLifecycleState(updated.lifecycleState ?? 'DRAFT');
+      // Re-hydrate from server so title/body/type stay consistent.
+      hydratedIdRef.current = null;
+      const details = await contentService.getById(id);
+      setTitle(details.content.title || 'Untitled');
+      setContentType(details.content.contentType ?? 'ARTICLE');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to convert to draft');
+    } finally {
+      setSaving(false);
+    }
+  }, [persistedContentId]);
 
   useEffect(() => {
     if (!editor) return;
@@ -172,13 +258,6 @@ export default function EditorLayout() {
       editor.off('update', updateCount);
     };
   }, [editor]);
-
-  useEffect(() => {
-    if (!editor) return;
-    if (editor.getHTML() !== content) {
-      editor.commands.setContent(content);
-    }
-  }, [content, editor]);
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) {
@@ -194,11 +273,12 @@ export default function EditorLayout() {
       if (!contentId) {
         const result = await contentService.createDraft(title.trim(), bodyDoc, {
           templateId: pendingTemplateId ?? undefined,
+          contentType,
         });
         setContentId(result.content.id);
         setPendingTemplateId(null);
       } else {
-        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc });
+        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc, contentType });
       }
       const t = title.trim();
       setSavedSnapshot({ title: t, content: editor?.getHTML() ?? content });
@@ -219,7 +299,9 @@ export default function EditorLayout() {
       if ((!editorEmpty || !emptyTitle) && !window.confirm('Replace the current title and body with this template?')) {
         return;
       }
-      const doc = tipTapDocFromTemplateRecord(record);
+      const parsed =
+        parseTemplateLayout(record.activeLayout) ?? parseTemplateLayout(record.draftLayout);
+      const doc = parsed ? layoutConfigToTipTapDoc(parsed) : { type: 'doc', content: [{ type: 'paragraph' }] };
       editor.chain().focus().setContent(doc).run();
       const html = editor.getHTML();
       setContent(html);
@@ -527,10 +609,21 @@ export default function EditorLayout() {
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-2">
+          {isPublished ? (
+            <button
+              type="button"
+              onClick={handleConvertToDraft}
+              disabled={saving || !persistedContentId}
+              className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3.5 py-2 text-[13px] font-semibold text-[var(--editor-doc-text)] transition-colors hover:bg-[var(--editor-canvas-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+              title="Convert to draft to edit"
+            >
+              Convert to draft
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={handleSaveDraft}
-            disabled={saving}
+            disabled={saving || isPublished}
             className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-[var(--editor-primary)] px-3.5 py-2 text-[13px] font-semibold text-[var(--editor-primary-fg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? (
@@ -540,7 +633,7 @@ export default function EditorLayout() {
             ) : (
               <Save size={16} />
             )}
-            {saving ? 'Saving…' : 'Save Draft'}
+            {isPublished ? 'Locked (published)' : saving ? 'Saving…' : 'Save Draft'}
           </button>
           {/* <button
             type="button"
@@ -572,7 +665,7 @@ export default function EditorLayout() {
           <div className="flex min-w-0 flex-wrap items-center gap-0.5">
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleBold().run()}
               className={fmtBtn(!!editor?.isActive('bold'))}
               title="Bold"
@@ -581,7 +674,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleItalic().run()}
               className={fmtBtn(!!editor?.isActive('italic'))}
               title="Italic"
@@ -590,7 +683,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleUnderline().run()}
               className={fmtBtn(!!editor?.isActive('underline'))}
               title="Underline"
@@ -600,7 +693,7 @@ export default function EditorLayout() {
             <span className="mx-1 h-4 w-px shrink-0 bg-[var(--editor-border)]" aria-hidden />
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
               className={fmtBtn(!!editor?.isActive('heading', { level: 1 }))}
               title="Heading 1"
@@ -609,7 +702,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
               className={fmtBtn(!!editor?.isActive('heading', { level: 2 }))}
               title="Heading 2"
@@ -618,7 +711,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleBulletList().run()}
               className={fmtBtn(!!editor?.isActive('bulletList'))}
               title="Bullet list"
@@ -627,7 +720,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={() => editor?.chain().focus().toggleOrderedList().run()}
               className={fmtBtn(!!editor?.isActive('orderedList'))}
               title="Numbered list"
@@ -636,7 +729,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={setLink}
               className={fmtBtn(!!editor?.isActive('link'))}
               title="Link"
@@ -645,7 +738,7 @@ export default function EditorLayout() {
             </button>
             <button
               type="button"
-              disabled={!editor}
+              disabled={!editor || isPublished}
               onClick={openCitationDialog}
               className={fmtBtn(false)}
               title="Citation"
@@ -670,24 +763,35 @@ export default function EditorLayout() {
                 <h1 className="m-0 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)]">
                   {title || 'Untitled'}
                 </h1>
-                {content && content !== '<p></p>' ? (
-                  <div
-                    className="tiptap-content mt-4 text-[15px] leading-relaxed text-[var(--editor-muted)]"
-                    dangerouslySetInnerHTML={{ __html: content }}
-                  />
-                ) : (
-                  <p className="mt-4 text-[15px] text-[var(--editor-faint)]">Nothing to preview yet.</p>
-                )}
+                {editor ? (
+                  <div className="tiptap-content mt-4">
+                    <TipTapReadonly
+                      doc={editor.getJSON()}
+                      className="ProseMirror text-[15px] leading-relaxed text-[var(--editor-muted)] outline-none"
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : (
               <>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Title"
-                  className="box-border w-full border-b-[0.5px] border-[var(--editor-border)] bg-transparent px-8 pb-3 pt-6 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
-                />
+                {isPublished ? (
+                  <div className="px-8 pb-3 pt-6">
+                    <h1 className="m-0 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)]">
+                      {title || 'Untitled'}
+                    </h1>
+                    <p className="mt-2 mb-0 text-[12px] text-[var(--editor-faint)]">
+                      This content is published and locked. Convert to draft to edit.
+                    </p>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Title"
+                    className="box-border w-full border-b-[0.5px] border-[var(--editor-border)] bg-transparent px-8 pb-3 pt-6 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
+                  />
+                )}
                 <div className="tiptap-content px-0 pb-8">
                   <EditorContent editor={editor} />
                 </div>
@@ -736,15 +840,34 @@ export default function EditorLayout() {
                     Load layout from an existing template into this draft.
                   </p>
                 </div>
-                {/* <div>
-                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Content type</label>
-                  <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
-                    <option>Article</option>
-                    <option>Guide</option>
-                    <option>Documentation</option>
-                    <option>Blog post</option>
+                <div>
+                  <label
+                    htmlFor="editor-content-type"
+                    className="mb-1 block font-medium text-[var(--editor-doc-text)]"
+                  >
+                    Content type
+                  </label>
+                  <select
+                    id="editor-content-type"
+                    value={contentType}
+                    onChange={(e) =>
+                      setContentType(
+                        e.target.value === 'VIDEO' || e.target.value === 'PODCAST' || e.target.value === 'DOCUMENT'
+                          ? e.target.value
+                          : 'ARTICLE',
+                      )
+                    }
+                    className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none"
+                  >
+                    <option value="ARTICLE">Article</option>
+                    <option value="VIDEO">Video</option>
+                    <option value="PODCAST">Podcast</option>
+                    <option value="DOCUMENT">Document</option>
                   </select>
-                </div> */}
+                  <p className="mt-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
+                    Saved with the draft and used for library filtering + color.
+                  </p>
+                </div>
                 <div>
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Tags</label>
                   <div className="flex flex-wrap gap-1">

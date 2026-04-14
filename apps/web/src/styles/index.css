@@ -70,6 +70,14 @@
   textarea:focus-visible {
     @apply outline-2 outline-offset-2 outline-app-accent;
   }
+
+  /* Native select dropdown option theming (some browsers default options to white). */
+  select,
+  option,
+  optgroup {
+    background-color: var(--color-app-bg);
+    color: var(--color-app-text);
+  }
 }
 
 @layer utilities {
@@ -676,6 +684,38 @@
 
   .editor-workspace .tiptap-content .ProseMirror .is-editor-empty:first-child::before {
     color: var(--editor-faint);
+  }
+
+  /* Template grid layout nodes (shared by template builder + content editor) */
+  .tiptap-content .template-layout-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    width: 100%;
+    padding: 10px 0;
+  }
+
+  .tiptap-content .template-layout-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .tiptap-content [data-region-field] {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px dashed rgba(128, 128, 140, 0.35);
+    color: rgba(92, 95, 110, 0.95);
+    background: rgba(240, 240, 245, 0.55);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .editor-workspace .tiptap-content .template-layout-row {
+    padding: 14px 22px;
   }
 
   .editor-workspace .tiptap-content .ProseMirror .component-reference {

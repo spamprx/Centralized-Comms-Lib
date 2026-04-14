@@ -13,6 +13,7 @@ import { getStaticVersionHistory } from '../data/mockContentVersionHistory';
 import { getVersionHistoryMode } from '../config/versionHistory';
 import { tipTapJsonToPlainText } from '../lib/tipTapPlainText';
 import { diffWords, type WordDiffPart } from '../lib/wordDiff';
+import TipTapReadonly from '../components/editor/TipTapReadonly';
 
 const PAGE_SIZE = 20;
 
@@ -43,11 +44,12 @@ function changeTypeLabel(changeType: string): string {
 function actorLabel(
   authorId: string,
   primaryAuthorId: string,
+  primaryAuthorName: string,
   coAuthors: Array<{ id: string; displayName: string }>,
 ): string {
-  if (authorId === primaryAuthorId) return 'Primary author';
+  if (authorId === primaryAuthorId) return primaryAuthorName || 'Primary author';
   const co = coAuthors.find((c) => c.id === authorId);
-  return co?.displayName ?? `User ${authorId.slice(0, 8)}…`;
+  return co?.displayName ?? 'Unknown user';
 }
 
 function versionPlainText(v: ContentVersion): string {
@@ -57,6 +59,15 @@ function versionPlainText(v: ContentVersion): string {
     return tipTapJsonToPlainText((meta as { body: unknown }).body);
   }
   return '';
+}
+
+function versionTipTapDoc(v: ContentVersion): unknown | null {
+  if (v.body != null) return v.body;
+  const meta = v.metadataSnapshot;
+  if (meta && typeof meta === 'object' && meta !== null && 'body' in meta) {
+    return (meta as { body: unknown }).body ?? null;
+  }
+  return null;
 }
 
 function normalizeServerSegments(
@@ -76,6 +87,7 @@ export default function VersionHistoryLayout() {
 
   const [contentTitle, setContentTitle] = useState<string>('');
   const [primaryAuthorId, setPrimaryAuthorId] = useState<string>('');
+  const [primaryAuthorName, setPrimaryAuthorName] = useState<string>('Primary author');
   const [coAuthors, setCoAuthors] = useState<Array<{ id: string; displayName: string }>>([]);
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
@@ -145,6 +157,7 @@ export default function VersionHistoryLayout() {
     ) => {
       setContentTitle(detail.content.title);
       setPrimaryAuthorId(detail.content.authorId);
+      setPrimaryAuthorName(detail.content.author?.displayName || 'Primary author');
       setCoAuthors(detail.coAuthors);
       const { items, total } = normalizeVersionListPayload(rawList);
       const { resetList, fetchOffset } = opts;
@@ -340,7 +353,15 @@ export default function VersionHistoryLayout() {
     setRestoreError(null);
     setRestoreBusy(true);
     try {
-      await contentService.restoreVersion(contentId, selected.id);
+      const doc = versionTipTapDoc(selected);
+      const isDoc =
+        doc && typeof doc === 'object' && doc !== null && 'type' in (doc as Record<string, unknown>);
+      if (!isDoc) {
+        throw new Error('Selected version has no body to restore.');
+      }
+
+      // Restore by rewriting the head body (creates a new MANUAL_SAVE version server-side).
+      await contentService.saveDraft(contentId, { body: doc });
       navigate(`/editor/${contentId}`);
     } catch (e) {
       setRestoreError(e instanceof Error ? e.message : 'Restore failed');
@@ -455,7 +476,7 @@ export default function VersionHistoryLayout() {
                       {new Date(version.createdAt).toLocaleString()}
                     </div>
                     <div className="mt-1 text-[10px] text-app-faint">
-                      {actorLabel(version.authorId, primaryAuthorId, coAuthors)}
+                      {actorLabel(version.authorId, primaryAuthorId, primaryAuthorName, coAuthors)}
                     </div>
 
                     {showDiff && selected && selected.id !== version.id && (
@@ -513,7 +534,12 @@ export default function VersionHistoryLayout() {
                 </h2>
                 <p className="mt-0.5 m-0 text-[11px] text-app-faint">
                   {selected
-                    ? `${new Date(selected.createdAt).toLocaleString()} · ${actorLabel(selected.authorId, primaryAuthorId, coAuthors)}`
+                    ? `${new Date(selected.createdAt).toLocaleString()} · ${actorLabel(
+                        selected.authorId,
+                        primaryAuthorId,
+                        primaryAuthorName,
+                        coAuthors,
+                      )}`
                     : '—'}
                 </p>
               </div>
@@ -607,9 +633,50 @@ export default function VersionHistoryLayout() {
                 )}
               </div>
             ) : (
-              <pre className="m-0 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-app-muted">
-                {versionPlainText(selected) || '(No body captured for this snapshot)'}
-              </pre>
+              (() => {
+                const doc = versionTipTapDoc(selected);
+                const isDoc =
+                  doc && typeof doc === 'object' && doc !== null && 'type' in (doc as Record<string, unknown>);
+                if (!isDoc) {
+                  const prevWithBody = versions.find(
+                    (v) => v.versionNumber < selected.versionNumber && versionTipTapDoc(v) != null,
+                  );
+                  const fallbackDoc = prevWithBody ? versionTipTapDoc(prevWithBody) : null;
+                  const fallbackIsDoc =
+                    fallbackDoc &&
+                    typeof fallbackDoc === 'object' &&
+                    fallbackDoc !== null &&
+                    'type' in (fallbackDoc as Record<string, unknown>);
+                  if (fallbackIsDoc && prevWithBody) {
+                    return (
+                      <div className="space-y-3">
+                        <p className="m-0 text-[12px] text-app-faint">
+                          No body was captured for this lifecycle-only snapshot. Showing body from v{prevWithBody.versionNumber}.
+                        </p>
+                        <div className="tiptap-content">
+                          <TipTapReadonly
+                            doc={fallbackDoc as any}
+                            className="ProseMirror text-[13px] leading-relaxed text-app-muted outline-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="m-0 text-[13px] leading-relaxed text-app-faint">
+                      (No body captured for this snapshot)
+                    </p>
+                  );
+                }
+                return (
+                  <div className="tiptap-content">
+                    <TipTapReadonly
+                      doc={doc as any}
+                      className="ProseMirror text-[13px] leading-relaxed text-app-muted outline-none"
+                    />
+                  </div>
+                );
+              })()
             )}
           </Surface>
         </div>

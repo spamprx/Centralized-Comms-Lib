@@ -163,7 +163,7 @@ export function auditEntryToActivityLog(entry: ApiAuditEntry): ActivityLog {
   return {
     id: entry.id,
     userId: actor,
-    userName: actor === 'system' ? 'System' : `User ${actor.slice(0, 8)}…`,
+    userName: actor === 'system' ? 'System' : 'User',
     action: entry.action,
     resource: `${entry.resource}${entry.resourceId ? ` / ${entry.resourceId.slice(0, 8)}` : ''}`,
     timestamp: toIso(entry.createdAt),
