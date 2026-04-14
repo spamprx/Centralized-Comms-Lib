@@ -3,6 +3,7 @@ import type { LifecycleState, Visibility } from "../../repository";
 import type { AuthRequest } from "../../middlewares/auth.middleware";
 import { aiDraftQuotaGate } from "../../middlewares/aiDraftQuotaGate.middleware";
 import { contentService } from "../../service";
+import { getPrismaClient } from "../../repository";
 import type { AuditContext } from "../../shared/context";
 
 const router = Router();
@@ -215,7 +216,7 @@ router.post("/:id/co-authors/respond", async (req: AuthRequest, res: Response) =
  */
 router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
   try {
-    const { title, body, aiGenerated, templateId } = req.body;
+    const { title, body, aiGenerated, templateId, contentType } = req.body;
     if (!title) {
       res.status(400).json({ error: "title is required" });
       return;
@@ -231,6 +232,7 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
       body: body ?? undefined,
       aiGenerated,
       templateId: templateId ?? undefined,
+      contentType: contentType ?? undefined,
     });
     if ("invalidFormatting" in result && result.invalidFormatting) {
       res.status(422).json({ error: "Formatting rule violations", violations: result.violations });
@@ -281,16 +283,24 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
  */
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
+    const isAdmin = req.user!.role === "ADMIN";
+    const requesterId = req.user!.id;
+    const requestedAuthorId = req.query.authorId as string | undefined;
+    const isOwnListRequest = !!requestedAuthorId && requestedAuthorId === requesterId;
     const filters = {
-      authorId: req.query.authorId as string | undefined,
-      lifecycleState: req.query.lifecycleState as LifecycleState | undefined,
+      authorId: requestedAuthorId,
+      // Security: non-admins can only list non-published content for themselves.
+      lifecycleState: (isAdmin || isOwnListRequest
+        ? (req.query.lifecycleState as LifecycleState | undefined)
+        : ("PUBLISHED" as LifecycleState)),
       visibility: req.query.visibility as Visibility | undefined,
-      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-      offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
+      contentType: req.query.contentType as any,
+      limit: req.query.limit ? Number.parseInt(req.query.limit as string) : undefined,
+      offset: req.query.offset ? Number.parseInt(req.query.offset as string) : undefined,
     };
     const contents = await contentService.list(filters, {
-      id: req.user!.id,
-      isAdmin: req.user!.role === "ADMIN",
+      id: requesterId,
+      isAdmin,
     });
     res.status(200).json(contents);
   } catch (err) {
@@ -342,6 +352,49 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
 /**
  * @openapi
  * /api/v1/content/{id}:
+ *   delete:
+ *     summary: Delete a content item (author or admin)
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Deleted
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await contentService.delete(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    if ("forbidden" in result && result.forbidden) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    res.status(204).send();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}:
  *   post:
  *     summary: Update content title and/or body
  *     description: Uses POST for updates instead of PATCH.
@@ -383,7 +436,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.post("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { body, title } = req.body;
+    const { body, title, contentType } = req.body;
     if (body !== undefined && body !== null && !isValidTipTapDocument(body)) {
       res.status(400).json({
         error: "body must be a valid TipTap document (type: 'doc', content: array)",
@@ -393,6 +446,7 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
     const result = await contentService.saveBody(auditContext(req), req.params.id, {
       body: body ?? undefined,
       title,
+      contentType: contentType ?? undefined,
     });
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
@@ -461,7 +515,9 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.post("/:id/STATE_TRANSITION", async (req: AuthRequest, res: Response) => {
   try {
-    const { lifecycleState } = req.body;
+    const raw = (req.body as { lifecycleState?: unknown })?.lifecycleState;
+    const lifecycleState =
+      typeof raw === "string" ? (raw.toUpperCase() as LifecycleState) : (raw as LifecycleState);
     if (!lifecycleState) {
       res.status(400).json({ error: "lifecycleState is required" });
       return;
@@ -486,6 +542,633 @@ router.post("/:id/STATE_TRANSITION", async (req: AuthRequest, res: Response) => 
       return;
     }
     if ("content" in result) res.status(200).json(result.content);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/annotations:
+ *   get:
+ *     summary: List annotations for a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of annotations
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ *   post:
+ *     summary: Add an annotation to a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - body
+ *             properties:
+ *               body:
+ *                 type: string
+ *               selectionFrom:
+ *                 type: integer
+ *               selectionTo:
+ *                 type: integer
+ *               selectionText:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Annotation created
+ *       400:
+ *         description: Missing body
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/:id/annotations", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const rows = await prisma.contentAnnotation.findMany({
+      where: { contentId: req.params.id },
+      orderBy: { createdAt: "desc" },
+      include: { author: { select: { id: true, displayName: true, email: true } } },
+      take: 200,
+    });
+    res.status(200).json(
+      rows.map((r: typeof rows[number]) => ({
+        id: r.id,
+        body: r.body,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        contentId: r.contentId,
+        author: r.author,
+        selectionFrom: r.selectionFrom,
+        selectionTo: r.selectionTo,
+        selectionText: r.selectionText,
+      })),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/:id/annotations", async (req: AuthRequest, res: Response) => {
+  try {
+    const { body, selectionFrom, selectionTo, selectionText } = req.body as {
+      body?: unknown;
+      selectionFrom?: unknown;
+      selectionTo?: unknown;
+      selectionText?: unknown;
+    };
+    if (typeof body !== "string" || body.trim() === "") {
+      res.status(400).json({ error: "body is required" });
+      return;
+    }
+
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const created = await prisma.contentAnnotation.create({
+      data: {
+        contentId: req.params.id,
+        authorId: req.user!.id,
+        body: body.trim(),
+        selectionFrom: typeof selectionFrom === "number" ? selectionFrom : null,
+        selectionTo: typeof selectionTo === "number" ? selectionTo : null,
+        selectionText: typeof selectionText === "string" ? selectionText : null,
+      },
+      include: { author: { select: { id: true, displayName: true, email: true } } },
+    });
+
+    res.status(201).json({
+      id: created.id,
+      body: created.body,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+      contentId: created.contentId,
+      author: created.author,
+      selectionFrom: created.selectionFrom,
+      selectionTo: created.selectionTo,
+      selectionText: created.selectionText,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/bookmark:
+ *   get:
+ *     summary: Check if current user bookmarked a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Bookmark state
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ *   post:
+ *     summary: Bookmark (save) a content item for current user
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: Bookmarked
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ *   delete:
+ *     summary: Remove bookmark for current user
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Unbookmarked
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/:id/bookmark", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const prisma = getPrismaClient();
+    const existing = await prisma.contentBookmark.findUnique({
+      where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+      select: { id: true },
+    });
+    res.status(200).json({ bookmarked: !!existing });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/:id/bookmark", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const prisma = getPrismaClient();
+    await prisma.contentBookmark.upsert({
+      where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+      create: { contentId: req.params.id, userId: req.user!.id },
+      update: {},
+    });
+    res.status(201).json({ bookmarked: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/:id/bookmark", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const prisma = getPrismaClient();
+    await prisma.contentBookmark.deleteMany({
+      where: { contentId: req.params.id, userId: req.user!.id },
+    });
+    res.status(204).send();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/engagement:
+ *   get:
+ *     summary: Get engagement counts and current-user state
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Engagement summary
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/:id/engagement", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const [views, likes, comments, likedByMe] = await Promise.all([
+      prisma.contentView.count({ where: { contentId: req.params.id } }),
+      prisma.contentLike.count({ where: { contentId: req.params.id } }),
+      prisma.contentComment.count({ where: { contentId: req.params.id } }),
+      prisma.contentLike.findUnique({
+        where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+        select: { id: true },
+      }),
+    ]);
+
+    res.status(200).json({
+      views,
+      likes,
+      comments,
+      likedByMe: !!likedByMe,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/view:
+ *   post:
+ *     summary: Record a view once per tab session
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sessionId
+ *             properties:
+ *               sessionId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Updated view count
+ *       400:
+ *         description: Missing sessionId
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/:id/view", async (req: AuthRequest, res: Response) => {
+  try {
+    const { sessionId } = req.body as { sessionId?: unknown };
+    if (typeof sessionId !== "string" || sessionId.trim() === "") {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    await prisma.contentView.upsert({
+      where: { contentId_sessionId: { contentId: req.params.id, sessionId: sessionId.trim() } },
+      create: { contentId: req.params.id, userId: req.user!.id, sessionId: sessionId.trim() },
+      update: {},
+    });
+
+    const views = await prisma.contentView.count({ where: { contentId: req.params.id } });
+    res.status(200).json({ views });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/like:
+ *   post:
+ *     summary: Like ("Helpful") a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Liked state + updated count
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ *   delete:
+ *     summary: Remove like ("Helpful") for a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Unliked state + updated count
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/:id/like", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    await prisma.contentLike.upsert({
+      where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+      create: { contentId: req.params.id, userId: req.user!.id },
+      update: {},
+    });
+    const likes = await prisma.contentLike.count({ where: { contentId: req.params.id } });
+    res.status(200).json({ liked: true, likes });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/:id/like", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    await prisma.contentLike.deleteMany({
+      where: { contentId: req.params.id, userId: req.user!.id },
+    });
+    const likes = await prisma.contentLike.count({ where: { contentId: req.params.id } });
+    res.status(200).json({ liked: false, likes });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/comments:
+ *   get:
+ *     summary: List comments for a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Comment list
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ *   post:
+ *     summary: Add a comment to a content item
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - body
+ *             properties:
+ *               body:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Created comment
+ *       400:
+ *         description: Missing body
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/:id/comments", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    type CommentRow = {
+      id: string;
+      body: string;
+      createdAt: Date;
+      updatedAt: Date;
+      contentId: string;
+      author: { id: string; displayName: string; email: string };
+    };
+    const rows = (await prisma.contentComment.findMany({
+      where: { contentId: req.params.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { author: { select: { id: true, displayName: true, email: true } } },
+    })) as CommentRow[];
+
+    res.status(200).json(
+      rows.map((c) => ({
+        id: c.id,
+        body: c.body,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        contentId: c.contentId,
+        author: c.author,
+      })),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/:id/comments", async (req: AuthRequest, res: Response) => {
+  try {
+    const { body } = req.body as { body?: unknown };
+    if (typeof body !== "string" || body.trim() === "") {
+      res.status(400).json({ error: "body is required" });
+      return;
+    }
+
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const created = await prisma.contentComment.create({
+      data: { contentId: req.params.id, authorId: req.user!.id, body: body.trim() },
+      include: { author: { select: { id: true, displayName: true, email: true } } },
+    });
+
+    res.status(201).json({
+      id: created.id,
+      body: created.body,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+      contentId: created.contentId,
+      author: created.author,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

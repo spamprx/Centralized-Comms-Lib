@@ -4,16 +4,27 @@ import { getAuthToken } from './tokenStore';
 export type LifecycleState = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
 export type Visibility = 'PUBLIC' | 'PRIVATE' | 'HIDDEN' | 'ARCHIVED' | 'PRIVATE_TO_GROUP';
 
+export type ContentAuthor = {
+  id: string;
+  displayName: string;
+  email: string;
+};
+
 export type Content = {
   id: string;
   title: string;
   slug: string;
   lifecycleState: LifecycleState;
   visibility: Visibility;
+  contentType: 'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT';
   aiGenerated: boolean;
   authorId: string;
+  author?: ContentAuthor | null;
   visibilityGroupId: string | null;
   templateId?: string | null;
+  /** Aggregated engagement counts (present in list responses). */
+  viewsCount?: number;
+  likesCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -31,10 +42,39 @@ export type ContentVersion = {
   authorId: string;
 };
 
+export type ContentAnnotation = {
+  id: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  contentId: string;
+  author: { id: string; displayName: string; email: string };
+  selectionFrom: number | null;
+  selectionTo: number | null;
+  selectionText: string | null;
+};
+
+export type ContentComment = {
+  id: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  contentId: string;
+  author: { id: string; displayName: string; email: string };
+};
+
+export type ContentEngagement = {
+  views: number;
+  likes: number;
+  comments: number;
+  likedByMe: boolean;
+};
+
 type ListFilters = {
   authorId?: string;
   lifecycleState?: LifecycleState;
   visibility?: Visibility;
+  contentType?: Content['contentType'];
   limit?: number;
   offset?: number;
 };
@@ -99,6 +139,7 @@ export const contentService = {
     if (filters.authorId) params.set('authorId', filters.authorId);
     if (filters.lifecycleState) params.set('lifecycleState', filters.lifecycleState);
     if (filters.visibility) params.set('visibility', filters.visibility);
+    if (filters.contentType) params.set('contentType', filters.contentType);
     if (typeof filters.limit === 'number') params.set('limit', String(filters.limit));
     if (typeof filters.offset === 'number') params.set('offset', String(filters.offset));
     const query = params.toString();
@@ -108,7 +149,7 @@ export const contentService = {
   createDraft: async (
     title: string,
     body?: unknown,
-    options?: { templateId?: string | null; aiGenerated?: boolean },
+    options?: { templateId?: string | null; aiGenerated?: boolean; contentType?: Content['contentType'] },
   ): Promise<{ content: Content }> => {
     return request<{ content: Content }>('/content', {
       method: 'POST',
@@ -116,16 +157,24 @@ export const contentService = {
         title,
         body,
         templateId: options?.templateId ?? undefined,
+        contentType: options?.contentType ?? undefined,
         aiGenerated: options?.aiGenerated,
       }),
     });
   },
 
-  saveDraft: async (id: string, data: { title?: string; body?: unknown }): Promise<unknown> => {
+  saveDraft: async (
+    id: string,
+    data: { title?: string; body?: unknown; contentType?: Content['contentType'] },
+  ): Promise<unknown> => {
     return request<unknown>(`/content/${id}`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await request<void>(`/content/${id}`, { method: 'DELETE' });
   },
 
   transitionState: async (id: string, lifecycleState: LifecycleState): Promise<Content> => {
@@ -142,6 +191,62 @@ export const contentService = {
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
   }> => {
     return request(`/content/${id}`);
+  },
+
+  listAnnotations: async (contentId: string): Promise<ContentAnnotation[]> => {
+    return request<ContentAnnotation[]>(`/content/${contentId}/annotations`);
+  },
+
+  addAnnotation: async (
+    contentId: string,
+    data: { body: string; selectionFrom?: number; selectionTo?: number; selectionText?: string },
+  ): Promise<ContentAnnotation> => {
+    return request<ContentAnnotation>(`/content/${contentId}/annotations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getBookmarkState: async (contentId: string): Promise<{ bookmarked: boolean }> => {
+    return request<{ bookmarked: boolean }>(`/content/${contentId}/bookmark`);
+  },
+
+  bookmark: async (contentId: string): Promise<{ bookmarked: boolean }> => {
+    return request<{ bookmarked: boolean }>(`/content/${contentId}/bookmark`, { method: 'POST' });
+  },
+
+  unbookmark: async (contentId: string): Promise<void> => {
+    await request<void>(`/content/${contentId}/bookmark`, { method: 'DELETE' });
+  },
+
+  getEngagement: async (contentId: string): Promise<ContentEngagement> => {
+    return request<ContentEngagement>(`/content/${contentId}/engagement`);
+  },
+
+  recordView: async (contentId: string, sessionId: string): Promise<{ views: number }> => {
+    return request<{ views: number }>(`/content/${contentId}/view`, {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+  },
+
+  like: async (contentId: string): Promise<{ liked: true; likes: number }> => {
+    return request<{ liked: true; likes: number }>(`/content/${contentId}/like`, { method: 'POST' });
+  },
+
+  unlike: async (contentId: string): Promise<{ liked: false; likes: number }> => {
+    return request<{ liked: false; likes: number }>(`/content/${contentId}/like`, { method: 'DELETE' });
+  },
+
+  listComments: async (contentId: string): Promise<ContentComment[]> => {
+    return request<ContentComment[]>(`/content/${contentId}/comments`);
+  },
+
+  addComment: async (contentId: string, body: string): Promise<ContentComment> => {
+    return request<ContentComment>(`/content/${contentId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    });
   },
 
   /**
