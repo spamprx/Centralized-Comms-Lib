@@ -7,7 +7,11 @@ export type Visibility =
   | "ARCHIVED"
   | "PRIVATE_TO_GROUP";
 
-export type VersionChangeType = "MANUAL_SAVE" | "STATE_TRANSITION" | "RESTORE" | "AI_GENERATED";
+export type VersionChangeType =
+  | "MANUAL_SAVE"
+  | "STATE_TRANSITION"
+  | "RESTORE"
+  | "AI_GENERATED";
 
 export type ContentType = "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
 
@@ -67,4 +71,3 @@ export interface ContentListFilters {
   limit?: number;
   offset?: number;
 }
-

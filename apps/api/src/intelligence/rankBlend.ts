@@ -1,1 +1,4 @@
-export { assertValidQueryVector, type RankBlendWeights } from "../search/rankBlend";
+export {
+  assertValidQueryVector,
+  type RankBlendWeights,
+} from "../search/rankBlend";

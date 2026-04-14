@@ -26,9 +26,14 @@ export interface ContentIndexDocument {
   titleEmbedding?: number[];
 }
 
-async function resolveDefaultWorkspaceId(prisma: PrismaClient): Promise<string | null> {
+async function resolveDefaultWorkspaceId(
+  prisma: PrismaClient,
+): Promise<string | null> {
   const slug = process.env.DEFAULT_WORKSPACE_SLUG?.trim() || "default";
-  const ws = await prisma.workspace.findUnique({ where: { slug }, select: { id: true } });
+  const ws = await prisma.workspace.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
   return ws?.id ?? null;
 }
 
@@ -86,10 +91,15 @@ export async function buildContentIndexDocument(
   const workspaceId = content.template?.workspaceId ?? defaultWs ?? "unknown";
 
   const channelIds =
-    content.template?.bindings.map((b: { channelId: string }) => b.channelId) ?? [];
+    content.template?.bindings.map((b: { channelId: string }) => b.channelId) ??
+    [];
   const tagIds = content.tags.map((ct: { tagId: string }) => ct.tagId);
-  const tagSlugs = content.tags.map((ct: { tag: { slug: string } }) => ct.tag.slug);
-  const tagNames = content.tags.map((ct: { tag: { name: string } }) => ct.tag.name);
+  const tagSlugs = content.tags.map(
+    (ct: { tag: { slug: string } }) => ct.tag.slug,
+  );
+  const tagNames = content.tags.map(
+    (ct: { tag: { name: string } }) => ct.tag.name,
+  );
 
   let publishedAt: Date | null = null;
   if (content.lifecycleState === "PUBLISHED") {

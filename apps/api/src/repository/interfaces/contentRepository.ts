@@ -17,7 +17,10 @@ export interface ContentRepository {
   list(filters?: ContentListFilters): Promise<Content[]>;
   delete(contentId: string): Promise<void>;
   updateTitle(contentId: string, title: string): Promise<Content>;
-  updateContentType(contentId: string, contentType: ContentType): Promise<Content>;
+  updateContentType(
+    contentId: string,
+    contentType: ContentType,
+  ): Promise<Content>;
 
   updateLifecycleState(
     contentId: string,
@@ -47,6 +50,11 @@ export interface ContentRepository {
    */
   listLatestContentVersionsMaybeReferencingComponentVersion(
     componentVersionId: string,
-  ): Promise<Array<{ contentVersionId: string; contentId: string; body: TipTapDocument | null }>>;
+  ): Promise<
+    Array<{
+      contentVersionId: string;
+      contentId: string;
+      body: TipTapDocument | null;
+    }>
+  >;
 }
-

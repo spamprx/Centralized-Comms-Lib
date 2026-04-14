@@ -21,7 +21,9 @@ function parseDateRange(
 ): { from: Date; to: Date } | { error: string } {
   const now = new Date();
   const to = toQ ? new Date(String(toQ)) : now;
-  const from = fromQ ? new Date(String(fromQ)) : new Date(now.getTime() - 30 * 86400000);
+  const from = fromQ
+    ? new Date(String(fromQ))
+    : new Date(now.getTime() - 30 * 86400000);
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
     return { error: "Invalid from or to date" };
   }
@@ -74,7 +76,10 @@ router.post("/track", async (req: AuthRequest, res: Response) => {
       return;
     }
     const prisma = getPrismaClient();
-    const content = await prisma.content.findUnique({ where: { id: contentId }, select: { id: true } });
+    const content = await prisma.content.findUnique({
+      where: { id: contentId },
+      select: { id: true },
+    });
     if (!content) {
       res.status(404).json({ error: "Content not found" });
       return;
@@ -106,7 +111,9 @@ router.post("/track", async (req: AuthRequest, res: Response) => {
     });
     res.status(204).send();
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -141,34 +148,42 @@ router.post("/track", async (req: AuthRequest, res: Response) => {
  *       400:
  *         description: Invalid date range
  */
-router.get("/content/:contentId/metrics", async (req: AuthRequest, res: Response) => {
-  try {
-    const range = parseDateRange(req.query.from, req.query.to);
-    if ("error" in range) {
-      res.status(400).json({ error: range.error });
-      return;
-    }
-    const prisma = getPrismaClient();
-    const rows = await prisma.contentAnalyticsEvent.groupBy({
-      by: ["eventType"],
-      where: {
+router.get(
+  "/content/:contentId/metrics",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const range = parseDateRange(req.query.from, req.query.to);
+      if ("error" in range) {
+        res.status(400).json({ error: range.error });
+        return;
+      }
+      const prisma = getPrismaClient();
+      const rows = await prisma.contentAnalyticsEvent.groupBy({
+        by: ["eventType"],
+        where: {
+          contentId: req.params.contentId,
+          createdAt: { gte: range.from, lte: range.to },
+        },
+        _count: { _all: true },
+      });
+      const total = rows.reduce((acc, r) => acc + r._count._all, 0);
+      res.status(200).json({
         contentId: req.params.contentId,
-        createdAt: { gte: range.from, lte: range.to },
-      },
-      _count: { _all: true },
-    });
-    const total = rows.reduce((acc, r) => acc + r._count._all, 0);
-    res.status(200).json({
-      contentId: req.params.contentId,
-      from: range.from.toISOString(),
-      to: range.to.toISOString(),
-      totalEvents: total,
-      byEventType: rows.map((r) => ({ eventType: r.eventType, count: r._count._all })),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+        totalEvents: total,
+        byEventType: rows.map((r) => ({
+          eventType: r.eventType,
+          count: r._count._all,
+        })),
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -198,38 +213,47 @@ router.get("/content/:contentId/metrics", async (req: AuthRequest, res: Response
  *       403:
  *         description: Not admin
  */
-router.get("/aggregate", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const range = parseDateRange(req.query.from, req.query.to);
-    if ("error" in range) {
-      res.status(400).json({ error: range.error });
-      return;
+router.get(
+  "/aggregate",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const range = parseDateRange(req.query.from, req.query.to);
+      if ("error" in range) {
+        res.status(400).json({ error: range.error });
+        return;
+      }
+      const prisma = getPrismaClient();
+      const [byType, distinctContent] = await Promise.all([
+        prisma.contentAnalyticsEvent.groupBy({
+          by: ["eventType"],
+          where: { createdAt: { gte: range.from, lte: range.to } },
+          _count: { _all: true },
+        }),
+        prisma.contentAnalyticsEvent.findMany({
+          where: { createdAt: { gte: range.from, lte: range.to } },
+          distinct: ["contentId"],
+          select: { contentId: true },
+        }),
+      ]);
+      const totalEvents = byType.reduce((a, r) => a + r._count._all, 0);
+      res.status(200).json({
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+        totalEvents,
+        distinctContentCount: distinctContent.length,
+        byEventType: byType.map((r) => ({
+          eventType: r.eventType,
+          count: r._count._all,
+        })),
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
     }
-    const prisma = getPrismaClient();
-    const [byType, distinctContent] = await Promise.all([
-      prisma.contentAnalyticsEvent.groupBy({
-        by: ["eventType"],
-        where: { createdAt: { gte: range.from, lte: range.to } },
-        _count: { _all: true },
-      }),
-      prisma.contentAnalyticsEvent.findMany({
-        where: { createdAt: { gte: range.from, lte: range.to } },
-        distinct: ["contentId"],
-        select: { contentId: true },
-      }),
-    ]);
-    const totalEvents = byType.reduce((a, r) => a + r._count._all, 0);
-    res.status(200).json({
-      from: range.from.toISOString(),
-      to: range.to.toISOString(),
-      totalEvents,
-      distinctContentCount: distinctContent.length,
-      byEventType: byType.map((r) => ({ eventType: r.eventType, count: r._count._all })),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+  },
+);
 
 // ─── KPIs ──────────────────────────────────────────────────────────────────
 
@@ -252,38 +276,64 @@ router.get("/aggregate", authorize("USER", "ADMIN"), async (req: AuthRequest, re
  *       200:
  *         description: KPI array
  */
-router.get("/kpis", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    const repos = uow.repos();
+router.get(
+  "/kpis",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const prisma = getPrismaClient();
+      const uow = new PrismaUnitOfWork(prisma);
+      const repos = uow.repos();
 
-    const range = req.query.range as string || '30d';
-    const days = parseInt(range) || 30;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+      const range = (req.query.range as string) || "30d";
+      const days = parseInt(range) || 30;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-    // Get counts from database. Views are currently mocked since there is
-    // no dedicated analytics table in the schema yet.
-    const [userCount, contentCount] = await Promise.all([
-      repos.userRole.listUsers().then((u: any[]) => u.length),
-      prisma.content.count({ where: { createdAt: { gte: startDate } } }),
-    ]);
-    const totalViews = Math.floor(5000 + Math.random() * 5000);
+      // Get counts from database. Views are currently mocked since there is
+      // no dedicated analytics table in the schema yet.
+      const [userCount, contentCount] = await Promise.all([
+        repos.userRole.listUsers().then((u: any[]) => u.length),
+        prisma.content.count({ where: { createdAt: { gte: startDate } } }),
+      ]);
+      const totalViews = Math.floor(5000 + Math.random() * 5000);
 
-    // Calculate engagement rate (mock calculation)
-    const engagementRate = 68.3 + (Math.random() * 5 - 2.5);
+      // Calculate engagement rate (mock calculation)
+      const engagementRate = 68.3 + (Math.random() * 5 - 2.5);
 
-    res.status(200).json([
-      { label: "Total Views", value: totalViews.toLocaleString(), change: 12.5, trend: "up" as const },
-      { label: "Avg. Engagement", value: `${engagementRate.toFixed(1)}%`, change: 5.2, trend: "up" as const },
-      { label: "Active Users", value: userCount.toLocaleString(), change: -2.1, trend: "down" as const },
-      { label: "Content Published", value: contentCount.toLocaleString(), change: 8.7, trend: "up" as const },
-    ]);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      res.status(200).json([
+        {
+          label: "Total Views",
+          value: totalViews.toLocaleString(),
+          change: 12.5,
+          trend: "up" as const,
+        },
+        {
+          label: "Avg. Engagement",
+          value: `${engagementRate.toFixed(1)}%`,
+          change: 5.2,
+          trend: "up" as const,
+        },
+        {
+          label: "Active Users",
+          value: userCount.toLocaleString(),
+          change: -2.1,
+          trend: "down" as const,
+        },
+        {
+          label: "Content Published",
+          value: contentCount.toLocaleString(),
+          change: 8.7,
+          trend: "up" as const,
+        },
+      ]);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 // ─── Views Time Series ──────────────────────────────────────────────────────
 
@@ -305,30 +355,36 @@ router.get("/kpis", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Re
  *       200:
  *         description: Points over time
  */
-router.get("/views", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const prisma = getPrismaClient();
-    const range = (req.query.range as string) || "30d";
-    const days = parseInt(range) || 30;
+router.get(
+  "/views",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const prisma = getPrismaClient();
+      const range = (req.query.range as string) || "30d";
+      const days = parseInt(range) || 30;
 
-    // In production, query actual analytics data grouped by date
-    // For now, return mock data structure
-    const data: { date: string; value: number }[] = [];
-    const now = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      data.push({
-        date: d.toISOString().split("T")[0],
-        value: Math.floor(3000 + Math.random() * 2000),
-      });
+      // In production, query actual analytics data grouped by date
+      // For now, return mock data structure
+      const data: { date: string; value: number }[] = [];
+      const now = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        data.push({
+          date: d.toISOString().split("T")[0],
+          value: Math.floor(3000 + Math.random() * 2000),
+        });
+      }
+
+      res.status(200).json(data);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
     }
-
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+  },
+);
 
 // ─── Engagement Metrics ─────────────────────────────────────────────────────
 
@@ -350,31 +406,37 @@ router.get("/views", authorize("USER", "ADMIN"), async (req: AuthRequest, res: R
  *       200:
  *         description: Engagement rows
  */
-router.get("/engagement", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const range = (req.query.range as string) || "7d";
-    const days = parseInt(range) || 7;
+router.get(
+  "/engagement",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const range = (req.query.range as string) || "7d";
+      const days = parseInt(range) || 7;
 
-    // In production, query actual engagement data
-    const data = [];
-    const now = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      data.push({
-        label: d.toISOString().slice(5, 10),
-        views: Math.floor(4000 + Math.random() * 1500),
-        likes: Math.floor(800 + Math.random() * 300),
-        shares: Math.floor(200 + Math.random() * 100),
-        comments: Math.floor(150 + Math.random() * 80),
-      });
+      // In production, query actual engagement data
+      const data = [];
+      const now = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        data.push({
+          label: d.toISOString().slice(5, 10),
+          views: Math.floor(4000 + Math.random() * 1500),
+          likes: Math.floor(800 + Math.random() * 300),
+          shares: Math.floor(200 + Math.random() * 100),
+          comments: Math.floor(150 + Math.random() * 80),
+        });
+      }
+
+      res.status(200).json(data);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
     }
-
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+  },
+);
 
 // ─── Reading Time Distribution ──────────────────────────────────────────────
 
@@ -391,21 +453,27 @@ router.get("/engagement", authorize("USER", "ADMIN"), async (req: AuthRequest, r
  *       200:
  *         description: Bucket counts
  */
-router.get("/reading-time", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    // In production, calculate from actual reading analytics
-    res.status(200).json([
-      { range: "0-1 min", count: 1250 },
-      { range: "1-3 min", count: 3420 },
-      { range: "3-5 min", count: 2890 },
-      { range: "5-10 min", count: 1560 },
-      { range: "10-15 min", count: 780 },
-      { range: "15+ min", count: 340 },
-    ]);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+router.get(
+  "/reading-time",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // In production, calculate from actual reading analytics
+      res.status(200).json([
+        { range: "0-1 min", count: 1250 },
+        { range: "1-3 min", count: 3420 },
+        { range: "3-5 min", count: 2890 },
+        { range: "5-10 min", count: 1560 },
+        { range: "10-15 min", count: 780 },
+        { range: "15+ min", count: 340 },
+      ]);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 // ─── Content Type Breakdown ─────────────────────────────────────────────────
 
@@ -422,22 +490,28 @@ router.get("/reading-time", authorize("USER", "ADMIN"), async (req: AuthRequest,
  *       200:
  *         description: Type segments
  */
-router.get("/content-types", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const prisma = getPrismaClient();
+router.get(
+  "/content-types",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const prisma = getPrismaClient();
 
-    // In production, group content by type
-    res.status(200).json([
-      { type: "Articles", value: 45, color: "#8b5cf6" },
-      { type: "Videos", value: 25, color: "#06b6d4" },
-      { type: "Podcasts", value: 15, color: "#f59e0b" },
-      { type: "Infographics", value: 10, color: "#10b981" },
-      { type: "Documents", value: 5, color: "#6b7280" },
-    ]);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      // In production, group content by type
+      res.status(200).json([
+        { type: "Articles", value: 45, color: "#8b5cf6" },
+        { type: "Videos", value: 25, color: "#06b6d4" },
+        { type: "Podcasts", value: 15, color: "#f59e0b" },
+        { type: "Infographics", value: 10, color: "#10b981" },
+        { type: "Documents", value: 5, color: "#6b7280" },
+      ]);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 // ─── Top Content ────────────────────────────────────────────────────────────
 
@@ -459,36 +533,42 @@ router.get("/content-types", authorize("USER", "ADMIN"), async (req: AuthRequest
  *       200:
  *         description: Ranked items
  */
-router.get("/top-content", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const prisma = getPrismaClient();
-    const limit = parseInt(req.query.limit as string) || 10;
+router.get(
+  "/top-content",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const prisma = getPrismaClient();
+      const limit = parseInt(req.query.limit as string) || 10;
 
-    // In production, query content ordered by an analytics metric. For now,
-    // use most recent content and mock the views/engagement numbers.
-    const content = await prisma.content.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: { author: { select: { displayName: true } } },
-    });
+      // In production, query content ordered by an analytics metric. For now,
+      // use most recent content and mock the views/engagement numbers.
+      const content = await prisma.content.findMany({
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: { author: { select: { displayName: true } } },
+      });
 
-    const data = content.map((c: any) => ({
-      id: c.id,
-      title: c.title,
-      author: c.author?.displayName ?? "Unknown",
-      views: Math.floor(500 + Math.random() * 4500),
-      engagement: Math.floor(60 + Math.random() * 35),
-      avgReadTime: `${Math.floor(3 + Math.random() * 10)}:${String(
-        Math.floor(Math.random() * 60),
-      ).padStart(2, "0")}`,
-      publishedAt: c.createdAt.toISOString(),
-    }));
+      const data = content.map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        author: c.author?.displayName ?? "Unknown",
+        views: Math.floor(500 + Math.random() * 4500),
+        engagement: Math.floor(60 + Math.random() * 35),
+        avgReadTime: `${Math.floor(3 + Math.random() * 10)}:${String(
+          Math.floor(Math.random() * 60),
+        ).padStart(2, "0")}`,
+        publishedAt: c.createdAt.toISOString(),
+      }));
 
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      res.status(200).json(data);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 // ─── AI Insights ────────────────────────────────────────────────────────────
 
@@ -505,42 +585,49 @@ router.get("/top-content", authorize("USER", "ADMIN"), async (req: AuthRequest, 
  *       200:
  *         description: Insights list
  */
-router.get("/ai-insights", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    // In production, generate insights using AI/ML based on analytics data
-    res.status(200).json([
-      {
-        title: "Engagement Peak Identified",
-        description:
-          "Content published between 9-11 AM receives 34% more engagement. Consider scheduling posts during this window.",
-        sentiment: "positive" as const,
-        impact: "high" as const,
-      },
-      {
-        title: "Video Content Trending",
-        description: "Video content shows 2.5x higher engagement rate compared to articles this month.",
-        sentiment: "positive" as const,
-        impact: "high" as const,
-      },
-      {
-        title: "Drop in Weekend Activity",
-        description:
-          "User activity drops 45% on weekends. Consider automated posting or weekend-specific content.",
-        sentiment: "neutral" as const,
-        impact: "medium" as const,
-      },
-      {
-        title: "Long-form Content Decline",
-        description:
-          "Articles over 1500 words show 20% lower completion rates. Consider breaking into series.",
-        sentiment: "negative" as const,
-        impact: "medium" as const,
-      },
-    ]);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+router.get(
+  "/ai-insights",
+  authorize("USER", "ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // In production, generate insights using AI/ML based on analytics data
+      res.status(200).json([
+        {
+          title: "Engagement Peak Identified",
+          description:
+            "Content published between 9-11 AM receives 34% more engagement. Consider scheduling posts during this window.",
+          sentiment: "positive" as const,
+          impact: "high" as const,
+        },
+        {
+          title: "Video Content Trending",
+          description:
+            "Video content shows 2.5x higher engagement rate compared to articles this month.",
+          sentiment: "positive" as const,
+          impact: "high" as const,
+        },
+        {
+          title: "Drop in Weekend Activity",
+          description:
+            "User activity drops 45% on weekends. Consider automated posting or weekend-specific content.",
+          sentiment: "neutral" as const,
+          impact: "medium" as const,
+        },
+        {
+          title: "Long-form Content Decline",
+          description:
+            "Articles over 1500 words show 20% lower completion rates. Consider breaking into series.",
+          sentiment: "negative" as const,
+          impact: "medium" as const,
+        },
+      ]);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 // ─── CSV Export ─────────────────────────────────────────────────────────────
 
@@ -619,14 +706,17 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
         `SELECT "contentId", "eventType", metadata
          FROM content_analytics_events
          WHERE "createdAt" >= $1 AND "createdAt" <= $2 AND "contentId" = $3`,
-        range.from, range.to, String(req.query.contentId),
+        range.from,
+        range.to,
+        String(req.query.contentId),
       );
     } else {
       events = await prisma.$queryRawUnsafe<RawEvent[]>(
         `SELECT "contentId", "eventType", metadata
          FROM content_analytics_events
          WHERE "createdAt" >= $1 AND "createdAt" <= $2`,
-        range.from, range.to,
+        range.from,
+        range.to,
       );
     }
 
@@ -635,7 +725,9 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
     const contentMap = new Map<string, { title: string; author: string }>();
 
     if (contentIds.length > 0) {
-      const authorFilter = req.query.authorId ? { authorId: String(req.query.authorId) } : {};
+      const authorFilter = req.query.authorId
+        ? { authorId: String(req.query.authorId) }
+        : {};
       const contents = await prisma.content.findMany({
         where: { id: { in: contentIds }, ...authorFilter },
         include: { author: { select: { displayName: true } } },
@@ -676,7 +768,9 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
     for (const ev of events) {
       const m = metricsMap.get(ev.contentId);
       if (!m) continue;
-      const meta = (typeof ev.metadata === "object" ? ev.metadata : null) as Record<string, unknown> | null;
+      const meta = (
+        typeof ev.metadata === "object" ? ev.metadata : null
+      ) as Record<string, unknown> | null;
       const userId = meta?.userId as string | undefined;
 
       switch (ev.eventType) {
@@ -717,10 +811,16 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
 
     for (const cid of filteredContentIds) {
       const m = metricsMap.get(cid)!;
-      const info = contentMap.get(cid) ?? { title: "Unknown", author: "Unknown" };
+      const info = contentMap.get(cid) ?? {
+        title: "Unknown",
+        author: "Unknown",
+      };
       const avgReadTime =
         m.readingTimeSeconds.length > 0
-          ? (m.readingTimeSeconds.reduce((a, b) => a + b, 0) / m.readingTimeSeconds.length).toFixed(1)
+          ? (
+              m.readingTimeSeconds.reduce((a, b) => a + b, 0) /
+              m.readingTimeSeconds.length
+            ).toFixed(1)
           : "0";
       const totalReactions = m.likes + m.shares + m.bookmarks;
 
@@ -748,7 +848,9 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.status(200).send(rows.join("\n"));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 

@@ -23,4 +23,3 @@ export function getPrismaClient(): PrismaClient {
 
   return createPrismaClient();
 }
-

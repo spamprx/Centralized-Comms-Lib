@@ -1,5 +1,8 @@
 import type { TipTapDocument } from "../../repository/types";
-import type { FormattingViolation, TemplateFormattingRules } from "./formattingRules.types";
+import type {
+  FormattingViolation,
+  TemplateFormattingRules,
+} from "./formattingRules.types";
 
 function normFont(name: string): string {
   return name.trim().toLowerCase().replace(/['"]/g, "");
@@ -43,7 +46,10 @@ function walkNode(ctx: WalkCtx, node: unknown, path: string[]): void {
   const pathStr = path.join(".");
 
   if (type === "heading") {
-    const level = typeof n.attrs?.level === "number" ? n.attrs.level : Number(n.attrs?.level);
+    const level =
+      typeof n.attrs?.level === "number"
+        ? n.attrs.level
+        : Number(n.attrs?.level);
     const max = ctx.rules.headings?.maxLevel;
     if (typeof max === "number" && Number.isFinite(level) && level > max) {
       ctx.violations.push({
@@ -73,14 +79,20 @@ function walkNode(ctx: WalkCtx, node: unknown, path: string[]): void {
 
   if (type === "text" && Array.isArray(n.marks)) {
     for (let mi = 0; mi < n.marks.length; mi++) {
-      const mark = n.marks[mi] as { type?: string; attrs?: Record<string, unknown> };
+      const mark = n.marks[mi] as {
+        type?: string;
+        attrs?: Record<string, unknown>;
+      };
       if (mark?.type !== "textStyle" && mark?.type !== "TextStyle") continue;
       const attrs = mark.attrs ?? {};
-      const ff = typeof attrs.fontFamily === "string" ? attrs.fontFamily : undefined;
+      const ff =
+        typeof attrs.fontFamily === "string" ? attrs.fontFamily : undefined;
       const allowedFonts = ctx.rules.fonts?.allowedFamilies;
       if (allowedFonts?.length && typeof ff === "string") {
         const want = normFont(ff);
-        const ok = allowedFonts.some((f) => normFont(f) === want || want.includes(normFont(f)));
+        const ok = allowedFonts.some(
+          (f) => normFont(f) === want || want.includes(normFont(f)),
+        );
         if (!ok) {
           ctx.violations.push({
             code: "FONT_NOT_ALLOWED",
@@ -96,7 +108,9 @@ function walkNode(ctx: WalkCtx, node: unknown, path: string[]): void {
       const restrict = ctx.rules.colors?.restrictToPalette;
       if (typeof color === "string" && palette?.length && restrict) {
         const hx = normHex(color);
-        const normalizedPalette = palette.map((p) => normHex(p)).filter(Boolean) as string[];
+        const normalizedPalette = palette
+          .map((p) => normHex(p))
+          .filter(Boolean) as string[];
         if (hx && !normalizedPalette.includes(hx)) {
           ctx.violations.push({
             code: "COLOR_NOT_IN_PALETTE",

@@ -1,7 +1,10 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
 import { hashPassword } from "../../utils/hash";
-import { getSettingsSnapshot, mergeSettingsSection } from "./adminSettings.defaults";
+import {
+  getSettingsSnapshot,
+  mergeSettingsSection,
+} from "./adminSettings.defaults";
 
 export const adminService = {
   // ── Roles ─────────────────────────────────────────────────────────────────
@@ -179,7 +182,11 @@ export const adminService = {
     });
   },
 
-  async assignRoleToUser(ctx: AuditContext, userId: string, roleId: string): Promise<void> {
+  async assignRoleToUser(
+    ctx: AuditContext,
+    userId: string,
+    roleId: string,
+  ): Promise<void> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     await uow.withTransaction(async (repos) => {
@@ -196,7 +203,11 @@ export const adminService = {
     });
   },
 
-  async removeRoleFromUser(ctx: AuditContext, userId: string, roleId: string): Promise<void> {
+  async removeRoleFromUser(
+    ctx: AuditContext,
+    userId: string,
+    roleId: string,
+  ): Promise<void> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     await uow.withTransaction(async (repos) => {
@@ -257,7 +268,12 @@ export const adminService = {
 
   async createUser(
     ctx: AuditContext,
-    input: { email: string; displayName: string; password: string; roleId?: string | null },
+    input: {
+      email: string;
+      displayName: string;
+      password: string;
+      roleId?: string | null;
+    },
   ) {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -278,7 +294,11 @@ export const adminService = {
         action: "CREATE",
         resource: "USER",
         resourceId: user.id,
-        newValue: { email: input.email, displayName: input.displayName, roleId: input.roleId },
+        newValue: {
+          email: input.email,
+          displayName: input.displayName,
+          roleId: input.roleId,
+        },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
@@ -304,7 +324,9 @@ export const adminService = {
       const existing = await repos.userRole.getUserById(id);
       if (!existing) return { notFound: true } as const;
       const updated = await repos.userRole.updateUser(id, {
-        ...(input.displayName !== undefined && { displayName: input.displayName }),
+        ...(input.displayName !== undefined && {
+          displayName: input.displayName,
+        }),
         ...(input.email !== undefined && { email: input.email }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
         ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
@@ -320,7 +342,11 @@ export const adminService = {
         action: "UPDATE",
         resource: "USER",
         resourceId: id,
-        oldValue: { email: existing.email, displayName: existing.displayName, isActive: existing.isActive },
+        oldValue: {
+          email: existing.email,
+          displayName: existing.displayName,
+          isActive: existing.isActive,
+        },
         newValue: {
           email: input.email ?? existing.email,
           displayName: input.displayName ?? existing.displayName,
@@ -383,7 +409,10 @@ export const adminService = {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     const user = await repos.userRole.getUserById(id);
     if (!user) return { notFound: true } as const;
-    return { emailSent: false, message: "Password reset email is not configured in this environment." } as const;
+    return {
+      emailSent: false,
+      message: "Password reset email is not configured in this environment.",
+    } as const;
   },
 
   async getUserById(id: string) {
@@ -447,7 +476,9 @@ export const adminService = {
         where: { id },
         data: {
           ...(input.name !== undefined && { name: input.name }),
-          ...(input.description !== undefined && { description: input.description }),
+          ...(input.description !== undefined && {
+            description: input.description,
+          }),
         },
       });
       await repos.audit.append({
@@ -493,7 +524,11 @@ export const adminService = {
     });
   },
 
-  async addGroupMember(ctx: AuditContext, groupId: string, userId: string): Promise<void> {
+  async addGroupMember(
+    ctx: AuditContext,
+    groupId: string,
+    userId: string,
+  ): Promise<void> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     await uow.withTransaction(async (repos) => {
@@ -551,6 +586,9 @@ export const adminService = {
   },
 
   patchSettingsSection(section: string, patch: Record<string, unknown>) {
-    return mergeSettingsSection(section as Parameters<typeof mergeSettingsSection>[0], patch);
+    return mergeSettingsSection(
+      section as Parameters<typeof mergeSettingsSection>[0],
+      patch,
+    );
   },
 };

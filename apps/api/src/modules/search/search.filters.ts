@@ -1,11 +1,20 @@
 import type { ContentSearchFilters } from "../../search/searchTypes";
 
 const LIFECYCLE = new Set(["DRAFT", "IN_REVIEW", "PUBLISHED", "ARCHIVED"]);
-const VISIBILITY = new Set(["PUBLIC", "PRIVATE", "HIDDEN", "ARCHIVED", "PRIVATE_TO_GROUP"]);
+const VISIBILITY = new Set([
+  "PUBLIC",
+  "PRIVATE",
+  "HIDDEN",
+  "ARCHIVED",
+  "PRIVATE_TO_GROUP",
+]);
 
 function splitCsv(v: string | undefined): string[] | undefined {
   if (!v || !v.trim()) return undefined;
-  const parts = v.split(",").map((s) => s.trim()).filter(Boolean);
+  const parts = v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   return parts.length ? parts : undefined;
 }
 
@@ -24,14 +33,17 @@ export interface ParsedFiltersResult {
 /**
  * Parses and validates facet filter query parameters for `/search/content`.
  */
-export function parseContentSearchFilters(q: Record<string, unknown>): ParsedFiltersResult {
+export function parseContentSearchFilters(
+  q: Record<string, unknown>,
+): ParsedFiltersResult {
   const errors: string[] = [];
   const filters: ContentSearchFilters = {};
 
   const ws = typeof q.workspaceId === "string" ? q.workspaceId : undefined;
   if (ws) filters.workspaceId = ws;
 
-  const ls = typeof q.lifecycleState === "string" ? q.lifecycleState : undefined;
+  const ls =
+    typeof q.lifecycleState === "string" ? q.lifecycleState : undefined;
   if (ls) {
     if (!LIFECYCLE.has(ls)) errors.push(`Invalid lifecycleState: ${ls}`);
     else filters.lifecycleState = ls;
@@ -49,16 +61,22 @@ export function parseContentSearchFilters(q: Record<string, unknown>): ParsedFil
   const tid = typeof q.templateId === "string" ? q.templateId : undefined;
   if (tid) filters.templateId = tid;
 
-  const ch = splitCsv(typeof q.channelIds === "string" ? q.channelIds : undefined);
+  const ch = splitCsv(
+    typeof q.channelIds === "string" ? q.channelIds : undefined,
+  );
   if (ch) filters.channelIds = ch;
 
   const tagIds = splitCsv(typeof q.tagIds === "string" ? q.tagIds : undefined);
   if (tagIds) filters.tagIds = tagIds;
 
-  const tagSlugs = splitCsv(typeof q.tagSlugs === "string" ? q.tagSlugs : undefined);
+  const tagSlugs = splitCsv(
+    typeof q.tagSlugs === "string" ? q.tagSlugs : undefined,
+  );
   if (tagSlugs) filters.tagSlugs = tagSlugs;
 
-  const ai = parseBool(typeof q.aiGenerated === "string" ? q.aiGenerated : undefined);
+  const ai = parseBool(
+    typeof q.aiGenerated === "string" ? q.aiGenerated : undefined,
+  );
   if (ai !== undefined) filters.aiGenerated = ai;
 
   return { filters, errors };

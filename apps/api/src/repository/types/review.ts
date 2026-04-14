@@ -44,4 +44,3 @@ export interface ReviewComment {
   createdAt: Date;
   updatedAt: Date;
 }
-

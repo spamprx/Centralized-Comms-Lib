@@ -24,14 +24,25 @@ function parseFloatEnv(name: string, fallback: number): number {
 
 export function getDefaultRankBlendWeights(): RankBlendWeights {
   return {
-    keyword: parseFloatEnv("SEARCH_RANK_WEIGHT_KEYWORD", DEFAULT_WEIGHTS.keyword),
+    keyword: parseFloatEnv(
+      "SEARCH_RANK_WEIGHT_KEYWORD",
+      DEFAULT_WEIGHTS.keyword,
+    ),
     vector: parseFloatEnv("SEARCH_RANK_WEIGHT_VECTOR", DEFAULT_WEIGHTS.vector),
-    recency: parseFloatEnv("SEARCH_RANK_WEIGHT_RECENCY", DEFAULT_WEIGHTS.recency),
-    engagement: parseFloatEnv("SEARCH_RANK_WEIGHT_ENGAGEMENT", DEFAULT_WEIGHTS.engagement),
+    recency: parseFloatEnv(
+      "SEARCH_RANK_WEIGHT_RECENCY",
+      DEFAULT_WEIGHTS.recency,
+    ),
+    engagement: parseFloatEnv(
+      "SEARCH_RANK_WEIGHT_ENGAGEMENT",
+      DEFAULT_WEIGHTS.engagement,
+    ),
   };
 }
 
-export function normalizeRankBlendWeights(w: Partial<RankBlendWeights> | undefined): RankBlendWeights {
+export function normalizeRankBlendWeights(
+  w: Partial<RankBlendWeights> | undefined,
+): RankBlendWeights {
   const base = getDefaultRankBlendWeights();
   const merged: RankBlendWeights = {
     keyword: w?.keyword ?? base.keyword,
@@ -54,7 +65,11 @@ export function rrfScore(rankIndex: number, k = 60): number {
   return 1 / (k + rankIndex + 1);
 }
 
-export function recencyScore(updatedAtIso: string | undefined, nowMs: number, halfLifeDays: number): number {
+export function recencyScore(
+  updatedAtIso: string | undefined,
+  nowMs: number,
+  halfLifeDays: number,
+): number {
   if (!updatedAtIso) return 0;
   const t = new Date(updatedAtIso).getTime();
   if (!Number.isFinite(t)) return 0;

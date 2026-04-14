@@ -1,12 +1,18 @@
 import type { PrismaClient } from "@prisma/client";
-import { CONTENT_INDEX_NAME, getElasticsearchClient, TITLE_EMBEDDING_DIMS } from "@comms-lib/db-elasticsearch";
+import {
+  CONTENT_INDEX_NAME,
+  getElasticsearchClient,
+  TITLE_EMBEDDING_DIMS,
+} from "@comms-lib/db-elasticsearch";
 import { buildContentIndexDocument } from "./contentIndex.document";
 
 /**
  * Optional HTTP embedding service: `EMBEDDING_SERVICE_URL` base URL, POST JSON `{ "text": "..." }`
  * returning `{ "embedding": number[] }` with length `TITLE_EMBEDDING_DIMS` (384).
  */
-export async function embedTextForIndex(text: string): Promise<number[] | null> {
+export async function embedTextForIndex(
+  text: string,
+): Promise<number[] | null> {
   const base = process.env.EMBEDDING_SERVICE_URL?.trim();
   if (!base) return null;
   const path = process.env.EMBEDDING_SERVICE_PATH?.trim() || "/embed";

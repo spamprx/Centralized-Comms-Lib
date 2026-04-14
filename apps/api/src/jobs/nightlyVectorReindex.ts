@@ -1,7 +1,13 @@
 import "dotenv/config";
-import { getElasticsearchClient, CONTENT_INDEX_NAME } from "@comms-lib/db-elasticsearch";
+import {
+  getElasticsearchClient,
+  CONTENT_INDEX_NAME,
+} from "@comms-lib/db-elasticsearch";
 import { getPrismaClient } from "../repository";
-import { ensureContentSearchIndex, syncContentIndexFromDb } from "../search/contentSearch.service";
+import {
+  ensureContentSearchIndex,
+  syncContentIndexFromDb,
+} from "../search/contentSearch.service";
 import { bumpSearchCacheEpoch } from "../shared/cache/redisClient";
 import { refreshTitleEmbeddingForContent } from "../search/contentEmbedding";
 
@@ -61,7 +67,11 @@ export async function runNightlyVectorReindex(): Promise<{
           const id = String(h._id ?? "");
           if (id && !validIds.has(id)) {
             try {
-              await es.delete({ index: CONTENT_INDEX_NAME, id, refresh: false });
+              await es.delete({
+                index: CONTENT_INDEX_NAME,
+                id,
+                refresh: false,
+              });
               pruned += 1;
             } catch {
               /* ignore */

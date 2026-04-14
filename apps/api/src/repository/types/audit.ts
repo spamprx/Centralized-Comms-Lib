@@ -32,4 +32,3 @@ export interface AuditLogFilters {
   limit?: number;
   offset?: number;
 }
-

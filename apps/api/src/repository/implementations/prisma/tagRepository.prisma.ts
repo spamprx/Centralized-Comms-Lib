@@ -41,7 +41,11 @@ export class PrismaTagRepository implements TagRepository {
     return rows.map(toTag);
   }
 
-  async create(input: { name: string; slug: string; parentId?: string | null }): Promise<Tag> {
+  async create(input: {
+    name: string;
+    slug: string;
+    parentId?: string | null;
+  }): Promise<Tag> {
     const row = await this.db.tag.create({
       data: {
         name: input.name,

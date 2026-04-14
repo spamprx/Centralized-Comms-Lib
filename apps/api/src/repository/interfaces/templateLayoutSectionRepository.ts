@@ -9,11 +9,21 @@ export interface CreateTemplateLayoutSectionInput {
 }
 
 export interface TemplateLayoutSectionRepository {
-  create(input: CreateTemplateLayoutSectionInput): Promise<TemplateLayoutSectionRecord>;
-  listForTemplatePhase(templateId: string, phase: LayoutPhase): Promise<TemplateLayoutSectionRecord[]>;
+  create(
+    input: CreateTemplateLayoutSectionInput,
+  ): Promise<TemplateLayoutSectionRecord>;
+  listForTemplatePhase(
+    templateId: string,
+    phase: LayoutPhase,
+  ): Promise<TemplateLayoutSectionRecord[]>;
   update(
     id: string,
-    input: Partial<Pick<TemplateLayoutSectionRecord, "sortOrder" | "componentVersionId" | "props">>,
+    input: Partial<
+      Pick<
+        TemplateLayoutSectionRecord,
+        "sortOrder" | "componentVersionId" | "props"
+      >
+    >,
   ): Promise<TemplateLayoutSectionRecord>;
   delete(id: string): Promise<void>;
   deleteAllForTemplate(templateId: string): Promise<void>;

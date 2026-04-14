@@ -1,14 +1,26 @@
 import Redis from "ioredis";
 import type { RedisOptions } from "ioredis";
-import { redisPingMs, searchCacheWritesSkipped } from "../../observability/prometheusRegistry";
+import {
+  redisPingMs,
+  searchCacheWritesSkipped,
+} from "../../observability/prometheusRegistry";
 
 let client: Redis | null | undefined;
 
-const MAX_CACHE_VALUE_BYTES = Number.parseInt(process.env.SEARCH_CACHE_MAX_VALUE_BYTES ?? "262144", 10);
+const MAX_CACHE_VALUE_BYTES = Number.parseInt(
+  process.env.SEARCH_CACHE_MAX_VALUE_BYTES ?? "262144",
+  10,
+);
 
 function buildRedisOptions(): RedisOptions {
-  const connectTimeout = Number.parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS ?? "10000", 10);
-  const commandTimeout = Number.parseInt(process.env.REDIS_COMMAND_TIMEOUT_MS ?? "5000", 10);
+  const connectTimeout = Number.parseInt(
+    process.env.REDIS_CONNECT_TIMEOUT_MS ?? "10000",
+    10,
+  );
+  const commandTimeout = Number.parseInt(
+    process.env.REDIS_COMMAND_TIMEOUT_MS ?? "5000",
+    10,
+  );
   return {
     maxRetriesPerRequest: 2,
     lazyConnect: true,
@@ -48,7 +60,11 @@ export async function redisGet(key: string): Promise<string | null> {
   }
 }
 
-export async function redisSet(key: string, value: string, ttlSec: number): Promise<void> {
+export async function redisSet(
+  key: string,
+  value: string,
+  ttlSec: number,
+): Promise<void> {
   const byteLen = Buffer.byteLength(value, "utf8");
   if (byteLen > MAX_CACHE_VALUE_BYTES) {
     searchCacheWritesSkipped.inc({ reason: "oversize" });

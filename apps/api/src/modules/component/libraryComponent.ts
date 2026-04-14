@@ -31,7 +31,10 @@ export function normalizeSnapshotDoc(raw: unknown): TipTapDocument | null {
   return null;
 }
 
-function defaultPlaceholderParagraph(kind: "linked" | "detached", label: string): unknown {
+function defaultPlaceholderParagraph(
+  kind: "linked" | "detached",
+  label: string,
+): unknown {
   const prefix = kind === "linked" ? "↻ Linked" : "⎘ Detached";
   return {
     type: "paragraph",
@@ -44,7 +47,9 @@ function defaultPlaceholderParagraph(kind: "linked" | "detached", label: string)
   };
 }
 
-function contentFromDocOrEmpty(doc: TipTapDocument | null | undefined): unknown[] {
+function contentFromDocOrEmpty(
+  doc: TipTapDocument | null | undefined,
+): unknown[] {
   if (!doc || !Array.isArray((doc as { content?: unknown }).content)) {
     return [];
   }
@@ -61,7 +66,9 @@ export function buildLinkedLibraryNode(input: {
   const label = input.label.trim() || input.componentKey;
   const fromCanonical = contentFromDocOrEmpty(input.canonicalBody ?? null);
   const content =
-    fromCanonical.length > 0 ? fromCanonical : [defaultPlaceholderParagraph("linked", label)];
+    fromCanonical.length > 0
+      ? fromCanonical
+      : [defaultPlaceholderParagraph("linked", label)];
 
   return {
     type: LIBRARY_NODE,
@@ -70,7 +77,9 @@ export function buildLinkedLibraryNode(input: {
       componentKey: input.componentKey,
       componentVersionId: input.componentVersionId,
       label,
-      ...(input.componentName?.trim() ? { componentName: input.componentName.trim() } : {}),
+      ...(input.componentName?.trim()
+        ? { componentName: input.componentName.trim() }
+        : {}),
     },
     content,
   };
@@ -89,10 +98,14 @@ export function refreshLinkedLibraryNodeFromCanonical(
   /** Detached blocks keep frozen `content` + `attrs.detachedSnapshot`; only linked nodes sync from the registry. */
   if (attrs.linkMode !== "linked") return node;
   const label =
-    typeof attrs.label === "string" ? attrs.label : String(attrs.componentKey ?? "component");
+    typeof attrs.label === "string"
+      ? attrs.label
+      : String(attrs.componentKey ?? "component");
   const fromCanonical = contentFromDocOrEmpty(canonical ?? null);
   const content =
-    fromCanonical.length > 0 ? fromCanonical : [defaultPlaceholderParagraph("linked", label)];
+    fromCanonical.length > 0
+      ? fromCanonical
+      : [defaultPlaceholderParagraph("linked", label)];
   return { ...node, content };
 }
 
@@ -107,7 +120,8 @@ export function buildDetachedLibraryNode(input: {
   const label = input.label.trim() || input.componentKey;
   const snap = deepCloneJson(input.snapshotDoc);
   const inner = contentFromDocOrEmpty(snap);
-  const content = inner.length > 0 ? inner : [defaultPlaceholderParagraph("detached", label)];
+  const content =
+    inner.length > 0 ? inner : [defaultPlaceholderParagraph("detached", label)];
 
   return {
     type: LIBRARY_NODE,
@@ -118,13 +132,18 @@ export function buildDetachedLibraryNode(input: {
       capturedAt: new Date().toISOString(),
       label,
       detachedSnapshot: snap,
-      ...(input.componentName?.trim() ? { componentName: input.componentName.trim() } : {}),
+      ...(input.componentName?.trim()
+        ? { componentName: input.componentName.trim() }
+        : {}),
     },
     content,
   };
 }
 
-function visitBlockNodes(node: Record<string, unknown>, visit: (n: Record<string, unknown>) => void): void {
+function visitBlockNodes(
+  node: Record<string, unknown>,
+  visit: (n: Record<string, unknown>) => void,
+): void {
   visit(node);
   const ch = node.content;
   if (!Array.isArray(ch)) return;
@@ -146,7 +165,10 @@ export function collectLinkedComponentVersionIds(doc: unknown): string[] {
   visitBlockNodes(root, (n) => {
     if (n.type !== LIBRARY_NODE) return;
     const attrs = (n.attrs as Record<string, unknown> | undefined) ?? {};
-    if (attrs.linkMode === "linked" && typeof attrs.componentVersionId === "string") {
+    if (
+      attrs.linkMode === "linked" &&
+      typeof attrs.componentVersionId === "string"
+    ) {
       ids.add(attrs.componentVersionId);
     }
   });
@@ -167,9 +189,16 @@ export function refreshLinkedNodesInDocument(
   visitBlockNodes(root, (n) => {
     if (n.type !== LIBRARY_NODE) return;
     const attrs = (n.attrs as Record<string, unknown> | undefined) ?? {};
-    if (attrs.linkMode !== "linked" || typeof attrs.componentVersionId !== "string") return;
+    if (
+      attrs.linkMode !== "linked" ||
+      typeof attrs.componentVersionId !== "string"
+    )
+      return;
     const canonical = canonicalByVersionId.get(attrs.componentVersionId);
-    const refreshed = refreshLinkedLibraryNodeFromCanonical(n, canonical ?? undefined);
+    const refreshed = refreshLinkedLibraryNodeFromCanonical(
+      n,
+      canonical ?? undefined,
+    );
     Object.assign(n, refreshed);
   });
   return cloned;

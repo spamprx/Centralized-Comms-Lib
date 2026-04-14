@@ -121,24 +121,35 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
     return row ? toUser(row) : null;
   }
 
-  async getUserByEmailWithPassword(email: string): Promise<UserWithPassword | null> {
+  async getUserByEmailWithPassword(
+    email: string,
+  ): Promise<UserWithPassword | null> {
     const row = await this.db.user.findUnique({ where: { email } });
     return row ? toUserWithPassword(row) : null;
   }
 
   async listUsers(): Promise<User[]> {
-    const rows = await this.db.user.findMany({ orderBy: { createdAt: "desc" } });
+    const rows = await this.db.user.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     return rows.map(toUser);
   }
 
   async updateUser(
     id: string,
-    input: { displayName?: string; email?: string; isActive?: boolean; avatarUrl?: string | null },
+    input: {
+      displayName?: string;
+      email?: string;
+      isActive?: boolean;
+      avatarUrl?: string | null;
+    },
   ): Promise<User> {
     const row = await this.db.user.update({
       where: { id },
       data: {
-        ...(input.displayName !== undefined && { displayName: input.displayName }),
+        ...(input.displayName !== undefined && {
+          displayName: input.displayName,
+        }),
         ...(input.email !== undefined && { email: input.email }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
         ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
@@ -196,7 +207,9 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name }),
-        ...(input.description !== undefined && { description: input.description }),
+        ...(input.description !== undefined && {
+          description: input.description,
+        }),
         ...(input.isSystem !== undefined && { isSystem: input.isSystem }),
       },
     });
@@ -207,7 +220,11 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
     await this.db.role.delete({ where: { id } });
   }
 
-  async assignRole(userId: string, roleId: string, assignedById?: string): Promise<void> {
+  async assignRole(
+    userId: string,
+    roleId: string,
+    assignedById?: string,
+  ): Promise<void> {
     await this.db.userRole.create({
       data: {
         userId,

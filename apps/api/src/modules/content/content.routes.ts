@@ -83,7 +83,9 @@ router.post("/:id/co-authors", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the main author can add co-authors" });
+      res
+        .status(403)
+        .json({ error: "Only the main author can add co-authors" });
       return;
     }
     if ("alreadyCoAuthor" in result && result.alreadyCoAuthor) {
@@ -138,39 +140,46 @@ router.post("/:id/co-authors", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post("/:id/co-authors/respond", async (req: AuthRequest, res: Response) => {
-  try {
-    const { decision } = req.body as { decision?: "APPROVE" | "REJECT" };
-    if (!decision || (decision !== "APPROVE" && decision !== "REJECT")) {
-      res.status(400).json({ error: "decision must be APPROVE or REJECT" });
-      return;
+router.post(
+  "/:id/co-authors/respond",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { decision } = req.body as { decision?: "APPROVE" | "REJECT" };
+      if (!decision || (decision !== "APPROVE" && decision !== "REJECT")) {
+        res.status(400).json({ error: "decision must be APPROVE or REJECT" });
+        return;
+      }
+
+      const result = await contentService.respondToCoAuthorRequest(
+        auditContext(req),
+        req.params.id,
+        decision,
+      );
+
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Co-author request not found" });
+        return;
+      }
+
+      if ("updated" in result && result.updated) {
+        const accepted = "accepted" in result && result.accepted;
+        res.status(200).json({
+          message: accepted
+            ? "Co-author request accepted"
+            : "Co-author request rejected",
+        });
+        return;
+      }
+
+      res
+        .status(500)
+        .json({ error: "Unexpected response from co-author service" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-
-    const result = await contentService.respondToCoAuthorRequest(
-      auditContext(req),
-      req.params.id,
-      decision,
-    );
-
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Co-author request not found" });
-      return;
-    }
-
-    if ("updated" in result && result.updated) {
-      const accepted = "accepted" in result && result.accepted;
-      res.status(200).json({
-        message: accepted ? "Co-author request accepted" : "Co-author request rejected",
-      });
-      return;
-    }
-
-    res.status(500).json({ error: "Unexpected response from co-author service" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -223,7 +232,8 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
     }
     if (body !== undefined && body !== null && !isValidTipTapDocument(body)) {
       res.status(400).json({
-        error: "body must be a valid TipTap document (type: 'doc', content: array)",
+        error:
+          "body must be a valid TipTap document (type: 'doc', content: array)",
       });
       return;
     }
@@ -235,7 +245,12 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
       contentType: contentType ?? undefined,
     });
     if ("invalidFormatting" in result && result.invalidFormatting) {
-      res.status(422).json({ error: "Formatting rule violations", violations: result.violations });
+      res
+        .status(422)
+        .json({
+          error: "Formatting rule violations",
+          violations: result.violations,
+        });
       return;
     }
     res.status(201).json(result);
@@ -286,17 +301,23 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const isAdmin = req.user!.role === "ADMIN";
     const requesterId = req.user!.id;
     const requestedAuthorId = req.query.authorId as string | undefined;
-    const isOwnListRequest = !!requestedAuthorId && requestedAuthorId === requesterId;
+    const isOwnListRequest =
+      !!requestedAuthorId && requestedAuthorId === requesterId;
     const filters = {
       authorId: requestedAuthorId,
       // Security: non-admins can only list non-published content for themselves.
-      lifecycleState: (isAdmin || isOwnListRequest
-        ? (req.query.lifecycleState as LifecycleState | undefined)
-        : ("PUBLISHED" as LifecycleState)),
+      lifecycleState:
+        isAdmin || isOwnListRequest
+          ? (req.query.lifecycleState as LifecycleState | undefined)
+          : ("PUBLISHED" as LifecycleState),
       visibility: req.query.visibility as Visibility | undefined,
       contentType: req.query.contentType as any,
-      limit: req.query.limit ? Number.parseInt(req.query.limit as string) : undefined,
-      offset: req.query.offset ? Number.parseInt(req.query.offset as string) : undefined,
+      limit: req.query.limit
+        ? Number.parseInt(req.query.limit as string)
+        : undefined,
+      offset: req.query.offset
+        ? Number.parseInt(req.query.offset as string)
+        : undefined,
     };
     const contents = await contentService.list(filters, {
       id: requesterId,
@@ -376,7 +397,10 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await contentService.delete(auditContext(req), req.params.id);
+    const result = await contentService.delete(
+      auditContext(req),
+      req.params.id,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
       return;
@@ -439,15 +463,20 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
     const { body, title, contentType } = req.body;
     if (body !== undefined && body !== null && !isValidTipTapDocument(body)) {
       res.status(400).json({
-        error: "body must be a valid TipTap document (type: 'doc', content: array)",
+        error:
+          "body must be a valid TipTap document (type: 'doc', content: array)",
       });
       return;
     }
-    const result = await contentService.saveBody(auditContext(req), req.params.id, {
-      body: body ?? undefined,
-      title,
-      contentType: contentType ?? undefined,
-    });
+    const result = await contentService.saveBody(
+      auditContext(req),
+      req.params.id,
+      {
+        body: body ?? undefined,
+        title,
+        contentType: contentType ?? undefined,
+      },
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
       return;
@@ -463,7 +492,12 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("invalidFormatting" in result && result.invalidFormatting) {
-      res.status(422).json({ error: "Formatting rule violations", violations: result.violations });
+      res
+        .status(422)
+        .json({
+          error: "Formatting rule violations",
+          violations: result.violations,
+        });
       return;
     }
     if ("version" in result) res.status(200).json(result.version);
@@ -513,40 +547,49 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post("/:id/STATE_TRANSITION", async (req: AuthRequest, res: Response) => {
-  try {
-    const raw = (req.body as { lifecycleState?: unknown })?.lifecycleState;
-    const lifecycleState =
-      typeof raw === "string" ? (raw.toUpperCase() as LifecycleState) : (raw as LifecycleState);
-    if (!lifecycleState) {
-      res.status(400).json({ error: "lifecycleState is required" });
-      return;
+router.post(
+  "/:id/STATE_TRANSITION",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const raw = (req.body as { lifecycleState?: unknown })?.lifecycleState;
+      const lifecycleState =
+        typeof raw === "string"
+          ? (raw.toUpperCase() as LifecycleState)
+          : (raw as LifecycleState);
+      if (!lifecycleState) {
+        res.status(400).json({ error: "lifecycleState is required" });
+        return;
+      }
+      const result = await contentService.transitionState(
+        auditContext(req),
+        req.params.id,
+        lifecycleState,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res
+          .status(403)
+          .json({
+            error: "Only the content author or an admin can transition state",
+          });
+        return;
+      }
+      if ("invalidTransition" in result && result.invalidTransition) {
+        res.status(422).json({
+          error: `Invalid state transition from ${result.current} to ${lifecycleState}`,
+        });
+        return;
+      }
+      if ("content" in result) res.status(200).json(result.content);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const result = await contentService.transitionState(
-      auditContext(req),
-      req.params.id,
-      lifecycleState,
-    );
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Content not found" });
-      return;
-    }
-    if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the content author or an admin can transition state" });
-      return;
-    }
-    if ("invalidTransition" in result && result.invalidTransition) {
-      res.status(422).json({
-        error: `Invalid state transition from ${result.current} to ${lifecycleState}`,
-      });
-      return;
-    }
-    if ("content" in result) res.status(200).json(result.content);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -624,11 +667,13 @@ router.get("/:id/annotations", async (req: AuthRequest, res: Response) => {
     const rows = await prisma.contentAnnotation.findMany({
       where: { contentId: req.params.id },
       orderBy: { createdAt: "desc" },
-      include: { author: { select: { id: true, displayName: true, email: true } } },
+      include: {
+        author: { select: { id: true, displayName: true, email: true } },
+      },
       take: 200,
     });
     res.status(200).json(
-      rows.map((r: typeof rows[number]) => ({
+      rows.map((r: (typeof rows)[number]) => ({
         id: r.id,
         body: r.body,
         createdAt: r.createdAt,
@@ -678,7 +723,9 @@ router.post("/:id/annotations", async (req: AuthRequest, res: Response) => {
         selectionTo: typeof selectionTo === "number" ? selectionTo : null,
         selectionText: typeof selectionText === "string" ? selectionText : null,
       },
-      include: { author: { select: { id: true, displayName: true, email: true } } },
+      include: {
+        author: { select: { id: true, displayName: true, email: true } },
+      },
     });
 
     res.status(201).json({
@@ -771,7 +818,9 @@ router.get("/:id/bookmark", async (req: AuthRequest, res: Response) => {
     }
     const prisma = getPrismaClient();
     const existing = await prisma.contentBookmark.findUnique({
-      where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+      where: {
+        contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+      },
       select: { id: true },
     });
     res.status(200).json({ bookmarked: !!existing });
@@ -793,7 +842,9 @@ router.post("/:id/bookmark", async (req: AuthRequest, res: Response) => {
     }
     const prisma = getPrismaClient();
     await prisma.contentBookmark.upsert({
-      where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+      where: {
+        contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+      },
       create: { contentId: req.params.id, userId: req.user!.id },
       update: {},
     });
@@ -865,7 +916,9 @@ router.get("/:id/engagement", async (req: AuthRequest, res: Response) => {
       prisma.contentLike.count({ where: { contentId: req.params.id } }),
       prisma.contentComment.count({ where: { contentId: req.params.id } }),
       prisma.contentLike.findUnique({
-        where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+        where: {
+          contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+        },
         select: { id: true },
       }),
     ]);
@@ -937,12 +990,23 @@ router.post("/:id/view", async (req: AuthRequest, res: Response) => {
 
     const prisma = getPrismaClient();
     await prisma.contentView.upsert({
-      where: { contentId_sessionId: { contentId: req.params.id, sessionId: sessionId.trim() } },
-      create: { contentId: req.params.id, userId: req.user!.id, sessionId: sessionId.trim() },
+      where: {
+        contentId_sessionId: {
+          contentId: req.params.id,
+          sessionId: sessionId.trim(),
+        },
+      },
+      create: {
+        contentId: req.params.id,
+        userId: req.user!.id,
+        sessionId: sessionId.trim(),
+      },
       update: {},
     });
 
-    const views = await prisma.contentView.count({ where: { contentId: req.params.id } });
+    const views = await prisma.contentView.count({
+      where: { contentId: req.params.id },
+    });
     res.status(200).json({ views });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1005,11 +1069,15 @@ router.post("/:id/like", async (req: AuthRequest, res: Response) => {
 
     const prisma = getPrismaClient();
     await prisma.contentLike.upsert({
-      where: { contentId_userId: { contentId: req.params.id, userId: req.user!.id } },
+      where: {
+        contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+      },
       create: { contentId: req.params.id, userId: req.user!.id },
       update: {},
     });
-    const likes = await prisma.contentLike.count({ where: { contentId: req.params.id } });
+    const likes = await prisma.contentLike.count({
+      where: { contentId: req.params.id },
+    });
     res.status(200).json({ liked: true, likes });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1032,7 +1100,9 @@ router.delete("/:id/like", async (req: AuthRequest, res: Response) => {
     await prisma.contentLike.deleteMany({
       where: { contentId: req.params.id, userId: req.user!.id },
     });
-    const likes = await prisma.contentLike.count({ where: { contentId: req.params.id } });
+    const likes = await prisma.contentLike.count({
+      where: { contentId: req.params.id },
+    });
     res.status(200).json({ liked: false, likes });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1119,7 +1189,9 @@ router.get("/:id/comments", async (req: AuthRequest, res: Response) => {
       where: { contentId: req.params.id },
       orderBy: { createdAt: "desc" },
       take: 100,
-      include: { author: { select: { id: true, displayName: true, email: true } } },
+      include: {
+        author: { select: { id: true, displayName: true, email: true } },
+      },
     })) as CommentRow[];
 
     res.status(200).json(
@@ -1157,8 +1229,14 @@ router.post("/:id/comments", async (req: AuthRequest, res: Response) => {
 
     const prisma = getPrismaClient();
     const created = await prisma.contentComment.create({
-      data: { contentId: req.params.id, authorId: req.user!.id, body: body.trim() },
-      include: { author: { select: { id: true, displayName: true, email: true } } },
+      data: {
+        contentId: req.params.id,
+        authorId: req.user!.id,
+        body: body.trim(),
+      },
+      include: {
+        author: { select: { id: true, displayName: true, email: true } },
+      },
     });
 
     res.status(201).json({
@@ -1174,7 +1252,6 @@ router.post("/:id/comments", async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: message });
   }
 });
-
 
 /**
  * @openapi
@@ -1214,7 +1291,11 @@ router.post("/:id/delete", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the content author or an admin can delete content" });
+      res
+        .status(403)
+        .json({
+          error: "Only the content author or an admin can delete content",
+        });
       return;
     }
     if ("invalidTransition" in result && result.invalidTransition) {
@@ -1289,7 +1370,11 @@ router.patch("/:id/visibility", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the content author or an admin can change visibility" });
+      res
+        .status(403)
+        .json({
+          error: "Only the content author or an admin can change visibility",
+        });
       return;
     }
     if ("content" in result) res.status(200).json(result.content);
@@ -1340,13 +1425,19 @@ router.post("/:id/tags", async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: "tagId is required" });
       return;
     }
-    const result = await contentService.assignTag(auditContext(req), req.params.id, tagId);
+    const result = await contentService.assignTag(
+      auditContext(req),
+      req.params.id,
+      tagId,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the content author or an admin can assign tags" });
+      res
+        .status(403)
+        .json({ error: "Only the content author or an admin can assign tags" });
       return;
     }
     res.status(200).json({ message: "Tag assigned" });
@@ -1394,7 +1485,9 @@ router.delete("/:id/tags/:tagId", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the content author or an admin can remove tags" });
+      res
+        .status(403)
+        .json({ error: "Only the content author or an admin can remove tags" });
       return;
     }
     res.status(200).json({ message: "Tag removed" });
@@ -1492,7 +1585,9 @@ router.post("/:id/snapshots/diff", async (req: AuthRequest, res: Response) => {
       snapshotBId?: string;
     };
     if (!snapshotAId || !snapshotBId) {
-      res.status(400).json({ error: "snapshotAId and snapshotBId are required" });
+      res
+        .status(400)
+        .json({ error: "snapshotAId and snapshotBId are required" });
       return;
     }
 

@@ -84,7 +84,10 @@ export class PrismaReviewRepository implements ReviewRepository {
     return rows.map(toRequest);
   }
 
-  async updateRequestStatus(requestId: string, status: ReviewRequestStatus): Promise<ReviewRequest> {
+  async updateRequestStatus(
+    requestId: string,
+    status: ReviewRequestStatus,
+  ): Promise<ReviewRequest> {
     const row = await this.db.reviewRequest.update({
       where: { id: requestId },
       data: { status },
@@ -112,7 +115,9 @@ export class PrismaReviewRepository implements ReviewRepository {
     return row ? toAssignment(row) : null;
   }
 
-  async listAssignmentsForRequest(requestId: string): Promise<ReviewAssignment[]> {
+  async listAssignmentsForRequest(
+    requestId: string,
+  ): Promise<ReviewAssignment[]> {
     const rows = await this.db.reviewAssignment.findMany({
       where: { reviewRequestId: requestId },
       orderBy: { assignedAt: "desc" },
@@ -120,7 +125,9 @@ export class PrismaReviewRepository implements ReviewRepository {
     return rows.map(toAssignment);
   }
 
-  async listAssignmentsForReviewer(reviewerId: string): Promise<ReviewAssignment[]> {
+  async listAssignmentsForReviewer(
+    reviewerId: string,
+  ): Promise<ReviewAssignment[]> {
     const rows = await this.db.reviewAssignment.findMany({
       where: { reviewerId },
       orderBy: { assignedAt: "desc" },
@@ -177,7 +184,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       where: { reviewAssignmentId: assignmentId },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map((row: typeof rows[number]) => ({
+    return rows.map((row: (typeof rows)[number]) => ({
       id: row.id,
       body: row.body,
       reviewAssignmentId: row.reviewAssignmentId,

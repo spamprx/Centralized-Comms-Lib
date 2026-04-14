@@ -15,4 +15,3 @@ export interface OutboxEvent {
   processedAt: Date | null;
   retryCount: number;
 }
-

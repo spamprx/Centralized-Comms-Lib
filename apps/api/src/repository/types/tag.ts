@@ -5,4 +5,3 @@ export interface Tag {
   parentId: string | null;
   createdAt: Date;
 }
-

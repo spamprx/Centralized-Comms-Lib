@@ -7,14 +7,18 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 export const formattingRuleService = {
-  async getForTemplate(templateId: string): Promise<{ id: string; rules: TemplateFormattingRules } | null> {
+  async getForTemplate(
+    templateId: string,
+  ): Promise<{ id: string; rules: TemplateFormattingRules } | null> {
     const row = await getPrismaClient().templateFormattingRule.findUnique({
       where: { templateId },
     });
     if (!row) return null;
     return {
       id: row.id,
-      rules: (isPlainObject(row.rules) ? row.rules : {}) as TemplateFormattingRules,
+      rules: (isPlainObject(row.rules)
+        ? row.rules
+        : {}) as TemplateFormattingRules,
     };
   },
 
@@ -22,15 +26,22 @@ export const formattingRuleService = {
     ctx: AuditContext,
     templateId: string,
     rules: unknown,
-  ): Promise<{ ok: true } | { notFound: true } | { invalid: true; message: string }> {
+  ): Promise<
+    { ok: true } | { notFound: true } | { invalid: true; message: string }
+  > {
     if (!isPlainObject(rules)) {
       return { invalid: true, message: "rules must be a JSON object" };
     }
     const prisma = getPrismaClient();
-    const tpl = await prisma.template.findUnique({ where: { id: templateId }, select: { id: true } });
+    const tpl = await prisma.template.findUnique({
+      where: { id: templateId },
+      select: { id: true },
+    });
     if (!tpl) return { notFound: true };
 
-    const existing = await prisma.templateFormattingRule.findUnique({ where: { templateId } });
+    const existing = await prisma.templateFormattingRule.findUnique({
+      where: { templateId },
+    });
     await prisma.templateFormattingRule.upsert({
       where: { templateId },
       create: { templateId, rules: rules as object },
@@ -55,7 +66,9 @@ export const formattingRuleService = {
     templateId: string,
   ): Promise<{ ok: true } | { notFound: true }> {
     const prisma = getPrismaClient();
-    const existing = await prisma.templateFormattingRule.findUnique({ where: { templateId } });
+    const existing = await prisma.templateFormattingRule.findUnique({
+      where: { templateId },
+    });
     if (!existing) return { notFound: true };
     await prisma.templateFormattingRule.delete({ where: { templateId } });
     const repos = new PrismaUnitOfWork(prisma).repos();

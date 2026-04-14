@@ -22,7 +22,7 @@ const swaggerDefinition = {
     {
       url: REMOTE_URL,
       description: "Remote development",
-    }
+    },
   ],
   components: {
     securitySchemes: {
@@ -35,9 +35,15 @@ const swaggerDefinition = {
   },
   tags: [
     { name: "Content", description: "Drafts, versions, lifecycle, tags" },
-    { name: "Templates", description: "Layouts, bindings, i18n, formatting rules" },
+    {
+      name: "Templates",
+      description: "Layouts, bindings, i18n, formatting rules",
+    },
     { name: "Search", description: "Full-text and similarity search" },
-    { name: "Components", description: "Reusable components and template sections" },
+    {
+      name: "Components",
+      description: "Reusable components and template sections",
+    },
     { name: "Citations", description: "Citation string rendering" },
     { name: "Analytics", description: "Metrics and dashboards" },
   ],
@@ -67,4 +73,3 @@ if (require.main === module) {
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(openapiSpec, null, 2));
 }
-

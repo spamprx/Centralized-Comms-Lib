@@ -92,7 +92,11 @@ router.post("/", async (req: AuthRequest, res: Response) => {
         action: "CREATE",
         resource: "COMPONENT",
         resourceId: comp.id,
-        newValue: { key: key.trim(), name: name.trim(), description: description ?? null },
+        newValue: {
+          key: key.trim(),
+          name: name.trim(),
+          description: description ?? null,
+        },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
@@ -114,10 +118,14 @@ router.post("/", async (req: AuthRequest, res: Response) => {
 router.get("/", async (_req: AuthRequest, res: Response) => {
   try {
     const uow = new PrismaUnitOfWork(getPrismaClient());
-    const list = await uow.repos().componentRegistry.listComponentsWithLatestVersion();
+    const list = await uow
+      .repos()
+      .componentRegistry.listComponentsWithLatestVersion();
     res.status(200).json(list);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -141,9 +149,12 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
  */
 router.get("/search", async (req: AuthRequest, res: Response) => {
   try {
-    const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+    const q =
+      typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
     const uow = new PrismaUnitOfWork(getPrismaClient());
-    const list = await uow.repos().componentRegistry.listComponentsWithLatestVersion();
+    const list = await uow
+      .repos()
+      .componentRegistry.listComponentsWithLatestVersion();
     const filtered = q
       ? list.filter(
           (c) =>
@@ -154,7 +165,9 @@ router.get("/search", async (req: AuthRequest, res: Response) => {
       : list;
     res.status(200).json(filtered);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -182,12 +195,16 @@ router.get("/search", async (req: AuthRequest, res: Response) => {
 router.get("/versions/:versionId", async (req: AuthRequest, res: Response) => {
   try {
     const uow = new PrismaUnitOfWork(getPrismaClient());
-    const ver = await uow.repos().componentRegistry.getVersionById(req.params.versionId);
+    const ver = await uow
+      .repos()
+      .componentRegistry.getVersionById(req.params.versionId);
     if (!ver) {
       res.status(404).json({ error: "Component version not found" });
       return;
     }
-    const comp = await uow.repos().componentRegistry.getComponentById(ver.componentId);
+    const comp = await uow
+      .repos()
+      .componentRegistry.getComponentById(ver.componentId);
     if (!comp) {
       res.status(404).json({ error: "Component not found" });
       return;
@@ -202,7 +219,9 @@ router.get("/versions/:versionId", async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -214,31 +233,40 @@ router.get("/versions/:versionId", async (req: AuthRequest, res: Response) => {
  *     tags:
  *       - Components
  */
-router.post("/versions/:versionId/propagate", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const ctx = auditContext(req);
-    const result = await propagateLinkedComponentToContent(ctx, req.params.versionId);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Component version not found" });
-      return;
-    }
-    const uow = new PrismaUnitOfWork(getPrismaClient());
-    await uow.withTransaction(async (r) => {
-      await r.audit.append({
-        action: "UPDATE",
-        resource: "COMPONENT_VERSION",
-        resourceId: req.params.versionId,
-        newValue: { linkedPropagation: true },
-        actorId: ctx.actorId,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
+router.post(
+  "/versions/:versionId/propagate",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const ctx = auditContext(req);
+      const result = await propagateLinkedComponentToContent(
+        ctx,
+        req.params.versionId,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Component version not found" });
+        return;
+      }
+      const uow = new PrismaUnitOfWork(getPrismaClient());
+      await uow.withTransaction(async (r) => {
+        await r.audit.append({
+          action: "UPDATE",
+          resource: "COMPONENT_VERSION",
+          resourceId: req.params.versionId,
+          newValue: { linkedPropagation: true },
+          actorId: ctx.actorId,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
       });
-    });
-    res.status(200).json(result);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      res.status(200).json(result);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -248,42 +276,62 @@ router.post("/versions/:versionId/propagate", authorize("ADMIN"), async (req: Au
  *     tags:
  *       - Components
  */
-router.patch("/versions/:versionId", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { bodyJson, propagate } = req.body as {
-      bodyJson?: unknown | null;
-      propagate?: boolean;
-    };
-    if (bodyJson !== undefined && bodyJson !== null && !isTipTapDoc(bodyJson)) {
-      res.status(400).json({ error: "bodyJson must be a valid TipTap document or null" });
-      return;
-    }
-    const ctx = auditContext(req);
-    const shouldPropagate = propagate !== false;
-    const out = await patchComponentVersionCanonicalBody(ctx, req.params.versionId, bodyJson, {
-      propagate: shouldPropagate,
-    });
-    if ("notFound" in out && out.notFound) {
-      res.status(404).json({ error: "Component version not found" });
-      return;
-    }
-    const uow = new PrismaUnitOfWork(getPrismaClient());
-    await uow.withTransaction(async (r) => {
-      await r.audit.append({
-        action: "UPDATE",
-        resource: "COMPONENT_VERSION",
-        resourceId: req.params.versionId,
-        newValue: { bodyJson: bodyJson !== undefined, propagate: shouldPropagate },
-        actorId: ctx.actorId,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
+router.patch(
+  "/versions/:versionId",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { bodyJson, propagate } = req.body as {
+        bodyJson?: unknown | null;
+        propagate?: boolean;
+      };
+      if (
+        bodyJson !== undefined &&
+        bodyJson !== null &&
+        !isTipTapDoc(bodyJson)
+      ) {
+        res
+          .status(400)
+          .json({ error: "bodyJson must be a valid TipTap document or null" });
+        return;
+      }
+      const ctx = auditContext(req);
+      const shouldPropagate = propagate !== false;
+      const out = await patchComponentVersionCanonicalBody(
+        ctx,
+        req.params.versionId,
+        bodyJson,
+        {
+          propagate: shouldPropagate,
+        },
+      );
+      if ("notFound" in out && out.notFound) {
+        res.status(404).json({ error: "Component version not found" });
+        return;
+      }
+      const uow = new PrismaUnitOfWork(getPrismaClient());
+      await uow.withTransaction(async (r) => {
+        await r.audit.append({
+          action: "UPDATE",
+          resource: "COMPONENT_VERSION",
+          resourceId: req.params.versionId,
+          newValue: {
+            bodyJson: bodyJson !== undefined,
+            propagate: shouldPropagate,
+          },
+          actorId: ctx.actorId,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
       });
-    });
-    res.status(200).json(out);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      res.status(200).json(out);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -325,48 +373,65 @@ router.patch("/versions/:versionId", authorize("ADMIN"), async (req: AuthRequest
  *       201:
  *         description: Version created
  */
-router.post("/:componentId/versions", async (req: AuthRequest, res: Response) => {
-  try {
-    const { version, bodyJson, linkRefs, propSchema } = req.body as {
-      version?: string;
-      bodyJson?: unknown;
-      linkRefs?: unknown;
-      propSchema?: unknown;
-    };
-    if (!version?.trim()) {
-      res.status(400).json({ error: "version is required" });
-      return;
-    }
-    if (bodyJson !== undefined && bodyJson !== null && !isTipTapDoc(bodyJson)) {
-      res.status(400).json({ error: "bodyJson must be a valid TipTap document (type: 'doc', content: array)" });
-      return;
-    }
-    const ctx = auditContext(req);
-    const uow = new PrismaUnitOfWork(getPrismaClient());
-    const v = await uow.withTransaction(async (r) => {
-      const ver = await r.componentRegistry.createVersion({
-        componentId: req.params.componentId,
-        version: version.trim(),
-        bodyJson: bodyJson === undefined ? undefined : bodyJson,
-        linkRefs,
-        propSchema,
+router.post(
+  "/:componentId/versions",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { version, bodyJson, linkRefs, propSchema } = req.body as {
+        version?: string;
+        bodyJson?: unknown;
+        linkRefs?: unknown;
+        propSchema?: unknown;
+      };
+      if (!version?.trim()) {
+        res.status(400).json({ error: "version is required" });
+        return;
+      }
+      if (
+        bodyJson !== undefined &&
+        bodyJson !== null &&
+        !isTipTapDoc(bodyJson)
+      ) {
+        res
+          .status(400)
+          .json({
+            error:
+              "bodyJson must be a valid TipTap document (type: 'doc', content: array)",
+          });
+        return;
+      }
+      const ctx = auditContext(req);
+      const uow = new PrismaUnitOfWork(getPrismaClient());
+      const v = await uow.withTransaction(async (r) => {
+        const ver = await r.componentRegistry.createVersion({
+          componentId: req.params.componentId,
+          version: version.trim(),
+          bodyJson: bodyJson === undefined ? undefined : bodyJson,
+          linkRefs,
+          propSchema,
+        });
+        await r.audit.append({
+          action: "CREATE",
+          resource: "COMPONENT_VERSION",
+          resourceId: ver.id,
+          newValue: {
+            componentId: req.params.componentId,
+            version: version.trim(),
+          },
+          actorId: ctx.actorId,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
+        return ver;
       });
-      await r.audit.append({
-        action: "CREATE",
-        resource: "COMPONENT_VERSION",
-        resourceId: ver.id,
-        newValue: { componentId: req.params.componentId, version: version.trim() },
-        actorId: ctx.actorId,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
-      });
-      return ver;
-    });
-    res.status(201).json(v);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      res.status(201).json(v);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -407,53 +472,60 @@ router.post("/:componentId/versions", async (req: AuthRequest, res: Response) =>
  *       201:
  *         description: Section created
  */
-router.post("/templates/:templateId/sections", async (req: AuthRequest, res: Response) => {
-  try {
-    const { phase, sortOrder, componentVersionId, props } = req.body as {
-      phase?: LayoutPhase;
-      sortOrder?: number;
-      componentVersionId?: string | null;
-      props?: unknown;
-    };
-    if (phase !== "DRAFT" && phase !== "ACTIVE") {
-      res.status(400).json({ error: "phase must be DRAFT or ACTIVE" });
-      return;
-    }
-    if (typeof sortOrder !== "number" || sortOrder < 0) {
-      res.status(400).json({ error: "sortOrder must be a non-negative number" });
-      return;
-    }
-    const ctx = auditContext(req);
-    const uow = new PrismaUnitOfWork(getPrismaClient());
-    const row = await uow.withTransaction(async (r) => {
-      const section = await r.templateLayoutSection.create({
-        templateId: req.params.templateId,
-        phase,
-        sortOrder,
-        componentVersionId: componentVersionId ?? null,
-        props: props ?? {},
-      });
-      await r.audit.append({
-        action: "CREATE",
-        resource: "TEMPLATE_LAYOUT_SECTION",
-        resourceId: section.id,
-        newValue: {
+router.post(
+  "/templates/:templateId/sections",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { phase, sortOrder, componentVersionId, props } = req.body as {
+        phase?: LayoutPhase;
+        sortOrder?: number;
+        componentVersionId?: string | null;
+        props?: unknown;
+      };
+      if (phase !== "DRAFT" && phase !== "ACTIVE") {
+        res.status(400).json({ error: "phase must be DRAFT or ACTIVE" });
+        return;
+      }
+      if (typeof sortOrder !== "number" || sortOrder < 0) {
+        res
+          .status(400)
+          .json({ error: "sortOrder must be a non-negative number" });
+        return;
+      }
+      const ctx = auditContext(req);
+      const uow = new PrismaUnitOfWork(getPrismaClient());
+      const row = await uow.withTransaction(async (r) => {
+        const section = await r.templateLayoutSection.create({
           templateId: req.params.templateId,
           phase,
           sortOrder,
           componentVersionId: componentVersionId ?? null,
-        },
-        actorId: ctx.actorId,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
+          props: props ?? {},
+        });
+        await r.audit.append({
+          action: "CREATE",
+          resource: "TEMPLATE_LAYOUT_SECTION",
+          resourceId: section.id,
+          newValue: {
+            templateId: req.params.templateId,
+            phase,
+            sortOrder,
+            componentVersionId: componentVersionId ?? null,
+          },
+          actorId: ctx.actorId,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
+        return section;
       });
-      return section;
-    });
-    res.status(201).json(row);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+      res.status(201).json(row);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -503,116 +575,149 @@ router.post("/templates/:templateId/sections", async (req: AuthRequest, res: Res
  *       422:
  *         description: Not editable or formatting violations
  */
-router.post("/content/:contentId/insert", async (req: AuthRequest, res: Response) => {
-  try {
-    const { insertionMode, componentKey, componentVersionId, label, snapshotDoc } = req.body as {
-      insertionMode?: string;
-      componentKey?: string;
-      componentVersionId?: string;
-      label?: string;
-      snapshotDoc?: unknown;
-    };
-    const mode = insertionMode === "detached" ? "detached" : "linked";
+router.post(
+  "/content/:contentId/insert",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const {
+        insertionMode,
+        componentKey,
+        componentVersionId,
+        label,
+        snapshotDoc,
+      } = req.body as {
+        insertionMode?: string;
+        componentKey?: string;
+        componentVersionId?: string;
+        label?: string;
+        snapshotDoc?: unknown;
+      };
+      const mode = insertionMode === "detached" ? "detached" : "linked";
 
-    if (!componentKey?.trim()) {
-      res.status(400).json({ error: "componentKey is required" });
-      return;
-    }
-    if (!componentVersionId?.trim()) {
-      res.status(400).json({ error: "componentVersionId is required" });
-      return;
-    }
-    if (insertionMode !== undefined && insertionMode !== "linked" && insertionMode !== "detached") {
-      res.status(400).json({ error: "insertionMode must be 'linked' or 'detached'" });
-      return;
-    }
-
-    const uow = new PrismaUnitOfWork(getPrismaClient());
-    const versionRecord = await uow.repos().componentRegistry.getVersionById(componentVersionId.trim());
-    if (!versionRecord) {
-      res.status(404).json({ error: "Component version not found" });
-      return;
-    }
-    const componentRecord = await uow.repos().componentRegistry.getComponentById(versionRecord.componentId);
-    if (!componentRecord || componentRecord.key !== componentKey.trim()) {
-      res.status(400).json({ error: "componentKey does not match this component version" });
-      return;
-    }
-
-    let block: Record<string, unknown>;
-    if (mode === "linked") {
-      const canonical =
-        versionRecord.bodyJson != null && isTipTapDoc(versionRecord.bodyJson)
-          ? (versionRecord.bodyJson as TipTapDocument)
-          : null;
-      block = buildLinkedLibraryNode({
-        componentKey: componentKey.trim(),
-        componentVersionId: versionRecord.id,
-        label: label?.trim() || componentRecord.name || componentKey.trim(),
-        componentName: componentRecord.name,
-        canonicalBody: canonical,
-      });
-    } else {
-      const normalized = normalizeSnapshotDoc(snapshotDoc);
-      if (!normalized) {
-        res.status(400).json({
-          error: "snapshotDoc is required for detached insertion (TipTap doc or content array)",
-        });
+      if (!componentKey?.trim()) {
+        res.status(400).json({ error: "componentKey is required" });
         return;
       }
-      block = buildDetachedLibraryNode({
-        componentKey: componentKey.trim(),
-        snapshotVersionId: versionRecord.id,
-        label: label?.trim() || componentRecord.name || componentKey.trim(),
-        componentName: componentRecord.name,
-        snapshotDoc: normalized,
+      if (!componentVersionId?.trim()) {
+        res.status(400).json({ error: "componentVersionId is required" });
+        return;
+      }
+      if (
+        insertionMode !== undefined &&
+        insertionMode !== "linked" &&
+        insertionMode !== "detached"
+      ) {
+        res
+          .status(400)
+          .json({ error: "insertionMode must be 'linked' or 'detached'" });
+        return;
+      }
+
+      const uow = new PrismaUnitOfWork(getPrismaClient());
+      const versionRecord = await uow
+        .repos()
+        .componentRegistry.getVersionById(componentVersionId.trim());
+      if (!versionRecord) {
+        res.status(404).json({ error: "Component version not found" });
+        return;
+      }
+      const componentRecord = await uow
+        .repos()
+        .componentRegistry.getComponentById(versionRecord.componentId);
+      if (!componentRecord || componentRecord.key !== componentKey.trim()) {
+        res
+          .status(400)
+          .json({
+            error: "componentKey does not match this component version",
+          });
+        return;
+      }
+
+      let block: Record<string, unknown>;
+      if (mode === "linked") {
+        const canonical =
+          versionRecord.bodyJson != null && isTipTapDoc(versionRecord.bodyJson)
+            ? (versionRecord.bodyJson as TipTapDocument)
+            : null;
+        block = buildLinkedLibraryNode({
+          componentKey: componentKey.trim(),
+          componentVersionId: versionRecord.id,
+          label: label?.trim() || componentRecord.name || componentKey.trim(),
+          componentName: componentRecord.name,
+          canonicalBody: canonical,
+        });
+      } else {
+        const normalized = normalizeSnapshotDoc(snapshotDoc);
+        if (!normalized) {
+          res.status(400).json({
+            error:
+              "snapshotDoc is required for detached insertion (TipTap doc or content array)",
+          });
+          return;
+        }
+        block = buildDetachedLibraryNode({
+          componentKey: componentKey.trim(),
+          snapshotVersionId: versionRecord.id,
+          label: label?.trim() || componentRecord.name || componentKey.trim(),
+          componentName: componentRecord.name,
+          snapshotDoc: normalized,
+        });
+      }
+
+      const detail = await contentService.getById(req.params.contentId, {
+        id: req.user!.id,
+        isAdmin: req.user!.role === "ADMIN",
       });
-    }
+      if (!detail) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      const latest = detail.versions[0];
+      const prevBody =
+        latest?.body && isTipTapDoc(latest.body)
+          ? latest.body
+          : ({ type: "doc", content: [] } as TipTapDocument);
+      const prevNodes = Array.isArray(
+        (prevBody as { content?: unknown }).content,
+      )
+        ? ([...(prevBody as { content: unknown[] }).content] as unknown[])
+        : [];
+      const merged: TipTapDocument = {
+        type: "doc",
+        content: [...prevNodes, block],
+      } as TipTapDocument;
 
-    const detail = await contentService.getById(req.params.contentId, {
-      id: req.user!.id,
-      isAdmin: req.user!.role === "ADMIN",
-    });
-    if (!detail) {
-      res.status(404).json({ error: "Content not found" });
-      return;
+      const result = await contentService.saveBody(
+        auditContext(req),
+        req.params.contentId,
+        {
+          body: merged,
+        },
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+      if ("invalidState" in result && result.invalidState) {
+        res.status(422).json({ error: "Content not editable in this state" });
+        return;
+      }
+      if ("invalidFormatting" in result && result.invalidFormatting) {
+        res.status(422).json({ violations: result.violations });
+        return;
+      }
+      if ("version" in result)
+        res.status(200).json({ version: result.version, inserted: true });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
     }
-    const latest = detail.versions[0];
-    const prevBody =
-      latest?.body && isTipTapDoc(latest.body)
-        ? latest.body
-        : ({ type: "doc", content: [] } as TipTapDocument);
-    const prevNodes = Array.isArray((prevBody as { content?: unknown }).content)
-      ? ([...(prevBody as { content: unknown[] }).content] as unknown[])
-      : [];
-    const merged: TipTapDocument = {
-      type: "doc",
-      content: [...prevNodes, block],
-    } as TipTapDocument;
-
-    const result = await contentService.saveBody(auditContext(req), req.params.contentId, {
-      body: merged,
-    });
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Content not found" });
-      return;
-    }
-    if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
-    if ("invalidState" in result && result.invalidState) {
-      res.status(422).json({ error: "Content not editable in this state" });
-      return;
-    }
-    if ("invalidFormatting" in result && result.invalidFormatting) {
-      res.status(422).json({ violations: result.violations });
-      return;
-    }
-    if ("version" in result) res.status(200).json({ version: result.version, inserted: true });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
+  },
+);
 
 export default router;

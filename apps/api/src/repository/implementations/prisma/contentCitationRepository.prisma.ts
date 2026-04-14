@@ -28,14 +28,17 @@ function toRecord(row: {
 export class PrismaContentCitationRepository implements ContentCitationRepository {
   public constructor(private readonly db: PrismaDb) {}
 
-  async create(input: CreateContentCitationInput): Promise<ContentCitationRecord> {
+  async create(
+    input: CreateContentCitationInput,
+  ): Promise<ContentCitationRecord> {
     const row = await this.db.contentCitation.create({
       data: {
         contentId: input.contentId,
         referenceType: input.referenceType,
         referenceId: input.referenceId,
         label: input.label ?? null,
-        metadata: input.metadata === undefined ? undefined : (input.metadata as object),
+        metadata:
+          input.metadata === undefined ? undefined : (input.metadata as object),
       },
     });
     return toRecord(row);

@@ -6,7 +6,10 @@ import { getPrismaClient, PrismaUnitOfWork } from "./repository";
 import { openapiSpec } from "./docs/openapi";
 import { API_V1_PREFIX } from "./config/constants";
 import { errorMiddleware } from "./middlewares/error.middleware";
-import { renderPrometheusText, metricsRegister } from "./observability/prometheusRegistry";
+import {
+  renderPrometheusText,
+  metricsRegister,
+} from "./observability/prometheusRegistry";
 import { getRedisHealth } from "./shared/cache/redisClient";
 
 const app: Application = express();
@@ -65,7 +68,9 @@ app.get("/health/db", async (req: Request, res: Response) => {
     res.status(200).json({ status: "ok", db: "connected" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    res.status(503).json({ status: "error", db: "disconnected", error: message });
+    res
+      .status(503)
+      .json({ status: "error", db: "disconnected", error: message });
   }
 });
 
@@ -77,7 +82,10 @@ app.get("/health/redis", async (_req: Request, res: Response) => {
   if (!url) {
     res.status(200).json({
       status: "ok",
-      redis: { configured: false, detail: "REDIS_URL not set; search cache degradation mode" },
+      redis: {
+        configured: false,
+        detail: "REDIS_URL not set; search cache degradation mode",
+      },
     });
     return;
   }
@@ -132,7 +140,9 @@ app.get("/dev/repo-check", async (req: Request, res: Response) => {
     res.status(200).json({ status: "ok", repository: "working" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    res.status(503).json({ status: "error", repository: "error", error: message });
+    res
+      .status(503)
+      .json({ status: "error", repository: "error", error: message });
   }
 });
 
@@ -157,10 +167,15 @@ app.post("/dev/reindex", async (_req: Request, res: Response) => {
     return;
   }
   try {
-    const { getElasticsearchClient } = await import("@comms-lib/db-elasticsearch");
+    const { getElasticsearchClient } =
+      await import("@comms-lib/db-elasticsearch");
     const esClient = getElasticsearchClient();
     if (!esClient) {
-      res.status(503).json({ error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)" });
+      res
+        .status(503)
+        .json({
+          error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)",
+        });
       return;
     }
     const { syncContentIndexFromDb } = await import("./intelligence");

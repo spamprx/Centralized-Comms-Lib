@@ -140,7 +140,10 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
  */
 router.post("/:id/clone", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await templateService.clone(auditContext(req), req.params.id);
+    const result = await templateService.clone(
+      auditContext(req),
+      req.params.id,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
@@ -184,13 +187,20 @@ router.post("/:id/clone", async (req: AuthRequest, res: Response) => {
  */
 router.get("/:id/i18n", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await templateService.getI18nTable(auditContext(req), req.params.id);
+    const result = await templateService.getI18nTable(
+      auditContext(req),
+      req.params.id,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Not allowed to manage translations for this template" });
+      res
+        .status(403)
+        .json({
+          error: "Not allowed to manage translations for this template",
+        });
       return;
     }
     if ("ok" in result && result.ok) {
@@ -256,7 +266,11 @@ router.get("/:id/i18n/resolve", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Not allowed to access translations for this template" });
+      res
+        .status(403)
+        .json({
+          error: "Not allowed to access translations for this template",
+        });
       return;
     }
     if ("ok" in result && result.ok) {
@@ -307,7 +321,11 @@ router.get("/:id/i18n/resolve", async (req: AuthRequest, res: Response) => {
  */
 router.patch("/:id/i18n", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await templateService.patchI18n(auditContext(req), req.params.id, req.body);
+    const result = await templateService.patchI18n(
+      auditContext(req),
+      req.params.id,
+      req.body,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
@@ -317,7 +335,11 @@ router.patch("/:id/i18n", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Not allowed to manage translations for this template" });
+      res
+        .status(403)
+        .json({
+          error: "Not allowed to manage translations for this template",
+        });
       return;
     }
     if ("ok" in result && result.ok) {
@@ -376,7 +398,11 @@ router.patch("/:id/layout/draft", async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body as { layout?: unknown };
     const layout = body?.layout !== undefined ? body.layout : req.body;
-    const result = await templateService.saveDraftLayout(auditContext(req), req.params.id, layout);
+    const result = await templateService.saveDraftLayout(
+      auditContext(req),
+      req.params.id,
+      layout,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
@@ -420,7 +446,10 @@ router.patch("/:id/layout/draft", async (req: AuthRequest, res: Response) => {
  */
 router.post("/:id/activate", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await templateService.activate(auditContext(req), req.params.id);
+    const result = await templateService.activate(
+      auditContext(req),
+      req.params.id,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
@@ -477,7 +506,11 @@ router.post("/:id/activate", async (req: AuthRequest, res: Response) => {
 router.post("/:id/bindings", async (req: AuthRequest, res: Response) => {
   try {
     const { channelId } = req.body as { channelId?: string };
-    const result = await templateService.addBinding(auditContext(req), req.params.id, channelId ?? "");
+    const result = await templateService.addBinding(
+      auditContext(req),
+      req.params.id,
+      channelId ?? "",
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template or channel not found" });
       return;
@@ -487,7 +520,9 @@ router.post("/:id/bindings", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("conflict" in result && result.conflict) {
-      res.status(409).json({ error: "Binding already exists for this channel" });
+      res
+        .status(409)
+        .json({ error: "Binding already exists for this channel" });
       return;
     }
     if ("ok" in result && result.ok) {
@@ -527,23 +562,26 @@ router.post("/:id/bindings", async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Binding not found
  */
-router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await templateService.removeBinding(
-      auditContext(req),
-      req.params.id,
-      req.params.bindingId,
-    );
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Binding not found" });
-      return;
+router.delete(
+  "/:id/bindings/:bindingId",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await templateService.removeBinding(
+        auditContext(req),
+        req.params.id,
+        req.params.bindingId,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Binding not found" });
+        return;
+      }
+      res.status(200).json({ message: "Binding removed" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json({ message: "Binding removed" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -646,7 +684,11 @@ router.put("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: "rules object is required" });
       return;
     }
-    const result = await formattingRuleService.upsert(auditContext(req), req.params.id, rules);
+    const result = await formattingRuleService.upsert(
+      auditContext(req),
+      req.params.id,
+      rules,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
@@ -666,19 +708,25 @@ router.put("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await formattingRuleService.delete(auditContext(req), req.params.id);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Formatting rules not found" });
-      return;
+router.delete(
+  "/:id/formatting-rules",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await formattingRuleService.delete(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Formatting rules not found" });
+        return;
+      }
+      res.status(204).send();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(204).send();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -785,12 +833,16 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
       slug?: string;
       status?: TemplateStatus;
     };
-    const result = await templateService.update(auditContext(req), req.params.id, {
-      name,
-      description,
-      slug,
-      status,
-    });
+    const result = await templateService.update(
+      auditContext(req),
+      req.params.id,
+      {
+        name,
+        description,
+        slug,
+        status,
+      },
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;
@@ -814,7 +866,10 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
 
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await templateService.delete(auditContext(req), req.params.id);
+    const result = await templateService.delete(
+      auditContext(req),
+      req.params.id,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Template not found" });
       return;

@@ -10,7 +10,9 @@ function utcDayKey(): string {
 
 function secondsUntilUtcMidnight(): number {
   const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const next = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+  );
   return Math.max(60, Math.ceil((next.getTime() - now.getTime()) / 1000));
 }
 
@@ -22,7 +24,11 @@ type MemBucket = { count: number; day: string };
 const userMem = new Map<string, MemBucket>();
 const orgMem = new Map<string, MemBucket>();
 
-function memIncr(map: Map<string, MemBucket>, logicalKey: string, limit: number): { ok: boolean; used: number } {
+function memIncr(
+  map: Map<string, MemBucket>,
+  logicalKey: string,
+  limit: number,
+): { ok: boolean; used: number } {
   const day = utcDayKey();
   const k = `${logicalKey}:${day}`;
   let b = map.get(k);
@@ -34,7 +40,11 @@ function memIncr(map: Map<string, MemBucket>, logicalKey: string, limit: number)
   return { ok: b.count <= limit, used: b.count };
 }
 
-async function redisIncrQuota(r: Redis, key: string, limit: number): Promise<{ ok: boolean; used: number; ttlSec: number }> {
+async function redisIncrQuota(
+  r: Redis,
+  key: string,
+  limit: number,
+): Promise<{ ok: boolean; used: number; ttlSec: number }> {
   await r.connect().catch(() => undefined);
   const n = await r.incr(key);
   if (n === 1) {
@@ -97,7 +107,10 @@ function successPayload(
  * Per-user (UTC day) and optional per-workspace/org caps for AI-assisted draft creation.
  * Org quota is off when `AI_ORG_DAILY_QUOTA` ≤ 0.
  */
-export async function tryConsumeAiDraftQuota(userId: string, orgWorkspaceId: string): Promise<AiDraftQuotaResult> {
+export async function tryConsumeAiDraftQuota(
+  userId: string,
+  orgWorkspaceId: string,
+): Promise<AiDraftQuotaResult> {
   const day = utcDayKey();
   const userKeyRedis = `${QUOTA_PREFIX}:user:${userId}:${day}`;
   const orgKeyRedis = `${QUOTA_PREFIX}:org:${orgWorkspaceId}:${day}`;
@@ -135,7 +148,12 @@ export async function tryConsumeAiDraftQuota(userId: string, orgWorkspaceId: str
           },
         };
       }
-      return successPayload(USER_DAILY_LIMIT - u.used, ORG_DAILY_LIMIT - o.used, ORG_DAILY_LIMIT, defaultTtl);
+      return successPayload(
+        USER_DAILY_LIMIT - u.used,
+        ORG_DAILY_LIMIT - o.used,
+        ORG_DAILY_LIMIT,
+        defaultTtl,
+      );
     }
     return successPayload(USER_DAILY_LIMIT - u.used, null, null, defaultTtl);
   }
@@ -170,7 +188,12 @@ export async function tryConsumeAiDraftQuota(userId: string, orgWorkspaceId: str
           },
         };
       }
-      return successPayload(USER_DAILY_LIMIT - uq.used, ORG_DAILY_LIMIT - oq.used, ORG_DAILY_LIMIT, oq.ttlSec);
+      return successPayload(
+        USER_DAILY_LIMIT - uq.used,
+        ORG_DAILY_LIMIT - oq.used,
+        ORG_DAILY_LIMIT,
+        oq.ttlSec,
+      );
     }
     return successPayload(USER_DAILY_LIMIT - uq.used, null, null, uq.ttlSec);
   } catch {

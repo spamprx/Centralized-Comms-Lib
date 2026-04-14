@@ -95,7 +95,10 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
           ? {
               id: v.id,
               version: v.version,
-              bodyJson: v.bodyJson === null || v.bodyJson === undefined ? null : (v.bodyJson as unknown),
+              bodyJson:
+                v.bodyJson === null || v.bodyJson === undefined
+                  ? null
+                  : (v.bodyJson as unknown),
             }
           : null,
       };
@@ -120,11 +123,12 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
               ? Prisma.JsonNull
               : (input.bodyJson as Prisma.InputJsonValue),
         linkRefs: (input.linkRefs ?? []) as object,
-        propSchema: input.propSchema === undefined
-          ? undefined
-          : input.propSchema === null
-            ? Prisma.JsonNull
-            : (input.propSchema as Prisma.InputJsonValue),
+        propSchema:
+          input.propSchema === undefined
+            ? undefined
+            : input.propSchema === null
+              ? Prisma.JsonNull
+              : (input.propSchema as Prisma.InputJsonValue),
       },
     });
     return toVersion(row);
@@ -135,7 +139,9 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
     return row ? toVersion(row) : null;
   }
 
-  async listVersionsForComponent(componentId: string): Promise<ComponentVersionRecord[]> {
+  async listVersionsForComponent(
+    componentId: string,
+  ): Promise<ComponentVersionRecord[]> {
     const rows = await this.db.componentVersion.findMany({
       where: { componentId },
       orderBy: { createdAt: "desc" },
@@ -143,12 +149,17 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
     return rows.map(toVersion);
   }
 
-  async updateVersionBodyJson(versionId: string, bodyJson: unknown | null): Promise<ComponentVersionRecord> {
+  async updateVersionBodyJson(
+    versionId: string,
+    bodyJson: unknown | null,
+  ): Promise<ComponentVersionRecord> {
     const row = await this.db.componentVersion.update({
       where: { id: versionId },
       data: {
         bodyJson:
-          bodyJson === null ? Prisma.JsonNull : (bodyJson as Prisma.InputJsonValue),
+          bodyJson === null
+            ? Prisma.JsonNull
+            : (bodyJson as Prisma.InputJsonValue),
       },
     });
     return toVersion(row);

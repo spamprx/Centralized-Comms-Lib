@@ -38,11 +38,17 @@ function isRegion(v: unknown): v is TemplateLayoutRegion {
   if (!isRecord(v)) return false;
   if (typeof v.id !== "string" || !v.id.trim()) return false;
   if (typeof v.type !== "string" || !v.type.trim()) return false;
-  if (v.props != null && (typeof v.props !== "object" || Array.isArray(v.props))) return false;
+  if (
+    v.props != null &&
+    (typeof v.props !== "object" || Array.isArray(v.props))
+  )
+    return false;
   return true;
 }
 
-function parseRegionsFromCellRaw(raw: Record<string, unknown>): TemplateLayoutRegion[] | null {
+function parseRegionsFromCellRaw(
+  raw: Record<string, unknown>,
+): TemplateLayoutRegion[] | null {
   if (Array.isArray(raw.regions)) {
     const regions: TemplateLayoutRegion[] = [];
     for (const r of raw.regions) {
@@ -97,7 +103,8 @@ function migrateRegionsToRows(regions: TemplateLayoutRegion[]): LayoutRow[] {
 function parseTemplateLayout(raw: unknown): TemplateLayoutConfig | null {
   if (raw == null || !isRecord(raw)) return null;
   const version = raw.version;
-  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) return null;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1)
+    return null;
 
   if (Array.isArray(raw.rows)) {
     if (raw.rows.length === 0) {
@@ -124,7 +131,9 @@ function parseTemplateLayout(raw: unknown): TemplateLayoutConfig | null {
   return null;
 }
 
-export function flattenRegions(config: TemplateLayoutConfig): TemplateLayoutRegion[] {
+export function flattenRegions(
+  config: TemplateLayoutConfig,
+): TemplateLayoutRegion[] {
   const out: TemplateLayoutRegion[] = [];
   for (const row of config.rows) {
     for (const cell of row.cells) {
@@ -140,7 +149,9 @@ export function flattenRegions(config: TemplateLayoutConfig): TemplateLayoutRegi
  * Validates and normalizes layout JSON. Returns null if invalid.
  * Accepts v2 `rows` (grid) or legacy v1 flat `regions`.
  */
-export function parseAndValidateLayoutConfig(layout: unknown): TemplateLayoutConfig | null {
+export function parseAndValidateLayoutConfig(
+  layout: unknown,
+): TemplateLayoutConfig | null {
   return parseTemplateLayout(layout);
 }
 

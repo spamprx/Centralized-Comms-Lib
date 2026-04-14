@@ -18,7 +18,12 @@ export interface UserRoleRepository {
   listUsers(): Promise<User[]>;
   updateUser(
     id: string,
-    input: { displayName?: string; email?: string; isActive?: boolean; avatarUrl?: string | null },
+    input: {
+      displayName?: string;
+      email?: string;
+      isActive?: boolean;
+      avatarUrl?: string | null;
+    },
   ): Promise<User>;
   deleteUser(id: string): Promise<void>;
 
@@ -32,7 +37,11 @@ export interface UserRoleRepository {
     input: { name?: string; description?: string | null; isSystem?: boolean },
   ): Promise<Role>;
   deleteRole(id: string): Promise<void>;
-  assignRole(userId: string, roleId: string, assignedById?: string): Promise<void>;
+  assignRole(
+    userId: string,
+    roleId: string,
+    assignedById?: string,
+  ): Promise<void>;
   removeRole(userId: string, roleId: string): Promise<void>;
 
   createPermission(input: CreatePermissionInput): Promise<Permission>;
@@ -52,4 +61,3 @@ export interface UserRoleRepository {
   removeUserFromGroup(userId: string, groupId: string): Promise<void>;
   listGroupMembers(groupId: string): Promise<User[]>;
 }
-

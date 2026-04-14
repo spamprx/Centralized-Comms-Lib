@@ -8,7 +8,11 @@ import { aiQuotaRejections } from "../observability/prometheusRegistry";
  * Runs after `authenticate`. For `POST /content` when `aiGenerated` is true,
  * consumes per-user and optional per-workspace AI quotas before the handler runs.
  */
-export function aiDraftQuotaGate(req: AuthRequest, res: Response, next: NextFunction): void {
+export function aiDraftQuotaGate(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): void {
   if (!req.body?.aiGenerated) {
     next();
     return;
@@ -40,7 +44,10 @@ export function aiDraftQuotaGate(req: AuthRequest, res: Response, next: NextFunc
       res.setHeader("X-AI-Quota-Reset", String(result.retryAfter));
       if (result.orgLimit != null) {
         res.setHeader("X-AI-Quota-Limit-Org", String(result.orgLimit));
-        res.setHeader("X-AI-Quota-Remaining-Org", String(result.orgRemaining ?? 0));
+        res.setHeader(
+          "X-AI-Quota-Remaining-Org",
+          String(result.orgRemaining ?? 0),
+        );
       }
       next();
     })

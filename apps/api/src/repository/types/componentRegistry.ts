@@ -20,5 +20,8 @@ export interface ComponentVersionRecord {
 
 /** Component row plus newest version by `createdAt` (for library UI / insert). */
 export type ComponentLibraryRecord = ComponentRecord & {
-  latestVersion: Pick<ComponentVersionRecord, "id" | "version" | "bodyJson"> | null;
+  latestVersion: Pick<
+    ComponentVersionRecord,
+    "id" | "version" | "bodyJson"
+  > | null;
 };

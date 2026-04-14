@@ -48,7 +48,10 @@ export class PrismaOutboxRepository implements OutboxRepository {
     return rows.map(toOutbox);
   }
 
-  async markProcessed(eventId: string, processedAt: Date = new Date()): Promise<void> {
+  async markProcessed(
+    eventId: string,
+    processedAt: Date = new Date(),
+  ): Promise<void> {
     await this.db.outboxEvent.update({
       where: { id: eventId },
       data: { processedAt },
@@ -62,4 +65,3 @@ export class PrismaOutboxRepository implements OutboxRepository {
     });
   }
 }
-

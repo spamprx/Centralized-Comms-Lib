@@ -78,7 +78,9 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       description,
     });
     if (result.conflict) {
-      res.status(409).json({ error: "Channel key already exists", channel: result.channel });
+      res
+        .status(409)
+        .json({ error: "Channel key already exists", channel: result.channel });
       return;
     }
     res.status(201).json(result.channel);

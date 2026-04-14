@@ -74,27 +74,31 @@ router.get("/roles", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post("/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { name, description } = req.body;
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
+router.post(
+  "/roles",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, description } = req.body;
+      if (!name) {
+        res.status(400).json({ error: "name is required" });
+        return;
+      }
+      const result = await adminService.createRole(auditContext(req), {
+        name,
+        description: description ?? null,
+      });
+      if (result.conflict) {
+        res.status(409).json({ error: "Role already exists" });
+        return;
+      }
+      res.status(201).json(result.role);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const result = await adminService.createRole(auditContext(req), {
-      name,
-      description: description ?? null,
-    });
-    if (result.conflict) {
-      res.status(409).json({ error: "Role already exists" });
-      return;
-    }
-    res.status(201).json(result.role);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -133,28 +137,36 @@ router.post("/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response
  *       500:
  *         description: Server error
  */
-router.patch("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { name, description, isSystem } = req.body as {
-      name?: string;
-      description?: string | null;
-      isSystem?: boolean;
-    };
-    const result = await adminService.updateRole(auditContext(req), req.params.id, {
-      name,
-      description,
-      isSystem,
-    });
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Role not found" });
-      return;
+router.patch(
+  "/roles/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, description, isSystem } = req.body as {
+        name?: string;
+        description?: string | null;
+        isSystem?: boolean;
+      };
+      const result = await adminService.updateRole(
+        auditContext(req),
+        req.params.id,
+        {
+          name,
+          description,
+          isSystem,
+        },
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Role not found" });
+        return;
+      }
+      res.status(200).json(result.role);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json(result.role);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -179,19 +191,26 @@ router.patch("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Res
  *       500:
  *         description: Server error
  */
-router.delete("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await adminService.deleteRole(auditContext(req), req.params.id);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Role not found" });
-      return;
+router.delete(
+  "/roles/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await adminService.deleteRole(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Role not found" });
+        return;
+      }
+      res.status(200).json({ message: "Role deleted" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json({ message: "Role deleted" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -214,15 +233,20 @@ router.delete("/roles/:id", authorize("ADMIN"), async (req: AuthRequest, res: Re
  *       500:
  *         description: Server error
  */
-router.get("/roles/:id/permissions", async (req: AuthRequest, res: Response) => {
-  try {
-    const permissions = await adminService.listPermissionsForRole(req.params.id);
-    res.status(200).json(permissions);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+router.get(
+  "/roles/:id/permissions",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const permissions = await adminService.listPermissionsForRole(
+        req.params.id,
+      );
+      res.status(200).json(permissions);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -261,23 +285,31 @@ router.get("/roles/:id/permissions", async (req: AuthRequest, res: Response) => 
  *       500:
  *         description: Server error
  */
-router.post("/roles/:id/permissions", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { action, resource } = req.body;
-    if (!action || !resource) {
-      res.status(400).json({ error: "action and resource are required" });
-      return;
+router.post(
+  "/roles/:id/permissions",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { action, resource } = req.body;
+      if (!action || !resource) {
+        res.status(400).json({ error: "action and resource are required" });
+        return;
+      }
+      const permission = await adminService.createPermission(
+        auditContext(req),
+        req.params.id,
+        {
+          action,
+          resource,
+        },
+      );
+      res.status(201).json(permission);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const permission = await adminService.createPermission(auditContext(req), req.params.id, {
-      action,
-      resource,
-    });
-    res.status(201).json(permission);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -313,23 +345,34 @@ router.post("/roles/:id/permissions", authorize("ADMIN"), async (req: AuthReques
  *       500:
  *         description: Server error
  */
-router.patch("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { action, resource } = req.body as { action?: string; resource?: string };
-    const result = await adminService.updatePermission(auditContext(req), req.params.id, {
-      action,
-      resource,
-    });
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Permission not found" });
-      return;
+router.patch(
+  "/permissions/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { action, resource } = req.body as {
+        action?: string;
+        resource?: string;
+      };
+      const result = await adminService.updatePermission(
+        auditContext(req),
+        req.params.id,
+        {
+          action,
+          resource,
+        },
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Permission not found" });
+        return;
+      }
+      res.status(200).json(result.permission);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json(result.permission);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -354,19 +397,26 @@ router.patch("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, re
  *       500:
  *         description: Server error
  */
-router.delete("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await adminService.deletePermission(auditContext(req), req.params.id);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Permission not found" });
-      return;
+router.delete(
+  "/permissions/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await adminService.deletePermission(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Permission not found" });
+        return;
+      }
+      res.status(200).json({ message: "Permission deleted" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json({ message: "Permission deleted" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 // ── User-Role Assignment ────────────────────────────────────────────────────
 
@@ -404,20 +454,28 @@ router.delete("/permissions/:id", authorize("ADMIN"), async (req: AuthRequest, r
  *       500:
  *         description: Server error
  */
-router.post("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { roleId } = req.body;
-    if (!roleId) {
-      res.status(400).json({ error: "roleId is required" });
-      return;
+router.post(
+  "/users/:userId/roles",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { roleId } = req.body;
+      if (!roleId) {
+        res.status(400).json({ error: "roleId is required" });
+        return;
+      }
+      await adminService.assignRoleToUser(
+        auditContext(req),
+        req.params.userId,
+        roleId,
+      );
+      res.status(200).json({ message: "Role assigned" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    await adminService.assignRoleToUser(auditContext(req), req.params.userId, roleId);
-    res.status(200).json({ message: "Role assigned" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -456,23 +514,32 @@ router.post("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest,
  *       500:
  *         description: Server error
  */
-router.patch("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { fromRoleId, toRoleId } = req.body as {
-      fromRoleId?: string;
-      toRoleId?: string;
-    };
-    if (!fromRoleId || !toRoleId) {
-      res.status(400).json({ error: "fromRoleId and toRoleId are required" });
-      return;
+router.patch(
+  "/users/:userId/roles",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { fromRoleId, toRoleId } = req.body as {
+        fromRoleId?: string;
+        toRoleId?: string;
+      };
+      if (!fromRoleId || !toRoleId) {
+        res.status(400).json({ error: "fromRoleId and toRoleId are required" });
+        return;
+      }
+      await adminService.updateUserRole(
+        auditContext(req),
+        req.params.userId,
+        fromRoleId,
+        toRoleId,
+      );
+      res.status(200).json({ message: "User role updated" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    await adminService.updateUserRole(auditContext(req), req.params.userId, fromRoleId, toRoleId);
-    res.status(200).json({ message: "User role updated" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -500,19 +567,23 @@ router.patch("/users/:userId/roles", authorize("ADMIN"), async (req: AuthRequest
  *       500:
  *         description: Server error
  */
-router.delete("/users/:userId/roles/:roleId", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    await adminService.removeRoleFromUser(
-      auditContext(req),
-      req.params.userId,
-      req.params.roleId,
-    );
-    res.status(200).json({ message: "Role removed" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+router.delete(
+  "/users/:userId/roles/:roleId",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      await adminService.removeRoleFromUser(
+        auditContext(req),
+        req.params.userId,
+        req.params.roleId,
+      );
+      res.status(200).json({ message: "Role removed" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 // ── Users ─────────────────────────────────────────────────────────────────
 
@@ -578,156 +649,216 @@ router.get("/users/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post("/users", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { email, displayName, password, roleId } = req.body as {
-      email?: string;
-      displayName?: string;
-      password?: string;
-      roleId?: string | null;
-    };
-    if (!email?.trim() || !displayName?.trim() || !password) {
-      res.status(400).json({ error: "email, displayName, and password are required" });
-      return;
+router.post(
+  "/users",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { email, displayName, password, roleId } = req.body as {
+        email?: string;
+        displayName?: string;
+        password?: string;
+        roleId?: string | null;
+      };
+      if (!email?.trim() || !displayName?.trim() || !password) {
+        res
+          .status(400)
+          .json({ error: "email, displayName, and password are required" });
+        return;
+      }
+      const result = await adminService.createUser(auditContext(req), {
+        email: email.trim(),
+        displayName: displayName.trim(),
+        password,
+        roleId: roleId ?? null,
+      });
+      if ("conflict" in result && result.conflict) {
+        res.status(409).json({ error: "User with this email already exists" });
+        return;
+      }
+      const full = await adminService.getUserById(result.user.id);
+      res.status(201).json(full ?? result.user);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const result = await adminService.createUser(auditContext(req), {
-      email: email.trim(),
-      displayName: displayName.trim(),
-      password,
-      roleId: roleId ?? null,
-    });
-    if ("conflict" in result && result.conflict) {
-      res.status(409).json({ error: "User with this email already exists" });
-      return;
-    }
-    const full = await adminService.getUserById(result.user.id);
-    res.status(201).json(full ?? result.user);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.patch("/users/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { displayName, email, isActive, avatarUrl, roleId } = req.body as {
-      displayName?: string;
-      email?: string;
-      isActive?: boolean;
-      avatarUrl?: string | null;
-      roleId?: string | null;
-    };
-    const result = await adminService.updateUser(auditContext(req), req.params.id, {
-      displayName,
-      email,
-      isActive,
-      avatarUrl,
-      roleId,
-    });
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "User not found" });
-      return;
+router.patch(
+  "/users/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { displayName, email, isActive, avatarUrl, roleId } = req.body as {
+        displayName?: string;
+        email?: string;
+        isActive?: boolean;
+        avatarUrl?: string | null;
+        roleId?: string | null;
+      };
+      const result = await adminService.updateUser(
+        auditContext(req),
+        req.params.id,
+        {
+          displayName,
+          email,
+          isActive,
+          avatarUrl,
+          roleId,
+        },
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      const full = await adminService.getUserById(req.params.id);
+      res.status(200).json(full ?? result.user);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const full = await adminService.getUserById(req.params.id);
-    res.status(200).json(full ?? result.user);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.delete("/users/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await adminService.deactivateUser(auditContext(req), req.params.id);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "User not found" });
-      return;
+router.delete(
+  "/users/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await adminService.deactivateUser(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      res.status(200).json({ deactivated: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json({ deactivated: true });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.post("/users/bulk-delete", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { ids } = req.body as { ids?: string[] };
-    if (!Array.isArray(ids) || ids.length === 0) {
-      res.status(400).json({ error: "ids array is required" });
-      return;
+router.post(
+  "/users/bulk-delete",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { ids } = req.body as { ids?: string[] };
+      if (!Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ error: "ids array is required" });
+        return;
+      }
+      const out = await adminService.bulkDeactivateUsers(
+        auditContext(req),
+        ids,
+      );
+      res.status(200).json(out);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const out = await adminService.bulkDeactivateUsers(auditContext(req), ids);
-    res.status(200).json(out);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.patch("/users/:id/status", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { status } = req.body as { status?: string };
-    if (!status) {
-      res.status(400).json({ error: "status is required" });
-      return;
+router.patch(
+  "/users/:id/status",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { status } = req.body as { status?: string };
+      if (!status) {
+        res.status(400).json({ error: "status is required" });
+        return;
+      }
+      const active = status === "active" || status === "pending";
+      const result = await adminService.updateUser(
+        auditContext(req),
+        req.params.id,
+        {
+          isActive: active,
+        },
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      const full = await adminService.getUserById(req.params.id);
+      res.status(200).json(full ?? result.user);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const active = status === "active" || status === "pending";
-    const result = await adminService.updateUser(auditContext(req), req.params.id, {
-      isActive: active,
-    });
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "User not found" });
-      return;
+  },
+);
+
+router.post(
+  "/users/:id/reset-password",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await adminService.resetUserPassword(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      res.status(200).json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const full = await adminService.getUserById(req.params.id);
-    res.status(200).json(full ?? result.user);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.post("/users/:id/reset-password", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await adminService.resetUserPassword(auditContext(req), req.params.id);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "User not found" });
-      return;
+router.get(
+  "/settings",
+  authorize("ADMIN"),
+  (_req: AuthRequest, res: Response) => {
+    try {
+      res.status(200).json(adminService.getSettings());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json(result);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.get("/settings", authorize("ADMIN"), (_req: AuthRequest, res: Response) => {
-  try {
-    res.status(200).json(adminService.getSettings());
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
-
-router.patch("/settings/:section", authorize("ADMIN"), (req: AuthRequest, res: Response) => {
-  try {
-    const merged = adminService.patchSettingsSection(req.params.section, req.body ?? {});
-    res.status(200).json(merged);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes("Unknown settings section")) {
-      res.status(400).json({ error: message });
-      return;
+router.patch(
+  "/settings/:section",
+  authorize("ADMIN"),
+  (req: AuthRequest, res: Response) => {
+    try {
+      const merged = adminService.patchSettingsSection(
+        req.params.section,
+        req.body ?? {},
+      );
+      res.status(200).json(merged);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("Unknown settings section")) {
+        res.status(400).json({ error: message });
+        return;
+      }
+      res.status(500).json({ error: message });
     }
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
-router.post("/settings/test-email", authorize("ADMIN"), (_req: AuthRequest, res: Response) => {
-  res.status(200).json({ success: false, message: "Outbound email is not configured." });
-});
+router.post(
+  "/settings/test-email",
+  authorize("ADMIN"),
+  (_req: AuthRequest, res: Response) => {
+    res
+      .status(200)
+      .json({ success: false, message: "Outbound email is not configured." });
+  },
+);
 
 // ── Groups ──────────────────────────────────────────────────────────────────
 
@@ -787,23 +918,27 @@ router.get("/groups", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post("/groups", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { name, description } = req.body;
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
+router.post(
+  "/groups",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, description } = req.body;
+      if (!name) {
+        res.status(400).json({ error: "name is required" });
+        return;
+      }
+      const group = await adminService.createGroup(auditContext(req), {
+        name,
+        description: description ?? null,
+      });
+      res.status(201).json(group);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const group = await adminService.createGroup(auditContext(req), {
-      name,
-      description: description ?? null,
-    });
-    res.status(201).json(group);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -877,23 +1012,34 @@ router.get("/groups/:id", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.patch("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { name, description } = req.body as { name?: string; description?: string | null };
-    const result = await adminService.updateGroup(auditContext(req), req.params.id, {
-      name,
-      description,
-    });
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Group not found" });
-      return;
+router.patch(
+  "/groups/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, description } = req.body as {
+        name?: string;
+        description?: string | null;
+      };
+      const result = await adminService.updateGroup(
+        auditContext(req),
+        req.params.id,
+        {
+          name,
+          description,
+        },
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Group not found" });
+        return;
+      }
+      res.status(200).json(result.group);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json(result.group);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -918,19 +1064,26 @@ router.patch("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Re
  *       500:
  *         description: Server error
  */
-router.delete("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await adminService.deleteGroup(auditContext(req), req.params.id);
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Group not found" });
-      return;
+router.delete(
+  "/groups/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await adminService.deleteGroup(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Group not found" });
+        return;
+      }
+      res.status(200).json({ message: "Group deleted" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json({ message: "Group deleted" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -966,20 +1119,28 @@ router.delete("/groups/:id", authorize("ADMIN"), async (req: AuthRequest, res: R
  *       500:
  *         description: Server error
  */
-router.post("/groups/:id/members", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const { userId } = req.body;
-    if (!userId) {
-      res.status(400).json({ error: "userId is required" });
-      return;
+router.post(
+  "/groups/:id/members",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        res.status(400).json({ error: "userId is required" });
+        return;
+      }
+      await adminService.addGroupMember(
+        auditContext(req),
+        req.params.id,
+        userId,
+      );
+      res.status(200).json({ message: "User added to group" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    await adminService.addGroupMember(auditContext(req), req.params.id, userId);
-    res.status(200).json({ message: "User added to group" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -1007,19 +1168,23 @@ router.post("/groups/:id/members", authorize("ADMIN"), async (req: AuthRequest, 
  *       500:
  *         description: Server error
  */
-router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    await adminService.removeGroupMember(
-      auditContext(req),
-      req.params.id,
-      req.params.userId,
-    );
-    res.status(200).json({ message: "User removed from group" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+router.delete(
+  "/groups/:id/members/:userId",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      await adminService.removeGroupMember(
+        auditContext(req),
+        req.params.id,
+        req.params.userId,
+      );
+      res.status(200).json({ message: "User removed from group" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 // ── Monitoring (JSON for admin UI; use GET /metrics for Prometheus) ─────────
 
@@ -1038,15 +1203,19 @@ router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: Aut
  *       403:
  *         description: Forbidden
  */
-router.get("/monitoring/metrics", authorize("ADMIN"), async (_req: AuthRequest, res: Response) => {
-  try {
-    const metrics = await getAdminOperationalMetrics();
-    res.status(200).json(metrics);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+router.get(
+  "/monitoring/metrics",
+  authorize("ADMIN"),
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const metrics = await getAdminOperationalMetrics();
+      res.status(200).json(metrics);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 // ── Audit Logs ──────────────────────────────────────────────────────────────
 
@@ -1130,36 +1299,44 @@ function auditCsvRow(fields: string[]): string {
  *       500:
  *         description: Server error
  */
-router.get("/logs", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const from = parseOptionalDate(req.query.from);
-    const to = parseOptionalDate(req.query.to);
-    if ((req.query.from && !from) || (req.query.to && !to)) {
-      res.status(400).json({ error: "Invalid from or to date" });
-      return;
-    }
-    if (from && to && from > to) {
-      res.status(400).json({ error: "`from` must be before `to`" });
-      return;
-    }
+router.get(
+  "/logs",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const from = parseOptionalDate(req.query.from);
+      const to = parseOptionalDate(req.query.to);
+      if ((req.query.from && !from) || (req.query.to && !to)) {
+        res.status(400).json({ error: "Invalid from or to date" });
+        return;
+      }
+      if (from && to && from > to) {
+        res.status(400).json({ error: "`from` must be before `to`" });
+        return;
+      }
 
-    const filters = {
-      actorId: req.query.actorId as string | undefined,
-      resource: req.query.resource as string | undefined,
-      resourceId: req.query.resourceId as string | undefined,
-      action: req.query.action as string | undefined,
-      from,
-      to,
-      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-      offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
-    };
-    const logs = await adminService.listLogs(filters);
-    res.status(200).json(logs);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+      const filters = {
+        actorId: req.query.actorId as string | undefined,
+        resource: req.query.resource as string | undefined,
+        resourceId: req.query.resourceId as string | undefined,
+        action: req.query.action as string | undefined,
+        from,
+        to,
+        limit: req.query.limit
+          ? parseInt(req.query.limit as string)
+          : undefined,
+        offset: req.query.offset
+          ? parseInt(req.query.offset as string)
+          : undefined,
+      };
+      const logs = await adminService.listLogs(filters);
+      res.status(200).json(logs);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -1237,90 +1414,107 @@ router.get("/logs", authorize("ADMIN"), async (req: AuthRequest, res: Response) 
  *       500:
  *         description: Server error
  */
-router.get("/logs/export", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
-  try {
-    const format = (req.query.format as string || "").toLowerCase();
-    if (format !== "csv" && format !== "json") {
-      res.status(400).json({ error: "format query parameter is required and must be 'csv' or 'json'" });
-      return;
-    }
+router.get(
+  "/logs/export",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const format = ((req.query.format as string) || "").toLowerCase();
+      if (format !== "csv" && format !== "json") {
+        res
+          .status(400)
+          .json({
+            error:
+              "format query parameter is required and must be 'csv' or 'json'",
+          });
+        return;
+      }
 
-    const from = parseOptionalDate(req.query.from);
-    const to = parseOptionalDate(req.query.to);
-    if ((req.query.from && !from) || (req.query.to && !to)) {
-      res.status(400).json({ error: "Invalid from or to date" });
-      return;
-    }
-    if (from && to && from > to) {
-      res.status(400).json({ error: "`from` must be before `to`" });
-      return;
-    }
+      const from = parseOptionalDate(req.query.from);
+      const to = parseOptionalDate(req.query.to);
+      if ((req.query.from && !from) || (req.query.to && !to)) {
+        res.status(400).json({ error: "Invalid from or to date" });
+        return;
+      }
+      if (from && to && from > to) {
+        res.status(400).json({ error: "`from` must be before `to`" });
+        return;
+      }
 
-    const rawLimit = req.query.limit ? parseInt(req.query.limit as string) : 1000;
-    const limit = Math.min(Math.max(1, rawLimit), 10000);
+      const rawLimit = req.query.limit
+        ? parseInt(req.query.limit as string)
+        : 1000;
+      const limit = Math.min(Math.max(1, rawLimit), 10000);
 
-    const filters = {
-      actorId: req.query.actorId as string | undefined,
-      resource: req.query.resource as string | undefined,
-      resourceId: req.query.resourceId as string | undefined,
-      action: req.query.action as string | undefined,
-      from,
-      to,
-      limit,
-      offset: 0,
-    };
-    const logs = await adminService.listLogs(filters);
+      const filters = {
+        actorId: req.query.actorId as string | undefined,
+        resource: req.query.resource as string | undefined,
+        resourceId: req.query.resourceId as string | undefined,
+        action: req.query.action as string | undefined,
+        from,
+        to,
+        limit,
+        offset: 0,
+      };
+      const logs = await adminService.listLogs(filters);
 
-    const fromStr = from ? from.toISOString().split("T")[0] : "all";
-    const toStr = to ? to.toISOString().split("T")[0] : "now";
+      const fromStr = from ? from.toISOString().split("T")[0] : "all";
+      const toStr = to ? to.toISOString().split("T")[0] : "now";
 
-    if (format === "json") {
-      const filename = `audit_logs_${fromStr}_to_${toStr}.json`;
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.status(200).json(logs);
-      return;
-    }
+      if (format === "json") {
+        const filename = `audit_logs_${fromStr}_to_${toStr}.json`;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${filename}"`,
+        );
+        res.status(200).json(logs);
+        return;
+      }
 
-    const CSV_HEADERS = [
-      "ID",
-      "Timestamp",
-      "Actor ID",
-      "Action",
-      "Resource",
-      "Resource ID",
-      "Old Value",
-      "New Value",
-      "IP Address",
-      "User Agent",
-    ];
-    const rows: string[] = [auditCsvRow(CSV_HEADERS)];
+      const CSV_HEADERS = [
+        "ID",
+        "Timestamp",
+        "Actor ID",
+        "Action",
+        "Resource",
+        "Resource ID",
+        "Old Value",
+        "New Value",
+        "IP Address",
+        "User Agent",
+      ];
+      const rows: string[] = [auditCsvRow(CSV_HEADERS)];
 
-    for (const log of logs) {
-      rows.push(
-        auditCsvRow([
-          log.id,
-          log.createdAt.toISOString(),
-          log.actorId ?? "",
-          log.action,
-          log.resource,
-          log.resourceId,
-          log.oldValue != null ? JSON.stringify(log.oldValue) : "",
-          log.newValue != null ? JSON.stringify(log.newValue) : "",
-          log.ipAddress ?? "",
-          log.userAgent ?? "",
-        ]),
+      for (const log of logs) {
+        rows.push(
+          auditCsvRow([
+            log.id,
+            log.createdAt.toISOString(),
+            log.actorId ?? "",
+            log.action,
+            log.resource,
+            log.resourceId,
+            log.oldValue != null ? JSON.stringify(log.oldValue) : "",
+            log.newValue != null ? JSON.stringify(log.newValue) : "",
+            log.ipAddress ?? "",
+            log.userAgent ?? "",
+          ]),
+        );
+      }
+
+      const filename = `audit_logs_${fromStr}_to_${toStr}.csv`;
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`,
       );
+      res.status(200).send(rows.join("\n"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-
-    const filename = `audit_logs_${fromStr}_to_${toStr}.csv`;
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.status(200).send(rows.join("\n"));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 export default router;

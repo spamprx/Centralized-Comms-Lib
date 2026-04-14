@@ -61,9 +61,12 @@ function toVersion(row: {
     versionNumber: row.versionNumber,
     changeType: row.changeType as VersionChangeType,
     title: row.title,
-    body: row.body != null && typeof row.body === "object" && !Array.isArray(row.body)
-      ? (row.body as TipTapDocument)
-      : null,
+    body:
+      row.body != null &&
+      typeof row.body === "object" &&
+      !Array.isArray(row.body)
+        ? (row.body as TipTapDocument)
+        : null,
     metadataSnapshot: row.metadataSnapshot ?? null,
     contentId: row.contentId,
     authorId: row.authorId,
@@ -127,7 +130,10 @@ export class PrismaContentRepository implements ContentRepository {
     return toContent(row);
   }
 
-  async updateContentType(contentId: string, contentType: ContentType): Promise<Content> {
+  async updateContentType(
+    contentId: string,
+    contentType: ContentType,
+  ): Promise<Content> {
     const row = await this.db.content.update({
       where: { id: contentId },
       data: { contentType: contentType as any },
@@ -146,7 +152,10 @@ export class PrismaContentRepository implements ContentRepository {
     return toContent(row);
   }
 
-  async updateVisibility(contentId: string, visibility: Visibility): Promise<Content> {
+  async updateVisibility(
+    contentId: string,
+    visibility: Visibility,
+  ): Promise<Content> {
     const row = await this.db.content.update({
       where: { id: contentId },
       data: { visibility },
@@ -165,7 +174,9 @@ export class PrismaContentRepository implements ContentRepository {
     return toContent(row);
   }
 
-  async createVersion(input: CreateContentVersionInput): Promise<ContentVersion> {
+  async createVersion(
+    input: CreateContentVersionInput,
+  ): Promise<ContentVersion> {
     const latest = await this.getLatestVersion(input.contentId);
     const nextVersion = latest ? latest.versionNumber + 1 : 1;
 
@@ -176,7 +187,9 @@ export class PrismaContentRepository implements ContentRepository {
         changeType: input.changeType,
         title: input.title,
         ...(input.body != null && { body: input.body as object }),
-        ...(input.metadataSnapshot != null && { metadataSnapshot: input.metadataSnapshot as object }),
+        ...(input.metadataSnapshot != null && {
+          metadataSnapshot: input.metadataSnapshot as object,
+        }),
         versionNumber: nextVersion,
       },
     });
@@ -219,7 +232,13 @@ export class PrismaContentRepository implements ContentRepository {
 
   async listLatestContentVersionsMaybeReferencingComponentVersion(
     componentVersionId: string,
-  ): Promise<Array<{ contentVersionId: string; contentId: string; body: TipTapDocument | null }>> {
+  ): Promise<
+    Array<{
+      contentVersionId: string;
+      contentId: string;
+      body: TipTapDocument | null;
+    }>
+  > {
     const pattern = `%${componentVersionId}%`;
     const rows = await this.db.$queryRaw<
       Array<{ id: string; contentId: string; body: unknown }>

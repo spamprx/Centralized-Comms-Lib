@@ -1,8 +1,21 @@
-import { getPrismaClient, PrismaUnitOfWork, type Repositories } from "../../repository";
-import type { Template, TemplateBinding, TemplateStatus, TemplateWithBindings } from "../../repository/types";
+import {
+  getPrismaClient,
+  PrismaUnitOfWork,
+  type Repositories,
+} from "../../repository";
+import type {
+  Template,
+  TemplateBinding,
+  TemplateStatus,
+  TemplateWithBindings,
+} from "../../repository/types";
 import type { LayoutPhase } from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
-import { mergeI18n, parseI18nPatch, type I18nStrings } from "../../shared/validation/i18nPatch";
+import {
+  mergeI18n,
+  parseI18nPatch,
+  type I18nStrings,
+} from "../../shared/validation/i18nPatch";
 import {
   flattenRegions,
   parseAndValidateLayoutConfig,
@@ -46,7 +59,12 @@ function getRequiredTemplateLocales(defaultLocale: string): string[] {
   return deduped.length > 0 ? deduped : [defaultLocale];
 }
 
-function extractLocalizableKeys(template: Pick<Template, "name" | "description" | "draftLayout" | "activeLayout">): string[] {
+function extractLocalizableKeys(
+  template: Pick<
+    Template,
+    "name" | "description" | "draftLayout" | "activeLayout"
+  >,
+): string[] {
   const source = JSON.stringify({
     name: template.name,
     description: template.description,
@@ -62,7 +80,10 @@ function extractLocalizableKeys(template: Pick<Template, "name" | "description" 
   return Array.from(found).sort((a, b) => a.localeCompare(b));
 }
 
-function ensureObjectLevelTemplateAccess(template: Template, ctx: AuditContext): boolean {
+function ensureObjectLevelTemplateAccess(
+  template: Template,
+  ctx: AuditContext,
+): boolean {
   return ctx.isAdmin || template.authorId === ctx.actorId;
 }
 
@@ -76,7 +97,8 @@ function validateRequiredLocaleCompleteness(
     const missingKeys = keys.filter((key) => !bundle[key]?.trim());
     if (missingKeys.length > 0) {
       const preview = missingKeys.slice(0, 5).join(", ");
-      const suffix = missingKeys.length > 5 ? ` (+${missingKeys.length - 5} more)` : "";
+      const suffix =
+        missingKeys.length > 5 ? ` (+${missingKeys.length - 5} more)` : "";
       return `Missing required translations for locale ${locale}: ${preview}${suffix}`;
     }
   }
@@ -95,7 +117,9 @@ function coalesceTranslationBundles(
   return merged;
 }
 
-function flattenI18nForRows(strings: I18nStrings): Array<{ locale: string; key: string; value: string }> {
+function flattenI18nForRows(
+  strings: I18nStrings,
+): Array<{ locale: string; key: string; value: string }> {
   const rows: Array<{ locale: string; key: string; value: string }> = [];
   for (const [locale, bundle] of Object.entries(strings)) {
     for (const [key, value] of Object.entries(bundle)) {
@@ -113,7 +137,10 @@ async function uniqueTemplateSlug(
   let candidate = slugify(baseName);
   if (!candidate) candidate = "template";
   for (let i = 0; i < 64; i++) {
-    const existing = await repos.template.getByWorkspaceAndSlug(workspaceId, candidate);
+    const existing = await repos.template.getByWorkspaceAndSlug(
+      workspaceId,
+      candidate,
+    );
     if (!existing) return candidate;
     candidate = `${slugify(baseName)}-${Date.now().toString(36)}${i}`;
   }
@@ -138,7 +165,8 @@ async function allocateUniqueCloneName(
 function validateName(name: unknown): string {
   if (typeof name !== "string") throw new Error("name must be a string");
   const t = name.trim();
-  if (t.length < 1 || t.length > 200) throw new Error("name must be 1–200 characters");
+  if (t.length < 1 || t.length > 200)
+    throw new Error("name must be 1–200 characters");
   return t;
 }
 
@@ -166,7 +194,11 @@ export const templateService = {
 
   async create(
     ctx: AuditContext,
-    input: { name: string; description?: string | null; draftLayout?: unknown | null },
+    input: {
+      name: string;
+      description?: string | null;
+      draftLayout?: unknown | null;
+    },
   ): Promise<Template> {
     const name = validateName(input.name);
     const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
@@ -220,7 +252,12 @@ export const templateService = {
   async update(
     ctx: AuditContext,
     id: string,
-    input: { name?: string; description?: string | null; slug?: string; status?: TemplateStatus },
+    input: {
+      name?: string;
+      description?: string | null;
+      slug?: string;
+      status?: TemplateStatus;
+    },
   ): Promise<
     | { ok: true; template: Template }
     | { notFound: true }
@@ -242,9 +279,15 @@ export const templateService = {
 
       if (input.name !== undefined) {
         patch.name = validateName(input.name);
-        const taken = await repos.template.findByWorkspaceAndName(current.workspaceId, patch.name);
+        const taken = await repos.template.findByWorkspaceAndName(
+          current.workspaceId,
+          patch.name,
+        );
         if (taken && taken.id !== id) {
-          return { conflict: true, message: "name already in use in this workspace" } as const;
+          return {
+            conflict: true,
+            message: "name already in use in this workspace",
+          } as const;
         }
       }
       if (input.description !== undefined) {
@@ -252,13 +295,26 @@ export const templateService = {
       }
       if (input.slug !== undefined) {
         if (typeof input.slug !== "string" || !input.slug.trim()) {
-          return { invalid: true, message: "slug must be a non-empty string" } as const;
+          return {
+            invalid: true,
+            message: "slug must be a non-empty string",
+          } as const;
         }
         const s = slugify(input.slug.trim());
-        if (!s) return { invalid: true, message: "slug must contain alphanumeric characters" } as const;
-        const taken = await repos.template.getByWorkspaceAndSlug(current.workspaceId, s);
+        if (!s)
+          return {
+            invalid: true,
+            message: "slug must contain alphanumeric characters",
+          } as const;
+        const taken = await repos.template.getByWorkspaceAndSlug(
+          current.workspaceId,
+          s,
+        );
         if (taken && taken.id !== id) {
-          return { conflict: true, message: "slug already in use in this workspace" } as const;
+          return {
+            conflict: true,
+            message: "slug already in use in this workspace",
+          } as const;
         }
         patch.slug = s;
       }
@@ -272,7 +328,10 @@ export const templateService = {
         if (input.status === "DRAFT" && current.status === "ACTIVE") {
           patch.status = "DRAFT";
         } else if (input.status !== current.status) {
-          return { invalid: true, message: "Invalid status transition" } as const;
+          return {
+            invalid: true,
+            message: "Invalid status transition",
+          } as const;
         }
       }
 
@@ -285,7 +344,11 @@ export const templateService = {
         action: "UPDATE",
         resource: "TEMPLATE",
         resourceId: id,
-        oldValue: { name: current.name, slug: current.slug, status: current.status },
+        oldValue: {
+          name: current.name,
+          slug: current.slug,
+          status: current.status,
+        },
         newValue: patch,
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
@@ -307,11 +370,17 @@ export const templateService = {
       const current = await repos.template.getById(id);
       if (!current) return { notFound: true } as const;
       if (current.status === "ACTIVE") {
-        return { inUse: true, reason: "Cannot delete an ACTIVE template; deactivate first" } as const;
+        return {
+          inUse: true,
+          reason: "Cannot delete an ACTIVE template; deactivate first",
+        } as const;
       }
       const n = await repos.template.countContentsUsingTemplate(id);
       if (n > 0) {
-        return { inUse: true, reason: `Template is referenced by ${n} content item(s)` } as const;
+        return {
+          inUse: true,
+          reason: `Template is referenced by ${n} content item(s)`,
+        } as const;
       }
       await repos.template.delete(id);
       await repos.audit.append({
@@ -331,8 +400,7 @@ export const templateService = {
     ctx: AuditContext,
     sourceId: string,
   ): Promise<
-    | { ok: true; template: TemplateWithBindings }
-    | { notFound: true }
+    { ok: true; template: TemplateWithBindings } | { notFound: true }
   > {
     const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
     const prisma = getPrismaClient();
@@ -343,9 +411,14 @@ export const templateService = {
 
       const name = await allocateUniqueCloneName(repos, workspaceId, src.name);
       const slug = await uniqueTemplateSlug(repos, workspaceId, name);
-      const draftLayout = src.draftLayout != null ? regenerateLayoutIds(deepCloneJson(src.draftLayout)) : null;
+      const draftLayout =
+        src.draftLayout != null
+          ? regenerateLayoutIds(deepCloneJson(src.draftLayout))
+          : null;
       const activeLayout =
-        src.activeLayout != null ? regenerateLayoutIds(deepCloneJson(src.activeLayout)) : null;
+        src.activeLayout != null
+          ? regenerateLayoutIds(deepCloneJson(src.activeLayout))
+          : null;
       const i18n = deepCloneJson(src.i18n) as I18nStrings;
 
       const created = await repos.template.create({
@@ -364,16 +437,24 @@ export const templateService = {
         await repos.template.createBinding(created.id, b.channelId);
       }
 
-      const translationRows = await repos.templateTranslation.listAllForTemplate(src.id);
+      const translationRows =
+        await repos.templateTranslation.listAllForTemplate(src.id);
       if (translationRows.length > 0) {
         await repos.templateTranslation.upsertMany(
           created.id,
-          translationRows.map((r) => ({ locale: r.locale, key: r.key, value: r.value })),
+          translationRows.map((r) => ({
+            locale: r.locale,
+            key: r.key,
+            value: r.value,
+          })),
         );
       }
 
       for (const phase of LAYOUT_PHASES) {
-        const secs = await repos.templateLayoutSection.listForTemplatePhase(src.id, phase);
+        const secs = await repos.templateLayoutSection.listForTemplatePhase(
+          src.id,
+          phase,
+        );
         for (const s of secs) {
           await repos.templateLayoutSection.create({
             templateId: created.id,
@@ -386,7 +467,8 @@ export const templateService = {
       }
 
       const withBindings = await repos.template.getByIdWithBindings(created.id);
-      if (!withBindings) throw new Error("Clone failed: template missing after create");
+      if (!withBindings)
+        throw new Error("Clone failed: template missing after create");
 
       await repos.audit.append({
         action: "TEMPLATE_CLONED",
@@ -412,10 +494,17 @@ export const templateService = {
     ctx: AuditContext,
     id: string,
     layout: unknown,
-  ): Promise<{ ok: true; template: Template } | { notFound: true } | { invalid: true; message: string }> {
+  ): Promise<
+    | { ok: true; template: Template }
+    | { notFound: true }
+    | { invalid: true; message: string }
+  > {
     const parsed = parseAndValidateLayoutConfig(layout);
     if (!parsed) {
-      return { invalid: true, message: "Invalid layout config schema" } as const;
+      return {
+        invalid: true,
+        message: "Invalid layout config schema",
+      } as const;
     }
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -458,13 +547,18 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const current = await repos.template.getById(id);
       if (!current) return { notFound: true } as const;
-      if (!ensureObjectLevelTemplateAccess(current, ctx)) return { forbidden: true } as const;
+      if (!ensureObjectLevelTemplateAccess(current, ctx))
+        return { forbidden: true } as const;
 
       const merged = mergeI18n(current.i18n, patch);
       const keys = extractLocalizableKeys(current);
       const defaultLocale = getTemplateDefaultLocale();
       const requiredLocales = getRequiredTemplateLocales(defaultLocale);
-      const completenessError = validateRequiredLocaleCompleteness(merged, keys, requiredLocales);
+      const completenessError = validateRequiredLocaleCompleteness(
+        merged,
+        keys,
+        requiredLocales,
+      );
       if (completenessError) {
         return { invalid: true, message: completenessError } as const;
       }
@@ -506,7 +600,8 @@ export const templateService = {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     const template = await repos.template.getById(id);
     if (!template) return { notFound: true } as const;
-    if (!ensureObjectLevelTemplateAccess(template, ctx)) return { forbidden: true } as const;
+    if (!ensureObjectLevelTemplateAccess(template, ctx))
+      return { forbidden: true } as const;
 
     const rows = await repos.templateTranslation.listAllForTemplate(id);
     const translations = coalesceTranslationBundles(template.i18n, rows);
@@ -550,15 +645,19 @@ export const templateService = {
   > {
     const locale = normalizeLocaleTag(input.locale);
     const key = input.key.trim();
-    if (!locale) return { invalid: true, message: "locale is required" } as const;
+    if (!locale)
+      return { invalid: true, message: "locale is required" } as const;
     if (!key) return { invalid: true, message: "key is required" } as const;
 
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     const template = await repos.template.getById(input.templateId);
     if (!template) return { notFound: true } as const;
-    if (!ensureObjectLevelTemplateAccess(template, ctx)) return { forbidden: true } as const;
+    if (!ensureObjectLevelTemplateAccess(template, ctx))
+      return { forbidden: true } as const;
 
-    const rows = await repos.templateTranslation.listAllForTemplate(input.templateId);
+    const rows = await repos.templateTranslation.listAllForTemplate(
+      input.templateId,
+    );
     const translations = coalesceTranslationBundles(template.i18n, rows);
     const defaultLocale = getTemplateDefaultLocale();
     const localized = translations[locale]?.[key];
@@ -618,14 +717,23 @@ export const templateService = {
       const current = await repos.template.getByIdWithBindings(id);
       if (!current) return { notFound: true } as const;
       if (current.draftLayout == null) {
-        return { invalid: true, message: "Cannot activate without a draft layout" } as const;
+        return {
+          invalid: true,
+          message: "Cannot activate without a draft layout",
+        } as const;
       }
       const layout = parseAndValidateLayoutConfig(current.draftLayout);
       if (!layout) {
-        return { invalid: true, message: "Draft layout failed schema validation" } as const;
+        return {
+          invalid: true,
+          message: "Draft layout failed schema validation",
+        } as const;
       }
       if (flattenRegions(layout).length < 1) {
-        return { invalid: true, message: "Layout must declare at least one region" } as const;
+        return {
+          invalid: true,
+          message: "Layout must declare at least one region",
+        } as const;
       }
       if (current.bindings.length < 1) {
         return {
@@ -691,7 +799,10 @@ export const templateService = {
       }
 
       try {
-        const binding = await repos.template.createBinding(templateId, channelId);
+        const binding = await repos.template.createBinding(
+          templateId,
+          channelId,
+        );
         await repos.audit.append({
           action: "CREATE",
           resource: "TEMPLATE_BINDING",
@@ -704,7 +815,10 @@ export const templateService = {
         return { ok: true, binding } as const;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("Unique constraint") || msg.includes("unique constraint")) {
+        if (
+          msg.includes("Unique constraint") ||
+          msg.includes("unique constraint")
+        ) {
           return { conflict: true } as const;
         }
         throw e;

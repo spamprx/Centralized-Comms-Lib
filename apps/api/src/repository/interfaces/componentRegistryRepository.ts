@@ -5,7 +5,11 @@ import type {
 } from "../types";
 
 export interface ComponentRegistryRepository {
-  createComponent(input: { key: string; name: string; description?: string | null }): Promise<ComponentRecord>;
+  createComponent(input: {
+    key: string;
+    name: string;
+    description?: string | null;
+  }): Promise<ComponentRecord>;
   getComponentById(id: string): Promise<ComponentRecord | null>;
   getComponentByKey(key: string): Promise<ComponentRecord | null>;
   listComponents(): Promise<ComponentRecord[]>;
@@ -20,7 +24,12 @@ export interface ComponentRegistryRepository {
     propSchema?: unknown | null;
   }): Promise<ComponentVersionRecord>;
   getVersionById(id: string): Promise<ComponentVersionRecord | null>;
-  listVersionsForComponent(componentId: string): Promise<ComponentVersionRecord[]>;
+  listVersionsForComponent(
+    componentId: string,
+  ): Promise<ComponentVersionRecord[]>;
   /** Updates canonical `bodyJson` for an existing version (library maintainer / propagation). */
-  updateVersionBodyJson(versionId: string, bodyJson: unknown | null): Promise<ComponentVersionRecord>;
+  updateVersionBodyJson(
+    versionId: string,
+    bodyJson: unknown | null,
+  ): Promise<ComponentVersionRecord>;
 }

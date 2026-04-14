@@ -93,7 +93,9 @@ export const contentService = {
     | { content: Content; version: ContentVersion }
     | { invalidFormatting: true; violations: FormattingViolation[] }
   > {
-    const rules = await getFormattingRulesForTemplateId(input.templateId ?? undefined);
+    const rules = await getFormattingRulesForTemplateId(
+      input.templateId ?? undefined,
+    );
     const violations = enforceFormattingRules(input.body ?? null, rules);
     if (violations.length > 0) {
       return { invalidFormatting: true, violations };
@@ -129,7 +131,9 @@ export const contentService = {
       });
       return { content, version };
     });
-    void syncContentIndexFromDb(prisma, result.content.id).catch(() => undefined);
+    void syncContentIndexFromDb(prisma, result.content.id).catch(
+      () => undefined,
+    );
     const author = await prisma.user.findUnique({
       where: { id: result.content.authorId },
       select: { id: true, displayName: true, email: true },
@@ -145,7 +149,8 @@ export const contentService = {
     type AuthorRow = { id: string; displayName: string; email: string };
     const uow = new PrismaUnitOfWork(prisma);
     const repos = uow.repos();
-    const isOwnListRequest = !!requester && !!filters.authorId && filters.authorId === requester.id;
+    const isOwnListRequest =
+      !!requester && !!filters.authorId && filters.authorId === requester.id;
     const effectiveFilters: ContentListFilters =
       requester && !requester.isAdmin && !isOwnListRequest
         ? { ...filters, lifecycleState: "PUBLISHED" }
@@ -162,12 +167,16 @@ export const contentService = {
         })();
 
     const visibleContents = await visible;
-    const authorIds = Array.from(new Set(visibleContents.map((c) => c.authorId).filter(Boolean)));
+    const authorIds = Array.from(
+      new Set(visibleContents.map((c) => c.authorId).filter(Boolean)),
+    );
     const authors = (await prisma.user.findMany({
       where: { id: { in: authorIds } },
       select: { id: true, displayName: true, email: true },
     })) as AuthorRow[];
-    const authorById = new Map<string, AuthorRow>(authors.map((u) => [u.id, u]));
+    const authorById = new Map<string, AuthorRow>(
+      authors.map((u) => [u.id, u]),
+    );
 
     const contentIds = visibleContents.map((c) => c.id);
     const [viewsRows, likesRows] = await Promise.all([
@@ -182,8 +191,12 @@ export const contentService = {
         _count: { _all: true },
       }),
     ]);
-    const viewsById = new Map<string, number>(viewsRows.map((r) => [r.contentId, r._count._all]));
-    const likesById = new Map<string, number>(likesRows.map((r) => [r.contentId, r._count._all]));
+    const viewsById = new Map<string, number>(
+      viewsRows.map((r) => [r.contentId, r._count._all]),
+    );
+    const likesById = new Map<string, number>(
+      likesRows.map((r) => [r.contentId, r._count._all]),
+    );
 
     return visibleContents.map((c) => ({
       ...c,
@@ -230,8 +243,13 @@ export const contentService = {
       isReviewer = !!reviewAssignment;
     }
 
-    const groups = requester ? await repos.userRole.listGroupsForUser(requester.id) : [];
-    if (!isReviewer && !canViewContent(content, requester, groups, isCoAuthor)) {
+    const groups = requester
+      ? await repos.userRole.listGroupsForUser(requester.id)
+      : [];
+    if (
+      !isReviewer &&
+      !canViewContent(content, requester, groups, isCoAuthor)
+    ) {
       return null;
     }
 
@@ -241,11 +259,13 @@ export const contentService = {
       where: { contentId: id, status: "ACCEPTED" },
       include: { user: true },
     });
-    const coAuthors = coAuthorsRows.map((row: { user: { id: string; displayName: string; email: string } }) => ({
-      id: row.user.id,
-      displayName: row.user.displayName,
-      email: row.user.email,
-    }));
+    const coAuthors = coAuthorsRows.map(
+      (row: { user: { id: string; displayName: string; email: string } }) => ({
+        id: row.user.id,
+        displayName: row.user.displayName,
+        email: row.user.email,
+      }),
+    );
 
     const author = await prisma.user.findUnique({
       where: { id: content.authorId },
@@ -264,7 +284,8 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const existing = await repos.content.getById(contentId);
       if (!existing) return { notFound: true } as const;
-      if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+      if (existing.authorId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
 
       // ReviewRequest.content has no cascade; delete review graph first.
       await prisma.reviewRequest.deleteMany({ where: { contentId } });
@@ -341,7 +362,9 @@ export const contentService = {
       where: { id: contentId },
       select: { templateId: true },
     });
-    const rules = await getFormattingRulesForTemplateId(existingForRules?.templateId);
+    const rules = await getFormattingRulesForTemplateId(
+      existingForRules?.templateId,
+    );
 
     let effectiveBody: TipTapDocument | null | undefined = input.body;
     if (input.body !== undefined && input.body !== null) {
@@ -357,7 +380,10 @@ export const contentService = {
               : null;
           canonicalByVersionId.set(id, c);
         }
-        effectiveBody = refreshLinkedNodesInDocument(input.body, canonicalByVersionId);
+        effectiveBody = refreshLinkedNodesInDocument(
+          input.body,
+          canonicalByVersionId,
+        );
       }
     }
 
@@ -374,7 +400,10 @@ export const contentService = {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
       if (content.authorId !== ctx.actorId) return { forbidden: true } as const;
-      if (content.lifecycleState !== "DRAFT" && content.lifecycleState !== "IN_REVIEW") {
+      if (
+        content.lifecycleState !== "DRAFT" &&
+        content.lifecycleState !== "IN_REVIEW"
+      ) {
         return { invalidState: true, state: content.lifecycleState } as const;
       }
       let currentTitle = content.title;
@@ -392,9 +421,16 @@ export const contentService = {
         title: currentTitle,
         body: input.body === undefined ? null : (effectiveBody ?? null),
       });
-      await recordSnapshotForVersion(repos, ctx, contentId, version.versionNumber, "MANUAL_SAVE", {
-        versionId: version.id,
-      });
+      await recordSnapshotForVersion(
+        repos,
+        ctx,
+        contentId,
+        version.versionNumber,
+        "MANUAL_SAVE",
+        {
+          versionId: version.id,
+        },
+      );
       await repos.audit.append({
         action: "BODY_SAVE",
         resource: "CONTENT_VERSION",
@@ -408,7 +444,11 @@ export const contentService = {
         aggregateType: "CONTENT",
         aggregateId: contentId,
         eventType: "CONTENT.BODY_SAVED",
-        payload: { contentId, versionId: version.id, versionNumber: version.versionNumber },
+        payload: {
+          contentId,
+          versionId: version.id,
+          versionNumber: version.versionNumber,
+        },
       });
       return { version };
     });
@@ -437,7 +477,9 @@ export const contentService = {
       where: { id: contentId },
       select: { templateId: true },
     });
-    const rules = await getFormattingRulesForTemplateId(existingForRules?.templateId);
+    const rules = await getFormattingRulesForTemplateId(
+      existingForRules?.templateId,
+    );
 
     let effectiveBody: TipTapDocument = inputBody;
     const ids = collectLinkedComponentVersionIds(inputBody);
@@ -452,7 +494,10 @@ export const contentService = {
             : null;
         canonicalByVersionId.set(id, c);
       }
-      effectiveBody = refreshLinkedNodesInDocument(inputBody, canonicalByVersionId);
+      effectiveBody = refreshLinkedNodesInDocument(
+        inputBody,
+        canonicalByVersionId,
+      );
     }
 
     const violations = enforceFormattingRules(effectiveBody, rules);
@@ -464,7 +509,10 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
-      if (content.lifecycleState !== "DRAFT" && content.lifecycleState !== "IN_REVIEW") {
+      if (
+        content.lifecycleState !== "DRAFT" &&
+        content.lifecycleState !== "IN_REVIEW"
+      ) {
         return { invalidState: true, state: content.lifecycleState } as const;
       }
       const version = await repos.content.createVersion({
@@ -474,10 +522,17 @@ export const contentService = {
         title: content.title,
         body: effectiveBody,
       });
-      await recordSnapshotForVersion(repos, ctx, contentId, version.versionNumber, "MANUAL_SAVE", {
-        versionId: version.id,
-        linkedComponentPropagation: true,
-      });
+      await recordSnapshotForVersion(
+        repos,
+        ctx,
+        contentId,
+        version.versionNumber,
+        "MANUAL_SAVE",
+        {
+          versionId: version.id,
+          linkedComponentPropagation: true,
+        },
+      );
       await repos.audit.append({
         action: "BODY_SAVE",
         resource: "CONTENT_VERSION",
@@ -525,16 +580,23 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const existing = await repos.content.getById(contentId);
       if (!existing) return { notFound: true } as const;
-      if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+      if (existing.authorId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
       // Idempotent transition: allow setting the current state again (no-op).
       if (existing.lifecycleState === lifecycleState) {
         return { content: existing } as const;
       }
       const allowed = VALID_TRANSITIONS[existing.lifecycleState] ?? [];
       if (!allowed.includes(lifecycleState)) {
-        return { invalidTransition: true, current: existing.lifecycleState } as const;
+        return {
+          invalidTransition: true,
+          current: existing.lifecycleState,
+        } as const;
       }
-      const updated = await repos.content.updateLifecycleState(contentId, lifecycleState);
+      const updated = await repos.content.updateLifecycleState(
+        contentId,
+        lifecycleState,
+      );
       const transitionVersion = await repos.content.createVersion({
         contentId: updated.id,
         authorId: ctx.actorId,
@@ -542,11 +604,18 @@ export const contentService = {
         title: updated.title,
         metadataSnapshot: { from: existing.lifecycleState, to: lifecycleState },
       });
-      await recordSnapshotForVersion(repos, ctx, updated.id, transitionVersion.versionNumber, "STATE_TRANSITION", {
-        versionId: transitionVersion.id,
-        from: existing.lifecycleState,
-        to: lifecycleState,
-      });
+      await recordSnapshotForVersion(
+        repos,
+        ctx,
+        updated.id,
+        transitionVersion.versionNumber,
+        "STATE_TRANSITION",
+        {
+          versionId: transitionVersion.id,
+          from: existing.lifecycleState,
+          to: lifecycleState,
+        },
+      );
       await repos.audit.append({
         action: "STATE_TRANSITION",
         resource: "CONTENT",
@@ -561,7 +630,11 @@ export const contentService = {
         aggregateType: "CONTENT",
         aggregateId: updated.id,
         eventType: `CONTENT.${lifecycleState}`,
-        payload: { contentId: updated.id, from: existing.lifecycleState, to: lifecycleState },
+        payload: {
+          contentId: updated.id,
+          from: existing.lifecycleState,
+          to: lifecycleState,
+        },
       });
       return { content: updated };
     });
@@ -582,8 +655,12 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const existing = await repos.content.getById(contentId);
       if (!existing) return { notFound: true } as const;
-      if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
-      const updated = await repos.content.updateVisibility(contentId, visibility);
+      if (existing.authorId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
+      const updated = await repos.content.updateVisibility(
+        contentId,
+        visibility,
+      );
       if (visibility === "PRIVATE_TO_GROUP" && visibilityGroupId) {
         await repos.content.bindVisibilityGroup(contentId, visibilityGroupId);
       } else if (visibility !== "PRIVATE_TO_GROUP") {
@@ -617,7 +694,8 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
-      if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+      if (content.authorId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
       await repos.tag.assignToContent(contentId, tagId);
       await repos.audit.append({
         action: "TAG_ASSIGN",
@@ -646,7 +724,8 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
-      if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+      if (content.authorId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
       await repos.tag.removeFromContent(contentId, tagId);
       await repos.audit.append({
         action: "TAG_REMOVE",
@@ -703,8 +782,10 @@ export const contentService = {
       });
 
       if (existing) {
-        if (existing.status === "ACCEPTED") return { alreadyCoAuthor: true } as const;
-        if (existing.status === "PENDING") return { alreadyPending: true } as const;
+        if (existing.status === "ACCEPTED")
+          return { alreadyCoAuthor: true } as const;
+        if (existing.status === "PENDING")
+          return { alreadyPending: true } as const;
 
         // If previously rejected, reset to pending
         await prisma.contentCoAuthor.update({
@@ -748,10 +829,7 @@ export const contentService = {
     ctx: AuditContext,
     contentId: string,
     decision: "APPROVE" | "REJECT",
-  ): Promise<
-    | { updated: true; accepted: boolean }
-    | { notFound: true }
-  > {
+  ): Promise<{ updated: true; accepted: boolean } | { notFound: true }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
 
@@ -786,8 +864,14 @@ export const contentService = {
       await repos.outbox.add({
         aggregateType: "CONTENT",
         aggregateId: contentId,
-        eventType: accepted ? "CONTENT.COAUTHOR_ACCEPTED" : "CONTENT.COAUTHOR_REJECTED",
-        payload: { contentId, userId: ctx.actorId, requestedById: request.requestedById },
+        eventType: accepted
+          ? "CONTENT.COAUTHOR_ACCEPTED"
+          : "CONTENT.COAUTHOR_REJECTED",
+        payload: {
+          contentId,
+          userId: ctx.actorId,
+          requestedById: request.requestedById,
+        },
       });
 
       return { updated: true, accepted } as const;
@@ -804,7 +888,9 @@ export const contentService = {
     snapshotBId: string,
     requester: { id: string; isAdmin?: boolean } | null,
   ): Promise<
-    SnapshotWordDiffResult | { notFound: true } | { badRequest: true; error: string }
+    | SnapshotWordDiffResult
+    | { notFound: true }
+    | { badRequest: true; error: string }
   > {
     const detail = await this.getById(contentId, requester);
     if (!detail) {
@@ -820,10 +906,16 @@ export const contentService = {
       return { notFound: true } as const;
     }
     if (sa.contentId !== sb.contentId) {
-      return { badRequest: true, error: "Snapshots belong to different content items" };
+      return {
+        badRequest: true,
+        error: "Snapshots belong to different content items",
+      };
     }
     if (sa.contentId !== contentId) {
-      return { badRequest: true, error: "Snapshots do not match content id in path" };
+      return {
+        badRequest: true,
+        error: "Snapshots do not match content id in path",
+      };
     }
 
     const [va, vb] = await Promise.all([

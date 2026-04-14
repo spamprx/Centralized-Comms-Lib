@@ -1,5 +1,8 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
-import type { ComponentVersionRecord, TipTapDocument } from "../../repository/types";
+import type {
+  ComponentVersionRecord,
+  TipTapDocument,
+} from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
 import { contentService } from "../content/content.service";
 import {
@@ -39,12 +42,17 @@ export async function propagateLinkedComponentToContent(
   }
 
   const canonical: TipTapDocument | null =
-    ver.bodyJson != null && isTipTapDoc(ver.bodyJson) ? (ver.bodyJson as TipTapDocument) : null;
-  const canonicalMap = new Map<string, TipTapDocument | null>([[componentVersionId, canonical]]);
+    ver.bodyJson != null && isTipTapDoc(ver.bodyJson)
+      ? (ver.bodyJson as TipTapDocument)
+      : null;
+  const canonicalMap = new Map<string, TipTapDocument | null>([
+    [componentVersionId, canonical],
+  ]);
 
-  const candidates = await repos.content.listLatestContentVersionsMaybeReferencingComponentVersion(
-    componentVersionId,
-  );
+  const candidates =
+    await repos.content.listLatestContentVersionsMaybeReferencingComponentVersion(
+      componentVersionId,
+    );
 
   const updatedContentIds: string[] = [];
   let skippedUnchanged = 0;
@@ -61,7 +69,11 @@ export async function propagateLinkedComponentToContent(
       continue;
     }
 
-    const result = await contentService.savePropagatedBody(ctx, row.contentId, refreshed);
+    const result = await contentService.savePropagatedBody(
+      ctx,
+      row.contentId,
+      refreshed,
+    );
     if ("invalidFormatting" in result) {
       skippedFormatting.push({
         contentId: row.contentId,
@@ -72,7 +84,8 @@ export async function propagateLinkedComponentToContent(
     if ("notFound" in result || "invalidState" in result) {
       skippedFormatting.push({
         contentId: row.contentId,
-        reason: "notFound" in result ? "content missing" : `state ${result.state}`,
+        reason:
+          "notFound" in result ? "content missing" : `state ${result.state}`,
       });
       continue;
     }
@@ -96,7 +109,10 @@ export async function patchComponentVersionCanonicalBody(
   bodyJson: unknown | null | undefined,
   options: { propagate: boolean },
 ): Promise<
-  | { record: ComponentVersionRecord; propagation?: PropagateLinkedComponentResult }
+  | {
+      record: ComponentVersionRecord;
+      propagation?: PropagateLinkedComponentResult;
+    }
   | { notFound: true }
 > {
   const prisma = getPrismaClient();
@@ -107,7 +123,10 @@ export async function patchComponentVersionCanonicalBody(
   }
   let record = existing;
   if (bodyJson !== undefined) {
-    record = await repos.componentRegistry.updateVersionBodyJson(versionId, bodyJson);
+    record = await repos.componentRegistry.updateVersionBodyJson(
+      versionId,
+      bodyJson,
+    );
   }
   if (!options.propagate) {
     return { record };

@@ -2,14 +2,20 @@ import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
 
 function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export const tagService = {
   async create(
     ctx: AuditContext,
     input: { name: string; parentId?: string | null },
-  ): Promise<{ tag: { id: string; name: string; slug: string }; conflict: boolean }> {
+  ): Promise<{
+    tag: { id: string; name: string; slug: string };
+    conflict: boolean;
+  }> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     const result = await uow.withTransaction(async (repos) => {

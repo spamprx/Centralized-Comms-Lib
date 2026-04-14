@@ -26,7 +26,9 @@ function toRecord(row: {
 export class PrismaTemplateLayoutSectionRepository implements TemplateLayoutSectionRepository {
   public constructor(private readonly db: PrismaDb) {}
 
-  async create(input: CreateTemplateLayoutSectionInput): Promise<TemplateLayoutSectionRecord> {
+  async create(
+    input: CreateTemplateLayoutSectionInput,
+  ): Promise<TemplateLayoutSectionRecord> {
     const row = await this.db.templateLayoutSection.create({
       data: {
         templateId: input.templateId,
@@ -39,7 +41,10 @@ export class PrismaTemplateLayoutSectionRepository implements TemplateLayoutSect
     return toRecord(row);
   }
 
-  async listForTemplatePhase(templateId: string, phase: LayoutPhase): Promise<TemplateLayoutSectionRecord[]> {
+  async listForTemplatePhase(
+    templateId: string,
+    phase: LayoutPhase,
+  ): Promise<TemplateLayoutSectionRecord[]> {
     const rows = await this.db.templateLayoutSection.findMany({
       where: { templateId, phase },
       orderBy: { sortOrder: "asc" },
@@ -49,13 +54,20 @@ export class PrismaTemplateLayoutSectionRepository implements TemplateLayoutSect
 
   async update(
     id: string,
-    input: Partial<Pick<TemplateLayoutSectionRecord, "sortOrder" | "componentVersionId" | "props">>,
+    input: Partial<
+      Pick<
+        TemplateLayoutSectionRecord,
+        "sortOrder" | "componentVersionId" | "props"
+      >
+    >,
   ): Promise<TemplateLayoutSectionRecord> {
     const row = await this.db.templateLayoutSection.update({
       where: { id },
       data: {
         ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
-        ...(input.componentVersionId !== undefined && { componentVersionId: input.componentVersionId }),
+        ...(input.componentVersionId !== undefined && {
+          componentVersionId: input.componentVersionId,
+        }),
         ...(input.props !== undefined && { props: input.props as object }),
       },
     });
