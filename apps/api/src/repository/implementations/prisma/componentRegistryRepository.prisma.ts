@@ -26,6 +26,7 @@ function toVersion(row: {
   id: string;
   componentId: string;
   version: string;
+  bodyJson: unknown;
   linkRefs: unknown;
   propSchema: unknown;
   createdAt: Date;
@@ -34,6 +35,7 @@ function toVersion(row: {
     id: row.id,
     componentId: row.componentId,
     version: row.version,
+    bodyJson: row.bodyJson ?? null,
     linkRefs: row.linkRefs,
     propSchema: row.propSchema ?? null,
     createdAt: row.createdAt,
@@ -76,6 +78,7 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
   async createVersion(input: {
     componentId: string;
     version: string;
+    bodyJson?: unknown | null;
     linkRefs?: unknown;
     propSchema?: unknown | null;
   }): Promise<ComponentVersionRecord> {
@@ -83,6 +86,12 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
       data: {
         componentId: input.componentId,
         version: input.version,
+        bodyJson:
+          input.bodyJson === undefined
+            ? undefined
+            : input.bodyJson === null
+              ? Prisma.JsonNull
+              : (input.bodyJson as Prisma.InputJsonValue),
         linkRefs: (input.linkRefs ?? []) as object,
         propSchema: input.propSchema === undefined
           ? undefined
@@ -105,5 +114,16 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toVersion);
+  }
+
+  async updateVersionBodyJson(versionId: string, bodyJson: unknown | null): Promise<ComponentVersionRecord> {
+    const row = await this.db.componentVersion.update({
+      where: { id: versionId },
+      data: {
+        bodyJson:
+          bodyJson === null ? Prisma.JsonNull : (bodyJson as Prisma.InputJsonValue),
+      },
+    });
+    return toVersion(row);
   }
 }

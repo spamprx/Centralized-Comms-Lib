@@ -35,6 +35,36 @@ function bindingJson(b: TemplateBinding) {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Weekly Newsletter"
+ *               description:
+ *                 type: string
+ *                 example: "Standard newsletter layout"
+ *               draftLayout:
+ *                 type: object
+ *                 example:
+ *                   sections:
+ *                     - id: hero
+ *                       type: image
+ *                       label: Hero Image
+ *                     - id: body
+ *                       type: richtext
+ *                       label: Body
+ *     responses:
+ *       201:
+ *         description: Created template
+ *       400:
+ *         description: Invalid name or layout
  */
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
@@ -72,6 +102,9 @@ router.post("/", async (req: AuthRequest, res: Response) => {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array of templates
  */
 router.get("/", async (_req: AuthRequest, res: Response) => {
   try {
@@ -92,6 +125,18 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the template to clone
+ *     responses:
+ *       201:
+ *         description: Cloned template with bindings
+ *       404:
+ *         description: Source template not found
  */
 router.post("/:id/clone", async (req: AuthRequest, res: Response) => {
   try {
@@ -122,6 +167,33 @@ router.post("/:id/clone", async (req: AuthRequest, res: Response) => {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             example:
+ *               en:
+ *                 title: Title
+ *                 body: Body
+ *               es:
+ *                 title: "Título"
+ *                 body: Cuerpo
+ *     responses:
+ *       200:
+ *         description: Updated template with merged i18n
+ *       400:
+ *         description: Invalid i18n payload
+ *       404:
+ *         description: Template not found
  */
 router.patch("/:id/i18n", async (req: AuthRequest, res: Response) => {
   try {
@@ -152,6 +224,39 @@ router.patch("/:id/i18n", async (req: AuthRequest, res: Response) => {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               layout:
+ *                 type: object
+ *                 description: Layout JSON to save as draft
+ *             example:
+ *               layout:
+ *                 sections:
+ *                   - id: hero
+ *                     type: image
+ *                     label: Hero Image
+ *                   - id: body
+ *                     type: richtext
+ *                     label: Body
+ *     responses:
+ *       200:
+ *         description: Updated template
+ *       400:
+ *         description: Invalid layout
+ *       404:
+ *         description: Template not found
  */
 router.patch("/:id/layout/draft", async (req: AuthRequest, res: Response) => {
   try {
@@ -184,6 +289,20 @@ router.patch("/:id/layout/draft", async (req: AuthRequest, res: Response) => {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     responses:
+ *       200:
+ *         description: Activated template
+ *       400:
+ *         description: Missing layout or bindings
+ *       404:
+ *         description: Template not found
  */
 router.post("/:id/activate", async (req: AuthRequest, res: Response) => {
   try {
@@ -214,6 +333,32 @@ router.post("/:id/activate", async (req: AuthRequest, res: Response) => {
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - channelId
+ *             properties:
+ *               channelId:
+ *                 type: string
+ *                 description: ID of the channel to bind
+ *     responses:
+ *       201:
+ *         description: Created binding
+ *       404:
+ *         description: Template or channel not found
+ *       409:
+ *         description: Binding already exists
  */
 router.post("/:id/bindings", async (req: AuthRequest, res: Response) => {
   try {
@@ -244,11 +389,29 @@ router.post("/:id/bindings", async (req: AuthRequest, res: Response) => {
  * @openapi
  * /api/v1/templates/{id}/bindings/{bindingId}:
  *   delete:
- *     summary: Remove a template–channel binding
+ *     summary: Remove a template-channel binding
  *     tags:
  *       - Templates
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *       - in: path
+ *         name: bindingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Binding ID to remove
+ *     responses:
+ *       200:
+ *         description: Binding removed
+ *       404:
+ *         description: Binding not found
  */
 router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response) => {
   try {
@@ -283,6 +446,7 @@ router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response
  *         required: true
  *         schema:
  *           type: string
+ *         description: Template ID
  *     responses:
  *       200:
  *         description: Rules document (may be empty object if unset)
@@ -298,6 +462,7 @@ router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response
  *         required: true
  *         schema:
  *           type: string
+ *         description: Template ID
  *     requestBody:
  *       required: true
  *       content:
@@ -310,6 +475,16 @@ router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response
  *               rules:
  *                 type: object
  *                 description: Fonts, colors, headings, and media constraints JSON
+ *                 example:
+ *                   fonts:
+ *                     heading: "Georgia, serif"
+ *                     body: "Inter, sans-serif"
+ *                   colors:
+ *                     primary: "#1a73e8"
+ *                   headings:
+ *                     h1:
+ *                       fontSize: "2rem"
+ *                       fontWeight: 700
  *     responses:
  *       200:
  *         description: Updated rules
@@ -329,6 +504,7 @@ router.delete("/:id/bindings/:bindingId", async (req: AuthRequest, res: Response
  *         required: true
  *         schema:
  *           type: string
+ *         description: Template ID
  *     responses:
  *       204:
  *         description: Deleted
@@ -405,11 +581,70 @@ router.delete("/:id/formatting-rules", async (req: AuthRequest, res: Response) =
  *         required: true
  *         schema:
  *           type: string
+ *         description: Template ID
  *     responses:
  *       200:
  *         description: Template with bindings
  *       404:
  *         description: Template not found
+ *   patch:
+ *     summary: Update template metadata (deactivate with status DRAFT)
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               slug:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [DRAFT, ACTIVE]
+ *     responses:
+ *       200:
+ *         description: Updated template
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: Template not found
+ *       409:
+ *         description: Name or slug conflict
+ *   delete:
+ *     summary: Delete template (blocked if ACTIVE or referenced by content)
+ *     tags:
+ *       - Templates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID
+ *     responses:
+ *       200:
+ *         description: Template deleted
+ *       404:
+ *         description: Template not found
+ *       409:
+ *         description: Template is active or in use by content
  */
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
@@ -428,16 +663,6 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
-/**
- * @openapi
- * /api/v1/templates/{id}:
- *   patch:
- *     summary: Update template metadata (deactivate with status DRAFT)
- *     tags:
- *       - Templates
- *     security:
- *       - bearerAuth: []
- */
 router.patch("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, slug, status } = req.body as {
@@ -473,16 +698,6 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
-/**
- * @openapi
- * /api/v1/templates/{id}:
- *   delete:
- *     summary: Delete template (blocked if ACTIVE or referenced by content)
- *     tags:
- *       - Templates
- *     security:
- *       - bearerAuth: []
- */
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const result = await templateService.delete(auditContext(req), req.params.id);

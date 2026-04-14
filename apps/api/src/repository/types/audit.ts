@@ -27,6 +27,8 @@ export interface AuditLogFilters {
   resource?: string;
   resourceId?: string;
   action?: string;
+  from?: Date;
+  to?: Date;
   limit?: number;
   offset?: number;
 }

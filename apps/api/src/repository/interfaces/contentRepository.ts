@@ -5,6 +5,7 @@ import {
   CreateContentVersionInput,
   CreateDraftInput,
   LifecycleState,
+  TipTapDocument,
   Visibility,
 } from "../types";
 
@@ -29,5 +30,20 @@ export interface ContentRepository {
   createVersion(input: CreateContentVersionInput): Promise<ContentVersion>;
   listVersions(contentId: string): Promise<ContentVersion[]>;
   getLatestVersion(contentId: string): Promise<ContentVersion | null>;
+  /**
+   * Latest version at or before `maxVersionNumber` whose `body` is non-null.
+   * Used to resolve document text for snapshots when intermediate rows omit `body` (e.g. state transitions).
+   */
+  getVersionWithBodyAtOrBefore(
+    contentId: string,
+    maxVersionNumber: number,
+  ): Promise<ContentVersion | null>;
+
+  /**
+   * Latest body row per content whose JSON may reference `componentVersionId` (broad filter; caller should verify linked nodes).
+   */
+  listLatestContentVersionsMaybeReferencingComponentVersion(
+    componentVersionId: string,
+  ): Promise<Array<{ contentVersionId: string; contentId: string; body: TipTapDocument | null }>>;
 }
 

@@ -7,6 +7,8 @@ import { getPrismaClient, PrismaUnitOfWork } from "./repository";
 import { openapiSpec } from "./docs/openapi";
 import { API_V1_PREFIX } from "./config/constants";
 import { errorMiddleware } from "./middlewares/error.middleware";
+import { renderPrometheusText, metricsRegister } from "./observability/prometheusRegistry";
+import { getRedisHealth } from "./shared/cache/redisClient";
 
 const app: Application = express();
 
@@ -69,6 +71,39 @@ app.get("/health/db", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Redis reachability for cache (search epoch, future rate-limit). Optional when `REDIS_URL` is unset.
+ */
+app.get("/health/redis", async (_req: Request, res: Response) => {
+  const url = process.env.REDIS_URL?.trim();
+  if (!url) {
+    res.status(200).json({
+      status: "ok",
+      redis: { configured: false, detail: "REDIS_URL not set; search cache degradation mode" },
+    });
+    return;
+  }
+  const h = await getRedisHealth();
+  if (!h.ok) {
+    res.status(503).json({
+      status: "error",
+      redis: { configured: true, ...h },
+    });
+    return;
+  }
+  res.status(200).json({ status: "ok", redis: { configured: true, ...h } });
+});
+
+/** Prometheus scrape endpoint (configure your monitoring stack to pull this target). */
+app.get("/metrics", async (_req: Request, res: Response) => {
+  if (process.env.METRICS_ENABLED === "false") {
+    res.status(404).end();
+    return;
+  }
+  res.setHeader("Content-Type", metricsRegister.contentType);
+  res.send(await renderPrometheusText());
+});
+
 // Dev-only: verify repository layer (ContentRepository read). No auth. Disabled in production.
 /**
  * @openapi
@@ -100,6 +135,55 @@ app.get("/dev/repo-check", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(503).json({ status: "error", repository: "error", error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /dev/reindex:
+ *   post:
+ *     summary: "Dev-only: bulk-index all content from Postgres into Elasticsearch"
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Reindex complete with count
+ *       404:
+ *         description: Not available in production
+ *       503:
+ *         description: Elasticsearch not configured
+ */
+app.post("/dev/reindex", async (_req: Request, res: Response) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  try {
+    const { getElasticsearchClient } = await import("@comms-lib/db-elasticsearch");
+    const esClient = getElasticsearchClient();
+    if (!esClient) {
+      res.status(503).json({ error: "Elasticsearch not configured (ELASTICSEARCH_URL not set)" });
+      return;
+    }
+    const { syncContentIndexFromDb } = await import("./intelligence");
+    const prisma = getPrismaClient();
+    const rows = await prisma.content.findMany({ select: { id: true } });
+    let indexed = 0;
+    for (const row of rows) {
+      await syncContentIndexFromDb(prisma, row.id);
+      indexed++;
+    }
+    const uow = new PrismaUnitOfWork(prisma);
+    await uow.repos().audit.append({
+      action: "DEV_REINDEX",
+      resource: "ELASTICSEARCH",
+      resourceId: "bulk",
+      newValue: { indexed, total: rows.length },
+    });
+    res.status(200).json({ status: "ok", indexed, total: rows.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
   }
 });
 

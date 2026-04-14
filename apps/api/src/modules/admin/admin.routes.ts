@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
 import { adminService } from "../../service";
 import type { AuditContext } from "../../shared/context";
+import { getAdminOperationalMetrics } from "../../observability/operationalMetrics";
 
 const router = Router();
 
@@ -869,13 +870,60 @@ router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: Aut
   }
 });
 
+// ── Monitoring (JSON for admin UI; use GET /metrics for Prometheus) ─────────
+
+/**
+ * @openapi
+ * /api/v1/admin/monitoring/metrics:
+ *   get:
+ *     summary: Operational metrics snapshot for admin dashboards
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Metric cards data
+ *       403:
+ *         description: Forbidden
+ */
+router.get("/monitoring/metrics", authorize("ADMIN"), async (_req: AuthRequest, res: Response) => {
+  try {
+    const metrics = await getAdminOperationalMetrics();
+    res.status(200).json(metrics);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 // ── Audit Logs ──────────────────────────────────────────────────────────────
+
+function parseOptionalDate(value: unknown): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function escapeAuditCsvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function auditCsvRow(fields: string[]): string {
+  return fields.map(escapeAuditCsvField).join(",");
+}
 
 /**
  * @openapi
  * /api/v1/admin/logs:
  *   get:
- *     summary: List audit logs with optional filters
+ *     summary: List audit logs with optional filters (F-ADM-005)
+ *     description: >
+ *       Returns immutable audit log entries filterable by user, action type,
+ *       content ID, and date range per F-ADM-005 REQ-2.
  *     tags:
  *       - Admin
  *     security:
@@ -885,44 +933,239 @@ router.delete("/groups/:id/members/:userId", authorize("ADMIN"), async (req: Aut
  *         name: actorId
  *         schema:
  *           type: string
+ *         description: Filter by the user who performed the action
  *       - in: query
  *         name: resource
  *         schema:
  *           type: string
+ *         description: Filter by resource type (e.g. CONTENT, USER, TEMPLATE)
  *       - in: query
  *         name: resourceId
  *         schema:
  *           type: string
+ *         description: Filter by specific resource / content ID
  *       - in: query
  *         name: action
  *         schema:
  *           type: string
+ *         description: Filter by action type (e.g. CREATE, UPDATE, DELETE, BODY_SAVE)
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start of date range (ISO 8601). Inclusive.
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End of date range (ISO 8601). Inclusive.
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
+ *           default: 50
  *       - in: query
  *         name: offset
  *         schema:
  *           type: integer
+ *           default: 0
  *     responses:
  *       200:
- *         description: List of audit logs
+ *         description: List of audit log entries
+ *       400:
+ *         description: Invalid date parameters
  *       500:
  *         description: Server error
  */
 router.get("/logs", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
+    const from = parseOptionalDate(req.query.from);
+    const to = parseOptionalDate(req.query.to);
+    if ((req.query.from && !from) || (req.query.to && !to)) {
+      res.status(400).json({ error: "Invalid from or to date" });
+      return;
+    }
+    if (from && to && from > to) {
+      res.status(400).json({ error: "`from` must be before `to`" });
+      return;
+    }
+
     const filters = {
       actorId: req.query.actorId as string | undefined,
       resource: req.query.resource as string | undefined,
       resourceId: req.query.resourceId as string | undefined,
       action: req.query.action as string | undefined,
+      from,
+      to,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
     };
     const logs = await adminService.listLogs(filters);
     res.status(200).json(logs);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/logs/export:
+ *   get:
+ *     summary: Export audit logs in CSV or JSON format (F-ADM-005)
+ *     description: >
+ *       Returns a downloadable file containing audit log entries matching the
+ *       given filters. Supports CSV and JSON formats per F-ADM-005 REQ-3.
+ *       Entries are immutable and retained for a configurable period (default 2 years).
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [csv, json]
+ *         description: Export file format
+ *       - in: query
+ *         name: actorId
+ *         schema:
+ *           type: string
+ *         description: Filter by the user who performed the action
+ *       - in: query
+ *         name: resource
+ *         schema:
+ *           type: string
+ *         description: Filter by resource type
+ *       - in: query
+ *         name: resourceId
+ *         schema:
+ *           type: string
+ *         description: Filter by specific resource / content ID
+ *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *         description: Filter by action type
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start of date range (ISO 8601)
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End of date range (ISO 8601)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 1000
+ *         description: Max rows to export (default 1000, max 10000)
+ *     responses:
+ *       200:
+ *         description: Audit log export file
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *       400:
+ *         description: Invalid format or date parameters
+ *       500:
+ *         description: Server error
+ */
+router.get("/logs/export", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
+  try {
+    const format = (req.query.format as string || "").toLowerCase();
+    if (format !== "csv" && format !== "json") {
+      res.status(400).json({ error: "format query parameter is required and must be 'csv' or 'json'" });
+      return;
+    }
+
+    const from = parseOptionalDate(req.query.from);
+    const to = parseOptionalDate(req.query.to);
+    if ((req.query.from && !from) || (req.query.to && !to)) {
+      res.status(400).json({ error: "Invalid from or to date" });
+      return;
+    }
+    if (from && to && from > to) {
+      res.status(400).json({ error: "`from` must be before `to`" });
+      return;
+    }
+
+    const rawLimit = req.query.limit ? parseInt(req.query.limit as string) : 1000;
+    const limit = Math.min(Math.max(1, rawLimit), 10000);
+
+    const filters = {
+      actorId: req.query.actorId as string | undefined,
+      resource: req.query.resource as string | undefined,
+      resourceId: req.query.resourceId as string | undefined,
+      action: req.query.action as string | undefined,
+      from,
+      to,
+      limit,
+      offset: 0,
+    };
+    const logs = await adminService.listLogs(filters);
+
+    const fromStr = from ? from.toISOString().split("T")[0] : "all";
+    const toStr = to ? to.toISOString().split("T")[0] : "now";
+
+    if (format === "json") {
+      const filename = `audit_logs_${fromStr}_to_${toStr}.json`;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.status(200).json(logs);
+      return;
+    }
+
+    const CSV_HEADERS = [
+      "ID",
+      "Timestamp",
+      "Actor ID",
+      "Action",
+      "Resource",
+      "Resource ID",
+      "Old Value",
+      "New Value",
+      "IP Address",
+      "User Agent",
+    ];
+    const rows: string[] = [auditCsvRow(CSV_HEADERS)];
+
+    for (const log of logs) {
+      rows.push(
+        auditCsvRow([
+          log.id,
+          log.createdAt.toISOString(),
+          log.actorId ?? "",
+          log.action,
+          log.resource,
+          log.resourceId,
+          log.oldValue != null ? JSON.stringify(log.oldValue) : "",
+          log.newValue != null ? JSON.stringify(log.newValue) : "",
+          log.ipAddress ?? "",
+          log.userAgent ?? "",
+        ]),
+      );
+    }
+
+    const filename = `audit_logs_${fromStr}_to_${toStr}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(rows.join("\n"));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });

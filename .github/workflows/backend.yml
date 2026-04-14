@@ -10,6 +10,9 @@ on:
     paths:
       - 'apps/api/**'
       - 'infra/docker/api/**'
+      - 'packages/database/mongo/**'
+      - 'packages/database/elasticsearch/**'
+      - 'docker-compose.yml'
 
 jobs:
   build-and-test:
@@ -22,10 +25,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Start postgres (backend depends on it)
-        run: docker compose up -d postgres
+      - name: Start Postgres, MongoDB, and Elasticsearch
+        run: docker compose up -d postgres mongo elasticsearch
 
-      - name: Wait for postgres to be healthy
+      - name: Wait for Postgres to be healthy
         run: |
           echo "Waiting for postgres..."
           for i in {1..10}; do
@@ -36,6 +39,42 @@ jobs:
             echo "Attempt $i failed, retrying..."
             sleep 5
           done
+
+      - name: Wait for MongoDB to accept connections
+        run: |
+          echo "Waiting for MongoDB..."
+          ready=0
+          for i in {1..15}; do
+            if docker compose exec -T mongo mongosh --quiet --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
+              echo "MongoDB is ready!"
+              ready=1
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 3
+          done
+          if [ "$ready" != 1 ]; then
+            echo "MongoDB did not become ready in time"
+            exit 1
+          fi
+
+      - name: Wait for Elasticsearch cluster ready
+        run: |
+          echo "Waiting for Elasticsearch..."
+          ready=0
+          for i in {1..30}; do
+            if curl -sf http://localhost:9200/_cluster/health | grep -qE '"status":"(green|yellow)"'; then
+              echo "Elasticsearch is ready!"
+              ready=1
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 3
+          done
+          if [ "$ready" != 1 ]; then
+            echo "Elasticsearch did not become ready in time"
+            exit 1
+          fi
 
       - name: Build backend image
         run: docker compose build backend
