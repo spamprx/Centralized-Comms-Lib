@@ -31,7 +31,7 @@ export const routeGroups: RouteGroup[] = [
     ],
   },
   {
-    label: "App",
+    label: "Core",
     routes: [
       { path: "/dashboard", element: <ProtectedRoute><DashboardPage /></ProtectedRoute> },
       { path: "/my-content", element: <ProtectedRoute><MyContentPage /></ProtectedRoute> },
@@ -39,43 +39,35 @@ export const routeGroups: RouteGroup[] = [
     ],
   },
   {
-    label: "Library",
+    label: "Content",
     routes: [
       { path: "/library", element: <ProtectedRoute><ContentLibraryPage /></ProtectedRoute> },
       { path: "/templates", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
       { path: "/templates/:templateId", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
       { path: "/templates/:templateId/edit", element: <ProtectedRoute><TemplatesPage /></ProtectedRoute> },
       { path: "/library/:contentId", element: <ProtectedRoute><ContentReadingPage /></ProtectedRoute> },
+      { path: "/assets", element: <ProtectedRoute><AssetManagementPage /></ProtectedRoute> },
     ],
   },
   {
-    label: "Editor",
+    label: "Collaboration",
     routes: [
+      { path: "/review", element: <ProtectedRoute><ReviewPage /></ProtectedRoute> },
       { path: "/editor/:contentId", element: <ProtectedRoute><ContentEditorPage /></ProtectedRoute> },
       { path: "/preview/:contentId", element: <ProtectedRoute><ContentPreviewPage /></ProtectedRoute> },
-    ],
-  },
-  {
-    label: "Review",
-    routes: [
       { path: "/review/:contentId", element: <ProtectedRoute><ReviewPage /></ProtectedRoute> },
       { path: "/history/:contentId", element: <ProtectedRoute><VersionHistoryPage /></ProtectedRoute> },
     ],
   },
   {
-    label: "Assets",
-    routes: [{ path: "/assets", element: <ProtectedRoute><AssetManagementPage /></ProtectedRoute> }],
+    label: "Insights",
+    routes: [
+      { path: "/analytics", element: <ProtectedRoute><AnalyticsPage /></ProtectedRoute> },
+      { path: "/ai-tutor", element: <ProtectedRoute><AITutorPage /></ProtectedRoute> },
+    ],
   },
   {
-    label: "AI",
-    routes: [{ path: "/ai-tutor", element: <ProtectedRoute><AITutorPage /></ProtectedRoute> }],
-  },
-  {
-    label: "Admin",
+    label: "System",
     routes: [{ path: "/admin", element: <ProtectedRoute><AdminPanelPage /></ProtectedRoute> }],
-  },
-  {
-    label: "Analytics",
-    routes: [{ path: "/analytics", element: <ProtectedRoute><AnalyticsPage /></ProtectedRoute> }],
   },
 ];

@@ -10,45 +10,36 @@ export interface NavCategory {
 
 export const navCategories: NavCategory[] = [
   {
-    label: "App",
+    label: "Core",
     items: [
       { path: "/dashboard", label: "Dashboard" },
       { path: "/my-content", label: "My Content" },
-      { path: "/profile", label: "Profile" },
     ],
   },
   {
-    label: "Library",
+    label: "Content",
     items: [
-      { path: "/library", label: "Browse Library" },
+      { path: "/library", label: "Library" },
       { path: "/templates", label: "Templates" },
-    ],
-  },
-  {
-    label: "Editor",
-    items: [
-      { path: "/editor/new", label: "Editor" },
-      { path: "/preview/new", label: "Preview" },
+      { path: "/assets", label: "Assets" },
     ],
   },
   {
     label: "Review",
-    items: [{ path: "/review/new", label: "Review" }],
+    items: [{ path: "/review", label: "Review" }],
   },
   {
-    label: "Assets",
-    items: [{ path: "/assets", label: "Asset Management" }],
+    label: "Insights",
+    items: [
+      { path: "/analytics", label: "Analytics" },
+      { path: "/ai-tutor", label: "AI Tutor" },
+    ],
   },
   {
-    label: "AI",
-    items: [{ path: "/ai-tutor", label: "AI Tutor" }],
-  },
-  {
-    label: "Admin",
-    items: [{ path: "/admin", label: "Admin Panel" }],
-  },
-  {
-    label: "Analytics",
-    items: [{ path: "/analytics", label: "Analytics" }],
+    label: "System",
+    items: [
+      { path: "/profile", label: "Profile" },
+      { path: "/admin", label: "Admin" },
+    ],
   },
 ];

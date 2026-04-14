@@ -1,17 +1,21 @@
 import type { ReactElement } from "react";
-import { Home, LayoutDashboard, BookOpen, Edit, MessageSquare, Image, Bot, Settings, BarChart3 } from "lucide-react";
+import {
+  Home,
+  LayoutDashboard,
+  FolderKanban,
+  Lightbulb,
+  MessageSquare,
+  Settings,
+} from "lucide-react";
 import type { NavCategory } from "../constants/navigation";
 
 const iconByLabel: Record<string, ReactElement> = {
   "Public": <Home />,
-  "App": <LayoutDashboard />,
-  "Library": <BookOpen />,
-  "Editor": <Edit />,
+  "Core": <LayoutDashboard />,
+  "Content": <FolderKanban />,
+  "Insights": <Lightbulb />,
+  "System": <Settings />,
   "Review": <MessageSquare />,
-  "Assets": <Image />,
-  "AI": <Bot />,
-  "Admin": <Settings />,
-  "Analytics": <BarChart3 />,
 };
 
 export function getNavIcon(category: NavCategory): ReactElement {

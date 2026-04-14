@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, LogOut, Menu, X } from "lucide-react";
+import { BookOpen, LogOut, Menu, Settings, X } from "lucide-react";
 import { navCategories, type NavCategory, type NavItem } from "../constants/navigation";
 import { getNavIcon } from "../lib/navIcons";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +13,21 @@ function filterNavForRole(categories: NavCategory[], isAdmin: boolean): NavCateg
       items: cat.items.filter((item: NavItem) => item.path !== "/admin" || isAdmin),
     }))
     .filter((cat) => cat.items.length > 0);
+}
+
+function isActivePath(pathname: string, itemPath: string): boolean {
+  if (pathname === itemPath) return true;
+  if (itemPath === "/dashboard") return pathname.startsWith("/dashboard");
+  if (itemPath === "/library") return pathname.startsWith("/library");
+  if (itemPath === "/templates") return pathname.startsWith("/templates");
+  if (itemPath === "/review") return pathname.startsWith("/review") || pathname.startsWith("/history");
+  if (itemPath === "/my-content") return pathname.startsWith("/my-content");
+  if (itemPath === "/assets") return pathname.startsWith("/assets");
+  if (itemPath === "/analytics") return pathname.startsWith("/analytics");
+  if (itemPath === "/ai-tutor") return pathname.startsWith("/ai-tutor");
+  if (itemPath === "/profile") return pathname.startsWith("/profile");
+  if (itemPath === "/admin") return pathname.startsWith("/admin");
+  return pathname.startsWith(`${itemPath}/`);
 }
 
 export default function Sidebar() {
@@ -69,7 +84,7 @@ export default function Sidebar() {
 
           if (isSingle) {
             const item = cat.items[0];
-            const active = pathname === item.path;
+            const active = isActivePath(pathname, item.path);
             return (
               <Link
                 key={cat.label}
@@ -124,7 +139,7 @@ export default function Sidebar() {
                     className="absolute left-full top-0 z-40 ml-1 min-w-[13rem] overflow-hidden rounded-app-lg border border-app-border/90 bg-app-bg/85 py-1 shadow-app-glow backdrop-blur-xl"
                   >
                     {cat.items.map((item) => {
-                      const active = pathname === item.path;
+                      const active = isActivePath(pathname, item.path);
                       return (
                         <Link
                           key={item.path}
@@ -148,6 +163,15 @@ export default function Sidebar() {
         })}
       </div>
       <div className="border-t border-app-border/80 px-2 py-3">
+        {/* <Link
+          to={isGlobalAdmin(user?.role) ? "/admin" : "/profile"}
+          title="Settings"
+          className={`group ${iconSlotBase} ${iconSlotIdle} mb-1 w-full text-app-faint hover:text-app-text focus-visible:outline-offset-2`}
+        >
+          <span className={`${iconClass} ${iconClassHover} [&_svg]:text-[1.35rem]`}>
+            <Settings aria-hidden />
+          </span>
+        </Link> */}
         <button
           type="button"
           onClick={handleLogout}
@@ -164,24 +188,43 @@ export default function Sidebar() {
 
   const mobileNav = (
     <nav className="flex flex-col gap-1 p-3" aria-label="Main">
-      {visibleNav.flatMap((cat) =>
-        cat.items.map((item) => {
-          const active = pathname === item.path;
-          return (
-            <Link
-              key={`${cat.label}-${item.path}`}
-              to={item.path}
-              onClick={() => setMobileOpen(false)}
-              className={`rounded-app-md px-3 py-2.5 text-sm font-medium transition-all ${active
-                  ? "bg-app-accent-muted text-app-accent-hover shadow-app-soft"
-                  : "text-app-muted hover:bg-app-surface-hover hover:text-app-text"
-                }`}
-            >
-              {item.label}
-            </Link>
-          );
-        }),
-      )}
+      {visibleNav.map((cat) => (
+        <div key={cat.label} className="mb-2">
+          <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.12em] text-app-faint">
+            {cat.label}
+          </div>
+          <div className="flex flex-col gap-1">
+            {cat.items.map((item) => {
+              const active = isActivePath(pathname, item.path);
+              return (
+                <Link
+                  key={`${cat.label}-${item.path}`}
+                  to={item.path}
+                  onClick={() => setMobileOpen(false)}
+                  className={`rounded-app-md px-3 py-2.5 text-sm font-medium transition-all ${
+                    active
+                      ? "bg-app-accent-muted text-app-accent-hover shadow-app-soft"
+                      : "text-app-muted hover:bg-app-surface-hover hover:text-app-text"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => {
+          setMobileOpen(false);
+          navigate(isGlobalAdmin(user?.role) ? "/admin" : "/profile");
+        }}
+        className="mt-2 flex items-center gap-2 rounded-app-md px-3 py-2.5 text-left text-sm font-medium text-app-muted hover:bg-app-surface-hover hover:text-app-text"
+      >
+        <Settings size={18} aria-hidden />
+        Settings
+      </button>
       <button
         type="button"
         onClick={() => {

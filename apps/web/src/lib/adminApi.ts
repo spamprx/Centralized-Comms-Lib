@@ -53,6 +53,8 @@ export type ApiAuditEntry = {
   action: string;
   resource: string;
   resourceId: string;
+  oldValue?: unknown | null;
+  newValue?: unknown | null;
   actorId: string | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -160,14 +162,27 @@ export function mapRoleWithPermissions(
 
 export function auditEntryToActivityLog(entry: ApiAuditEntry): ActivityLog {
   const actor = entry.actorId ?? 'system';
+  const upperAction = entry.action.toUpperCase();
+  const severity: ActivityLog['severity'] = upperAction.includes("FAILED")
+    ? "error"
+    : upperAction.startsWith("DELETE")
+      ? "warning"
+      : upperAction.includes("LOGIN") || upperAction.startsWith("CREATE") || upperAction.startsWith("UPDATE")
+        ? "success"
+        : "info";
   return {
     id: entry.id,
     userId: actor,
     userName: actor === 'system' ? 'System' : 'User',
     action: entry.action,
-    resource: `${entry.resource}${entry.resourceId ? ` / ${entry.resourceId.slice(0, 8)}` : ''}`,
+    resource: entry.resource,
+    resourceId: entry.resourceId || undefined,
     timestamp: toIso(entry.createdAt),
     ipAddress: entry.ipAddress ?? '—',
-    status: 'success',
+    userAgent: entry.userAgent ?? undefined,
+    oldValue: entry.oldValue ?? null,
+    newValue: entry.newValue ?? null,
+    severity,
+    status: upperAction.includes("FAILED") ? "failure" : "success",
   };
 }

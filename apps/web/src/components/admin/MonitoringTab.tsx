@@ -1,6 +1,17 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdminMonitoring } from '../../hooks/useAdmin';
-import { RefreshCw, TrendingUp, TrendingDown, Minus, Check, X as XIcon } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  Minus,
+  RefreshCw,
+  ShieldAlert,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import type { SystemMetric, ActivityLog } from '../../types/admin';
 
@@ -53,25 +64,51 @@ function getActionColor(action: string): string {
   return '#8f96ad';
 }
 
+function compactJson(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 // ─── Main Component ──────────────────────────────────────────────────
 
 export default function MonitoringTab() {
   const { metrics, logs, loading, error, refetch } = useAdminMonitoring();
+  const [query, setQuery] = useState('');
+  const [severity, setSeverity] = useState<'all' | ActivityLog['severity']>('all');
+
+  const filteredLogs = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return logs.filter((log) => {
+      const matchesSeverity = severity === 'all' || log.severity === severity;
+      if (!matchesSeverity) return false;
+      if (!q) return true;
+      const haystack = `${log.action} ${log.resource} ${log.resourceId ?? ''} ${log.ipAddress} ${log.userAgent ?? ''}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [logs, query, severity]);
+
   if (error) return <div className="text-red-400 p-6">⚠ {error}</div>;
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
+      <div className="rounded-xl border border-app-border bg-app-bg-subtle p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-app-text mb-1">Monitoring</h2>
-          <p className="text-[13px] text-app-faint m-0">System health, metrics, and activity logs</p>
+            <h2 className="text-lg font-medium text-app-text mb-1">Monitoring</h2>
+            <p className="text-[13px] text-app-faint m-0">System health, metrics, and detailed audit activity</p>
         </div>
         <button
-          className="flex items-center gap-1.5 px-3 py-[7px] admin-glass-button rounded-xl text-app-muted text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-[7px] rounded-xl border border-app-border bg-app-surface text-app-muted text-[13px] transition-colors hover:border-app-border-strong hover:text-app-text disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={refetch}
           disabled={loading}
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
+        </div>
       </div>
 
       {/* KPI Metric Cards */}
@@ -83,15 +120,37 @@ export default function MonitoringTab() {
           : metrics.map((m, idx) => <MetricCard key={m.label} metric={m} index={idx} />)}
       </div>
 
-      {/* Activity Log Timeline */}
-      <div className="flex flex-col">
-        <h3 className="text-sm font-semibold text-app-muted mb-3">Recent Activity</h3>
-        <div className="flex flex-col gap-0 max-h-[480px] overflow-y-auto pr-2">
-          {logs.map((log, idx) => (
-            <TimelineRow key={log.id} log={log} index={idx} />
+      {/* Activity Log Stream */}
+      <div className="rounded-xl border border-app-border bg-app-bg-subtle p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-medium text-app-muted m-0">Recent activity</h3>
+          <div className="flex items-center gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter logs..."
+              className="h-8 w-44 rounded-lg border border-app-border bg-app-bg px-2.5 text-[12px] text-app-text outline-none transition-colors focus:border-app-accent"
+            />
+            <select
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value as 'all' | ActivityLog['severity'])}
+              className="h-8 rounded-lg border border-app-border bg-app-bg px-2.5 text-[12px] text-app-muted outline-none transition-colors focus:border-app-accent"
+            >
+              <option value="all">All severities</option>
+              <option value="success">Success</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex max-h-[560px] flex-col gap-2 overflow-y-auto pr-1">
+          {filteredLogs.map((log, idx) => (
+            <LogRow key={log.id} log={log} index={idx} />
           ))}
-          {!loading && logs.length === 0 && (
-            <div className="text-center text-app-faint p-8 text-sm">No activity logs available.</div>
+          {!loading && filteredLogs.length === 0 && (
+            <div className="text-center text-app-faint p-8 text-sm">No matching logs found.</div>
           )}
         </div>
       </div>
@@ -178,28 +237,30 @@ function MetricCard({ metric, index }: { metric: SystemMetric; index: number }) 
 
 // ─── Timeline Row ────────────────────────────────────────────────────
 
-function TimelineRow({ log, index }: { log: ActivityLog; index: number }) {
+function LogRow({ log, index }: { log: ActivityLog; index: number }) {
+  const [expanded, setExpanded] = useState(false);
   const actionColor = getActionColor(log.action);
   const isSuccess = log.status === 'success';
+  const severityIcon = log.severity === 'error'
+    ? <ShieldAlert size={13} />
+    : log.severity === 'warning'
+      ? <AlertTriangle size={13} />
+      : log.severity === 'success'
+        ? <CheckCircle2 size={13} />
+        : <Clock3 size={13} />;
+  const severityTone = log.severity === 'error'
+    ? 'text-rose-300 bg-rose-500/10 border-rose-400/30'
+    : log.severity === 'warning'
+      ? 'text-amber-300 bg-amber-500/10 border-amber-400/30'
+      : log.severity === 'success'
+        ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/30'
+        : 'text-blue-300 bg-blue-500/10 border-blue-400/30';
 
   return (
-    <div
-      className="admin-timeline-item py-3 admin-row-enter"
-      style={{ '--row-index': index } as React.CSSProperties}
-    >
-      {/* Timeline dot */}
-      <div
-        className="admin-timeline-dot"
-        style={{ borderColor: actionColor }}
-      />
-
-      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
-        {/* User */}
-        <span className="text-[13px] font-medium text-app-text whitespace-nowrap">{log.userName}</span>
-
-        {/* Action badge */}
+    <div className="admin-row-enter rounded-lg border border-app-border bg-app-bg/35" style={{ '--row-index': index } as React.CSSProperties}>
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <span
-          className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-mono whitespace-nowrap"
+          className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-mono"
           style={{
             color: actionColor,
             background: `${actionColor}15`,
@@ -208,43 +269,55 @@ function TimelineRow({ log, index }: { log: ActivityLog; index: number }) {
         >
           {log.action}
         </span>
-
-        {/* Resource */}
-        <span className="text-[12px] text-app-muted truncate flex-1">{log.resource}</span>
-
-        {/* Meta info */}
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-[11px] font-mono text-app-faint">{log.ipAddress}</span>
-          <span className="text-[11px] font-mono text-app-faint">
-            {new Date(log.timestamp).toLocaleTimeString()}
+        <span className="text-[12px] text-app-text">{log.resource}</span>
+        {log.resourceId ? (
+          <span className="rounded-md border border-app-border bg-app-bg px-1.5 py-0.5 text-[10px] font-mono text-app-faint">
+            {log.resourceId.slice(0, 12)}
           </span>
-
-          {/* Status icon */}
-          {isSuccess ? (
-            <span
-              className="flex items-center justify-center w-5 h-5 rounded-full"
-              style={{
-                color: '#34d399',
-                background: 'rgba(52,211,153,0.1)',
-                boxShadow: '0 0 8px rgba(52,211,153,0.15)',
-              }}
-            >
-              <Check size={11} strokeWidth={3} />
-            </span>
-          ) : (
-            <span
-              className="flex items-center justify-center w-5 h-5 rounded-full"
-              style={{
-                color: '#f87171',
-                background: 'rgba(248,113,113,0.1)',
-                boxShadow: '0 0 8px rgba(248,113,113,0.15)',
-              }}
-            >
-              <XIcon size={11} strokeWidth={3} />
-            </span>
-          )}
-        </div>
+        ) : null}
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${severityTone}`}>
+          {severityIcon}
+          {log.severity}
+        </span>
+        <span className="ml-auto text-[11px] text-app-faint">{new Date(log.timestamp).toLocaleString()}</span>
+        <button
+          className="inline-flex h-6 items-center gap-1 rounded-md border border-app-border px-2 text-[11px] text-app-muted transition-colors hover:border-app-border-strong hover:text-app-text"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          details {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
       </div>
+
+      {expanded ? (
+        <div className="grid gap-2 border-t border-app-border px-3 py-2.5 md:grid-cols-2">
+          <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Actor / Network</div>
+            <div className="text-[12px] text-app-text">Actor: {log.userName} ({log.userId})</div>
+            <div className="text-[12px] text-app-muted">IP: {log.ipAddress}</div>
+            <div className="text-[11px] text-app-faint wrap-break-word">UA: {log.userAgent || '—'}</div>
+          </div>
+          <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Status</div>
+            <div className="text-[12px] text-app-text">
+              {isSuccess ? 'Completed successfully' : 'Failed'}
+            </div>
+            <div className="text-[11px] text-app-faint">Event ID: {log.id}</div>
+          </div>
+          <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2 md:col-span-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Change payload</div>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <div className="mb-1 text-[11px] text-app-muted">Previous</div>
+                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">{compactJson(log.oldValue)}</pre>
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] text-app-muted">Current</div>
+                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">{compactJson(log.newValue)}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import templateRouter from "../../modules/template/template.routes";
 import searchRouter from "../../modules/search/search.routes";
 import componentRouter from "../../modules/component/component.routes";
 import citationRouter from "../../modules/citation/citation.routes";
+import profileRouter from "../../modules/profile/profile.routes";
 
 export const applicationDomainRouters = {
   auth: authRouter,
@@ -22,4 +23,5 @@ export const applicationDomainRouters = {
   search: searchRouter,
   component: componentRouter,
   citation: citationRouter,
+  profile: profileRouter,
 };

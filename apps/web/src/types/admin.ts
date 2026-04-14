@@ -57,8 +57,13 @@ export interface ActivityLog {
   userName: string;
   action: string;
   resource: string;
+  resourceId?: string;
   timestamp: string;
   ipAddress: string;
+  userAgent?: string;
+  oldValue?: unknown | null;
+  newValue?: unknown | null;
+  severity: 'info' | 'warning' | 'error' | 'success';
   status: 'success' | 'failure';
 }
 
