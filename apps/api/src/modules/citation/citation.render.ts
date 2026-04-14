@@ -9,7 +9,13 @@ function authorsApa(authors: string[] | undefined): string {
 
 function authorsIeee(authors: string[] | undefined): string {
   if (!authors?.length) return "";
-  return authors.map((a) => (a.includes(",") ? a : `${a.split(" ").pop()}, ${a.split(" ").slice(0, -1).join(" ")}`)).join(", ");
+  return authors
+    .map((a) =>
+      a.includes(",")
+        ? a
+        : `${a.split(" ").pop()}, ${a.split(" ").slice(0, -1).join(" ")}`,
+    )
+    .join(", ");
 }
 
 function authorsMla(authors: string[] | undefined): string {
@@ -18,10 +24,17 @@ function authorsMla(authors: string[] | undefined): string {
   return `${authors[0]}, et al.`;
 }
 
-export function renderCitation(style: CitationStyle, work: CitationWork): string {
+export function renderCitation(
+  style: CitationStyle,
+  work: CitationWork,
+): string {
   const year = work.year != null ? String(work.year) : "n.d.";
   const title = work.title || "Untitled";
-  const doi = work.doi ? (work.doi.startsWith("http") ? work.doi : `https://doi.org/${work.doi}`) : "";
+  const doi = work.doi
+    ? work.doi.startsWith("http")
+      ? work.doi
+      : `https://doi.org/${work.doi}`
+    : "";
 
   switch (style) {
     case "APA": {
@@ -31,7 +44,9 @@ export function renderCitation(style: CitationStyle, work: CitationWork): string
         `(${year})`,
         title.endsWith(".") ? title : `${title}.`,
         work.container ? `${work.container}.` : "",
-        work.volume != null ? `${work.volume}${work.issue != null ? `(${work.issue})` : ""}` : "",
+        work.volume != null
+          ? `${work.volume}${work.issue != null ? `(${work.issue})` : ""}`
+          : "",
         work.pages ? `pp. ${work.pages}.` : "",
         doi || work.url || "",
       ];
@@ -48,9 +63,15 @@ export function renderCitation(style: CitationStyle, work: CitationWork): string
         work.pages ? `pp. ${work.pages},` : "",
         work.location ? `${work.location}` : "",
         year + ".",
-        work.doi ? ` doi: ${work.doi.replace(/^https?:\/\/doi\.org\//, "")}.` : "",
+        work.doi
+          ? ` doi: ${work.doi.replace(/^https?:\/\/doi\.org\//, "")}.`
+          : "",
       ];
-      return parts.filter((p) => p && p !== ",").join(" ").replace(/\s+/g, " ").trim();
+      return parts
+        .filter((p) => p && p !== ",")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
     }
     case "MLA": {
       const a = authorsMla(work.authors);

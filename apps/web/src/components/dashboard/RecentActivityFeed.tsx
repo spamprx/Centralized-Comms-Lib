@@ -1,45 +1,33 @@
-import type { Activity } from '../../data/mockDashboardData';
+import type { Activity } from "../../data/mockDashboardData";
+import { Surface } from "../ui";
 
 export function RecentActivityFeed({ activities }: { activities: Activity[] }) {
   return (
-    <div style={{
-      padding: 20,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 10,
-      width: 320,
-      flexShrink: 0,
-    }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>Recent Activity</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <Surface className="flex h-full min-h-[300px] w-full flex-col">
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-app-faint">
+        Recent activity
+      </h3>
+      <p className="mb-4 text-sm font-semibold text-app-text">Live from your workspace</p>
+      <div className="flex flex-col gap-3">
         {activities.map((activity) => (
-          <div key={activity.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#fff',
-              flexShrink: 0,
-            }}>
-              {activity.user.split(' ').map(n => n[0]).join('')}
+          <div key={activity.id} className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-app-accent to-cyan-500 text-xs font-semibold text-white">
+              {activity.user
+                .split(" ")
+                .map((n) => n[0])
+                .join("")}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 12, color: '#e2e4f0', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                <span style={{ fontWeight: 500 }}>{activity.user}</span>{' '}
-                <span style={{ color: '#8b8fa8' }}>{activity.action}</span>{' '}
-                <span style={{ fontWeight: 500, color: '#a78bfa' }}>{activity.target}</span>
+            <div className="min-w-0 flex-1">
+              <p className="m-0 truncate text-xs text-app-text">
+                <span className="font-medium">{activity.user}</span>{" "}
+                <span className="text-app-muted">{activity.action}</span>{" "}
+                <span className="font-medium text-app-accent">{activity.target}</span>
               </p>
-              <span style={{ fontSize: 10, color: '#555870' }}>{activity.time}</span>
+              <span className="text-[10px] text-app-faint">{activity.time}</span>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </Surface>
   );
 }

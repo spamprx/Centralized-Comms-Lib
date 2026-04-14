@@ -4,7 +4,9 @@ import {
   ContentVersion,
   CreateContentVersionInput,
   CreateDraftInput,
+  ContentType,
   LifecycleState,
+  TipTapDocument,
   Visibility,
 } from "../types";
 
@@ -13,7 +15,12 @@ export interface ContentRepository {
   getById(id: string): Promise<Content | null>;
   getBySlug(slug: string): Promise<Content | null>;
   list(filters?: ContentListFilters): Promise<Content[]>;
+  delete(contentId: string): Promise<void>;
   updateTitle(contentId: string, title: string): Promise<Content>;
+  updateContentType(
+    contentId: string,
+    contentType: ContentType,
+  ): Promise<Content>;
 
   updateLifecycleState(
     contentId: string,
@@ -37,5 +44,17 @@ export interface ContentRepository {
     contentId: string,
     maxVersionNumber: number,
   ): Promise<ContentVersion | null>;
-}
 
+  /**
+   * Latest body row per content whose JSON may reference `componentVersionId` (broad filter; caller should verify linked nodes).
+   */
+  listLatestContentVersionsMaybeReferencingComponentVersion(
+    componentVersionId: string,
+  ): Promise<
+    Array<{
+      contentVersionId: string;
+      contentId: string;
+      body: TipTapDocument | null;
+    }>
+  >;
+}

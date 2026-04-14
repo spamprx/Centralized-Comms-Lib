@@ -7,15 +7,23 @@ type Verdict = "APPROVED" | "DENIED" | "ROLLBACK";
 export const reviewService = {
   async createRequest(
     ctx: AuditContext,
-    input: { contentId: string; contentVersionId: string; quorumRequired?: number },
+    input: {
+      contentId: string;
+      contentVersionId: string;
+      quorumRequired?: number;
+    },
   ) {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(input.contentId);
       if (!content) return { notFound: true } as const;
-      if (content.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
-      if (content.lifecycleState !== "DRAFT" && content.lifecycleState !== "IN_REVIEW") {
+      if (content.authorId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
+      if (
+        content.lifecycleState !== "DRAFT" &&
+        content.lifecycleState !== "IN_REVIEW"
+      ) {
         return { invalidState: true, state: content.lifecycleState } as const;
       }
       if (content.lifecycleState === "DRAFT") {
@@ -61,8 +69,12 @@ export const reviewService = {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
     const request = await repos.review.getRequestById(requestId);
     if (!request) return null;
-    const assignments = await repos.review.listAssignmentsForRequest(request.id);
-    const isAssignedReviewer = assignments.some((a) => a.reviewerId === requester.id);
+    const assignments = await repos.review.listAssignmentsForRequest(
+      request.id,
+    );
+    const isAssignedReviewer = assignments.some(
+      (a) => a.reviewerId === requester.id,
+    );
     if (
       !requester.isAdmin &&
       request.requestedById !== requester.id &&
@@ -83,11 +95,14 @@ export const reviewService = {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
       if (content.authorId !== requester.id) {
-        const allRequests = await repos.review.listRequestsForContent(contentId);
+        const allRequests =
+          await repos.review.listRequestsForContent(contentId);
         const allAssignments = await Promise.all(
           allRequests.map((r) => repos.review.listAssignmentsForRequest(r.id)),
         );
-        const isReviewer = allAssignments.flat().some((a) => a.reviewerId === requester.id);
+        const isReviewer = allAssignments
+          .flat()
+          .some((a) => a.reviewerId === requester.id);
         if (!isReviewer) return { forbidden: true } as const;
       }
     }
@@ -152,8 +167,10 @@ export const reviewService = {
     const result = await uow.withTransaction(async (repos) => {
       const assignment = await repos.review.getAssignmentById(assignmentId);
       if (!assignment) return { notFound: true } as const;
-      if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
-      if (assignment.status === "COMPLETED") return { alreadyCompleted: true } as const;
+      if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
+      if (assignment.status === "COMPLETED")
+        return { alreadyCompleted: true } as const;
 
       await repos.review.recordDecision({
         reviewAssignmentId: assignment.id,
@@ -161,20 +178,30 @@ export const reviewService = {
         comment,
       });
 
-      const request = await repos.review.getRequestById(assignment.reviewRequestId);
+      const request = await repos.review.getRequestById(
+        assignment.reviewRequestId,
+      );
       if (request && verdict === "APPROVED") {
-        const allAssignments = await repos.review.listAssignmentsForRequest(request.id);
+        const allAssignments = await repos.review.listAssignmentsForRequest(
+          request.id,
+        );
         const completedApprovals = allAssignments.filter(
           (a) => a.id === assignment.id || a.status === "COMPLETED",
         ).length;
         if (completedApprovals >= request.quorumRequired) {
           await repos.review.updateRequestStatus(request.id, "CLOSED");
-          await repos.content.updateLifecycleState(request.contentId, "PUBLISHED");
+          await repos.content.updateLifecycleState(
+            request.contentId,
+            "PUBLISHED",
+          );
           await repos.outbox.add({
             aggregateType: "CONTENT",
             aggregateId: request.contentId,
             eventType: "CONTENT.PUBLISHED",
-            payload: { contentId: request.contentId, reviewRequestId: request.id },
+            payload: {
+              contentId: request.contentId,
+              reviewRequestId: request.id,
+            },
           });
         }
       } else if (request && verdict === "DENIED") {
@@ -191,7 +218,10 @@ export const reviewService = {
           },
         });
       } else if (request && verdict === "ROLLBACK") {
-        await repos.content.updateLifecycleState(request.contentId, "IN_REVIEW");
+        await repos.content.updateLifecycleState(
+          request.contentId,
+          "IN_REVIEW",
+        );
         await repos.review.updateRequestStatus(request.id, "OPEN");
         await repos.outbox.add({
           aggregateType: "CONTENT",
@@ -265,13 +295,16 @@ export const reviewService = {
     ctx: AuditContext,
     assignmentId: string,
     body: string,
-  ): Promise<{ comment: ReviewComment } | { notFound: true } | { forbidden: true }> {
+  ): Promise<
+    { comment: ReviewComment } | { notFound: true } | { forbidden: true }
+  > {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
       const assignment = await repos.review.getAssignmentById(assignmentId);
       if (!assignment) return { notFound: true } as const;
-      if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+      if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin)
+        return { forbidden: true } as const;
 
       const comment = await repos.review.addComment({
         reviewAssignmentId: assignmentId,

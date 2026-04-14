@@ -4,4 +4,3 @@ export interface AuditLogRepository {
   append(entry: AuditLogEntryInput): Promise<AuditLogEntry>;
   list(filters?: AuditLogFilters): Promise<AuditLogEntry[]>;
 }
-

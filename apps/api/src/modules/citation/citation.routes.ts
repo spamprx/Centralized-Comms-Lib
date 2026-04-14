@@ -64,14 +64,21 @@ router.post("/render", async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: "style must be APA, IEEE, or MLA" });
       return;
     }
-    if (!work || typeof work !== "object" || typeof work.title !== "string" || !work.title.trim()) {
+    if (
+      !work ||
+      typeof work !== "object" ||
+      typeof work.title !== "string" ||
+      !work.title.trim()
+    ) {
       res.status(400).json({ error: "work.title is required" });
       return;
     }
     const text = renderCitation(style as CitationStyle, work);
     res.status(200).json({ style, text, work });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 

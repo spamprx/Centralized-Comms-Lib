@@ -8,6 +8,13 @@
 # Optional: copy apps/api/env.example to apps/api/.env and add to backend env_file for overrides.
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: comms-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
   mongo:
     image: mongo:7
     container_name: comms-mongo
@@ -20,6 +27,7 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
     container_name: comms-elasticsearch
+    hostname: elasticsearch
     restart: unless-stopped
     environment:
       - discovery.type=single-node
@@ -43,7 +51,7 @@ services:
     volumes:
       - comms_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U comms -d comms"]
+      test: [ "CMD-SHELL", "pg_isready -U comms -d comms" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -60,6 +68,8 @@ services:
         condition: service_started
       elasticsearch:
         condition: service_started
+      redis:
+        condition: service_started
     environment:
       NODE_ENV: development
       PORT: "8000"
@@ -75,7 +85,7 @@ services:
       JWT_SECRET: your-super-secret-key-change-in-production
       JWT_ISSUER: your-app-name
       JWT_AUDIENCE: your-app-client
-      REDIS_URL: redis://localhost:6379
+      REDIS_URL: redis://redis:6379
       AI_DAILY_QUOTA: "50"
       AI_QUOTA_WINDOW_MS: "86400000"
     ports:

@@ -3,7 +3,12 @@ import type {
   TemplateRepository,
   UpdateTemplateInput,
 } from "../../interfaces/templateRepository";
-import type { Template, TemplateBinding, TemplateStatus, TemplateWithBindings } from "../../types";
+import type {
+  Template,
+  TemplateBinding,
+  TemplateStatus,
+  TemplateWithBindings,
+} from "../../types";
 import { normalizeI18nFromDb } from "../../templateI18n";
 import type { PrismaDb } from "./prismaTypes";
 
@@ -88,14 +93,20 @@ export class PrismaTemplateRepository implements TemplateRepository {
     };
   }
 
-  async getByWorkspaceAndSlug(workspaceId: string, slug: string): Promise<Template | null> {
+  async getByWorkspaceAndSlug(
+    workspaceId: string,
+    slug: string,
+  ): Promise<Template | null> {
     const row = await this.db.template.findUnique({
       where: { workspaceId_slug: { workspaceId, slug } },
     });
     return row ? toTemplate(row) : null;
   }
 
-  async findByWorkspaceAndName(workspaceId: string, name: string): Promise<Template | null> {
+  async findByWorkspaceAndName(
+    workspaceId: string,
+    name: string,
+  ): Promise<Template | null> {
     const row = await this.db.template.findUnique({
       where: { workspaceId_name: { workspaceId, name } },
     });
@@ -116,10 +127,16 @@ export class PrismaTemplateRepository implements TemplateRepository {
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.slug !== undefined && { slug: input.slug }),
-        ...(input.description !== undefined && { description: input.description }),
+        ...(input.description !== undefined && {
+          description: input.description,
+        }),
         ...(input.status !== undefined && { status: input.status }),
-        ...(input.draftLayout !== undefined && { draftLayout: input.draftLayout ?? undefined }),
-        ...(input.activeLayout !== undefined && { activeLayout: input.activeLayout ?? undefined }),
+        ...(input.draftLayout !== undefined && {
+          draftLayout: input.draftLayout ?? undefined,
+        }),
+        ...(input.activeLayout !== undefined && {
+          activeLayout: input.activeLayout ?? undefined,
+        }),
         ...(input.i18n !== undefined && { i18n: input.i18n as object }),
       },
     });
@@ -134,7 +151,10 @@ export class PrismaTemplateRepository implements TemplateRepository {
     return this.db.content.count({ where: { templateId } });
   }
 
-  async createBinding(templateId: string, channelId: string): Promise<TemplateBinding> {
+  async createBinding(
+    templateId: string,
+    channelId: string,
+  ): Promise<TemplateBinding> {
     const row = await this.db.templateChannelBinding.create({
       data: { templateId, channelId },
     });
@@ -148,7 +168,10 @@ export class PrismaTemplateRepository implements TemplateRepository {
     return res.count > 0;
   }
 
-  async getBinding(templateId: string, bindingId: string): Promise<TemplateBinding | null> {
+  async getBinding(
+    templateId: string,
+    bindingId: string,
+  ): Promise<TemplateBinding | null> {
     const row = await this.db.templateChannelBinding.findFirst({
       where: { id: bindingId, templateId },
     });

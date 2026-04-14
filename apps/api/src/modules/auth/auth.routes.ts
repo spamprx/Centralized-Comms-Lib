@@ -9,7 +9,11 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_ISSUER = process.env.JWT_ISSUER;
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE;
 
-function signToken(payload: { id: string; email: string; role: UserRole }): string {
+function signToken(payload: {
+  id: string;
+  email: string;
+  role: UserRole;
+}): string {
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: "24h",
     algorithm: "HS256",
@@ -58,7 +62,9 @@ router.post("/register", async (req: Request, res: Response) => {
   try {
     const { email, displayName, password } = req.body;
     if (!email || !displayName || !password) {
-      res.status(400).json({ error: "email, displayName, and password are required" });
+      res
+        .status(400)
+        .json({ error: "email, displayName, and password are required" });
       return;
     }
     const result = await authService.register(

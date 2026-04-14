@@ -6,12 +6,14 @@ import type {
   ContentTypeBreakdown,
   TopContentItem,
   AIInsight,
-} from '../data/mockAnalyticsData';
+} from '../types/analytics';
+import type { DateRange } from '../lib/dateUtils';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('auth_token');
+  const { getAuthToken } = await import('./tokenStore');
+  const token = getAuthToken();
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -29,21 +31,34 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return res.json();
 }
 
+// Helper function to build date parameters for API requests
+function buildDateParams(dateRange?: string | DateRange): string {
+  if (!dateRange) return '';
+  
+  if (typeof dateRange === 'string') {
+    return `?range=${dateRange}`;
+  }
+  
+  // For custom DateRange, calculate the number of days and use as range
+  const days = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+  return `?range=${days}d`;
+}
+
 // ─── Analytics Service ────────────────────────────────────────────────────────
 
 export const analyticsService = {
-  getKPIs: async (dateRange?: string): Promise<KPI[]> => {
-    const params = dateRange ? `?range=${dateRange}` : '';
+  getKPIs: async (dateRange?: string | DateRange): Promise<KPI[]> => {
+    const params = buildDateParams(dateRange);
     return request<KPI[]>(`/analytics/kpis${params}`);
   },
 
-  getViewsData: async (dateRange?: string): Promise<TimeSeriesPoint[]> => {
-    const params = dateRange ? `?range=${dateRange}` : '';
+  getViewsData: async (dateRange?: string | DateRange): Promise<TimeSeriesPoint[]> => {
+    const params = buildDateParams(dateRange);
     return request<TimeSeriesPoint[]>(`/analytics/views${params}`);
   },
 
-  getEngagementData: async (dateRange?: string): Promise<EngagementData[]> => {
-    const params = dateRange ? `?range=${dateRange}` : '';
+  getEngagementData: async (dateRange?: string | DateRange): Promise<EngagementData[]> => {
+    const params = buildDateParams(dateRange);
     return request<EngagementData[]>(`/analytics/engagement${params}`);
   },
 
@@ -51,8 +66,9 @@ export const analyticsService = {
     return request<ReadingTimeBucket[]>('/analytics/reading-time');
   },
 
-  getContentTypeData: async (): Promise<ContentTypeBreakdown[]> => {
-    return request<ContentTypeBreakdown[]>('/analytics/content-types');
+  getContentTypeData: async (dateRange?: string | DateRange): Promise<ContentTypeBreakdown[]> => {
+    const params = buildDateParams(dateRange);
+    return request<ContentTypeBreakdown[]>(`/analytics/content-types${params}`);
   },
 
   getTopContent: async (limit?: number): Promise<TopContentItem[]> => {

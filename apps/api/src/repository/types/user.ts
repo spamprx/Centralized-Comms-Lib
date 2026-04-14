@@ -59,4 +59,3 @@ export interface CreateUserGroupInput {
   name: string;
   description?: string | null;
 }
-

@@ -7,8 +7,16 @@ import {
   buildContentFacetAggregations,
   getElasticsearchClient,
 } from "@comms-lib/db-elasticsearch";
-import { bumpSearchCacheEpoch, getSearchCacheEpoch, redisGet, redisSet } from "../shared/cache/redisClient";
-import { buildContentIndexDocument, type ContentIndexDocument } from "./contentIndex.document";
+import {
+  bumpSearchCacheEpoch,
+  getSearchCacheEpoch,
+  redisGet,
+  redisSet,
+} from "../shared/cache/redisClient";
+import {
+  buildContentIndexDocument,
+  type ContentIndexDocument,
+} from "./contentIndex.document";
 import {
   assertValidQueryVector,
   engagementNorm,
@@ -19,7 +27,7 @@ import {
 } from "./rankBlend";
 import { joinSnippet, sanitizeHighlightFragments } from "./searchSnippets";
 import type {
-   ContentCheckByTextRequest,
+  ContentCheckByTextRequest,
   ContentCheckByTextResponse,
   ContentCheckSearchRequest,
   ContentSearchFilters,
@@ -40,11 +48,15 @@ export type {
   FacetBucket,
 } from "./searchTypes";
 
-function boolFilters(filters: ContentSearchFilters | undefined): estypes.QueryDslQueryContainer[] {
+function boolFilters(
+  filters: ContentSearchFilters | undefined,
+): estypes.QueryDslQueryContainer[] {
   const f: estypes.QueryDslQueryContainer[] = [];
   if (!filters) return f;
-  if (filters.workspaceId) f.push({ term: { workspaceId: filters.workspaceId } });
-  if (filters.lifecycleState) f.push({ term: { lifecycleState: filters.lifecycleState } });
+  if (filters.workspaceId)
+    f.push({ term: { workspaceId: filters.workspaceId } });
+  if (filters.lifecycleState)
+    f.push({ term: { lifecycleState: filters.lifecycleState } });
   if (filters.visibility) f.push({ term: { visibility: filters.visibility } });
   if (filters.authorId) f.push({ term: { authorId: filters.authorId } });
   if (filters.templateId) f.push({ term: { templateId: filters.templateId } });
@@ -68,7 +80,9 @@ function normEsScore(raw: number): number {
   return raw / (raw + 1);
 }
 
-function parseFacetAggregations(aggs: Record<string, unknown> | undefined): Record<string, FacetBucket[]> {
+function parseFacetAggregations(
+  aggs: Record<string, unknown> | undefined,
+): Record<string, FacetBucket[]> {
   const out: Record<string, FacetBucket[]> = {};
   if (!aggs) return out;
   for (const [key, agg] of Object.entries(aggs)) {
@@ -103,7 +117,14 @@ function keywordMustClause(q: string): estypes.QueryDslQueryContainer {
             type: "best_fields",
             fuzziness: "AUTO",
             prefix_length: 1,
-            fields: ["title^4", "title.auto^2", "summary^2.5", "bodyPlain^1.2", "body^0.8", "tags^1.5"],
+            fields: [
+              "title^4",
+              "title.auto^2",
+              "summary^2.5",
+              "bodyPlain^1.2",
+              "body^0.8",
+              "tags^1.5",
+            ],
           },
         },
         {
@@ -121,7 +142,10 @@ function keywordMustClause(q: string): estypes.QueryDslQueryContainer {
   };
 }
 
-function mapHitWithHighlight(h: estypes.SearchHit, fallbackScore: number): ContentSearchHit {
+function mapHitWithHighlight(
+  h: estypes.SearchHit,
+  fallbackScore: number,
+): ContentSearchHit {
   const src = (h._source as Record<string, unknown>) ?? {};
   const hl = h.highlight as Record<string, string[]> | undefined;
   const highlight: Record<string, string[]> = {};
@@ -153,7 +177,9 @@ async function fetchFacets(
   filterClauses: estypes.QueryDslQueryContainer[],
 ): Promise<Record<string, FacetBucket[]>> {
   const facetQuery: estypes.QueryDslQueryContainer =
-    filterClauses.length > 0 ? { bool: { filter: filterClauses } } : { match_all: {} };
+    filterClauses.length > 0
+      ? { bool: { filter: filterClauses } }
+      : { match_all: {} };
   const res = await client.search({
     index: CONTENT_INDEX_NAME,
     size: 0,
@@ -167,7 +193,8 @@ async function fetchFacets(
 }
 
 export async function ensureContentSearchIndex(client: Client): Promise<void> {
-  const { buildContentIndexSettingsAndMappings } = await import("@comms-lib/db-elasticsearch");
+  const { buildContentIndexSettingsAndMappings } =
+    await import("@comms-lib/db-elasticsearch");
   const exists = await client.indices.exists({ index: CONTENT_INDEX_NAME });
   if (!exists) {
     const def = buildContentIndexSettingsAndMappings() as {
@@ -188,7 +215,8 @@ export async function indexContentDocument(
 ): Promise<void> {
   const { titleEmbedding, ...rest } = doc;
   const body: Record<string, unknown> = { ...rest };
-  if (titleEmbedding && titleEmbedding.length > 0) body.titleEmbedding = titleEmbedding;
+  if (titleEmbedding && titleEmbedding.length > 0)
+    body.titleEmbedding = titleEmbedding;
   await client.index({
     index: CONTENT_INDEX_NAME,
     id: doc.contentId,
@@ -197,9 +225,16 @@ export async function indexContentDocument(
   });
 }
 
-export async function deleteContentFromIndex(client: Client, contentId: string): Promise<void> {
+export async function deleteContentFromIndex(
+  client: Client,
+  contentId: string,
+): Promise<void> {
   try {
-    await client.delete({ index: CONTENT_INDEX_NAME, id: contentId, refresh: false });
+    await client.delete({
+      index: CONTENT_INDEX_NAME,
+      id: contentId,
+      refresh: false,
+    });
   } catch (e: unknown) {
     const status = (e as { meta?: { statusCode?: number } })?.meta?.statusCode;
     if (status === 404) return;
@@ -207,7 +242,10 @@ export async function deleteContentFromIndex(client: Client, contentId: string):
   }
 }
 
-export async function syncContentIndexFromDb(prisma: PrismaClient, contentId: string): Promise<void> {
+export async function syncContentIndexFromDb(
+  prisma: PrismaClient,
+  contentId: string,
+): Promise<void> {
   const client = getElasticsearchClient();
   if (!client) return;
   await ensureContentSearchIndex(client);
@@ -226,7 +264,9 @@ function cacheKey(epoch: string, payload: string): string {
   return `comms:search:v2:${epoch}:${h}`;
 }
 
-export async function searchContentCached(req: ContentSearchRequest): Promise<ContentSearchResponse | null> {
+export async function searchContentCached(
+  req: ContentSearchRequest,
+): Promise<ContentSearchResponse | null> {
   const q = req.q?.trim() || "";
   const hasVec = assertValidQueryVector(req.queryVector) != null;
   const useFacets = req.includeFacets !== false;
@@ -258,7 +298,10 @@ export async function searchContentCached(req: ContentSearchRequest): Promise<Co
     }
     const fresh = await searchContent({ ...req, includeFacets: false });
     if (fresh) {
-      const ttl = Math.min(300, Math.max(30, Number(process.env.SEARCH_CACHE_TTL_SEC) || 90));
+      const ttl = Math.min(
+        300,
+        Math.max(30, Number(process.env.SEARCH_CACHE_TTL_SEC) || 90),
+      );
       await redisSet(key, JSON.stringify(fresh), ttl);
     }
     return fresh;
@@ -267,7 +310,9 @@ export async function searchContentCached(req: ContentSearchRequest): Promise<Co
   return searchContent(req);
 }
 
-export async function searchContent(req: ContentSearchRequest): Promise<ContentSearchResponse | null> {
+export async function searchContent(
+  req: ContentSearchRequest,
+): Promise<ContentSearchResponse | null> {
   const client = getElasticsearchClient();
   if (!client) return null;
 
@@ -284,10 +329,14 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
   const withSnippets = req.includeSnippets === true;
 
   const facetsPromise =
-    req.includeFacets !== false ? fetchFacets(client, filterClauses) : Promise.resolve(undefined);
+    req.includeFacets !== false
+      ? fetchFacets(client, filterClauses)
+      : Promise.resolve(undefined);
 
   const browseQuery: estypes.QueryDslQueryContainer =
-    filterClauses.length > 0 ? { bool: { filter: filterClauses } } : { match_all: {} };
+    filterClauses.length > 0
+      ? { bool: { filter: filterClauses } }
+      : { match_all: {} };
 
   if (!q && !queryVector) {
     const [res, facets] = await Promise.all([
@@ -301,12 +350,16 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
       facetsPromise,
     ]);
     const total =
-      typeof res.hits.total === "number" ? res.hits.total : res.hits.total?.value ?? 0;
-    const hits: ContentSearchHit[] = (res.hits.hits ?? []).map((h: estypes.SearchHit) => ({
-      contentId: String(h._id),
-      score: typeof h._score === "number" ? h._score : 0,
-      source: (h._source as Record<string, unknown>) ?? {},
-    }));
+      typeof res.hits.total === "number"
+        ? res.hits.total
+        : (res.hits.total?.value ?? 0);
+    const hits: ContentSearchHit[] = (res.hits.hits ?? []).map(
+      (h: estypes.SearchHit) => ({
+        contentId: String(h._id),
+        score: typeof h._score === "number" ? h._score : 0,
+        source: (h._source as Record<string, unknown>) ?? {},
+      }),
+    );
     return { total, hits, facets };
   }
 
@@ -329,7 +382,9 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
       : Promise.resolve(null);
 
   const knnFilter: estypes.QueryDslQueryContainer =
-    filterClauses.length > 0 ? { bool: { filter: filterClauses } } : { match_all: {} };
+    filterClauses.length > 0
+      ? { bool: { filter: filterClauses } }
+      : { match_all: {} };
 
   const knnPromise =
     queryVector != null
@@ -347,9 +402,18 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
         })
       : Promise.resolve(null);
 
-  const [kwRes, knnRes, facets] = await Promise.all([keywordPromise, knnPromise, facetsPromise]);
+  const [kwRes, knnRes, facets] = await Promise.all([
+    keywordPromise,
+    knnPromise,
+    facetsPromise,
+  ]);
 
-  type Hit = { _id?: string; _score?: number | null; _source?: Record<string, unknown>; highlight?: unknown };
+  type Hit = {
+    _id?: string;
+    _score?: number | null;
+    _source?: Record<string, unknown>;
+    highlight?: unknown;
+  };
 
   const kwHits = (kwRes?.hits?.hits ?? []) as Hit[];
   const knnHits = (knnRes?.hits?.hits ?? []) as Hit[];
@@ -371,7 +435,9 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
     const id = String(h._id ?? "");
     if (!id) return;
     const esScore = typeof h._score === "number" ? h._score : 0;
-    const prev = byId.get(id) ?? { source: (h._source ?? {}) as Record<string, unknown> };
+    const prev = byId.get(id) ?? {
+      source: (h._source ?? {}) as Record<string, unknown>,
+    };
     prev.kw = esScore;
     prev.kwRank = i;
     prev.source = { ...prev.source, ...(h._source ?? {}) };
@@ -386,7 +452,9 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
   knnHits.forEach((h, i) => {
     const id = String(h._id ?? "");
     if (!id) return;
-    const prev = byId.get(id) ?? { source: (h._source ?? {}) as Record<string, unknown> };
+    const prev = byId.get(id) ?? {
+      source: (h._source ?? {}) as Record<string, unknown>,
+    };
     prev.kn = typeof h._score === "number" ? h._score : 0;
     prev.knRank = i;
     prev.source = { ...prev.source, ...(h._source ?? {}) };
@@ -395,14 +463,18 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
 
   const scored = [...byId.entries()].map(([contentId, v]) => {
     const src = v.source;
-    const updatedAt = typeof src.updatedAt === "string" ? src.updatedAt : undefined;
-    const eng = typeof src.engagementScore === "number" ? src.engagementScore : 0;
+    const updatedAt =
+      typeof src.updatedAt === "string" ? src.updatedAt : undefined;
+    const eng =
+      typeof src.engagementScore === "number" ? src.engagementScore : 0;
 
     const rrfKw = v.kwRank !== undefined ? rrfScore(v.kwRank) : 0;
     const rrfKn = v.knRank !== undefined ? rrfScore(v.knRank) : 0;
 
     const kwSignal =
-      q.length > 0 ? weights.keyword * (0.6 * rrfKw + 0.4 * normEsScore(v.kw ?? 0)) : 0;
+      q.length > 0
+        ? weights.keyword * (0.6 * rrfKw + 0.4 * normEsScore(v.kw ?? 0))
+        : 0;
     const vecSignal =
       queryVector != null
         ? weights.vector * (0.6 * rrfKn + 0.4 * normEsScore(v.kn ?? 0))
@@ -435,10 +507,18 @@ export async function searchContent(req: ContentSearchRequest): Promise<ContentS
   }));
 
   let total = scored.length;
-  if (kwRes && typeof kwRes.hits?.total === "object" && kwRes.hits.total !== null) {
+  if (
+    kwRes &&
+    typeof kwRes.hits?.total === "object" &&
+    kwRes.hits.total !== null
+  ) {
     total = Math.max(total, kwRes.hits.total.value ?? 0);
   }
-  if (knnRes && typeof knnRes.hits?.total === "object" && knnRes.hits.total !== null) {
+  if (
+    knnRes &&
+    typeof knnRes.hits?.total === "object" &&
+    knnRes.hits.total !== null
+  ) {
     total = Math.max(total, knnRes.hits.total.value ?? 0);
   }
   if (!kwRes && !knnRes) total = 0;
@@ -458,7 +538,10 @@ export async function searchContentCheck(
   const size = Math.min(50, Math.max(1, req.size ?? 12));
   const minScore =
     req.minScore ??
-    Math.min(25, Math.max(4, Number(process.env.CONTENT_CHECK_MIN_SCORE) || 10.5));
+    Math.min(
+      25,
+      Math.max(4, Number(process.env.CONTENT_CHECK_MIN_SCORE) || 10.5),
+    );
 
   const res = await client.search({
     index: CONTENT_INDEX_NAME,
@@ -476,7 +559,19 @@ export async function searchContentCheck(
               min_term_freq: 1,
               max_query_terms: 28,
               minimum_should_match: "38%",
-              stop_words: ["the", "a", "an", "and", "or", "of", "to", "in", "for", "on", "with"],
+              stop_words: [
+                "the",
+                "a",
+                "an",
+                "and",
+                "or",
+                "of",
+                "to",
+                "in",
+                "for",
+                "on",
+                "with",
+              ],
             },
           },
         ],
@@ -487,12 +582,16 @@ export async function searchContentCheck(
   });
 
   const total =
-    typeof res.hits.total === "number" ? res.hits.total : res.hits.total?.value ?? 0;
-  const hits: ContentSearchHit[] = (res.hits.hits ?? []).map((h: estypes.SearchHit) => ({
-    contentId: String(h._id),
-    score: typeof h._score === "number" ? h._score : 0,
-    source: (h._source as Record<string, unknown>) ?? {},
-  }));
+    typeof res.hits.total === "number"
+      ? res.hits.total
+      : (res.hits.total?.value ?? 0);
+  const hits: ContentSearchHit[] = (res.hits.hits ?? []).map(
+    (h: estypes.SearchHit) => ({
+      contentId: String(h._id),
+      score: typeof h._score === "number" ? h._score : 0,
+      source: (h._source as Record<string, unknown>) ?? {},
+    }),
+  );
 
   return { total, hits };
 }
@@ -506,8 +605,25 @@ const CONTENT_CHECK_MIN_INPUT_LEN = Math.max(
   Number(process.env.CONTENT_CHECK_MIN_INPUT_LEN) || 12,
 );
 const MLT_STOP_WORDS = [
-  "the", "a", "an", "and", "or", "of", "to", "in", "for", "on",
-  "with", "is", "it", "that", "this", "was", "are", "be", "has",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "to",
+  "in",
+  "for",
+  "on",
+  "with",
+  "is",
+  "it",
+  "that",
+  "this",
+  "was",
+  "are",
+  "be",
+  "has",
 ];
 
 export async function searchContentCheckByText(
@@ -517,9 +633,9 @@ export async function searchContentCheckByText(
   if (!client) return null;
   await ensureContentSearchIndex(client);
 
-  const title   = (req.title   ?? "").trim();
+  const title = (req.title ?? "").trim();
   const summary = (req.summary ?? "").trim();
-  let   body    = (req.body    ?? "").trim();
+  let body = (req.body ?? "").trim();
 
   const combinedLen = title.length + summary.length + body.length;
   if (combinedLen < CONTENT_CHECK_MIN_INPUT_LEN) {
@@ -539,7 +655,10 @@ export async function searchContentCheckByText(
   const size = Math.min(50, Math.max(1, req.size ?? 10));
   const minScoreRaw =
     req.minScore ??
-    Math.min(20, Math.max(2, Number(process.env.CONTENT_CHECK_TEXT_MIN_SCORE) || 5));
+    Math.min(
+      20,
+      Math.max(2, Number(process.env.CONTENT_CHECK_TEXT_MIN_SCORE) || 5),
+    );
 
   const mltClauses: estypes.QueryDslQueryContainer[] = [];
 
@@ -637,7 +756,9 @@ export async function searchContentCheckByText(
   });
 
   const total =
-    typeof res.hits.total === "number" ? res.hits.total : res.hits.total?.value ?? 0;
+    typeof res.hits.total === "number"
+      ? res.hits.total
+      : (res.hits.total?.value ?? 0);
 
   return { total, hits };
 }

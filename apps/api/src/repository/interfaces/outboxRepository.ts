@@ -6,4 +6,3 @@ export interface OutboxRepository {
   markProcessed(eventId: string, processedAt?: Date): Promise<void>;
   incrementRetry(eventId: string): Promise<void>;
 }
-

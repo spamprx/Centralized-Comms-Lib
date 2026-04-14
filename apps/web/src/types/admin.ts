@@ -1,5 +1,6 @@
 export type UserRole = 'super_admin' | 'admin' | 'moderator' | 'editor' | 'viewer';
-export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending';
+/** Mirrors `User.isActive` from the API (no separate suspended/pending in schema). */
+export type UserStatus = 'active' | 'inactive';
 
 export interface User {
   id: string;
@@ -8,9 +9,12 @@ export interface User {
   avatar?: string;
   role: UserRole;
   status: UserStatus;
+  /** Group membership ids from the API */
   groups: string[];
   lastActive: string;
   createdAt: string;
+  /** First role assignment id (for counts / admin sync) */
+  primaryRoleId?: string;
 }
 
 export interface Role {
@@ -20,6 +24,8 @@ export interface Role {
   permissions: Permission[];
   userCount: number;
   createdAt: string;
+  /** From API — built-in roles may not be deleted */
+  isSystem?: boolean;
 }
 
 export interface Permission {
@@ -51,8 +57,13 @@ export interface ActivityLog {
   userName: string;
   action: string;
   resource: string;
+  resourceId?: string;
   timestamp: string;
   ipAddress: string;
+  userAgent?: string;
+  oldValue?: unknown | null;
+  newValue?: unknown | null;
+  severity: 'info' | 'warning' | 'error' | 'success';
   status: 'success' | 'failure';
 }
 

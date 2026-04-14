@@ -12,6 +12,12 @@ export interface CreateContentSnapshotInput {
 export interface ContentSnapshotRepository {
   create(input: CreateContentSnapshotInput): Promise<ContentSnapshotRecord>;
   getById(id: string): Promise<ContentSnapshotRecord | null>;
-  listForContent(contentId: string, limit?: number): Promise<ContentSnapshotRecord[]>;
-  updateMongoRef(id: string, mongoDocumentId: string | null): Promise<ContentSnapshotRecord>;
+  listForContent(
+    contentId: string,
+    limit?: number,
+  ): Promise<ContentSnapshotRecord[]>;
+  updateMongoRef(
+    id: string,
+    mongoDocumentId: string | null,
+  ): Promise<ContentSnapshotRecord>;
 }

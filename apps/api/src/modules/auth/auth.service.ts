@@ -4,10 +4,21 @@ import { hashPassword, verifyPassword } from "../../utils/hash";
 
 export const authService = {
   async register(
-    ctx: Omit<AuditContext, "actorId"> & { ipAddress?: string; userAgent?: string },
+    ctx: Omit<AuditContext, "actorId"> & {
+      ipAddress?: string;
+      userAgent?: string;
+    },
     input: { email: string; displayName: string; password: string },
   ): Promise<
-    | { user: { id: string; email: string; displayName: string; avatarUrl: string | null }; conflict: false }
+    | {
+        user: {
+          id: string;
+          email: string;
+          displayName: string;
+          avatarUrl: string | null;
+        };
+        conflict: false;
+      }
     | { conflict: true }
   > {
     const prisma = getPrismaClient();
@@ -42,7 +53,15 @@ export const authService = {
       password: string;
     },
   ): Promise<
-    | { user: { id: string; email: string; displayName: string; avatarUrl: string | null }; role: "ADMIN" | "USER" }
+    | {
+        user: {
+          id: string;
+          email: string;
+          displayName: string;
+          avatarUrl: string | null;
+        };
+        role: "ADMIN" | "USER";
+      }
     | { invalidCredentials: true }
   > {
     const prisma = getPrismaClient();

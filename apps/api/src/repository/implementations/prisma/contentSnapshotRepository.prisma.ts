@@ -30,7 +30,9 @@ function toRecord(row: {
 export class PrismaContentSnapshotRepository implements ContentSnapshotRepository {
   public constructor(private readonly db: PrismaDb) {}
 
-  async create(input: CreateContentSnapshotInput): Promise<ContentSnapshotRecord> {
+  async create(
+    input: CreateContentSnapshotInput,
+  ): Promise<ContentSnapshotRecord> {
     const row = await this.db.contentSnapshot.create({
       data: {
         contentId: input.contentId,
@@ -49,7 +51,10 @@ export class PrismaContentSnapshotRepository implements ContentSnapshotRepositor
     return row ? toRecord(row) : null;
   }
 
-  async listForContent(contentId: string, limit = 50): Promise<ContentSnapshotRecord[]> {
+  async listForContent(
+    contentId: string,
+    limit = 50,
+  ): Promise<ContentSnapshotRecord[]> {
     const rows = await this.db.contentSnapshot.findMany({
       where: { contentId },
       orderBy: { createdAt: "desc" },
@@ -58,7 +63,10 @@ export class PrismaContentSnapshotRepository implements ContentSnapshotRepositor
     return rows.map(toRecord);
   }
 
-  async updateMongoRef(id: string, mongoDocumentId: string | null): Promise<ContentSnapshotRecord> {
+  async updateMongoRef(
+    id: string,
+    mongoDocumentId: string | null,
+  ): Promise<ContentSnapshotRecord> {
     const row = await this.db.contentSnapshot.update({
       where: { id },
       data: { mongoDocumentId },

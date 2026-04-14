@@ -5,8 +5,11 @@ export interface ContentItem {
   title: string;
   type: 'article' | 'video' | 'podcast' | 'document';
   author: string;
+  /** Distribution / surface (facet for library filters). */
+  channel: string;
   status: 'draft' | 'review' | 'published';
   views: number;
+  likes?: number;
   createdAt: string;
   thumbnail?: string;
   tags: string[];
@@ -24,6 +27,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Getting Started with Our Platform',
     type: 'article',
     author: 'Alice Johnson',
+    channel: 'Web',
     status: 'published',
     views: 12450,
     createdAt: '2025-02-15',
@@ -34,6 +38,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Advanced Features Deep Dive',
     type: 'video',
     author: 'Bob Smith',
+    channel: 'Product',
     status: 'published',
     views: 9823,
     createdAt: '2025-02-20',
@@ -44,6 +49,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Best Practices for Content Creation',
     type: 'article',
     author: 'Carol Williams',
+    channel: 'Marketing',
     status: 'review',
     views: 0,
     createdAt: '2025-03-01',
@@ -54,6 +60,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Q1 2025 Product Updates',
     type: 'document',
     author: 'David Brown',
+    channel: 'Product',
     status: 'published',
     views: 7234,
     createdAt: '2025-03-05',
@@ -64,6 +71,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Customer Success Stories',
     type: 'podcast',
     author: 'Eve Davis',
+    channel: 'Support',
     status: 'draft',
     views: 0,
     createdAt: '2025-03-08',
@@ -74,6 +82,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Marketing Strategy 2025',
     type: 'document',
     author: 'Frank Miller',
+    channel: 'Marketing',
     status: 'published',
     views: 5432,
     createdAt: '2025-02-10',
@@ -84,6 +93,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Technical Documentation v2',
     type: 'article',
     author: 'Grace Wilson',
+    channel: 'Web',
     status: 'review',
     views: 0,
     createdAt: '2025-03-09',
@@ -94,6 +104,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'User Onboarding Flow',
     type: 'video',
     author: 'Henry Taylor',
+    channel: 'Web',
     status: 'published',
     views: 8765,
     createdAt: '2025-02-25',
@@ -104,6 +115,7 @@ export const mockContentItems: ContentItem[] = [
     title: 'Community Guidelines',
     type: 'article',
     author: 'Alice Johnson',
+    channel: 'Support',
     status: 'published',
     views: 4321,
     createdAt: '2025-01-20',

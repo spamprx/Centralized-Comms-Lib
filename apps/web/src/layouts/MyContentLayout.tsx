@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMyContent } from '../hooks/useMyContent';
-import { FileText, Video, Mic, File, Edit2, Eye, Trash2 } from 'lucide-react';
+import { FileText, Video, Mic, File, Edit2, Eye, Trash2, Send, MessageCircle, History } from 'lucide-react';
+import { contentService } from '../services/contentService';
+import ManageReviewersModal from '../components/ManageReviewersModal';
+import ReviewFeedbackModal from '../components/ReviewFeedbackModal';
+import { PageHeader, PageShell, Surface, formInputClass, formSelectClass } from '../components/ui';
 
 const typeIcons = {
   article: FileText,
@@ -24,227 +29,303 @@ const statusColors = {
 };
 
 export default function MyContentLayout() {
-  const { contentItems, stats, loading, searchQuery, setSearchQuery, statusFilter, setStatusFilter } = useMyContent();
+  const { contentItems, stats, loading, searchQuery, setSearchQuery, statusFilter, setStatusFilter, refreshContent } = useMyContent();
   const [sortBy, setSortBy] = useState('lastModified');
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [reviewModalItem, setReviewModalItem] = useState<{ id: string; title: string } | null>(null);
+  const [feedbackModalItem, setFeedbackModalItem] = useState<{ id: string; title: string } | null>(null);
+  const navigate = useNavigate();
+
+  const sortedItems = useMemo(() => {
+    const items = [...contentItems];
+    switch (sortBy) {
+      case 'createdAt':
+        return items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      case 'title':
+        return items.sort((a, b) => a.title.localeCompare(b.title));
+      case 'views':
+        return items.sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+      case 'lastModified':
+      default:
+        return items.sort((a, b) => +new Date(b.lastModified) - +new Date(a.lastModified));
+    }
+  }, [contentItems, sortBy]);
+
+  const handleSubmitForReview = async (itemId: string) => {
+    setSubmittingId(itemId);
+    try {
+      await contentService.transitionState(itemId, 'IN_REVIEW');
+      await refreshContent();
+    } catch (err) {
+      console.error('Failed to submit for review:', err);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleDelete = async (itemId: string, title: string) => {
+    const ok = globalThis.window?.confirm(`Delete "${title}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await contentService.delete(itemId);
+      await refreshContent();
+    } catch (err) {
+      console.error('Failed to delete content:', err);
+    }
+  };
+
+  const handleCreateContent = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const r = await contentService.createDraft('Untitled draft', undefined, { contentType: 'ARTICLE' });
+      await refreshContent();
+      navigate(`/editor/${r.content.id}`);
+    } catch (err) {
+      console.error('Failed to create content:', err);
+    } finally {
+      setCreating(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div style={{ padding: 24 }}>
-        <div style={{ height: 48, background: 'rgba(255,255,255,0.03)', borderRadius: 10, marginBottom: 24 }} />
-        <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} style={{ height: 80, flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />
+      <PageShell wide className="animate-pulse">
+        <div className="mb-8 h-10 max-w-md rounded-app-lg bg-app-surface" />
+        <div className="mb-6 flex flex-wrap gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 min-w-[160px] flex-1 rounded-app-lg bg-app-surface" />
           ))}
         </div>
-        <div style={{ height: 40, background: 'rgba(255,255,255,0.03)', borderRadius: 8, marginBottom: 16 }} />
-        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, minHeight: 400 }} />
-      </div>
+        <div className="mb-4 h-10 rounded-app-md bg-app-surface" />
+        <div className="min-h-[400px] rounded-app-lg bg-app-surface" />
+      </PageShell>
     );
   }
 
   return (
-    <div style={{ padding: 24, minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: '0 0 4px' }}>My Content</h1>
-        <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>Manage and track all your content</p>
-      </div>
-
-      {/* Stats Cards */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-        {stats.map((stat, i) => (
-          <div
-            key={i}
-            style={{
-              flex: 1,
-              minWidth: 160,
-              padding: 16,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 10,
-            }}
+    <PageShell wide>
+      <PageHeader
+        title="My content"
+        description="Manage and track everything you own."
+        actions={
+          <button
+            type="button"
+            onClick={() => void handleCreateContent()}
+            disabled={creating}
+            className={`inline-flex h-10 items-center justify-center rounded-app-lg border border-app-accent/35 bg-app-accent-muted px-4 py-2.5 text-[13px] font-semibold text-app-accent shadow-sm transition-colors hover:bg-app-accent/20 ${
+              creating ? 'cursor-not-allowed opacity-70' : ''
+            }`}
+            title="Create a new draft"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: '#555870', textTransform: 'uppercase', fontWeight: 600 }}>{stat.label}</span>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                background: `${stat.color}22`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: stat.color,
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  {stat.icon === 'content' && <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /></>}
-                  {stat.icon === 'published' && <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>}
-                  {stat.icon === 'review' && <><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></>}
-                  {stat.icon === 'views' && <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>}
-                </svg>
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0' }}>{stat.value}</div>
-          </div>
-        ))}
-      </div>
+            {creating ? 'Creating…' : 'Create content'}
+          </button>
+        }
+      />
 
-      {/* Search & Filter */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 250, position: 'relative' }}>
+      <div className="animate-fade-in space-y-6">
+      {/* Filters + compact stats row */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative min-w-[260px] flex-1">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search your content..."
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8,
-              color: '#e2e4f0',
-              fontSize: 13,
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            className={`${formInputClass} py-2.5 text-[13px]`}
           />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`${formSelectClass} w-auto min-w-[10rem] py-2.5 text-[13px]`}
+            aria-label="Filter by status"
+          >
+            <option value="all">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="in_review">In Review</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className={`${formSelectClass} w-auto min-w-[11rem] py-2.5 text-[13px]`}
+            aria-label="Sort by"
+          >
+            <option value="lastModified">Last Modified</option>
+            <option value="createdAt">Date Created</option>
+            <option value="views">Most Views</option>
+            <option value="title">Title A-Z</option>
+          </select>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{
-            padding: '10px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
-        >
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option>
-          <option value="in_review">In Review</option>
-          <option value="published">Published</option>
-          <option value="archived">Archived</option>
-        </select>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          style={{
-            padding: '10px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
-        >
-          <option value="lastModified">Last Modified</option>
-          <option value="createdAt">Date Created</option>
-          <option value="views">Most Views</option>
-          <option value="title">Title A-Z</option>
-        </select>
+
+        <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+          {stats.map((stat) => (
+            <Surface
+              key={stat.label}
+              padding="sm"
+              className="min-w-[150px] flex-1 lg:flex-none lg:min-w-[170px]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-app-faint">
+                    {stat.label}
+                  </div>
+                  <div className="text-[16px] font-bold tracking-tight text-app-text">
+                    {stat.value}
+                  </div>
+                </div>
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-app-md"
+                  style={{ background: `${stat.color}22`, color: stat.color }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {stat.icon === 'content' ? <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /> : null}
+                    {stat.icon === 'published' ? (
+                      <>
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </>
+                    ) : null}
+                    {stat.icon === 'review' ? (
+                      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                    ) : null}
+                    {stat.icon === 'views' ? (
+                      <>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    ) : null}
+                  </svg>
+                </div>
+              </div>
+            </Surface>
+          ))}
+        </div>
       </div>
 
       {/* Content Table */}
-      <div style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 10,
-        overflow: 'hidden',
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <Surface padding="none" className="overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase' }}>Title</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase' }}>Type</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase' }}>Status</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase' }}>Views</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase' }}>Last Modified</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#555870', textTransform: 'uppercase' }}>Actions</th>
+            <tr className="border-b border-app-border bg-app-bg/40">
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">Title</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">Type</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">Status</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">Views</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">Last Modified</th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-app-faint">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {contentItems.map((item) => {
+            {sortedItems.map((item) => {
               const TypeIcon = typeIcons[item.type];
               return (
-                <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 6,
-                        background: `${typeColors[item.type]}22`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: typeColors[item.type],
-                      }}>
+                <tr key={item.id} className="border-b border-app-border/60 transition-colors hover:bg-app-surface/40">
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex h-9 w-9 items-center justify-center rounded-app-md"
+                        style={{ background: `${typeColors[item.type]}22`, color: typeColors[item.type] }}
+                      >
                         <TypeIcon size={18} />
                       </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e4f0' }}>{item.title}</div>
-                        <div style={{ fontSize: 11, color: '#555870' }}>{item.collaborators} collaborators</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[13px] font-medium text-app-text">{item.title}</div>
+                        <div className="text-[11px] text-app-faint">{item.collaborators} collaborators</div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      background: `${typeColors[item.type]}22`,
-                      borderRadius: 12,
-                      color: typeColors[item.type],
-                      textTransform: 'capitalize',
-                    }}>{item.type}</span>
+                  <td className="p-4">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[11px] capitalize"
+                      style={{ background: `${typeColors[item.type]}22`, color: typeColors[item.type] }}
+                    >{item.type}</span>
                   </td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      background: `${statusColors[item.status]}22`,
-                      borderRadius: 12,
-                      color: statusColors[item.status],
-                      textTransform: 'uppercase',
-                      fontWeight: 600,
-                    }}>{item.status.replace('_', ' ')}</span>
+                  <td className="p-4">
+                    {item.status === 'in_review' ? (
+                      <button
+                        type="button"
+                        onClick={() => setReviewModalItem({ id: item.id, title: item.title })}
+                        className="cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase transition-opacity hover:opacity-90"
+                        style={{
+                          background: `${statusColors[item.status]}22`,
+                          color: statusColors[item.status],
+                          border: `1px solid ${statusColors[item.status]}44`,
+                        }}
+                        title="Click to manage reviewers"
+                      >
+                        {item.status.replace('_', ' ')} ▸
+                      </button>
+                    ) : (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
+                        style={{ background: `${statusColors[item.status]}22`, color: statusColors[item.status] }}
+                      >{item.status.replace('_', ' ')}</span>
+                    )}
                   </td>
-                  <td style={{ padding: '16px', fontSize: 13, color: '#8b8fa8' }}>{item.views.toLocaleString()}</td>
-                  <td style={{ padding: '16px', fontSize: 13, color: '#555870' }}>{new Date(item.lastModified).toLocaleDateString()}</td>
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-                      <button style={{
-                        padding: 6,
-                        background: 'none',
-                        border: 'none',
-                        color: '#555870',
-                        cursor: 'pointer',
-                        borderRadius: 4,
-                      }} title="Edit">
+                  <td className="p-4 text-[13px] text-app-muted">{item.views.toLocaleString()}</td>
+                  <td className="p-4 text-[13px] text-app-faint">{new Date(item.lastModified).toLocaleDateString()}</td>
+                  <td className="p-4 text-right">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {item.status === 'draft' && (
+                        <button
+                          type="button"
+                          onClick={() => handleSubmitForReview(item.id)}
+                          disabled={submittingId === item.id}
+                          className={`flex items-center gap-1 rounded-app-md border border-amber-400/30 bg-amber-400/15 px-2.5 py-1 text-[11px] font-semibold text-amber-400 transition-all duration-200 ${
+                            submittingId === item.id ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-amber-400/20'
+                          }`}
+                          title="Submit for Review"
+                        >
+                          <Send size={12} />
+                          {submittingId === item.id ? 'Submitting...' : 'Review'}
+                        </button>
+                      )}
+                      {(item.status === 'in_review' || item.status === 'published') && (
+                        <button
+                          type="button"
+                          onClick={() => setFeedbackModalItem({ id: item.id, title: item.title })}
+                          className="flex cursor-pointer items-center gap-1 rounded-app-md border border-app-accent/35 bg-app-accent-muted px-2.5 py-1 text-[11px] font-semibold text-app-accent transition-colors hover:bg-app-accent/25"
+                          title="View Review Feedback"
+                        >
+                          <MessageCircle size={12} />
+                          Feedback
+                        </button>
+                      )}
+                      <Link
+                        to={`/history/${item.id}`}
+                        className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                        title="Version history for this item"
+                      >
+                        <History size={14} />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/editor/${item.id}`)}
+                        className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                        title="Edit"
+                      >
                         <Edit2 size={14} />
                       </button>
-                      <button style={{
-                        padding: 6,
-                        background: 'none',
-                        border: 'none',
-                        color: '#555870',
-                        cursor: 'pointer',
-                        borderRadius: 4,
-                      }} title="View">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/preview/${item.id}`)}
+                        className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                        title="View"
+                      >
                         <Eye size={14} />
                       </button>
-                      <button style={{
-                        padding: 6,
-                        background: 'none',
-                        border: 'none',
-                        color: '#f87171',
-                        cursor: 'pointer',
-                        borderRadius: 4,
-                      }} title="Delete">
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(item.id, item.title)}
+                        className="rounded-app-md p-1.5 text-red-400 transition-colors hover:bg-red-500/10"
+                        title="Delete"
+                      >
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -254,12 +335,33 @@ export default function MyContentLayout() {
             })}
           </tbody>
         </table>
+        </div>
         {contentItems.length === 0 && (
-          <div style={{ padding: 48, textAlign: 'center', color: '#555870', fontSize: 14 }}>
+          <div className="p-12 text-center text-sm text-app-faint">
             No content found matching your filters.
           </div>
         )}
+      </Surface>
+
+      {/* Manage Reviewers Modal */}
+      {reviewModalItem && (
+        <ManageReviewersModal
+          contentId={reviewModalItem.id}
+          contentTitle={reviewModalItem.title}
+          onClose={() => setReviewModalItem(null)}
+          onAssigned={() => refreshContent()}
+        />
+      )}
+
+      {/* Review Feedback Modal */}
+      {feedbackModalItem && (
+        <ReviewFeedbackModal
+          contentId={feedbackModalItem.id}
+          contentTitle={feedbackModalItem.title}
+          onClose={() => setFeedbackModalItem(null)}
+        />
+      )}
       </div>
-    </div>
+    </PageShell>
   );
 }

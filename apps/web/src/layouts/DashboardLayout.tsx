@@ -1,70 +1,63 @@
-import { useDashboard } from '../hooks/useDashboard';
-import { StatCardsRow, QuickActionsPanel, RecentActivityFeed, PendingItemsList, NotificationsSummary } from '../components/dashboard';
+import { useDashboard } from "../hooks/useDashboard";
+import {
+  StatCardsRow,
+  QuickActionsPanel,
+  RecentActivityFeed,
+  PendingItemsList,
+  NotificationsSummary,
+} from "../components/dashboard";
+import { PageHeader, PageShell } from "../components/ui";
 
 export default function DashboardLayout() {
-  const { statCards, quickActions, recentActivity, pendingItems, notifications, loading } = useDashboard();
+  const {
+    statCards,
+    quickActions,
+    recentActivity,
+    pendingItems,
+    notifications,
+    loading,
+  } = useDashboard();
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', padding: 24 }}>
-        <div style={{ width: 256, marginRight: 24, background: 'rgba(255,255,255,0.03)', borderRadius: 10 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ height: 64, background: 'rgba(255,255,255,0.03)', borderRadius: 10, marginBottom: 24 }} />
-          <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-            {[1, 2, 3, 4].map(i => <div key={i} style={{ height: 96, flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />)}
-          </div>
+      <PageShell wide className="animate-pulse">
+        <div className="mb-8 h-10 max-w-md rounded-app-xl bg-app-surface" />
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 rounded-app-xl bg-app-surface" />
+          ))}
         </div>
-      </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="h-72 rounded-app-xl bg-app-surface lg:col-span-2" />
+          <div className="h-72 rounded-app-xl bg-app-surface" />
+        </div>
+      </PageShell>
     );
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Sidebar placeholder */}
-      <div style={{
-        width: 256,
-        background: 'rgba(255,255,255,0.02)',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        padding: 20,
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e4f0', marginBottom: 24 }}>Dashboard</div>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {['Overview', 'Content', 'Analytics', 'Settings'].map(item => (
-            <a key={item} href="#" style={{
-              padding: '10px 12px',
-              borderRadius: 6,
-              color: '#8b8fa8',
-              textDecoration: 'none',
-              fontSize: 13,
-              transition: 'all 0.15s',
-            }}>{item}</a>
-          ))}
-        </nav>
-      </div>
+    <PageShell wide>
+      <PageHeader
+        title="Welcome back"
+        accentWord="back"
+        description="Here's what's happening with your content today."
+      />
 
-      {/* Main content */}
-      <main style={{ flex: 1, padding: 24 }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: '0 0 4px' }}>Welcome back!</h1>
-          <p style={{ fontSize: 13, color: '#555870', margin: 0 }}>Here's what's happening with your content today.</p>
-        </div>
-
-        {/* Stat Cards */}
+      <div className="animate-fade-in space-y-8">
         <StatCardsRow statCards={statCards} />
 
-        {/* Quick Actions & Recent Activity */}
-        <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
-          <QuickActionsPanel actions={quickActions} />
+        <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
+          <div className="min-w-0 lg:col-span-2">
+            <QuickActionsPanel actions={quickActions} />
+          </div>
           <RecentActivityFeed activities={recentActivity} />
         </div>
 
-        {/* Pending Items & Notifications */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+        <div className="grid gap-6 lg:grid-cols-2">
           <PendingItemsList items={pendingItems} />
           <NotificationsSummary notifications={notifications} />
         </div>
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

@@ -10,54 +10,36 @@ export interface NavCategory {
 
 export const navCategories: NavCategory[] = [
   {
-    label: "Public",
-    items: [
-      { path: "/", label: "Home" },
-      { path: "/login", label: "Login" },
-    ],
-  },
-  {
-    label: "App",
+    label: "Core",
     items: [
       { path: "/dashboard", label: "Dashboard" },
       { path: "/my-content", label: "My Content" },
-      { path: "/profile", label: "Profile" },
     ],
   },
   {
-    label: "Library",
+    label: "Content",
     items: [
-      { path: "/library", label: "Browse Library" },
-      { path: "/library/demo", label: "Reading" },
-    ],
-  },
-  {
-    label: "Editor",
-    items: [
-      { path: "/editor/new", label: "Editor" },
-      { path: "/preview/new", label: "Preview" },
+      { path: "/library", label: "Library" },
+      { path: "/templates", label: "Templates" },
+      { path: "/assets", label: "Assets" },
     ],
   },
   {
     label: "Review",
+    items: [{ path: "/review", label: "Review" }],
+  },
+  {
+    label: "Insights",
     items: [
-      { path: "/review/new", label: "Review" },
-      { path: "/history/new", label: "Version History" },
+      { path: "/analytics", label: "Analytics" },
+      { path: "/ai-tutor", label: "AI Tutor" },
     ],
   },
   {
-    label: "Assets",
-    items: [{ path: "/assets", label: "Asset Management" }],
-  },
-  {
-    label: "AI",
-    items: [{ path: "/ai-tutor", label: "AI Tutor" }],
-  },
-  {
-    label: "Admin & Analytics",
+    label: "System",
     items: [
-      { path: "/admin", label: "Admin Panel" },
-      { path: "/analytics", label: "Analytics" },
+      { path: "/profile", label: "Profile" },
+      { path: "/admin", label: "Admin" },
     ],
   },
 ];

@@ -5,7 +5,10 @@ export interface TemplateTranslationRepository {
     templateId: string,
     entries: Array<{ locale: string; key: string; value: string }>,
   ): Promise<void>;
-  listByTemplateAndLocale(templateId: string, locale: string): Promise<TemplateTranslationRow[]>;
+  listByTemplateAndLocale(
+    templateId: string,
+    locale: string,
+  ): Promise<TemplateTranslationRow[]>;
   listLocalesForTemplate(templateId: string): Promise<string[]>;
   deleteKey(templateId: string, locale: string, key: string): Promise<boolean>;
   listAllForTemplate(templateId: string): Promise<TemplateTranslationRow[]>;

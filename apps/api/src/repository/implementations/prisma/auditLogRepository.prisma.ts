@@ -1,5 +1,9 @@
 import type { AuditLogRepository } from "../../interfaces";
-import type { AuditLogEntry, AuditLogEntryInput, AuditLogFilters } from "../../types";
+import type {
+  AuditLogEntry,
+  AuditLogEntryInput,
+  AuditLogFilters,
+} from "../../types";
 import type { PrismaDb } from "./prismaTypes";
 
 function toAudit(row: {

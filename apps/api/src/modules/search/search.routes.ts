@@ -5,13 +5,18 @@ import {
   searchContentCached,
   searchContentCheck,
   searchContentCheckByText,
-} from "../../search/contentSearch.service";
+} from "../../intelligence";
 import { parseContentSearchFilters } from "./search.filters";
-import { assertValidQueryVector, type RankBlendWeights } from "../../search/rankBlend";
+import {
+  assertValidQueryVector,
+  type RankBlendWeights,
+} from "../../intelligence/rankBlend";
 
 const router = Router();
 
-function parseWeights(raw: string | undefined): Partial<RankBlendWeights> | undefined {
+function parseWeights(
+  raw: string | undefined,
+): Partial<RankBlendWeights> | undefined {
   if (!raw?.trim()) return undefined;
   try {
     const j = JSON.parse(raw) as Partial<RankBlendWeights>;
@@ -119,33 +124,53 @@ function parseWeights(raw: string | undefined): Partial<RankBlendWeights> | unde
  */
 router.get("/content", async (req: AuthRequest, res: Response) => {
   try {
-    const { filters, errors } = parseContentSearchFilters(req.query as Record<string, unknown>);
+    const { filters, errors } = parseContentSearchFilters(
+      req.query as Record<string, unknown>,
+    );
     if (errors.length) {
-      res.status(400).json({ error: "Invalid filter parameters", details: errors });
+      res
+        .status(400)
+        .json({ error: "Invalid filter parameters", details: errors });
       return;
     }
 
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
-    const from = req.query.from ? Math.max(0, parseInt(String(req.query.from), 10) || 0) : 0;
-    const size = req.query.size ? Math.min(100, Math.max(1, parseInt(String(req.query.size), 10) || 20)) : 20;
+    const from = req.query.from
+      ? Math.max(0, parseInt(String(req.query.from), 10) || 0)
+      : 0;
+    const size = req.query.size
+      ? Math.min(100, Math.max(1, parseInt(String(req.query.size), 10) || 20))
+      : 20;
     const includeFacets = req.query.includeFacets !== "false";
     const includeSnippets = req.query.includeSnippets === "true";
     const halfLife = req.query.recencyHalfLifeDays
       ? Math.max(1, parseInt(String(req.query.recencyHalfLifeDays), 10) || 30)
       : 30;
-    const weights = parseWeights(typeof req.query.weights === "string" ? req.query.weights : undefined);
+    const weights = parseWeights(
+      typeof req.query.weights === "string" ? req.query.weights : undefined,
+    );
 
     let queryVector: unknown = undefined;
-    if (typeof req.query.queryVector === "string" && req.query.queryVector.trim()) {
+    if (
+      typeof req.query.queryVector === "string" &&
+      req.query.queryVector.trim()
+    ) {
       try {
         queryVector = JSON.parse(req.query.queryVector);
       } catch {
-        res.status(400).json({ error: "queryVector must be JSON array of numbers" });
+        res
+          .status(400)
+          .json({ error: "queryVector must be JSON array of numbers" });
         return;
       }
     }
-    if (queryVector !== undefined && assertValidQueryVector(queryVector) === null) {
-      res.status(400).json({ error: `queryVector must have valid embedding length` });
+    if (
+      queryVector !== undefined &&
+      assertValidQueryVector(queryVector) === null
+    ) {
+      res
+        .status(400)
+        .json({ error: `queryVector must have valid embedding length` });
       return;
     }
 
@@ -161,12 +186,18 @@ router.get("/content", async (req: AuthRequest, res: Response) => {
       weights,
     });
     if (raw === null) {
-      res.status(503).json({ error: "Search index unavailable (Elasticsearch not configured)" });
+      res
+        .status(503)
+        .json({
+          error: "Search index unavailable (Elasticsearch not configured)",
+        });
       return;
     }
     res.status(200).json(raw);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -245,36 +276,49 @@ router.get("/content", async (req: AuthRequest, res: Response) => {
  */
 router.get("/content-check", async (req: AuthRequest, res: Response) => {
   try {
-    const contentId = typeof req.query.contentId === "string" ? req.query.contentId.trim() : "";
-    const title     = typeof req.query.title     === "string" ? req.query.title             : undefined;
-    const summary   = typeof req.query.summary   === "string" ? req.query.summary           : undefined;
-    const body      = typeof req.query.body      === "string" ? req.query.body              : undefined;
-    const hasText   = !!(title || summary || body);
+    const contentId =
+      typeof req.query.contentId === "string" ? req.query.contentId.trim() : "";
+    const title =
+      typeof req.query.title === "string" ? req.query.title : undefined;
+    const summary =
+      typeof req.query.summary === "string" ? req.query.summary : undefined;
+    const body =
+      typeof req.query.body === "string" ? req.query.body : undefined;
+    const hasText = !!(title || summary || body);
 
     if (!contentId && !hasText) {
       res.status(400).json({
-        error: "Provide either contentId or at least one of title, summary, body",
+        error:
+          "Provide either contentId or at least one of title, summary, body",
       });
       return;
     }
 
-    const { filters, errors } = parseContentSearchFilters(req.query as Record<string, unknown>);
+    const { filters, errors } = parseContentSearchFilters(
+      req.query as Record<string, unknown>,
+    );
     if (errors.length) {
-      res.status(400).json({ error: "Invalid filter parameters", details: errors });
+      res
+        .status(400)
+        .json({ error: "Invalid filter parameters", details: errors });
       return;
     }
 
     const size = req.query.size
       ? Math.min(50, Math.max(1, parseInt(String(req.query.size), 10) || 10))
       : 10;
-    const minScore = req.query.minScore ? parseFloat(String(req.query.minScore)) : undefined;
+    const minScore = req.query.minScore
+      ? parseFloat(String(req.query.minScore))
+      : undefined;
 
     if (contentId) {
       const raw = await searchContentCheck({
         contentId,
         filters,
         size,
-        ...(minScore !== undefined && Number.isFinite(minScore) ? { minScore } : {}),
+        ...(minScore !== undefined && Number.isFinite(minScore)
+          ? { minScore }
+          : {}),
       });
       if (raw === null) {
         res.status(503).json({ error: "Search index unavailable" });
@@ -290,7 +334,9 @@ router.get("/content-check", async (req: AuthRequest, res: Response) => {
       body,
       filters,
       size,
-      ...(minScore !== undefined && Number.isFinite(minScore) ? { minScore } : {}),
+      ...(minScore !== undefined && Number.isFinite(minScore)
+        ? { minScore }
+        : {}),
     });
     if (raw === null) {
       res.status(503).json({ error: "Search index unavailable" });
@@ -298,7 +344,9 @@ router.get("/content-check", async (req: AuthRequest, res: Response) => {
     }
     res.status(200).json(raw);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 

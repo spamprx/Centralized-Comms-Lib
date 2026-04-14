@@ -13,16 +13,27 @@ const server = app.listen(PORT, () => {
  */
 if (process.env.ENABLE_NIGHTLY_VECTOR_REINDEX === "true") {
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const initialMs = parseInt(process.env.NIGHTLY_VECTOR_REINDEX_INITIAL_DELAY_MS ?? "3600000", 10);
+  const initialMs = parseInt(
+    process.env.NIGHTLY_VECTOR_REINDEX_INITIAL_DELAY_MS ?? "3600000",
+    10,
+  );
   const tick = (): void => {
     import("./jobs/nightlyVectorReindex")
       .then((m) => m.runNightlyVectorReindex())
-      .catch((e) => console.error("[nightlyVectorReindex]", e instanceof Error ? e.message : e));
+      .catch((e) =>
+        console.error(
+          "[nightlyVectorReindex]",
+          e instanceof Error ? e.message : e,
+        ),
+      );
   };
-  setTimeout(() => {
-    tick();
-    setInterval(tick, DAY_MS).unref();
-  }, Math.max(0, initialMs)).unref();
+  setTimeout(
+    () => {
+      tick();
+      setInterval(tick, DAY_MS).unref();
+    },
+    Math.max(0, initialMs),
+  ).unref();
 }
 
 process.on("SIGTERM", () => {

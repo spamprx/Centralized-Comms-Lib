@@ -51,7 +51,8 @@ export function normalizeI18nFromDb(raw: unknown): I18nStrings {
   const o = raw as Record<string, unknown>;
   const out: I18nStrings = {};
   for (const [locale, bundle] of Object.entries(o)) {
-    if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) continue;
+    if (!bundle || typeof bundle !== "object" || Array.isArray(bundle))
+      continue;
     const inner: Record<string, string> = {};
     for (const [k, v] of Object.entries(bundle as Record<string, unknown>)) {
       if (typeof v === "string") inner[k] = v;

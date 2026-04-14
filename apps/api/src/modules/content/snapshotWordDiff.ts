@@ -38,16 +38,21 @@ function countWords(s: string): number {
   return t.split(/\s+/).length;
 }
 
-function snapshotPlainDocument(version: ContentVersion | null): { title: string; plain: string } {
+function snapshotPlainDocument(version: ContentVersion | null): {
+  title: string;
+  plain: string;
+} {
   const title = version?.title ?? "";
   const bodyPlain = version?.body ? tiptapToPlainText(version.body) : "";
   const plain = [title.trim(), bodyPlain].filter(Boolean).join("\n\n");
   return { title, plain };
 }
 
-export function buildPlainTextForSnapshotSide(
-  version: ContentVersion | null,
-): { title: string; plain: string; resolvedFromVersionNumber: number | null } {
+export function buildPlainTextForSnapshotSide(version: ContentVersion | null): {
+  title: string;
+  plain: string;
+  resolvedFromVersionNumber: number | null;
+} {
   if (!version) {
     return { title: "", plain: "", resolvedFromVersionNumber: null };
   }
@@ -55,7 +60,10 @@ export function buildPlainTextForSnapshotSide(
   return { title, plain, resolvedFromVersionNumber: version.versionNumber };
 }
 
-export function computeWordDiff(leftPlain: string, rightPlain: string): Omit<SnapshotWordDiffResult, "contentId" | "left" | "right"> {
+export function computeWordDiff(
+  leftPlain: string,
+  rightPlain: string,
+): Omit<SnapshotWordDiffResult, "contentId" | "left" | "right"> {
   const parts = diffWords(leftPlain, rightPlain);
   const segments: WordDiffSegment[] = [];
   let equalWords = 0;
@@ -90,7 +98,8 @@ export function sideSummary(
   snap: ContentSnapshotRecord,
   version: ContentVersion | null,
 ): SnapshotSideSummary {
-  const { title, plain, resolvedFromVersionNumber } = buildPlainTextForSnapshotSide(version);
+  const { title, plain, resolvedFromVersionNumber } =
+    buildPlainTextForSnapshotSide(version);
   return {
     snapshotId: snap.id,
     toVersionNumber: snap.toVersionNumber,

@@ -60,7 +60,9 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
   try {
     const { contentId, contentVersionId, quorumRequired } = req.body;
     if (!contentId || !contentVersionId) {
-      res.status(400).json({ error: "contentId and contentVersionId are required" });
+      res
+        .status(400)
+        .json({ error: "contentId and contentVersionId are required" });
       return;
     }
     const result = await reviewService.createRequest(auditContext(req), {
@@ -73,7 +75,12 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the content author or an admin can submit a review request" });
+      res
+        .status(403)
+        .json({
+          error:
+            "Only the content author or an admin can submit a review request",
+        });
       return;
     }
     if ("invalidState" in result && result.invalidState) {
@@ -114,13 +121,18 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
  */
 router.get("/requests/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await reviewService.getRequestById(req.params.id, requester(req));
+    const result = await reviewService.getRequestById(
+      req.params.id,
+      requester(req),
+    );
     if (!result) {
       res.status(404).json({ error: "Review request not found" });
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "You do not have access to this review request" });
+      res
+        .status(403)
+        .json({ error: "You do not have access to this review request" });
       return;
     }
     res.status(200).json(result);
@@ -153,13 +165,20 @@ router.get("/requests/:id", async (req: AuthRequest, res: Response) => {
  */
 router.get("/content/:contentId", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await reviewService.listRequestsForContent(req.params.contentId, requester(req));
+    const result = await reviewService.listRequestsForContent(
+      req.params.contentId,
+      requester(req),
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "You do not have access to review requests for this content" });
+      res
+        .status(403)
+        .json({
+          error: "You do not have access to review requests for this content",
+        });
       return;
     }
     res.status(200).json(result.requests);
@@ -222,7 +241,11 @@ router.post("/requests/:id/assign", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the review requester or an admin can assign reviewers" });
+      res
+        .status(403)
+        .json({
+          error: "Only the review requester or an admin can assign reviewers",
+        });
       return;
     }
     res.status(201).json(result);
@@ -274,44 +297,52 @@ router.post("/requests/:id/assign", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post("/assignments/:id/decide", async (req: AuthRequest, res: Response) => {
-  try {
-    const { verdict, comment } = req.body;
-    if (!verdict || !comment) {
-      res.status(400).json({ error: "verdict and comment are required" });
-      return;
+router.post(
+  "/assignments/:id/decide",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { verdict, comment } = req.body;
+      if (!verdict || !comment) {
+        res.status(400).json({ error: "verdict and comment are required" });
+        return;
+      }
+      const validVerdicts = ["APPROVED", "DENIED", "ROLLBACK"];
+      if (!validVerdicts.includes(verdict)) {
+        res.status(400).json({
+          error: `verdict must be one of: ${validVerdicts.join(", ")}`,
+        });
+        return;
+      }
+      const result = await reviewService.decide(
+        auditContext(req),
+        req.params.id,
+        verdict,
+        comment,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Review assignment not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res
+          .status(403)
+          .json({
+            error:
+              "Only the assigned reviewer or an admin can record a decision",
+          });
+        return;
+      }
+      if ("alreadyCompleted" in result && result.alreadyCompleted) {
+        res.status(422).json({ error: "Assignment already completed" });
+        return;
+      }
+      res.status(200).json({ message: `Decision recorded: ${verdict}` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const validVerdicts = ["APPROVED", "DENIED", "ROLLBACK"];
-    if (!validVerdicts.includes(verdict)) {
-      res.status(400).json({
-        error: `verdict must be one of: ${validVerdicts.join(", ")}`,
-      });
-      return;
-    }
-    const result = await reviewService.decide(
-      auditContext(req),
-      req.params.id,
-      verdict,
-      comment,
-    );
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Review assignment not found" });
-      return;
-    }
-    if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the assigned reviewer or an admin can record a decision" });
-      return;
-    }
-    if ("alreadyCompleted" in result && result.alreadyCompleted) {
-      res.status(422).json({ error: "Assignment already completed" });
-      return;
-    }
-    res.status(200).json({ message: `Decision recorded: ${verdict}` });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -339,28 +370,35 @@ router.post("/assignments/:id/decide", async (req: AuthRequest, res: Response) =
  *       500:
  *         description: Server error
  */
-router.post("/assignments/:id/rollback", async (req: AuthRequest, res: Response) => {
-  try {
-    const result = await reviewService.rollbackToPending(
-      auditContext(req),
-      req.params.id,
-    );
+router.post(
+  "/assignments/:id/rollback",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await reviewService.rollbackToPending(
+        auditContext(req),
+        req.params.id,
+      );
 
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Review assignment not found" });
-      return;
-    }
-    if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the assigned reviewer can roll back this decision" });
-      return;
-    }
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Review assignment not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res
+          .status(403)
+          .json({
+            error: "Only the assigned reviewer can roll back this decision",
+          });
+        return;
+      }
 
-    res.status(200).json({ message: "Assignment rolled back to pending" });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+      res.status(200).json({ message: "Assignment rolled back to pending" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -399,28 +437,40 @@ router.post("/assignments/:id/rollback", async (req: AuthRequest, res: Response)
  *       500:
  *         description: Server error
  */
-router.post("/assignments/:id/comment", async (req: AuthRequest, res: Response) => {
-  try {
-    const { body } = req.body;
-    if (!body || typeof body !== "string" || body.trim() === "") {
-      res.status(400).json({ error: "body is required" });
-      return;
+router.post(
+  "/assignments/:id/comment",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { body } = req.body;
+      if (!body || typeof body !== "string" || body.trim() === "") {
+        res.status(400).json({ error: "body is required" });
+        return;
+      }
+      const result = await reviewService.addComment(
+        auditContext(req),
+        req.params.id,
+        body.trim(),
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Review assignment not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res
+          .status(403)
+          .json({
+            error:
+              "Only the assigned reviewer or an admin can comment on this assignment",
+          });
+        return;
+      }
+      if ("comment" in result) res.status(201).json(result.comment);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const result = await reviewService.addComment(auditContext(req), req.params.id, body.trim());
-    if ("notFound" in result && result.notFound) {
-      res.status(404).json({ error: "Review assignment not found" });
-      return;
-    }
-    if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "Only the assigned reviewer or an admin can comment on this assignment" });
-      return;
-    }
-    if ("comment" in result) res.status(201).json(result.comment);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -439,7 +489,9 @@ router.post("/assignments/:id/comment", async (req: AuthRequest, res: Response) 
  */
 router.get("/my-assignments", async (req: AuthRequest, res: Response) => {
   try {
-    const assignments = await reviewService.listAssignmentsForReviewer(req.user!.id);
+    const assignments = await reviewService.listAssignmentsForReviewer(
+      req.user!.id,
+    );
     res.status(200).json(assignments);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

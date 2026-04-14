@@ -17,7 +17,10 @@ export interface ReviewRepository {
 
   getRequestById(id: string): Promise<ReviewRequest | null>;
   listRequestsForContent(contentId: string): Promise<ReviewRequest[]>;
-  updateRequestStatus(requestId: string, status: ReviewRequestStatus): Promise<ReviewRequest>;
+  updateRequestStatus(
+    requestId: string,
+    status: ReviewRequestStatus,
+  ): Promise<ReviewRequest>;
 
   assignReviewer(input: {
     reviewRequestId: string;
@@ -37,4 +40,3 @@ export interface ReviewRepository {
 
   listComments(assignmentId: string): Promise<ReviewComment[]>;
 }
-

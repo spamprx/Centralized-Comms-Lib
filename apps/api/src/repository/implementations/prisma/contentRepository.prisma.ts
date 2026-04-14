@@ -2,6 +2,7 @@ import type { ContentRepository } from "../../interfaces";
 import type {
   Content,
   ContentListFilters,
+  ContentType,
   ContentVersion,
   CreateContentVersionInput,
   CreateDraftInput,
@@ -10,6 +11,8 @@ import type {
   VersionChangeType,
   Visibility,
 } from "../../types";
+import { Prisma } from "@prisma/client";
+
 import type { PrismaDb } from "./prismaTypes";
 
 function toContent(row: {
@@ -18,6 +21,7 @@ function toContent(row: {
   slug: string;
   lifecycleState: string;
   visibility: string;
+  contentType: string;
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
@@ -31,6 +35,7 @@ function toContent(row: {
     slug: row.slug,
     lifecycleState: row.lifecycleState as LifecycleState,
     visibility: row.visibility as Visibility,
+    contentType: row.contentType as ContentType,
     aiGenerated: row.aiGenerated,
     authorId: row.authorId,
     visibilityGroupId: row.visibilityGroupId,
@@ -56,9 +61,12 @@ function toVersion(row: {
     versionNumber: row.versionNumber,
     changeType: row.changeType as VersionChangeType,
     title: row.title,
-    body: row.body != null && typeof row.body === "object" && !Array.isArray(row.body)
-      ? (row.body as TipTapDocument)
-      : null,
+    body:
+      row.body != null &&
+      typeof row.body === "object" &&
+      !Array.isArray(row.body)
+        ? (row.body as TipTapDocument)
+        : null,
     metadataSnapshot: row.metadataSnapshot ?? null,
     contentId: row.contentId,
     authorId: row.authorId,
@@ -76,6 +84,7 @@ export class PrismaContentRepository implements ContentRepository {
         slug: input.slug,
         authorId: input.authorId,
         aiGenerated: input.aiGenerated ?? false,
+        contentType: (input.contentType ?? "ARTICLE") as any,
         templateId: input.templateId ?? undefined,
       },
     });
@@ -98,6 +107,7 @@ export class PrismaContentRepository implements ContentRepository {
     if (filters?.authorId) where.authorId = filters.authorId;
     if (filters?.lifecycleState) where.lifecycleState = filters.lifecycleState;
     if (filters?.visibility) where.visibility = filters.visibility;
+    if (filters?.contentType) where.contentType = filters.contentType;
 
     const rows = await this.db.content.findMany({
       where,
@@ -108,10 +118,25 @@ export class PrismaContentRepository implements ContentRepository {
     return rows.map(toContent);
   }
 
+  async delete(contentId: string): Promise<void> {
+    await this.db.content.delete({ where: { id: contentId } });
+  }
+
   async updateTitle(contentId: string, title: string): Promise<Content> {
     const row = await this.db.content.update({
       where: { id: contentId },
       data: { title },
+    });
+    return toContent(row);
+  }
+
+  async updateContentType(
+    contentId: string,
+    contentType: ContentType,
+  ): Promise<Content> {
+    const row = await this.db.content.update({
+      where: { id: contentId },
+      data: { contentType: contentType as any },
     });
     return toContent(row);
   }
@@ -127,7 +152,10 @@ export class PrismaContentRepository implements ContentRepository {
     return toContent(row);
   }
 
-  async updateVisibility(contentId: string, visibility: Visibility): Promise<Content> {
+  async updateVisibility(
+    contentId: string,
+    visibility: Visibility,
+  ): Promise<Content> {
     const row = await this.db.content.update({
       where: { id: contentId },
       data: { visibility },
@@ -146,7 +174,9 @@ export class PrismaContentRepository implements ContentRepository {
     return toContent(row);
   }
 
-  async createVersion(input: CreateContentVersionInput): Promise<ContentVersion> {
+  async createVersion(
+    input: CreateContentVersionInput,
+  ): Promise<ContentVersion> {
     const latest = await this.getLatestVersion(input.contentId);
     const nextVersion = latest ? latest.versionNumber + 1 : 1;
 
@@ -157,7 +187,9 @@ export class PrismaContentRepository implements ContentRepository {
         changeType: input.changeType,
         title: input.title,
         ...(input.body != null && { body: input.body as object }),
-        ...(input.metadataSnapshot != null && { metadataSnapshot: input.metadataSnapshot as object }),
+        ...(input.metadataSnapshot != null && {
+          metadataSnapshot: input.metadataSnapshot as object,
+        }),
         versionNumber: nextVersion,
       },
     });
@@ -196,5 +228,34 @@ export class PrismaContentRepository implements ContentRepository {
       if (row.body != null) return toVersion(row);
     }
     return null;
+  }
+
+  async listLatestContentVersionsMaybeReferencingComponentVersion(
+    componentVersionId: string,
+  ): Promise<
+    Array<{
+      contentVersionId: string;
+      contentId: string;
+      body: TipTapDocument | null;
+    }>
+  > {
+    const pattern = `%${componentVersionId}%`;
+    const rows = await this.db.$queryRaw<
+      Array<{ id: string; contentId: string; body: unknown }>
+    >(Prisma.sql`
+      SELECT DISTINCT ON (cv."contentId") cv.id, cv."contentId", cv.body
+      FROM content_versions cv
+      WHERE cv.body IS NOT NULL
+      AND cv.body::text LIKE ${pattern}
+      ORDER BY cv."contentId", cv."versionNumber" DESC
+    `);
+    return rows.map((r) => ({
+      contentVersionId: r.id,
+      contentId: r.contentId,
+      body:
+        r.body != null && typeof r.body === "object" && !Array.isArray(r.body)
+          ? (r.body as TipTapDocument)
+          : null,
+    }));
   }
 }

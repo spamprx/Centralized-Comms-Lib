@@ -1,7 +1,9 @@
 /**
  * Elasticsearch highlight HTML: allow only <em> and <mark>; strip other tags.
  */
-export function sanitizeHighlightFragments(fragments: string[] | undefined): string[] {
+export function sanitizeHighlightFragments(
+  fragments: string[] | undefined,
+): string[] {
   if (!fragments?.length) return [];
   return fragments.map(sanitizeOne);
 }

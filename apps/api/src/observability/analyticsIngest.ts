@@ -1,4 +1,7 @@
-import { analyticsIngestFailures, analyticsIngestSuccess } from "./prometheusRegistry";
+import {
+  analyticsIngestFailures,
+  analyticsIngestSuccess,
+} from "./prometheusRegistry";
 
 export type AnalyticsTrackForwardPayload = {
   contentId: string;
@@ -12,11 +15,15 @@ export type AnalyticsTrackForwardPayload = {
  * When `ANALYTICS_INGEST_URL` is set, each persisted `/analytics/track` event
  * is POSTed here for Grafana/Loki/Segment-style pipelines. Uses fire-and-forget.
  */
-export function forwardAnalyticsTrackEvent(payload: AnalyticsTrackForwardPayload): void {
+export function forwardAnalyticsTrackEvent(
+  payload: AnalyticsTrackForwardPayload,
+): void {
   const url = process.env.ANALYTICS_INGEST_URL?.trim();
   if (!url) return;
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
   const apiKey = process.env.ANALYTICS_INGEST_API_KEY?.trim();
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 

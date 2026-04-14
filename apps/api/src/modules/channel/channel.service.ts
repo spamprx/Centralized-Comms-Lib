@@ -18,7 +18,10 @@ export const channelService = {
   async create(
     ctx: AuditContext,
     input: { name: string; key?: string; description?: string | null },
-  ): Promise<{ channel: { id: string; name: string; key: string }; conflict: boolean }> {
+  ): Promise<{
+    channel: { id: string; name: string; key: string };
+    conflict: boolean;
+  }> {
     const name = input.name?.trim();
     if (!name || name.length > 200) {
       throw new Error("name is required and must be at most 200 characters");
@@ -33,7 +36,10 @@ export const channelService = {
     return uow.withTransaction(async (repos) => {
       const existing = await repos.channel.getByKey(key);
       if (existing) {
-        return { conflict: true, channel: { id: existing.id, name: existing.name, key: existing.key } };
+        return {
+          conflict: true,
+          channel: { id: existing.id, name: existing.name, key: existing.key },
+        };
       }
       const channel = await repos.channel.create({
         name,
@@ -49,7 +55,10 @@ export const channelService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      return { conflict: false, channel: { id: channel.id, name: channel.name, key: channel.key } };
+      return {
+        conflict: false,
+        channel: { id: channel.id, name: channel.name, key: channel.key },
+      };
     });
   },
 

@@ -1,31 +1,20 @@
-import { useState } from 'react';
-import { useAnalytics } from '../hooks/useAnalytics';
-import { ViewsLineChart } from '../components/analytics/ViewsLineChart';
-import { EngagementBarChart } from '../components/analytics/EngagementBarChart';
-import { ReadingTimeHistogram } from '../components/analytics/ReadingTimeHistogram';
-import { ContentTypeBreakdownPie } from '../components/analytics/ContentTypeBreakdownPie';
-import { AIAnalysisSummaryCard } from '../components/analytics/AIAnalysisSummaryCard';
-import { TopContentTable } from '../components/analytics/TopContentTable';
+import { useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useAnalytics } from "../hooks/useAnalytics";
+import { AnalyticsDashboard } from "../components/analytics/AnalyticsDashboard";
+import { buildAnalyticsCsv, downloadCsv } from "../lib/analyticsCsv";
+import type { DateRange } from "../lib/dateUtils";
+import { formatDateRange } from "../lib/dateUtils";
 
-// Simple KPI Card component
-function KPICardsRow({ kpis }: { kpis: any[] }) {
-  return (
-    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-      {kpis?.map((kpi, i) => (
-        <div key={i} style={{ padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 10, minWidth: 200, flex: 1 }}>
-          <div style={{ fontSize: 11, color: '#555870', textTransform: 'uppercase', marginBottom: 8 }}>{kpi.label}</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', marginBottom: 4 }}>{kpi.value}</div>
-          <div style={{ fontSize: 12, color: kpi.trend === 'up' ? '#34d399' : kpi.trend === 'down' ? '#f87171' : '#6b7280' }}>
-            {kpi.change > 0 ? '+' : ''}{kpi.change.toFixed(1)}%
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+const BG = "#0d0f18";
+const MUTED = "rgba(255,255,255,0.45)";
+const RED = "#E24B4A";
+const PURPLE = "#7C6FF7";
 
 export default function AnalyticsLayout() {
-  const [dateRange, setDateRange] = useState('30d');
+  const [dateRange, setDateRange] = useState<string | DateRange>("30d");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const {
     kpis,
     viewsData,
@@ -38,60 +27,89 @@ export default function AnalyticsLayout() {
     error,
   } = useAnalytics(dateRange);
 
+  const exportFileName = useMemo(() => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const rangeDisplay =
+      typeof dateRange === "string" ? dateRange : formatDateRange(dateRange).replace(/\s-\s/g, "-to-");
+    return `analytics-dashboard-${rangeDisplay}-${stamp}.csv`;
+  }, [dateRange]);
+
+  const handleExportCsv = async () => {
+    try {
+      setExporting(true);
+      setExportError(null);
+
+      const csv = buildAnalyticsCsv({
+        dateRange: typeof dateRange === "string" ? dateRange : formatDateRange(dateRange),
+        exportedAt: new Date(),
+        kpis,
+        viewsData,
+        engagementData,
+        readingTimeData,
+        contentTypeData,
+        topContent,
+        aiInsights,
+      });
+
+      downloadCsv(exportFileName, csv);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Failed to export CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (error) {
-    return <div style={{ padding: 24, color: '#f87171' }}>Error: {error}</div>;
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center px-6 py-10 font-sans text-white"
+        style={{ backgroundColor: BG, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
+      >
+        <div
+          className="max-w-md rounded-xl border p-6 text-center transition-colors duration-150"
+          style={{ borderColor: "rgba(226,75,74,0.35)", backgroundColor: "rgba(226,75,74,0.08)" }}
+        >
+          <p className="m-0 text-[14px] font-medium" style={{ color: RED }}>
+            Something went wrong
+          </p>
+          <p className="mt-2 text-[13px] font-normal leading-relaxed" style={{ color: MUTED }}>
+            {error}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
-    return <div style={{ padding: 24, color: '#8b8fa8' }}>Loading analytics...</div>;
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center gap-3 font-sans text-[13px] font-medium transition-colors duration-150"
+        style={{
+          backgroundColor: BG,
+          color: MUTED,
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        }}
+      >
+        <Loader2 className="size-5 animate-spin" style={{ color: PURPLE }} aria-hidden />
+        Loading analytics…
+      </div>
+    );
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e4f0', margin: 0 }}>Analytics Dashboard</h1>
-          <p style={{ fontSize: 13, color: '#555870', margin: '4px 0 0' }}>Track your content performance and engagement metrics</p>
-        </div>
-        <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#e2e4f0',
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
-        >
-          <option value="7d">Last 7 days</option>
-          <option value="14d">Last 14 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-        </select>
-      </div>
-
-      {/* KPI Cards */}
-      <KPICardsRow kpis={kpis} />
-
-      {/* Charts Row 1 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <ViewsLineChart data={viewsData} loading={loading} />
-        <EngagementBarChart data={engagementData} loading={loading} />
-      </div>
-
-      {/* Charts Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <ReadingTimeHistogram data={readingTimeData} loading={loading} />
-        <ContentTypeBreakdownPie data={contentTypeData} loading={loading} />
-        <AIAnalysisSummaryCard data={aiInsights} loading={loading} />
-      </div>
-
-      {/* Top Content Table */}
-      <TopContentTable data={topContent} loading={loading} />
-    </div>
+    <AnalyticsDashboard
+      dateRange={dateRange}
+      onDateRangeChange={setDateRange}
+      kpis={kpis}
+      viewsData={viewsData}
+      engagementData={engagementData}
+      readingTimeData={readingTimeData}
+      contentTypeData={contentTypeData}
+      topContent={topContent}
+      aiInsights={aiInsights}
+      exporting={exporting}
+      exportError={exportError}
+      onExportCsv={handleExportCsv}
+    />
   );
 }

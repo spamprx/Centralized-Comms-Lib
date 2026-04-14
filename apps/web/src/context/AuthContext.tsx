@@ -1,37 +1,60 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { authService } from "../services/authService";
+import { setAuthToken, decodeTokenPayload } from "../services/tokenStore";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  role?: string;
+};
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (email: string) => void;
+  isAuthReady: boolean;
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Derive an AuthUser from the JWT payload stored in the cookie */
+function getUserFromToken(): AuthUser | null {
+  const payload = decodeTokenPayload();
+  if (!payload) return null;
+  return { id: payload.id, email: payload.email, role: payload.role };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // On mount: check cookie for an existing token and derive the user from it
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getUserFromToken());
+  const [isAuthReady] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(() => getUserFromToken());
 
-  useEffect(() => {
-    // Check for existing session on mount
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      setIsAuthenticated(true);
-    }
-  }, []);
-
-  const login = (email: string) => {
-    // Store a mock token
-    localStorage.setItem("auth_token", "mock_token_" + email);
+  const login = async (email: string, password: string) => {
+    const res = await authService.login(email, password);
+    // Store token in cookie via tokenStore (also kept in memory)
+    setAuthToken(res.token);
+    // Role is only guaranteed on the JWT — merge so admin UI can gate immediately
+    const payload = decodeTokenPayload();
+    setUser({
+      ...res.user,
+      role: payload?.role ?? res.user.role,
+    });
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem("auth_token");
+    void authService.logout();
+    // Clear token from cookie and memory
+    setAuthToken(null);
+    setUser(null);
     setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isAuthReady, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

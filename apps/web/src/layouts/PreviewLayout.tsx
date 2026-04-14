@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Monitor, Smartphone, Tablet, ChevronLeft, Share2, Download } from 'lucide-react';
+import { Surface } from '../components/ui/Surface';
+import { contentService } from '../services/contentService';
+import TipTapReadonly from '../components/editor/TipTapReadonly';
 
 const channels = [
   { id: 'web', name: 'Web', icon: Monitor },
@@ -7,239 +11,181 @@ const channels = [
   { id: 'tablet', name: 'Tablet', icon: Tablet },
 ];
 
-const mockContent = {
-  title: 'Getting Started with Our Platform',
-  sections: [
-    { type: 'heading', content: 'Welcome to the Platform' },
-    { type: 'paragraph', content: 'This is a preview of your content. You can see how it will appear across different channels and devices.' },
-    { type: 'list', items: ['Easy to use interface', 'Powerful features', 'Great support'] },
-    { type: 'paragraph', content: 'Use the channel switcher above to see how your content adapts to different screen sizes and formats.' },
-  ],
-};
-
 export default function PreviewLayout() {
+  const { contentId } = useParams<{ contentId: string }>();
+  const navigate = useNavigate();
   const [activeChannel, setActiveChannel] = useState('web');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [title, setTitle] = useState('Preview');
+  const [bodyDoc, setBodyDoc] = useState<unknown>(null);
 
   const getPreviewWidth = () => {
     switch (activeChannel) {
-      case 'mobile': return 375;
-      case 'tablet': return 768;
-      default: return '100%';
+      case 'mobile':
+        return 375;
+      case 'tablet':
+        return 768;
+      default:
+        return '100%';
     }
   };
 
+  useEffect(() => {
+    if (!contentId) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    void (async () => {
+      try {
+        const details = await contentService.getById(contentId);
+        if (cancelled) return;
+        setTitle(details.content.title || 'Untitled');
+        const bodyVersions = (details.versions ?? []).filter(
+          (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+        );
+        if (bodyVersions.length === 0) {
+          setBodyDoc(null);
+        } else {
+          const latestWithBody = bodyVersions.reduce((prev, curr) =>
+            curr.versionNumber > prev.versionNumber ? curr : prev,
+          );
+          setBodyDoc(latestWithBody.body ?? null);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setLoadError(e instanceof Error ? e.message : 'Failed to load content');
+        setTitle('Unable to load');
+        setBodyDoc(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  const hasTipTapDoc = useMemo(
+    () => bodyDoc && typeof bodyDoc === 'object' && bodyDoc !== null && 'type' in (bodyDoc as Record<string, unknown>),
+    [bodyDoc],
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0b0d14' }}>
-      {/* Topbar */}
-      <div style={{
-        padding: '12px 24px',
-        background: 'rgba(255,255,255,0.03)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button style={{
-            background: 'none',
-            border: 'none',
-            color: '#555870',
-            cursor: 'pointer',
-            padding: 8,
-          }}>
+    <div className="flex h-screen min-h-0 flex-col bg-app-bg">
+      <header className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-app-elevated hover:text-app-text"
+            aria-label="Back"
+          >
             <ChevronLeft size={20} />
           </button>
-          <h1 style={{ fontSize: 16, fontWeight: 600, color: '#e2e4f0', margin: 0 }}>Preview Mode</h1>
-          <span style={{ color: 'rgba(255,255,255,0.2)', margin: '0 8px' }}>|</span>
-          <span style={{ fontSize: 13, color: '#8b8fa8' }}>{mockContent.title}</span>
+          <h1 className="m-0 shrink-0 text-sm font-semibold text-app-text sm:text-base">Preview</h1>
+          <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
+          <span className="min-w-0 truncate text-[13px] text-app-muted">{title}</span>
         </div>
 
-        {/* Channel Switcher */}
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 4 }}>
+        <div className="flex rounded-app-lg border border-app-border/80 bg-app-bg/40 p-1">
           {channels.map((channel) => (
             <button
               key={channel.id}
+              type="button"
               onClick={() => setActiveChannel(channel.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 12px',
-                background: activeChannel === channel.id ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                border: 'none',
-                borderRadius: 6,
-                color: activeChannel === channel.id ? '#a78bfa' : '#555870',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
+              className={`flex items-center gap-1.5 rounded-app-md px-3 py-2 text-xs transition-colors ${
+                activeChannel === channel.id
+                  ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
+                  : 'text-app-faint hover:bg-app-elevated hover:text-app-muted'
+              }`}
             >
-              <channel.icon size={14} />
-              {channel.name}
+              <channel.icon size={14} className="shrink-0 opacity-90" />
+              <span className="hidden sm:inline">{channel.name}</span>
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 6,
-            color: '#8b8fa8',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-app-md border border-app-border/80 bg-app-bg/40 px-3 py-2 text-xs text-app-muted transition-colors hover:border-app-accent/25 hover:text-app-text"
+          >
             <Download size={14} /> Export
           </button>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            border: 'none',
-            borderRadius: 6,
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-app-md border-none bg-gradient-to-br from-app-accent to-app-accent-2 px-3.5 py-2 text-xs font-semibold text-white shadow-app-glow"
+          >
             <Share2 size={14} /> Share
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Preview Canvas */}
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        padding: 40,
-        display: 'flex',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.3)',
-      }}>
-        <div style={{
-          width: getPreviewWidth(),
-          maxWidth: '100%',
-          background: '#fff',
-          borderRadius: activeChannel === 'web' ? 0 : 24,
-          overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        }}>
-          {/* Preview Header */}
-          <div style={{
-            padding: '24px 32px',
-            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-            color: '#fff',
-          }}>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>{mockContent.title}</h1>
-            <p style={{ fontSize: 13, opacity: 0.8, margin: 0 }}>Last updated: March 11, 2025</p>
-          </div>
-
-          {/* Preview Content */}
-          <div style={{ padding: 32 }}>
-            {mockContent.sections.map((section, index) => {
-              if (section.type === 'heading') {
-                return (
-                  <h2 key={index} style={{
-                    fontSize: 20,
-                    fontWeight: 600,
-                    color: '#1a1d2e',
-                    margin: '0 0 16px',
-                  }}>{section.content}</h2>
-                );
-              }
-              if (section.type === 'paragraph') {
-                return (
-                  <p key={index} style={{
-                    fontSize: 15,
-                    color: '#4b5563',
-                    lineHeight: 1.7,
-                    margin: '0 0 16px',
-                  }}>{section.content}</p>
-                );
-              }
-              if (section.type === 'list') {
-                return (
-                  <ul key={index} style={{
-                    margin: '0 0 16px 20px',
-                    padding: 0,
-                  }}>
-                    {section.items?.map((item, i) => (
-                      <li key={i} style={{
-                        fontSize: 15,
-                        color: '#4b5563',
-                        lineHeight: 1.7,
-                        marginBottom: 8,
-                      }}>{item}</li>
-                    ))}
-                  </ul>
-                );
-              }
-              return null;
-            })}
-          </div>
-
-          {/* Preview Footer */}
-          <div style={{
-            padding: '20px 32px',
-            borderTop: '1px solid #e5e7eb',
-            background: '#f9fafb',
-          }}>
-            <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>
-              © 2025 CommsLib. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Conditional Sections Panel */}
-      <div style={{
-        width: 280,
-        background: 'rgba(255,255,255,0.03)',
-        borderLeft: '1px solid rgba(255,255,255,0.05)',
-        padding: 20,
-        position: 'absolute',
-        right: 0,
-        top: 57,
-        bottom: 0,
-        overflowY: 'auto',
-      }}>
-        <h3 style={{ fontSize: 12, fontWeight: 600, color: '#e2e4f0', margin: '0 0 16px' }}>
-          Conditional Sections
-        </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {[
-            { name: 'Introduction', enabled: true },
-            { name: 'Getting Started', enabled: true },
-            { name: 'Advanced Features', enabled: false },
-            { name: 'FAQ', enabled: true },
-            { name: 'Related Content', enabled: false },
-          ].map((section) => (
-            <label
-              key={section.name}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '10px 12px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,rgba(147,124,248,0.06),transparent_50%)] p-6 md:p-10">
+          <div className="mx-auto flex max-w-[1100px] justify-center">
+            <div
+              style={{ width: getPreviewWidth() }}
+              className={`max-w-full overflow-hidden border border-app-border/60 bg-app-surface/90 shadow-app-lift backdrop-blur-sm ${
+                activeChannel === 'web' ? 'rounded-app-xl' : 'rounded-[2rem] ring-2 ring-app-border-strong'
+              }`}
             >
-              <span style={{ fontSize: 12, color: '#8b8fa8' }}>{section.name}</span>
-              <input
-                type="checkbox"
-                defaultChecked={section.enabled}
-                style={{ accentColor: '#8b5cf6' }}
-              />
-            </label>
-          ))}
+              <div className="bg-gradient-to-br from-app-accent to-app-accent-2 px-6 py-6 text-white sm:px-8 sm:py-8">
+                <h1 className="mb-2 text-2xl font-bold">{title}</h1>
+                <p className="m-0 text-[13px] text-white/85">Last updated: March 11, 2026</p>
+              </div>
+
+              <div className="p-6 sm:p-8">
+                {loadError ? (
+                  <p className="m-0 text-sm text-red-300">{loadError}</p>
+                ) : loading ? (
+                  <p className="m-0 text-sm text-app-faint">Loading preview…</p>
+                ) : hasTipTapDoc ? (
+                  <div className="tiptap-content">
+                    <TipTapReadonly
+                      doc={bodyDoc as any}
+                      className="ProseMirror text-app-muted leading-relaxed outline-none"
+                    />
+                  </div>
+                ) : (
+                  <p className="m-0 text-sm text-app-faint">No saved body found for this item.</p>
+                )}
+              </div>
+
+              <div className="border-t border-app-border/80 bg-app-surface/50 px-6 py-4 sm:px-8">
+                <p className="m-0 text-xs text-app-faint">© 2026 CommsLib. All rights reserved.</p>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <Surface
+          variant="glass"
+          padding="md"
+          className="max-h-[40vh] w-full shrink-0 overflow-y-auto border-t border-app-border/80 lg:max-h-none lg:w-[280px] lg:border-l lg:border-t-0"
+        >
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-app-faint">
+            Conditional sections
+          </h3>
+          <div className="flex flex-col gap-2">
+            {[
+              { name: 'Introduction', enabled: true },
+              { name: 'Getting Started', enabled: true },
+              { name: 'Advanced Features', enabled: false },
+              { name: 'FAQ', enabled: true },
+              { name: 'Related Content', enabled: false },
+            ].map((section) => (
+              <label
+                key={section.name}
+                className="flex cursor-pointer items-center justify-between rounded-app-md border border-app-border/60 bg-app-bg/35 px-3 py-2.5 transition-colors hover:border-app-accent/25"
+              >
+                <span className="text-xs text-app-muted">{section.name}</span>
+                <input type="checkbox" defaultChecked={section.enabled} className="accent-app-accent" />
+              </label>
+            ))}
+          </div>
+        </Surface>
       </div>
     </div>
   );

@@ -1,13 +1,5 @@
-import { useState, useEffect } from 'react';
-import {
-  mockKPIs,
-  mockViewsData,
-  mockEngagementData,
-  mockReadingTimeData,
-  mockContentTypeData,
-  mockTopContent,
-  mockAIInsights,
-} from '../data/mockAnalyticsData';
+import { useState, useEffect } from "react";
+import { analyticsService } from "../services/analyticsService";
 import type {
   KPI,
   TimeSeriesPoint,
@@ -16,14 +8,14 @@ import type {
   ContentTypeBreakdown,
   TopContentItem,
   AIInsight,
-} from '../data/mockAnalyticsData';
+} from "../types/analytics";
+import type { DateRange } from "../lib/dateUtils";
 
-// Enable mock data mode (set to false when backend is ready)
-const USE_MOCK_DATA = true;
+function dateRangeToApiParam(dateRange: string | DateRange): string | DateRange {
+  return dateRange;
+}
 
-// ─── Analytics Hook ───────────────────────────────────────────────────────────
-
-export function useAnalytics(dateRange: string = '30d') {
+export function useAnalytics(dateRange: string | DateRange = "30d") {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [viewsData, setViewsData] = useState<TimeSeriesPoint[]>([]);
   const [engagementData, setEngagementData] = useState<EngagementData[]>([]);
@@ -36,39 +28,51 @@ export function useAnalytics(dateRange: string = '30d') {
 
   useEffect(() => {
     let mounted = true;
-    
+
     async function fetchData() {
       setLoading(true);
       setError(null);
       try {
-        if (USE_MOCK_DATA) {
-          // Simulate API delay
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          if (!mounted) return;
-          
-          // Set mock data
-          setKpis(mockKPIs.map(k => ({
-            ...k,
-            change: k.change + (Math.random() * 2 - 1),
-          })));
-          setViewsData(mockViewsData);
-          setEngagementData(mockEngagementData);
-          setReadingTimeData(mockReadingTimeData);
-          setContentTypeData(mockContentTypeData);
-          setTopContent(mockTopContent);
-          setAiInsights(mockAIInsights);
-        }
+        const param = dateRangeToApiParam(dateRange);
+        const [
+          kpisData,
+          viewsDataResult,
+          engagementDataResult,
+          readingTimeDataResult,
+          contentTypeDataResult,
+          topContentResult,
+          aiInsightsResult,
+        ] = await Promise.all([
+          analyticsService.getKPIs(param),
+          analyticsService.getViewsData(param),
+          analyticsService.getEngagementData(param),
+          analyticsService.getReadingTimeData(),
+          analyticsService.getContentTypeData(param),
+          analyticsService.getTopContent(10),
+          analyticsService.getAIInsights(),
+        ]);
+
+        if (!mounted) return;
+
+        setKpis(kpisData);
+        setViewsData(viewsDataResult);
+        setEngagementData(engagementDataResult);
+        setReadingTimeData(readingTimeDataResult);
+        setContentTypeData(contentTypeDataResult);
+        setTopContent(topContentResult);
+        setAiInsights(aiInsightsResult);
       } catch (e) {
-        if (mounted) setError(e instanceof Error ? e.message : 'Failed to load analytics data');
+        if (mounted) setError(e instanceof Error ? e.message : "Failed to load analytics data");
       } finally {
         if (mounted) setLoading(false);
       }
     }
-    
+
     fetchData();
-    
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, [dateRange]);
 
   return {

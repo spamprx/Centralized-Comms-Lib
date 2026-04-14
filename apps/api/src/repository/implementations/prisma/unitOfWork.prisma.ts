@@ -50,7 +50,9 @@ export interface Repositories {
   contentSnapshot: ContentSnapshotRepository;
 }
 
-export function createPrismaRepositories(db: PrismaDb | Prisma.TransactionClient): Repositories {
+export function createPrismaRepositories(
+  db: PrismaDb | Prisma.TransactionClient,
+): Repositories {
   return {
     content: new PrismaContentRepository(db),
     userRole: new PrismaUserRoleRepository(db),
@@ -76,7 +78,9 @@ export class PrismaUnitOfWork {
     return createPrismaRepositories(this.prisma);
   }
 
-  async withTransaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T> {
+  async withTransaction<T>(
+    fn: (repos: Repositories) => Promise<T>,
+  ): Promise<T> {
     return this.prisma.$transaction(async (tx: any) =>
       fn(createPrismaRepositories(tx)),
     );

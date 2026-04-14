@@ -49,7 +49,10 @@ export class PrismaTemplateTranslationRepository implements TemplateTranslationR
     }
   }
 
-  async listByTemplateAndLocale(templateId: string, locale: string): Promise<TemplateTranslationRow[]> {
+  async listByTemplateAndLocale(
+    templateId: string,
+    locale: string,
+  ): Promise<TemplateTranslationRow[]> {
     const rows = await this.db.templateTranslation.findMany({
       where: { templateId, locale },
       orderBy: { key: "asc" },
@@ -66,14 +69,20 @@ export class PrismaTemplateTranslationRepository implements TemplateTranslationR
     return rows.map((r: { locale: string }) => r.locale);
   }
 
-  async deleteKey(templateId: string, locale: string, key: string): Promise<boolean> {
+  async deleteKey(
+    templateId: string,
+    locale: string,
+    key: string,
+  ): Promise<boolean> {
     const r = await this.db.templateTranslation.deleteMany({
       where: { templateId, locale, key },
     });
     return r.count > 0;
   }
 
-  async listAllForTemplate(templateId: string): Promise<TemplateTranslationRow[]> {
+  async listAllForTemplate(
+    templateId: string,
+  ): Promise<TemplateTranslationRow[]> {
     const rows = await this.db.templateTranslation.findMany({
       where: { templateId },
       orderBy: [{ locale: "asc" }, { key: "asc" }],
