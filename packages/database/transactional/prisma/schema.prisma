@@ -40,6 +40,11 @@ model User {
 
   authoredTemplates Template[] @relation("TemplateAuthor")
   contentSnapshots  ContentSnapshot[]
+  contentAnnotations ContentAnnotation[] @relation("ContentAnnotationAuthor")
+  contentBookmarks  ContentBookmark[] @relation("ContentBookmarkUser")
+  contentComments   ContentComment[] @relation("ContentCommentAuthor")
+  contentLikes      ContentLike[] @relation("ContentLikeUser")
+  contentViews      ContentView[] @relation("ContentViewUser")
 
   @@map("users")
 }
@@ -193,6 +198,13 @@ enum VersionChangeType {
   STATE_TRANSITION
   RESTORE
   AI_GENERATED
+}
+
+enum ContentType {
+  ARTICLE
+  VIDEO
+  PODCAST
+  DOCUMENT
 }
 
 enum ReviewRequestStatus {
@@ -402,6 +414,7 @@ model Content {
   slug           String         @unique
   lifecycleState LifecycleState @default(DRAFT)
   visibility     Visibility     @default(PRIVATE)
+  contentType    ContentType    @default(ARTICLE)
   aiGenerated    Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -422,6 +435,11 @@ model Content {
   citations      ContentCitation[]
   snapshots      ContentSnapshot[]
   analyticsEvents ContentAnalyticsEvent[]
+  annotations   ContentAnnotation[] @relation("ContentAnnotations")
+  bookmarks     ContentBookmark[] @relation("ContentBookmarks")
+  comments      ContentComment[] @relation("ContentComments")
+  likes         ContentLike[] @relation("ContentLikes")
+  views         ContentView[] @relation("ContentViews")
 
   @@index([authorId])
   @@index([lifecycleState])
@@ -502,6 +520,105 @@ model ContentVersion {
   @@unique([contentId, versionNumber])
   @@index([contentId])
   @@map("content_versions")
+}
+
+// ── ContentAnnotation ────────────────────────────────────────────────────────
+// Reader annotations, optionally anchored to a specific text selection.
+model ContentAnnotation {
+  id        String   @id @default(uuid())
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentId String
+  content   Content  @relation("ContentAnnotations", fields: [contentId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation("ContentAnnotationAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  // ProseMirror positions at time of annotation; null means "general" note.
+  selectionFrom Int?
+  selectionTo   Int?
+  selectionText String?
+
+  @@index([contentId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("content_annotations")
+}
+
+// ── ContentBookmark ─────────────────────────────────────────────────────────
+// Saved/bookmarked content for a user (per-session persistent).
+model ContentBookmark {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  contentId String
+  content   Content  @relation("ContentBookmarks", fields: [contentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation("ContentBookmarkUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([userId, createdAt])
+  @@index([contentId, createdAt])
+  @@map("content_bookmarks")
+}
+
+// ── ContentComment ──────────────────────────────────────────────────────────
+// Reader comments on published content.
+model ContentComment {
+  id        String   @id @default(uuid())
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentId String
+  content   Content  @relation("ContentComments", fields: [contentId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation("ContentCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([contentId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("content_comments")
+}
+
+// ── ContentLike ─────────────────────────────────────────────────────────────
+// "Helpful" like toggle per user.
+model ContentLike {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  contentId String
+  content   Content  @relation("ContentLikes", fields: [contentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation("ContentLikeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([userId, createdAt])
+  @@index([contentId, createdAt])
+  @@map("content_likes")
+}
+
+// ── ContentView ─────────────────────────────────────────────────────────────
+// Legitimate views: counted once per browser-tab session (sessionId provided by client).
+model ContentView {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  contentId String
+  content   Content  @relation("ContentViews", fields: [contentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation("ContentViewUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionId String
+
+  @@unique([contentId, sessionId])
+  @@index([contentId, createdAt])
+  @@index([userId, createdAt])
+  @@map("content_views")
 }
 
 // ── Tag / ContentTag ────────────────────────────────────────────────────────
