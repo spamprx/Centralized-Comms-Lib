@@ -4,6 +4,7 @@ import {
   ContentVersion,
   CreateContentVersionInput,
   CreateDraftInput,
+  ContentType,
   LifecycleState,
   TipTapDocument,
   Visibility,
@@ -14,7 +15,9 @@ export interface ContentRepository {
   getById(id: string): Promise<Content | null>;
   getBySlug(slug: string): Promise<Content | null>;
   list(filters?: ContentListFilters): Promise<Content[]>;
+  delete(contentId: string): Promise<void>;
   updateTitle(contentId: string, title: string): Promise<Content>;
+  updateContentType(contentId: string, contentType: ContentType): Promise<Content>;
 
   updateLifecycleState(
     contentId: string,

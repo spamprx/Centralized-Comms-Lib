@@ -29,7 +29,8 @@ import {
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
   IN_REVIEW: ["DRAFT", "PUBLISHED", "ARCHIVED"],
-  PUBLISHED: ["ARCHIVED", "IN_REVIEW"],
+  // Allow returning to draft for edits.
+  PUBLISHED: ["ARCHIVED", "IN_REVIEW", "DRAFT"],
   ARCHIVED: ["DRAFT"],
 };
 
@@ -86,6 +87,7 @@ export const contentService = {
       body?: TipTapDocument | null;
       aiGenerated?: boolean;
       templateId?: string | null;
+      contentType?: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
     },
   ): Promise<
     | { content: Content; version: ContentVersion }
@@ -106,6 +108,7 @@ export const contentService = {
         slug,
         authorId: ctx.actorId,
         aiGenerated: input.aiGenerated ?? false,
+        contentType: input.contentType ?? "ARTICLE",
         templateId: input.templateId ?? undefined,
       });
       const version = await repos.content.createVersion({
@@ -127,25 +130,67 @@ export const contentService = {
       return { content, version };
     });
     void syncContentIndexFromDb(prisma, result.content.id).catch(() => undefined);
-    return result;
+    const author = await prisma.user.findUnique({
+      where: { id: result.content.authorId },
+      select: { id: true, displayName: true, email: true },
+    });
+    return { ...result, content: { ...result.content, author } };
   },
 
   async list(
     filters: ContentListFilters,
     requester: { id: string; isAdmin?: boolean } | null = null,
-  ): Promise<Content[]> {
-    const uow = new PrismaUnitOfWork(getPrismaClient());
+  ): Promise<Array<Content & { viewsCount: number; likesCount: number }>> {
+    const prisma = getPrismaClient();
+    type AuthorRow = { id: string; displayName: string; email: string };
+    const uow = new PrismaUnitOfWork(prisma);
     const repos = uow.repos();
-    const contents = await repos.content.list(filters);
+    const isOwnListRequest = !!requester && !!filters.authorId && filters.authorId === requester.id;
+    const effectiveFilters: ContentListFilters =
+      requester && !requester.isAdmin && !isOwnListRequest
+        ? { ...filters, lifecycleState: "PUBLISHED" }
+        : filters;
+    const contents = await repos.content.list(effectiveFilters);
 
-    if (!requester) {
-      return contents.filter((c) => canViewContent(c, null));
-    }
+    const visible = !requester
+      ? contents.filter((c) => canViewContent(c, null))
+      : (() => {
+          const groupsPromise = repos.userRole.listGroupsForUser(requester.id);
+          return groupsPromise.then((groups) =>
+            contents.filter((c) => canViewContent(c, requester, groups)),
+          );
+        })();
 
-    const groups = await repos.userRole.listGroupsForUser(requester.id);
-    // For listing we don't expand co-authors per content (costly); visibility
-    // rules here treat co-authors like regular viewers.
-    return contents.filter((c) => canViewContent(c, requester, groups));
+    const visibleContents = await visible;
+    const authorIds = Array.from(new Set(visibleContents.map((c) => c.authorId).filter(Boolean)));
+    const authors = (await prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true, displayName: true, email: true },
+    })) as AuthorRow[];
+    const authorById = new Map<string, AuthorRow>(authors.map((u) => [u.id, u]));
+
+    const contentIds = visibleContents.map((c) => c.id);
+    const [viewsRows, likesRows] = await Promise.all([
+      prisma.contentView.groupBy({
+        by: ["contentId"],
+        where: { contentId: { in: contentIds } },
+        _count: { _all: true },
+      }),
+      prisma.contentLike.groupBy({
+        by: ["contentId"],
+        where: { contentId: { in: contentIds } },
+        _count: { _all: true },
+      }),
+    ]);
+    const viewsById = new Map<string, number>(viewsRows.map((r) => [r.contentId, r._count._all]));
+    const likesById = new Map<string, number>(likesRows.map((r) => [r.contentId, r._count._all]));
+
+    return visibleContents.map((c) => ({
+      ...c,
+      author: authorById.get(c.authorId) ?? null,
+      viewsCount: viewsById.get(c.id) ?? 0,
+      likesCount: likesById.get(c.id) ?? 0,
+    }));
   },
 
   async getById(
@@ -202,7 +247,43 @@ export const contentService = {
       email: row.user.email,
     }));
 
-    return { content, tags, versions, coAuthors };
+    const author = await prisma.user.findUnique({
+      where: { id: content.authorId },
+      select: { id: true, displayName: true, email: true },
+    });
+
+    return { content: { ...content, author }, tags, versions, coAuthors };
+  },
+
+  async delete(
+    ctx: AuditContext,
+    contentId: string,
+  ): Promise<{ ok: true } | { notFound: true } | { forbidden: true }> {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    const result = await uow.withTransaction(async (repos) => {
+      const existing = await repos.content.getById(contentId);
+      if (!existing) return { notFound: true } as const;
+      if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+
+      // ReviewRequest.content has no cascade; delete review graph first.
+      await prisma.reviewRequest.deleteMany({ where: { contentId } });
+
+      await repos.content.delete(contentId);
+      await repos.audit.append({
+        action: "DELETE",
+        resource: "CONTENT",
+        resourceId: contentId,
+        oldValue: { title: existing.title, slug: existing.slug },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { ok: true } as const;
+    });
+
+    // Note: search-index cleanup for deletes should be handled by a dedicated endpoint/task.
+    return result;
   },
 
   async updateTitle(
@@ -243,7 +324,11 @@ export const contentService = {
   async saveBody(
     ctx: AuditContext,
     contentId: string,
-    input: { body?: TipTapDocument | null; title?: string },
+    input: {
+      body?: TipTapDocument | null;
+      title?: string;
+      contentType?: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
+    },
   ): Promise<
     | { version: ContentVersion }
     | { notFound: true }
@@ -296,6 +381,9 @@ export const contentService = {
       if (input.title && input.title.trim()) {
         await repos.content.updateTitle(contentId, input.title.trim());
         currentTitle = input.title.trim();
+      }
+      if (input.contentType) {
+        await repos.content.updateContentType(contentId, input.contentType);
       }
       const version = await repos.content.createVersion({
         contentId,
@@ -438,6 +526,10 @@ export const contentService = {
       const existing = await repos.content.getById(contentId);
       if (!existing) return { notFound: true } as const;
       if (existing.authorId !== ctx.actorId && !ctx.isAdmin) return { forbidden: true } as const;
+      // Idempotent transition: allow setting the current state again (no-op).
+      if (existing.lifecycleState === lifecycleState) {
+        return { content: existing } as const;
+      }
       const allowed = VALID_TRANSITIONS[existing.lifecycleState] ?? [];
       if (!allowed.includes(lifecycleState)) {
         return { invalidTransition: true, current: existing.lifecycleState } as const;

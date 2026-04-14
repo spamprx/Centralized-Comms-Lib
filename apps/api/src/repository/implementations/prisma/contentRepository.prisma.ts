@@ -2,6 +2,7 @@ import type { ContentRepository } from "../../interfaces";
 import type {
   Content,
   ContentListFilters,
+  ContentType,
   ContentVersion,
   CreateContentVersionInput,
   CreateDraftInput,
@@ -20,6 +21,7 @@ function toContent(row: {
   slug: string;
   lifecycleState: string;
   visibility: string;
+  contentType: string;
   aiGenerated: boolean;
   authorId: string;
   visibilityGroupId: string | null;
@@ -33,6 +35,7 @@ function toContent(row: {
     slug: row.slug,
     lifecycleState: row.lifecycleState as LifecycleState,
     visibility: row.visibility as Visibility,
+    contentType: row.contentType as ContentType,
     aiGenerated: row.aiGenerated,
     authorId: row.authorId,
     visibilityGroupId: row.visibilityGroupId,
@@ -78,6 +81,7 @@ export class PrismaContentRepository implements ContentRepository {
         slug: input.slug,
         authorId: input.authorId,
         aiGenerated: input.aiGenerated ?? false,
+        contentType: (input.contentType ?? "ARTICLE") as any,
         templateId: input.templateId ?? undefined,
       },
     });
@@ -100,6 +104,7 @@ export class PrismaContentRepository implements ContentRepository {
     if (filters?.authorId) where.authorId = filters.authorId;
     if (filters?.lifecycleState) where.lifecycleState = filters.lifecycleState;
     if (filters?.visibility) where.visibility = filters.visibility;
+    if (filters?.contentType) where.contentType = filters.contentType;
 
     const rows = await this.db.content.findMany({
       where,
@@ -110,10 +115,22 @@ export class PrismaContentRepository implements ContentRepository {
     return rows.map(toContent);
   }
 
+  async delete(contentId: string): Promise<void> {
+    await this.db.content.delete({ where: { id: contentId } });
+  }
+
   async updateTitle(contentId: string, title: string): Promise<Content> {
     const row = await this.db.content.update({
       where: { id: contentId },
       data: { title },
+    });
+    return toContent(row);
+  }
+
+  async updateContentType(contentId: string, contentType: ContentType): Promise<Content> {
+    const row = await this.db.content.update({
+      where: { id: contentId },
+      data: { contentType: contentType as any },
     });
     return toContent(row);
   }
