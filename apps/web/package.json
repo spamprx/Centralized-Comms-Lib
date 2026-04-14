@@ -18,6 +18,7 @@
     "@tiptap/extension-underline": "^3.22.3",
     "@tiptap/react": "^3.20.4",
     "@tiptap/starter-kit": "^3.20.4",
+    "framer-motion": "^12.4.7",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-router-dom": "^7.13.1",
