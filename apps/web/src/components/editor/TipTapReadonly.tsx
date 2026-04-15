@@ -11,7 +11,11 @@ type TipTapReadonlyProps = {
   onSelectionChange?: (sel: { from: number; to: number; text: string }) => void;
 };
 
-export default function TipTapReadonly({ doc, className, onSelectionChange }: Readonly<TipTapReadonlyProps>) {
+export default function TipTapReadonly({
+  doc,
+  className,
+  onSelectionChange,
+}: Readonly<TipTapReadonlyProps>) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -57,4 +61,3 @@ export default function TipTapReadonly({ doc, className, onSelectionChange }: Re
 
   return <EditorContent editor={editor} />;
 }
-

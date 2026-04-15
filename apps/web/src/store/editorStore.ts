@@ -21,6 +21,6 @@ export const useEditorStore = create<EditorState>()(
     {
       name: 'editor-storage',
       storage: createJSONStorage(() => sessionStorage),
-    }
-  )
+    },
+  ),
 );

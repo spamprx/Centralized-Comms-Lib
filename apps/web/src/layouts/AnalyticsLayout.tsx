@@ -1,18 +1,18 @@
-import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { useAnalytics } from "../hooks/useAnalytics";
-import { AnalyticsDashboard } from "../components/analytics/AnalyticsDashboard";
-import { buildAnalyticsCsv, downloadCsv } from "../lib/analyticsCsv";
-import type { DateRange } from "../lib/dateUtils";
-import { formatDateRange } from "../lib/dateUtils";
+import { useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { AnalyticsDashboard } from '../components/analytics/AnalyticsDashboard';
+import { buildAnalyticsCsv, downloadCsv } from '../lib/analyticsCsv';
+import type { DateRange } from '../lib/dateUtils';
+import { formatDateRange } from '../lib/dateUtils';
 
-const BG = "#0d0f18";
-const MUTED = "rgba(255,255,255,0.45)";
-const RED = "#E24B4A";
-const PURPLE = "#7C6FF7";
+const BG = '#0d0f18';
+const MUTED = 'rgba(255,255,255,0.45)';
+const RED = '#E24B4A';
+const PURPLE = '#7C6FF7';
 
 export default function AnalyticsLayout() {
-  const [dateRange, setDateRange] = useState<string | DateRange>("30d");
+  const [dateRange, setDateRange] = useState<string | DateRange>('30d');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const {
@@ -30,7 +30,9 @@ export default function AnalyticsLayout() {
   const exportFileName = useMemo(() => {
     const stamp = new Date().toISOString().slice(0, 10);
     const rangeDisplay =
-      typeof dateRange === "string" ? dateRange : formatDateRange(dateRange).replace(/\s-\s/g, "-to-");
+      typeof dateRange === 'string'
+        ? dateRange
+        : formatDateRange(dateRange).replace(/\s-\s/g, '-to-');
     return `analytics-dashboard-${rangeDisplay}-${stamp}.csv`;
   }, [dateRange]);
 
@@ -40,7 +42,7 @@ export default function AnalyticsLayout() {
       setExportError(null);
 
       const csv = buildAnalyticsCsv({
-        dateRange: typeof dateRange === "string" ? dateRange : formatDateRange(dateRange),
+        dateRange: typeof dateRange === 'string' ? dateRange : formatDateRange(dateRange),
         exportedAt: new Date(),
         kpis,
         viewsData,
@@ -53,7 +55,7 @@ export default function AnalyticsLayout() {
 
       downloadCsv(exportFileName, csv);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : "Failed to export CSV");
+      setExportError(err instanceof Error ? err.message : 'Failed to export CSV');
     } finally {
       setExporting(false);
     }
@@ -63,11 +65,11 @@ export default function AnalyticsLayout() {
     return (
       <div
         className="flex min-h-screen items-center justify-center px-6 py-10 font-sans text-white"
-        style={{ backgroundColor: BG, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
+        style={{ backgroundColor: BG, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
       >
         <div
           className="max-w-md rounded-xl border p-6 text-center transition-colors duration-150"
-          style={{ borderColor: "rgba(226,75,74,0.35)", backgroundColor: "rgba(226,75,74,0.08)" }}
+          style={{ borderColor: 'rgba(226,75,74,0.35)', backgroundColor: 'rgba(226,75,74,0.08)' }}
         >
           <p className="m-0 text-[14px] font-medium" style={{ color: RED }}>
             Something went wrong
@@ -87,7 +89,7 @@ export default function AnalyticsLayout() {
         style={{
           backgroundColor: BG,
           color: MUTED,
-          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
         }}
       >
         <Loader2 className="size-5 animate-spin" style={{ color: PURPLE }} aria-hidden />

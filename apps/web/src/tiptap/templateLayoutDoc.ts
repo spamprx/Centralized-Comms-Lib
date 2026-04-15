@@ -5,7 +5,12 @@
  */
 import { Node, mergeAttributes } from '@tiptap/core';
 import type { JSONContent } from '@tiptap/core';
-import type { LayoutCell, LayoutRow, TemplateLayoutConfig, TemplateLayoutRegion } from '../services/templateCrudService';
+import type {
+  LayoutCell,
+  LayoutRow,
+  TemplateLayoutConfig,
+  TemplateLayoutRegion,
+} from '../services/templateCrudService';
 import { LAYOUT_VERSION } from '../lib/templateLayout/layoutConfig';
 
 const RT = 'richText';
@@ -26,7 +31,11 @@ export const LayoutRowNode = Node.create({
     return [{ tag: 'div[data-layout-row]' }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes(HTMLAttributes, { 'data-layout-row': 'true', class: 'template-layout-row' }), 0];
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, { 'data-layout-row': 'true', class: 'template-layout-row' }),
+      0,
+    ];
   },
 });
 
@@ -94,7 +103,11 @@ export const RegionMediaNode = Node.create({
   },
   renderHTML({ node }) {
     const caption = String(node.attrs.caption ?? '');
-    return ['figure', { 'data-region-media': 'true', class: 'template-region-media' }, ['figcaption', {}, caption]];
+    return [
+      'figure',
+      { 'data-region-media': 'true', class: 'template-region-media' },
+      ['figcaption', {}, caption],
+    ];
   },
 });
 
@@ -254,12 +267,23 @@ export function tipTapDocToLayoutConfig(doc: JSONContent): TemplateLayoutConfig 
   const rows: LayoutRow[] = [];
 
   for (const block of doc.content) {
-    if (!block || typeof block !== 'object' || block.type !== 'layoutRow' || !Array.isArray(block.content)) continue;
+    if (
+      !block ||
+      typeof block !== 'object' ||
+      block.type !== 'layoutRow' ||
+      !Array.isArray(block.content)
+    )
+      continue;
     const rowId = String((block.attrs as { rowId?: string })?.rowId ?? crypto.randomUUID());
     const cells: LayoutCell[] = [];
 
     for (const cellNode of block.content) {
-      if (!cellNode || typeof cellNode !== 'object' || cellNode.type !== 'layoutCell' || !Array.isArray(cellNode.content))
+      if (
+        !cellNode ||
+        typeof cellNode !== 'object' ||
+        cellNode.type !== 'layoutCell' ||
+        !Array.isArray(cellNode.content)
+      )
         continue;
       const cellId = String((cellNode.attrs as { cellId?: string })?.cellId ?? crypto.randomUUID());
       const flexGrow = Number((cellNode.attrs as { flexGrow?: number })?.flexGrow);

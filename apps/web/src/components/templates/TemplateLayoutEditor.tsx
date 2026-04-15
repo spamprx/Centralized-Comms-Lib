@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   DndContext,
   KeyboardSensor,
@@ -20,16 +21,27 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor, JSONContent } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import {
+  Bold,
   ChevronDown,
   CheckCircle,
   Columns2,
   Columns3,
   Eye,
+  FolderOpen,
   GripVertical,
+  Heading1,
+  Heading2,
   Image as ImageIcon,
+  Italic,
+  Languages,
+  Link2,
   Loader2,
+  List,
+  ListOrdered,
   Monitor,
   Mail,
   Plus,
@@ -37,6 +49,8 @@ import {
   Settings2,
   Smartphone,
   Trash2,
+  Underline as UnderlineIcon,
+  X,
 } from 'lucide-react';
 import {
   templateCrudService,
@@ -75,6 +89,97 @@ const REGION_TYPES = {
   field: 'field',
 } as const;
 
+/** Inline image uploads above this size are rejected (base64 would bloat the layout JSON). */
+const TEMPLATE_INLINE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+
+/** Demo rows for “asset library” until the app wires a real assets API into the editor. */
+const TEMPLATE_LIBRARY_DEMO_IMAGES: { id: string; name: string; src: string }[] = [
+  {
+    id: 'tpl-lib-hero',
+    name: 'Gradient hero',
+    src:
+      'data:image/svg+xml,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="160"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)" rx="14"/><text x="50%" y="50%" fill="white" font-size="15" font-family="system-ui,sans-serif" text-anchor="middle" dy=".35em">Library · Hero</text></svg>',
+      ),
+  },
+  {
+    id: 'tpl-lib-banner',
+    name: 'Dark banner',
+    src:
+      'data:image/svg+xml,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="120"><rect width="100%" height="100%" fill="#0f172a" rx="10"/><text x="50%" y="50%" fill="#94a3b8" font-size="13" font-family="system-ui,sans-serif" text-anchor="middle" dy=".35em">Library · Banner</text></svg>',
+      ),
+  },
+];
+
+function TemplateImageLibraryModal({
+  open,
+  onClose,
+  onPick,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPick: (src: string) => void;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pick image from library"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="max-h-[min(90vh,520px)] w-full max-w-lg overflow-hidden rounded-app-xl border border-app-border bg-app-bg-subtle shadow-xl">
+        <div className="flex items-center justify-between border-b border-app-border px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-app-text">
+            <FolderOpen size={16} className="text-app-accent" aria-hidden />
+            Asset library
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-app-faint hover:bg-app-surface-hover hover:text-app-muted"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="max-h-[min(60vh,380px)] space-y-2 overflow-y-auto p-3">
+          {TEMPLATE_LIBRARY_DEMO_IMAGES.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => onPick(a.src)}
+              className="flex w-full items-center gap-3 rounded-xl border border-app-border bg-app-bg p-2 text-left hover:border-app-accent/40 hover:bg-app-accent-muted/20"
+            >
+              <img src={a.src} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-app-text">
+                {a.name}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="border-t border-app-border px-4 py-3 text-[11px] text-app-faint">
+          <RouterLink
+            to="/assets"
+            className="font-medium text-app-accent hover:underline"
+            onClick={onClose}
+          >
+            Open full asset library
+          </RouterLink>{' '}
+          to upload and manage files. Demo thumbnails above insert placeholder images into the
+          template.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function emptyDoc(): JSONContent {
   return { type: 'doc', content: [{ type: 'paragraph' }] };
 }
@@ -93,11 +198,31 @@ function docFromSectionTitle(sectionTitle: string): JSONContent {
 
 function ensureRichDoc(props: Record<string, unknown> | undefined): JSONContent {
   const doc = props?.doc;
-  if (doc && typeof doc === 'object' && !Array.isArray(doc) && (doc as JSONContent).type === 'doc') {
+  if (
+    doc &&
+    typeof doc === 'object' &&
+    !Array.isArray(doc) &&
+    (doc as JSONContent).type === 'doc'
+  ) {
     return doc as JSONContent;
   }
   return emptyDoc();
 }
+
+/** Rich-text formatting actions for the shared toolbar (targets the focused editor). */
+type RichTextToolkitFlags = {
+  heading1: boolean;
+  heading2: boolean;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  bulletList: boolean;
+  orderedList: boolean;
+  link: boolean;
+  insertImage: boolean;
+  fieldToken: boolean;
+  mediaToken: boolean;
+};
 
 type RichTextEditorProps = {
   initialDoc: JSONContent;
@@ -106,10 +231,16 @@ type RichTextEditorProps = {
   onEditorReady?: (editor: Editor | null) => void;
 };
 
-function RichTextEditor({ initialDoc, placeholder, onDocChange, onEditorReady }: RichTextEditorProps) {
+function RichTextEditor({
+  initialDoc,
+  placeholder,
+  onDocChange,
+  onEditorReady,
+}: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -118,6 +249,11 @@ function RichTextEditor({ initialDoc, placeholder, onDocChange, onEditorReady }:
           rel: 'noopener noreferrer nofollow',
           target: '_blank',
         },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+        HTMLAttributes: { class: 'max-w-full rounded-lg border border-white/[0.08]' },
       }),
       Placeholder.configure({ placeholder }),
     ],
@@ -141,14 +277,570 @@ function RichTextEditor({ initialDoc, placeholder, onDocChange, onEditorReady }:
   return <EditorContent editor={editor} />;
 }
 
+/** Keeps the TipTap selection when clicking toolbar controls. */
+function toolbarControlMouseDown(e: React.MouseEvent) {
+  e.preventDefault();
+}
+
+function SharedRichTextToolkitBar({
+  toolkit,
+  editor,
+  activeRegionTitle,
+  activeRegionId,
+  getEditorByRegionId,
+}: {
+  toolkit: RichTextToolkitFlags;
+  editor: Editor | null;
+  activeRegionTitle: string | null;
+  activeRegionId: string | null;
+  getEditorByRegionId: (regionId: string) => Editor | null;
+}) {
+  const [, setToolbarRenderTick] = useState(0);
+  useEffect(() => {
+    if (!editor) return;
+    let raf = 0;
+    const sync = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setToolbarRenderTick((t) => t + 1);
+      });
+    };
+    editor.on('selectionUpdate', sync);
+    editor.on('transaction', sync);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      editor.off('selectionUpdate', sync);
+      editor.off('transaction', sync);
+    };
+  }, [editor]);
+
+  const [showFieldPopover, setShowFieldPopover] = useState(false);
+  const [showMediaPopover, setShowMediaPopover] = useState(false);
+  const [showImageMenu, setShowImageMenu] = useState(false);
+  const [showAssetLibrary, setShowAssetLibrary] = useState(false);
+  const [imagePickMessage, setImagePickMessage] = useState<string | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const [fieldTokenInput, setFieldTokenInput] = useState('firstName');
+  const [mediaTokenInput, setMediaTokenInput] = useState('avatarImage');
+  const [showTranslatePopover, setShowTranslatePopover] = useState(false);
+  const [inlineTranslateTo, setInlineTranslateTo] = useState('es');
+  const [inlineTranslating, setInlineTranslating] = useState(false);
+  const [translateCapture, setTranslateCapture] = useState<{
+    regionId: string;
+    text: string;
+    from: number;
+    to: number;
+  } | null>(null);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+
+  const insertToken = useCallback(
+    (token: string) => {
+      if (!editor) return;
+      editor.chain().focus().insertContent(token).run();
+    },
+    [editor],
+  );
+
+  const insertFieldTokenFromPopover = useCallback(() => {
+    const key = fieldTokenInput.trim();
+    if (!key) return;
+    insertToken(`{{${key}}}`);
+    setShowFieldPopover(false);
+  }, [fieldTokenInput, insertToken]);
+
+  const insertMediaTokenFromPopover = useCallback(() => {
+    const key = mediaTokenInput.trim();
+    if (!key) return;
+    insertToken(`<${key}>`);
+    setShowMediaPopover(false);
+  }, [mediaTokenInput, insertToken]);
+
+  const insertImageFromSrc = useCallback(
+    (src: string) => {
+      if (!editor || !src.trim()) return;
+      setImagePickMessage(null);
+      editor.chain().focus().setImage({ src: src.trim(), alt: 'Template image' }).run();
+    },
+    [editor],
+  );
+
+  const onImageFileChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        setImagePickMessage('Please choose an image file.');
+        return;
+      }
+      if (file.size > TEMPLATE_INLINE_IMAGE_MAX_BYTES) {
+        setImagePickMessage(
+          `Image is too large (max ${Math.round(TEMPLATE_INLINE_IMAGE_MAX_BYTES / (1024 * 1024))} MB).`,
+        );
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = reader.result;
+        if (typeof r === 'string') insertImageFromSrc(r);
+      };
+      reader.onerror = () => setImagePickMessage('Could not read that file.');
+      reader.readAsDataURL(file);
+      setShowImageMenu(false);
+    },
+    [insertImageFromSrc],
+  );
+
+  const fmtBtn = (active: boolean) =>
+    `inline-flex h-7 min-w-7 items-center justify-center rounded-md border px-1.5 text-[11px] ${
+      active
+        ? 'border-app-accent/45 bg-app-accent-muted/40 text-app-accent'
+        : 'border-app-border bg-app-bg-subtle/40 text-app-muted hover:bg-app-surface-hover'
+    }`;
+
+  const setLink = useCallback(() => {
+    if (!editor) return;
+    const previousUrl = editor.getAttributes('link')?.href as string | undefined;
+    const url = window.prompt('Enter URL', previousUrl ?? '');
+    if (url === null) return;
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  }, [editor]);
+
+  const hasEditor = !!editor;
+
+  return (
+    <>
+      <div
+        data-shared-rich-toolbar
+        className="shrink-0 border-b border-white/[0.07] bg-[#0d0f18] px-4 py-2"
+      >
+        <div className="mb-1.5 flex min-h-[14px] flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-app-faint">
+          <span className="font-medium uppercase tracking-[0.06em] text-app-muted">Formatting</span>
+          <span className="text-app-faint">·</span>
+          {activeRegionTitle ? (
+            <span className="min-w-0 truncate text-app-muted">{activeRegionTitle}</span>
+          ) : (
+            <span className="text-app-faint italic">Click a rich text block to target it</span>
+          )}
+        </div>
+        <div
+          className={`flex flex-wrap items-center gap-2 rounded-app-md border border-app-border/60 p-2 ${
+            hasEditor ? 'bg-app-bg-subtle/50' : 'bg-app-bg-subtle/20 opacity-50'
+          }`}
+        >
+          {toolkit.heading1 ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+              className={fmtBtn(Boolean(editor?.isActive('heading', { level: 1 })))}
+              title="Heading 1"
+            >
+              <Heading1 size={13} />
+            </button>
+          ) : null}
+          {toolkit.heading2 ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+              className={fmtBtn(Boolean(editor?.isActive('heading', { level: 2 })))}
+              title="Heading 2"
+            >
+              <Heading2 size={13} />
+            </button>
+          ) : null}
+          {toolkit.bold ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleBold().run()}
+              className={fmtBtn(Boolean(editor?.isActive('bold')))}
+              title="Bold"
+            >
+              <Bold size={13} />
+            </button>
+          ) : null}
+          {toolkit.italic ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleItalic().run()}
+              className={fmtBtn(Boolean(editor?.isActive('italic')))}
+              title="Italic"
+            >
+              <Italic size={13} />
+            </button>
+          ) : null}
+          {toolkit.underline ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleUnderline().run()}
+              className={fmtBtn(Boolean(editor?.isActive('underline')))}
+              title="Underline"
+            >
+              <UnderlineIcon size={13} />
+            </button>
+          ) : null}
+          {toolkit.bulletList ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleBulletList().run()}
+              className={fmtBtn(Boolean(editor?.isActive('bulletList')))}
+              title="Bullet list"
+            >
+              <List size={13} />
+            </button>
+          ) : null}
+          {toolkit.orderedList ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+              className={fmtBtn(Boolean(editor?.isActive('orderedList')))}
+              title="Ordered list"
+            >
+              <ListOrdered size={13} />
+            </button>
+          ) : null}
+          {toolkit.link ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={setLink}
+              className={fmtBtn(Boolean(editor?.isActive('link')))}
+              title="Link"
+            >
+              <Link2 size={13} />
+            </button>
+          ) : null}
+          {toolkit.insertImage ? (
+            <div className="relative">
+              <button
+                type="button"
+                disabled={!hasEditor}
+                onMouseDown={toolbarControlMouseDown}
+                onClick={() => {
+                  setShowFieldPopover(false);
+                  setShowMediaPopover(false);
+                  setImagePickMessage(null);
+                  setShowImageMenu((v) => !v);
+                }}
+                className={fmtBtn(false)}
+                title="Insert image (device or asset library)"
+              >
+                <ImageIcon size={13} />
+              </button>
+              <input
+                ref={imageFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onImageFileChange}
+              />
+              {showImageMenu && hasEditor ? (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[210px] rounded-lg border border-app-border bg-app-bg py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onMouseDown={toolbarControlMouseDown}
+                    className="block w-full px-3 py-2 text-left text-xs text-app-text hover:bg-app-surface-hover"
+                    onClick={() => {
+                      setImagePickMessage(null);
+                      imageFileInputRef.current?.click();
+                    }}
+                  >
+                    Upload from device…
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={toolbarControlMouseDown}
+                    className="block w-full px-3 py-2 text-left text-xs text-app-text hover:bg-app-surface-hover"
+                    onClick={() => {
+                      setShowImageMenu(false);
+                      setImagePickMessage(null);
+                      setShowAssetLibrary(true);
+                    }}
+                  >
+                    Choose from asset library…
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {toolkit.fieldToken ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => {
+                setShowImageMenu(false);
+                setShowMediaPopover(false);
+                setShowFieldPopover((v) => !v);
+              }}
+              className="rounded border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20 disabled:opacity-40"
+            >
+              Add field token
+            </button>
+          ) : null}
+          {toolkit.mediaToken ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => {
+                setShowImageMenu(false);
+                setShowFieldPopover(false);
+                setShowMediaPopover((v) => !v);
+              }}
+              className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20 disabled:opacity-40"
+            >
+              Add media token
+            </button>
+          ) : null}
+          {showFieldPopover && hasEditor ? (
+            <div className="w-full max-w-[340px] rounded border border-amber-400/30 bg-black/25 p-2.5">
+              <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-app-faint">
+                Field key
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={fieldTokenInput}
+                  onChange={(e) => setFieldTokenInput(e.target.value)}
+                  placeholder="firstName"
+                  className="flex-1 rounded border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text"
+                />
+                <button
+                  type="button"
+                  onMouseDown={toolbarControlMouseDown}
+                  onClick={insertFieldTokenFromPopover}
+                  className="rounded border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
+                >
+                  Insert
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {showMediaPopover && hasEditor ? (
+            <div className="w-full max-w-[340px] rounded border border-cyan-400/30 bg-black/25 p-2.5">
+              <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-app-faint">
+                Media key
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={mediaTokenInput}
+                  onChange={(e) => setMediaTokenInput(e.target.value)}
+                  placeholder="avatarImage"
+                  className="flex-1 rounded border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text"
+                />
+                <button
+                  type="button"
+                  onMouseDown={toolbarControlMouseDown}
+                  onClick={insertMediaTokenFromPopover}
+                  className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
+                >
+                  Insert
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {imagePickMessage ? (
+            <p className="w-full basis-full text-[11px] leading-snug text-red-300">
+              {imagePickMessage}
+            </p>
+          ) : null}
+
+          {/* Divider */}
+          <div className="mx-0.5 hidden h-5 w-px bg-app-border/40 sm:block" />
+
+          {/* Translate selection */}
+          <div className="relative">
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => {
+                setShowFieldPopover(false);
+                setShowMediaPopover(false);
+                setShowImageMenu(false);
+                setTranslateError(null);
+                if (showTranslatePopover) {
+                  setShowTranslatePopover(false);
+                  setTranslateCapture(null);
+                  return;
+                }
+                if (!editor || !activeRegionId) return;
+                const { from, to } = editor.state.selection;
+                const text = editor.state.doc.textBetween(from, to, ' ');
+                setTranslateCapture({ regionId: activeRegionId, text, from, to });
+                setShowTranslatePopover(true);
+              }}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40"
+              title="Translate selected text"
+            >
+              <Languages size={12} />
+              <span className="hidden sm:inline">Translate</span>
+            </button>
+            {showTranslatePopover && hasEditor ? (
+              <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[260px] rounded-lg border border-app-border bg-app-bg shadow-lg">
+                <div className="border-b border-app-border/40 px-3 py-2">
+                  <span className="text-[10px] font-medium text-app-muted">
+                    {translateCapture?.text
+                      ? `Translate: "${translateCapture.text.length > 30 ? translateCapture.text.slice(0, 30) + '…' : translateCapture.text}"`
+                      : 'Select text first, then click Translate'}
+                  </span>
+                </div>
+                <div className="max-h-[220px] overflow-y-auto py-1">
+                  {[
+                    { code: 'en', name: 'English' },
+                    { code: 'es', name: 'Spanish' },
+                    { code: 'fr', name: 'French' },
+                    { code: 'de', name: 'German' },
+                    { code: 'hi', name: 'Hindi' },
+                    { code: 'pt', name: 'Portuguese' },
+                    { code: 'ja', name: 'Japanese' },
+                    { code: 'ko', name: 'Korean' },
+                    { code: 'zh-CN', name: 'Chinese (Simplified)' },
+                    { code: 'zh-TW', name: 'Chinese (Traditional)' },
+                    { code: 'ar', name: 'Arabic' },
+                    { code: 'ru', name: 'Russian' },
+                    { code: 'it', name: 'Italian' },
+                    { code: 'nl', name: 'Dutch' },
+                    { code: 'pl', name: 'Polish' },
+                    { code: 'tr', name: 'Turkish' },
+                    { code: 'vi', name: 'Vietnamese' },
+                    { code: 'th', name: 'Thai' },
+                    { code: 'id', name: 'Indonesian' },
+                    { code: 'sv', name: 'Swedish' },
+                    { code: 'te', name: 'Telugu' },
+                    { code: 'ta', name: 'Tamil' },
+                    { code: 'bn', name: 'Bengali' },
+                    { code: 'mr', name: 'Marathi' },
+                    { code: 'ur', name: 'Urdu' },
+                    { code: 'uk', name: 'Ukrainian' },
+                    { code: 'el', name: 'Greek' },
+                    { code: 'he', name: 'Hebrew' },
+                    { code: 'cs', name: 'Czech' },
+                    { code: 'ro', name: 'Romanian' },
+                  ].map((l) => (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onMouseDown={toolbarControlMouseDown}
+                      onClick={() => {
+                        const cap = translateCapture;
+                        if (!cap?.text.trim()) return;
+                        setInlineTranslateTo(l.code);
+                        setInlineTranslating(true);
+                        setTranslateError(null);
+                        void (async () => {
+                          try {
+                            const { translated } = await templateCrudService.translateText(
+                              cap.text,
+                              l.code,
+                            );
+                            const ed = getEditorByRegionId(cap.regionId) ?? editor;
+                            if (!ed) {
+                              setTranslateError('Editor for this block is no longer available.');
+                              return;
+                            }
+                            const textNode = ed.state.schema.text(translated);
+                            ed.chain()
+                              .focus()
+                              .command(({ tr }) => {
+                                tr.replaceWith(cap.from, cap.to, textNode);
+                                return true;
+                              })
+                              .run();
+                            setShowTranslatePopover(false);
+                            setTranslateCapture(null);
+                            setTranslateError(null);
+                          } catch (e) {
+                            setTranslateError(
+                              e instanceof Error ? e.message : 'Translation failed',
+                            );
+                          } finally {
+                            setInlineTranslating(false);
+                          }
+                        })();
+                      }}
+                      disabled={inlineTranslating || !translateCapture?.text.trim()}
+                      className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] hover:bg-app-surface-hover disabled:opacity-50 ${
+                        inlineTranslateTo === l.code ? 'text-emerald-300' : 'text-app-text'
+                      }`}
+                    >
+                      <span>{l.name}</span>
+                      <span className="text-[9px] text-app-faint">{l.code}</span>
+                    </button>
+                  ))}
+                </div>
+                {inlineTranslating && (
+                  <div className="flex items-center gap-1.5 border-t border-app-border/40 px-3 py-2 text-[10px] text-emerald-300">
+                    <Loader2 size={10} className="animate-spin" /> Translating…
+                  </div>
+                )}
+                {translateError ? (
+                  <div className="border-t border-app-border/40 px-3 py-2 text-[10px] text-red-300">
+                    {translateError}
+                  </div>
+                ) : null}
+                <div className="border-t border-app-border/40 px-3 py-1.5">
+                  <p className="text-[8px] text-app-faint">
+                    {translateCapture?.text.trim()
+                      ? 'Pick a language to replace the selection with its translation.'
+                      : 'Select text in the editor first, then click the Translate button.'}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <TemplateImageLibraryModal
+        open={showAssetLibrary}
+        onClose={() => setShowAssetLibrary(false)}
+        onPick={(src) => {
+          insertImageFromSrc(src);
+          setShowAssetLibrary(false);
+        }}
+      />
+    </>
+  );
+}
+
 type SortableRegionProps = {
   region: TemplateLayoutRegion;
   onUpdateDoc: (id: string, doc: JSONContent) => void;
   onConfigure: (id: string) => void;
   onRemove: (id: string) => void;
+  onEditorFocusRegion?: (regionId: string) => void;
+  onEditorBlurRegion?: (regionId: string, relatedTarget: EventTarget | null) => void;
+  onRichTextEditorRegister?: (regionId: string, editor: Editor | null) => void;
 };
 
-function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: SortableRegionProps) {
+function SortableRegionCard({
+  region,
+  onUpdateDoc,
+  onConfigure,
+  onRemove,
+  onEditorFocusRegion,
+  onEditorBlurRegion,
+  onRichTextEditorRegister,
+}: SortableRegionProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: region.id,
   });
@@ -161,7 +853,10 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
   const doc = region.type === REGION_TYPES.richText ? ensureRichDoc(region.props) : emptyDoc();
   const editorPlaceholder =
     region.type === REGION_TYPES.richText
-      ? String((region.props as { editorPlaceholder?: string } | undefined)?.editorPlaceholder ?? 'Write section content…')
+      ? String(
+          (region.props as { editorPlaceholder?: string } | undefined)?.editorPlaceholder ??
+            'Write section content…',
+        )
       : 'Write section content…';
   const sectionTitle =
     region.type === REGION_TYPES.richText
@@ -195,33 +890,6 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
     region.type === REGION_TYPES.media
       ? String((region.props as { caption?: string } | undefined)?.caption ?? '')
       : '';
-  const [editorRef, setEditorRef] = useState<Editor | null>(null);
-  const [showFieldPopover, setShowFieldPopover] = useState(false);
-  const [showMediaPopover, setShowMediaPopover] = useState(false);
-  const [fieldTokenInput, setFieldTokenInput] = useState('firstName');
-  const [mediaTokenInput, setMediaTokenInput] = useState('avatarImage');
-
-  const insertToken = useCallback(
-    (token: string) => {
-      if (!editorRef) return;
-      editorRef.chain().focus().insertContent(token).run();
-    },
-    [editorRef],
-  );
-
-  const insertFieldTokenFromPopover = useCallback(() => {
-    const key = fieldTokenInput.trim();
-    if (!key) return;
-    insertToken(`{{${key}}}`);
-    setShowFieldPopover(false);
-  }, [fieldTokenInput, insertToken]);
-
-  const insertMediaTokenFromPopover = useCallback(() => {
-    const key = mediaTokenInput.trim();
-    if (!key) return;
-    insertToken(`<${key}>`);
-    setShowMediaPopover(false);
-  }, [mediaTokenInput, insertToken]);
 
   return (
     <div
@@ -267,75 +935,17 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
       </div>
       <div className="p-4">
         {region.type === REGION_TYPES.richText && (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 rounded-app-md border border-app-border/60 bg-app-bg-subtle/50 p-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMediaPopover(false);
-                  setShowFieldPopover((v) => !v);
-                }}
-                className="rounded border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
-              >
-                Add field token
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFieldPopover(false);
-                  setShowMediaPopover((v) => !v);
-                }}
-                className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
-              >
-                Add media token
-              </button>
-              {showFieldPopover ? (
-                <div className="w-full max-w-[340px] rounded border border-amber-400/30 bg-black/25 p-2.5">
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-app-faint">Field key</label>
-                  <div className="flex gap-2">
-                    <input
-                      value={fieldTokenInput}
-                      onChange={(e) => setFieldTokenInput(e.target.value)}
-                      placeholder="firstName"
-                      className="flex-1 rounded border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text"
-                    />
-                    <button
-                      type="button"
-                      onClick={insertFieldTokenFromPopover}
-                      className="rounded border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20"
-                    >
-                      Insert
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              {showMediaPopover ? (
-                <div className="w-full max-w-[340px] rounded border border-cyan-400/30 bg-black/25 p-2.5">
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-app-faint">Media key</label>
-                  <div className="flex gap-2">
-                    <input
-                      value={mediaTokenInput}
-                      onChange={(e) => setMediaTokenInput(e.target.value)}
-                      placeholder="avatarImage"
-                      className="flex-1 rounded border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text"
-                    />
-                    <button
-                      type="button"
-                      onClick={insertMediaTokenFromPopover}
-                      className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
-                    >
-                      Insert
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+          <div
+            className="space-y-3"
+            onFocusCapture={() => onEditorFocusRegion?.(region.id)}
+            onBlurCapture={(e) => onEditorBlurRegion?.(region.id, e.relatedTarget)}
+          >
             <RichTextEditor
               key={`${region.id}-${editorPlaceholder}`}
               initialDoc={doc}
               placeholder={editorPlaceholder}
               onDocChange={(d) => onUpdateDoc(region.id, d)}
-              onEditorReady={setEditorRef}
+              onEditorReady={(ed) => onRichTextEditorRegister?.(region.id, ed)}
             />
           </div>
         )}
@@ -343,7 +953,9 @@ function SortableRegionCard({ region, onUpdateDoc, onConfigure, onRemove }: Sort
           <div className="space-y-2">
             <div className="flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-app-md border border-dashed border-app-border/70 bg-app-bg-subtle/50 px-4 py-4 text-center">
               <ImageIcon size={22} className="text-app-faint" />
-              <span className="text-[11px] text-app-muted">{mediaCaption || 'Media placeholder'}</span>
+              <span className="text-[11px] text-app-muted">
+                {mediaCaption || 'Media placeholder'}
+              </span>
               <span className="text-[10px] text-app-faint">Alt: {mediaAlt || '—'}</span>
             </div>
           </div>
@@ -382,7 +994,11 @@ function ColumnResizeHandle({ onPointerDown }: ResizeHandleProps) {
 
 type SortableLayoutRowProps = {
   row: LayoutRow;
-  onResizePointerDown: (e: React.PointerEvent<HTMLDivElement>, rowId: string, leftCellIndex: number) => void;
+  onResizePointerDown: (
+    e: React.PointerEvent<HTMLDivElement>,
+    rowId: string,
+    leftCellIndex: number,
+  ) => void;
   onRequestAddColumn: (rowId: string) => void;
   /** Stack another block in this column (same grid track, rows stack vertically). */
   onRequestAddToCell: (rowId: string, cellId: string) => void;
@@ -390,6 +1006,9 @@ type SortableLayoutRowProps = {
   onUpdateDoc: (id: string, doc: JSONContent) => void;
   onConfigure: (id: string) => void;
   onRemove: (id: string) => void;
+  onEditorFocusRegion: (regionId: string) => void;
+  onEditorBlurRegion: (regionId: string, relatedTarget: EventTarget | null) => void;
+  onRichTextEditorRegister: (regionId: string, editor: Editor | null) => void;
 };
 
 function SortableLayoutRow({
@@ -401,6 +1020,9 @@ function SortableLayoutRow({
   onUpdateDoc,
   onConfigure,
   onRemove,
+  onEditorFocusRegion,
+  onEditorBlurRegion,
+  onRichTextEditorRegister,
 }: SortableLayoutRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.id,
@@ -453,8 +1075,7 @@ function SortableLayoutRow({
           className="inline-flex items-center gap-1.5 rounded-md border border-app-accent/35 bg-app-accent-muted/40 px-2.5 py-1 text-[10px] font-medium text-app-accent hover:bg-app-accent-muted"
           title="Add a new column block in this row"
         >
-          <Columns2 size={12} aria-hidden />
-          + Column
+          <Columns2 size={12} aria-hidden />+ Column
         </button>
       </div>
       <div
@@ -471,6 +1092,9 @@ function SortableLayoutRow({
                   onUpdateDoc={onUpdateDoc}
                   onConfigure={onConfigure}
                   onRemove={onRemove}
+                  onEditorFocusRegion={onEditorFocusRegion}
+                  onEditorBlurRegion={onEditorBlurRegion}
+                  onRichTextEditorRegister={onRichTextEditorRegister}
                 />
               ))}
               <button
@@ -478,17 +1102,17 @@ function SortableLayoutRow({
                 onClick={() => onRequestAddToCell(row.id, cell.id)}
                 className="flex w-full items-center justify-center gap-1 rounded-app-md border border-dashed border-white/[0.1] bg-black/15 py-1.5 text-[10px] font-medium text-app-faint hover:border-app-accent/35 hover:bg-app-accent-muted/20 hover:text-app-accent"
               >
-                <Plus size={11} aria-hidden />
-                + Block
+                <Plus size={11} aria-hidden />+ Block
               </button>
             </div>,
           ];
           if (i < row.cells.length - 1) {
             chunk.push(
-              <div key={`${row.id}-gutter-${i}`} className="flex min-w-0 items-stretch justify-center">
-                <ColumnResizeHandle
-                  onPointerDown={(e) => onResizePointerDown(e, row.id, i)}
-                />
+              <div
+                key={`${row.id}-gutter-${i}`}
+                className="flex min-w-0 items-stretch justify-center"
+              >
+                <ColumnResizeHandle onPointerDown={(e) => onResizePointerDown(e, row.id, i)} />
               </div>,
             );
           }
@@ -508,12 +1132,18 @@ function ReadOnlyRich({ doc }: { doc: JSONContent }) {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
       Link.configure({
         openOnClick: true,
         HTMLAttributes: {
           rel: 'noopener noreferrer nofollow',
           target: '_blank',
         },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+        HTMLAttributes: { class: 'max-w-full rounded-lg border border-white/[0.08]' },
       }),
     ],
     content: doc,
@@ -555,7 +1185,9 @@ function PreviewRegionCard({ region }: { region: TemplateLayoutRegion }) {
             {`{{${String((region.props as { fieldKey?: string })?.fieldKey ?? 'field')}}}`}
           </div>
           {(region.props as { label?: string })?.label ? (
-            <div className="mt-1 text-xs text-app-muted">{String((region.props as { label?: string }).label)}</div>
+            <div className="mt-1 text-xs text-app-muted">
+              {String((region.props as { label?: string }).label)}
+            </div>
           ) : null}
           {(region.props as { helpText?: string })?.helpText ? (
             <p className="mt-1 mb-0 text-[11px] text-app-faint">
@@ -580,14 +1212,18 @@ function extractTextFromDoc(doc: JSONContent): string {
       parts.push('\n');
       return;
     }
-    const isBlock = node.type === 'paragraph' || node.type === 'heading' || node.type === 'blockquote';
+    const isBlock =
+      node.type === 'paragraph' || node.type === 'heading' || node.type === 'blockquote';
     if (Array.isArray(node.content)) {
       node.content.forEach((child) => walk(child as JSONContent));
       if (isBlock) parts.push('\n');
     }
   };
   walk(doc);
-  return parts.join('').replace(/\n{3,}/g, '\n\n').trim();
+  return parts
+    .join('')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function InlineTemplateText({ text }: { text: string }) {
@@ -611,7 +1247,8 @@ function InlineTemplateText({ text }: { text: string }) {
 }
 
 function highlightJsonHtml(raw: string): string {
-  const esc = (s: string) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const esc = (s: string) =>
+    s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   return esc(raw).replace(
     /"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:\s*)?("([^"\\]*(?:\\.[^"\\]*)*)")?/g,
     (_m, keyText: string, sep: string | undefined, quotedVal: string | undefined) => {
@@ -689,6 +1326,23 @@ type TemplateLayoutEditorProps = {
     channelKey: string;
     layoutConfig?: Record<string, unknown> | null;
   }>;
+  channelCompatibility?: {
+    fieldTypes?: string[];
+    restrictions?: {
+      maxCharacters?: number;
+      [key: string]: unknown;
+    };
+  } | null;
+  channelLabel?: string;
+  /** Fired when dirty / save / activate eligibility changes (used by compact topbar). */
+  onToolbarState?: (s: {
+    dirty: boolean;
+    canActivate: boolean;
+    canSaveDraft: boolean;
+    exceedsCharacterLimit: boolean;
+  }) => void;
+  /** HTTP 200 after a successful draft save (parent may show a toast). */
+  onDraftSaved?: () => void;
 };
 
 type BlockModalState =
@@ -707,6 +1361,10 @@ export default function TemplateLayoutEditor({
   onSavingChange,
   onActivatingChange,
   previewChannels = [],
+  channelCompatibility,
+  channelLabel,
+  onToolbarState,
+  onDraftSaved,
 }: TemplateLayoutEditorProps) {
   const [rows, setRows] = useState<LayoutRow[]>([]);
   const rowsRef = useRef(rows);
@@ -724,16 +1382,117 @@ export default function TemplateLayoutEditor({
   const [previewFieldJson, setPreviewFieldJson] = useState<string>('{}');
   /** Full-width editor vs full-width preview — avoids splitting horizontal space */
   const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'preview'>('editor');
+  const supportedFieldTypes = useMemo(
+    () => new Set((channelCompatibility?.fieldTypes ?? []).map((v) => String(v).toLowerCase())),
+    [channelCompatibility?.fieldTypes],
+  );
+  const hasFieldTypeRestrictions = supportedFieldTypes.size > 0;
+  const allows = useCallback(
+    (name: string) => !hasFieldTypeRestrictions || supportedFieldTypes.has(name.toLowerCase()),
+    [hasFieldTypeRestrictions, supportedFieldTypes],
+  );
+  /** Legacy `restrictions.supportsUnderline`; matrix `underline` in fieldTypes is the source of truth when saving. */
+  const underlineRestrictionOk = channelCompatibility?.restrictions?.supportsUnderline !== false;
+  const allowRichText = allows('richText') || allows('paragraph');
+  const allowMedia = allows('media') || allows('image');
+  const allowField = allows('field');
+  const richTextToolkit = useMemo<RichTextToolkitFlags>(
+    () => ({
+      heading1: allows('heading1'),
+      heading2: allows('heading2'),
+      bold: allows('bold'),
+      italic: allows('italic'),
+      underline: allows('underline') && underlineRestrictionOk,
+      bulletList: allows('bullet_list'),
+      orderedList: allows('ordered_list'),
+      link: allows('link'),
+      insertImage: allows('image'),
+      fieldToken: allows('field'),
+      mediaToken: allows('media'),
+    }),
+    [allows, underlineRestrictionOk],
+  );
+
+  const richTextEditorsRef = useRef<Map<string, Editor>>(new Map());
+  const [focusedRichRegionId, setFocusedRichRegionId] = useState<string | null>(null);
+  const [editorRegistryEpoch, setEditorRegistryEpoch] = useState(0);
+
+  const handleEditorFocusRegion = useCallback((regionId: string) => {
+    setFocusedRichRegionId(regionId);
+  }, []);
+
+  const handleEditorBlurRegion = useCallback(
+    (regionId: string, relatedTarget: EventTarget | null) => {
+      const el = relatedTarget as HTMLElement | null;
+      if (el?.closest?.('[data-shared-rich-toolbar]')) return;
+      if (el?.closest?.('.ProseMirror')) return;
+      if (!el) {
+        window.setTimeout(() => {
+          const ae = document.activeElement as HTMLElement | null;
+          if (ae?.closest?.('[data-shared-rich-toolbar]')) return;
+          if (ae?.closest?.('.ProseMirror')) return;
+          setFocusedRichRegionId((prev) => (prev === regionId ? null : prev));
+        }, 0);
+        return;
+      }
+      setFocusedRichRegionId((prev) => (prev === regionId ? null : prev));
+    },
+    [],
+  );
+
+  const registerRichTextEditor = useCallback((regionId: string, editor: Editor | null) => {
+    if (editor) {
+      if (richTextEditorsRef.current.get(regionId) === editor) return;
+      richTextEditorsRef.current.set(regionId, editor);
+    } else {
+      if (!richTextEditorsRef.current.has(regionId)) return;
+      richTextEditorsRef.current.delete(regionId);
+    }
+    setEditorRegistryEpoch((e) => e + 1);
+  }, []);
+
+  const handleLayoutDragStart = useCallback(() => {
+    setFocusedRichRegionId(null);
+  }, []);
+
+  useEffect(() => {
+    if (workspaceTab !== 'editor') setFocusedRichRegionId(null);
+  }, [workspaceTab]);
+
+  const activeRichToolbarEditor = useMemo(() => {
+    void editorRegistryEpoch;
+    if (!focusedRichRegionId) return null;
+    return richTextEditorsRef.current.get(focusedRichRegionId) ?? null;
+  }, [focusedRichRegionId, editorRegistryEpoch]);
+
+  /** JSON snapshot last synced with the server (load or successful save). */
+  const lastSyncedLayoutJsonRef = useRef('');
+  /** Bumps when the synced baseline changes so dirty recomputes. */
+  const [layoutBaselineEpoch, setLayoutBaselineEpoch] = useState(0);
 
   useEffect(() => {
     const parsed = parseTemplateLayout(draftLayout);
-    setRows(parsed?.rows?.length ? parsed.rows : []);
+    const nextRows = parsed?.rows?.length ? parsed.rows : [];
+    setRows(nextRows);
+    setFocusedRichRegionId(null);
+    richTextEditorsRef.current.clear();
+    setEditorRegistryEpoch((e) => e + 1);
+    lastSyncedLayoutJsonRef.current = JSON.stringify({
+      version: LAYOUT_VERSION,
+      rows: nextRows,
+    });
+    setLayoutBaselineEpoch((e) => e + 1);
   }, [templateId, draftLayout]);
 
-  const flatRegions = useMemo(
-    () => flattenRegions({ version: LAYOUT_VERSION, rows }),
-    [rows],
-  );
+  const flatRegions = useMemo(() => flattenRegions({ version: LAYOUT_VERSION, rows }), [rows]);
+
+  const activeRichToolbarTitle = useMemo(() => {
+    if (!focusedRichRegionId) return null;
+    const r = flatRegions.find((x) => x.id === focusedRichRegionId);
+    if (!r || r.type !== REGION_TYPES.richText) return null;
+    const st = String((r.props as { sectionTitle?: string })?.sectionTitle ?? '').trim();
+    return st || 'Rich text';
+  }, [flatRegions, focusedRichRegionId]);
 
   const layoutConfig = useMemo(
     (): TemplateLayoutConfig => ({
@@ -742,6 +1501,13 @@ export default function TemplateLayoutEditor({
     }),
     [rows],
   );
+
+  const currentLayoutJson = useMemo(() => JSON.stringify(layoutConfig), [layoutConfig]);
+
+  const dirty = useMemo(() => {
+    void layoutBaselineEpoch;
+    return currentLayoutJson !== lastSyncedLayoutJsonRef.current;
+  }, [currentLayoutJson, layoutBaselineEpoch]);
 
   const regionCount = layoutRegionCount({ version: LAYOUT_VERSION, rows });
 
@@ -767,7 +1533,9 @@ export default function TemplateLayoutEditor({
       row.cells.forEach((cell) => {
         cell.regions.forEach((region) => {
           if (region.type === REGION_TYPES.field) {
-            const key = String((region.props as { fieldKey?: string } | undefined)?.fieldKey ?? '').trim();
+            const key = String(
+              (region.props as { fieldKey?: string } | undefined)?.fieldKey ?? '',
+            ).trim();
             if (key) field.add(key);
           }
           if (region.type === REGION_TYPES.richText) {
@@ -811,10 +1579,43 @@ export default function TemplateLayoutEditor({
     }
   }, [previewFieldJson]);
 
-  const previewFieldJsonHighlighted = useMemo(() => highlightJsonHtml(previewFieldJson), [previewFieldJson]);
+  const previewFieldJsonHighlighted = useMemo(
+    () => highlightJsonHtml(previewFieldJson),
+    [previewFieldJson],
+  );
+  const richTextCharCount = useMemo(() => {
+    let total = 0;
+    rows.forEach((row) => {
+      row.cells.forEach((cell) => {
+        cell.regions.forEach((region) => {
+          if (region.type !== REGION_TYPES.richText) return;
+          total += extractTextFromDoc(ensureRichDoc(region.props)).length;
+        });
+      });
+    });
+    return total;
+  }, [rows]);
+  const maxCharacters = Number(channelCompatibility?.restrictions?.maxCharacters);
+  const hasMaxCharacters = Number.isFinite(maxCharacters) && maxCharacters > 0;
+  const exceedsCharacterLimit = hasMaxCharacters ? richTextCharCount > maxCharacters : false;
+
+  const canSaveDraft = useMemo(
+    () => dirty && !exceedsCharacterLimit,
+    [dirty, exceedsCharacterLimit],
+  );
+
+  const canActivate = useMemo(
+    () => !dirty && bindingCount >= 1 && regionCount >= 1 && !exceedsCharacterLimit,
+    [dirty, bindingCount, regionCount, exceedsCharacterLimit],
+  );
+
+  useEffect(() => {
+    onToolbarState?.({ dirty, canActivate, canSaveDraft, exceedsCharacterLimit });
+  }, [dirty, canActivate, canSaveDraft, exceedsCharacterLimit, onToolbarState]);
 
   const selectedPreviewChannel = useMemo(
-    () => previewChannels.find((c) => c.bindingId === previewBindingId) ?? previewChannels[0] ?? null,
+    () =>
+      previewChannels.find((c) => c.bindingId === previewBindingId) ?? previewChannels[0] ?? null,
     [previewChannels, previewBindingId],
   );
 
@@ -903,7 +1704,9 @@ export default function TemplateLayoutEditor({
       const startLeft = row.cells[leftIdx].flexGrow;
       const startRight = row.cells[leftIdx + 1].flexGrow;
       const pool = startLeft + startRight;
-      const host = (e.currentTarget as HTMLElement).closest('[data-layout-row]') as HTMLElement | null;
+      const host = (e.currentTarget as HTMLElement).closest(
+        '[data-layout-row]',
+      ) as HTMLElement | null;
       const width = Math.max(120, host?.getBoundingClientRect().width ?? 400);
       const startX = e.clientX;
       const onMove = (ev: PointerEvent) => {
@@ -938,9 +1741,12 @@ export default function TemplateLayoutEditor({
     setRows((prev) => mapRegion(prev, id, (r) => ({ ...r, props: { ...r.props, ...updates } })));
   }, []);
 
-  const removeRegion = (id: string) => {
+  const removeRegion = useCallback((id: string) => {
     setRows((prev) => removeRegionFromRows(prev, id));
-  };
+    setFocusedRichRegionId((cur) => (cur === id ? null : cur));
+    richTextEditorsRef.current.delete(id);
+    setEditorRegistryEpoch((e) => e + 1);
+  }, []);
 
   const updateDoc = useCallback((id: string, doc: JSONContent) => {
     setRows((prev) => mapRegion(prev, id, (r) => ({ ...r, props: { ...r.props, doc } })));
@@ -950,8 +1756,10 @@ export default function TemplateLayoutEditor({
     const r = flatRegions.find((x) => x.id === regionId);
     if (!r) return;
     if (r.type === REGION_TYPES.richText) setBlockModal({ flow: 'edit', kind: 'text', regionId });
-    else if (r.type === REGION_TYPES.media) setBlockModal({ flow: 'edit', kind: 'media', regionId });
-    else if (r.type === REGION_TYPES.field) setBlockModal({ flow: 'edit', kind: 'field', regionId });
+    else if (r.type === REGION_TYPES.media)
+      setBlockModal({ flow: 'edit', kind: 'media', regionId });
+    else if (r.type === REGION_TYPES.field)
+      setBlockModal({ flow: 'edit', kind: 'field', regionId });
   }
 
   function closeBlockModal() {
@@ -1010,6 +1818,7 @@ export default function TemplateLayoutEditor({
   }, [blockModal, flatRegions]);
 
   function handleTextModalSubmit(values: TextBlockFormValues) {
+    if (!allowRichText) return;
     if (!blockModal || blockModal.kind !== 'text') return;
     if (blockModal.flow === 'add') {
       const id = crypto.randomUUID();
@@ -1040,6 +1849,7 @@ export default function TemplateLayoutEditor({
   }
 
   function handleMediaModalSubmit(values: MediaBlockFormValues) {
+    if (!allowMedia) return;
     if (!blockModal || blockModal.kind !== 'media') return;
     const payload = {
       role: values.role,
@@ -1064,6 +1874,7 @@ export default function TemplateLayoutEditor({
   }
 
   function handleFieldModalSubmit(values: FieldBlockFormValues) {
+    if (!allowField) return;
     if (!blockModal || blockModal.kind !== 'field') return;
     const payload = {
       fieldKey: values.fieldKey,
@@ -1104,15 +1915,43 @@ export default function TemplateLayoutEditor({
   );
 
   function onPaletteAdd() {
-    addRichTextRegion();
+    if (allowRichText) {
+      addRichTextRegion();
+      return;
+    }
+    if (allowMedia) {
+      setAppendToRowId(null);
+      setAppendToCell(null);
+      setBlockModal({ flow: 'add', kind: 'media' });
+      return;
+    }
+    if (allowField) {
+      setAppendToRowId(null);
+      setAppendToCell(null);
+      setBlockModal({ flow: 'add', kind: 'field' });
+    }
   }
 
   function onRequestAddColumn(rowId: string) {
-    addRichTextRegion({ rowId });
+    if (!allowRichText && !allowMedia && !allowField) return;
+    if (allowRichText) {
+      addRichTextRegion({ rowId });
+      return;
+    }
+    setAppendToRowId(rowId);
+    setAppendToCell(null);
+    setBlockModal({ flow: 'add', kind: allowMedia ? 'media' : 'field' });
   }
 
   function onRequestAddToCell(rowId: string, cellId: string) {
-    addRichTextRegion({ rowId, cellId });
+    if (!allowRichText && !allowMedia && !allowField) return;
+    if (allowRichText) {
+      addRichTextRegion({ rowId, cellId });
+      return;
+    }
+    setAppendToRowId(null);
+    setAppendToCell({ rowId, cellId });
+    setBlockModal({ flow: 'add', kind: allowMedia ? 'media' : 'field' });
   }
 
   const onEqualizeColumns = useCallback((rowId: string) => {
@@ -1120,19 +1959,39 @@ export default function TemplateLayoutEditor({
   }, []);
 
   const handleSaveDraft = useCallback(async () => {
+    if (exceedsCharacterLimit) {
+      setSaveError(
+        hasMaxCharacters
+          ? `This channel allows at most ${maxCharacters} characters in rich text. Shorten content before saving.`
+          : 'Content exceeds the channel character limit. Shorten content before saving.',
+      );
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     onSavingChange?.(true);
     try {
       const updated = await templateCrudService.saveDraftLayout(templateId, layoutConfig);
+      lastSyncedLayoutJsonRef.current = JSON.stringify(layoutConfig);
+      setLayoutBaselineEpoch((e) => e + 1);
       onLayoutSaved(updated);
+      onDraftSaved?.();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Failed to save draft layout');
     } finally {
       setSaving(false);
       onSavingChange?.(false);
     }
-  }, [templateId, layoutConfig, onLayoutSaved, onSavingChange]);
+  }, [
+    templateId,
+    layoutConfig,
+    onLayoutSaved,
+    onSavingChange,
+    onDraftSaved,
+    exceedsCharacterLimit,
+    hasMaxCharacters,
+    maxCharacters,
+  ]);
 
   const handleActivate = useCallback(async () => {
     setActivating(true);
@@ -1179,7 +2038,7 @@ export default function TemplateLayoutEditor({
         </div>
       )}
 
-      <div className="flex min-h-[680px] flex-col overflow-hidden rounded-[12px] border border-white/[0.07] bg-[#0d0f18]">
+      <div className="flex min-h-[680px] flex-1 flex-col overflow-hidden rounded-[12px] border border-white/[0.07] bg-[#0d0f18]">
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.07] px-3">
           <div className="flex items-center gap-3">
             <div className="flex h-8 items-center rounded-full border border-white/[0.09] bg-white/[0.05] p-0.5">
@@ -1187,7 +2046,9 @@ export default function TemplateLayoutEditor({
                 type="button"
                 onClick={() => setWorkspaceTab('editor')}
                 className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-150 ease-in ${
-                  workspaceTab === 'editor' ? 'bg-[#7C6FF7] text-white' : 'bg-transparent text-app-muted hover:text-app-text'
+                  workspaceTab === 'editor'
+                    ? 'bg-[#7C6FF7] text-white'
+                    : 'bg-transparent text-app-muted hover:text-app-text'
                 }`}
               >
                 Editor
@@ -1196,7 +2057,9 @@ export default function TemplateLayoutEditor({
                 type="button"
                 onClick={() => setWorkspaceTab('preview')}
                 className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-150 ease-in ${
-                  workspaceTab === 'preview' ? 'bg-[#7C6FF7] text-white' : 'bg-transparent text-app-muted hover:text-app-text'
+                  workspaceTab === 'preview'
+                    ? 'bg-[#7C6FF7] text-white'
+                    : 'bg-transparent text-app-muted hover:text-app-text'
                 }`}
               >
                 Preview
@@ -1211,6 +2074,14 @@ export default function TemplateLayoutEditor({
                 </div>
               </>
             ) : null}
+            {channelLabel ? (
+              <>
+                <span className="h-5 w-px bg-white/[0.09]" />
+                <div className="flex items-center gap-2 text-[12px] text-app-muted">
+                  Channel: {channelLabel}
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="flex items-center gap-3">
             {workspaceTab === 'preview' ? (
@@ -1220,7 +2091,9 @@ export default function TemplateLayoutEditor({
                     type="button"
                     onClick={() => setPreviewBp('desktop')}
                     className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-150 ease-in ${
-                      previewBp === 'desktop' ? 'bg-white text-[#0d0f18]' : 'bg-transparent text-app-muted hover:text-app-text'
+                      previewBp === 'desktop'
+                        ? 'bg-white text-[#0d0f18]'
+                        : 'bg-transparent text-app-muted hover:text-app-text'
                     }`}
                   >
                     <Monitor size={13} /> Desktop
@@ -1229,7 +2102,9 @@ export default function TemplateLayoutEditor({
                     type="button"
                     onClick={() => setPreviewBp('mobile')}
                     className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-150 ease-in ${
-                      previewBp === 'mobile' ? 'bg-white text-[#0d0f18]' : 'bg-transparent text-app-muted hover:text-app-text'
+                      previewBp === 'mobile'
+                        ? 'bg-white text-[#0d0f18]'
+                        : 'bg-transparent text-app-muted hover:text-app-text'
                     }`}
                   >
                     <Smartphone size={13} /> Mobile
@@ -1241,202 +2116,273 @@ export default function TemplateLayoutEditor({
             <button
               type="button"
               onClick={onPaletteAdd}
+              disabled={!allowRichText && !allowMedia && !allowField}
               className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-white/[0.12] bg-transparent px-3 text-[13px] font-medium text-app-muted transition-all duration-150 ease-in hover:border-white/[0.14] hover:text-app-text"
             >
               <Plus size={14} /> Add block
             </button>
           </div>
         </div>
-
-        {workspaceTab === 'editor' ? (
-          <div className="min-w-0 flex flex-col gap-0">
-            <div className="border-b border-white/[0.07] px-4 py-2 text-[12px] text-app-faint">
-              Drag rows, resize gutters, use <span className="text-app-muted">+ Column</span>, and stack blocks with dashed +.
+        <SharedRichTextToolkitBar
+          toolkit={richTextToolkit}
+          editor={workspaceTab === 'editor' ? activeRichToolbarEditor : null}
+          activeRegionTitle={activeRichToolbarTitle}
+          activeRegionId={focusedRichRegionId}
+          getEditorByRegionId={(id) => richTextEditorsRef.current.get(id) ?? null}
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {hasMaxCharacters ? (
+            <div
+              className={`border-b px-4 py-2 text-[11px] ${
+                exceedsCharacterLimit
+                  ? 'border-amber-400/30 bg-amber-500/10 text-amber-100'
+                  : 'border-white/[0.07] text-app-faint'
+              }`}
+            >
+              Character usage: {richTextCharCount} / {maxCharacters}
+              {exceedsCharacterLimit ? ' (reduce content for this channel)' : ''}
             </div>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-4 px-4 pb-4">
-                  {rows.length === 0 ? (
-                    <div className="rounded-app-lg border border-dashed border-app-accent/25 bg-app-accent-muted/10 px-4 py-10 text-center">
-                      <p className="m-0 text-[13px] text-app-faint">Empty — add a block from the bar above.</p>
-                    </div>
-                  ) : (
-                    rows.map((row) => (
-                      <SortableLayoutRow
-                        key={row.id}
-                        row={row}
-                        onResizePointerDown={handleResizePointerDown}
-                        onRequestAddColumn={onRequestAddColumn}
-                        onRequestAddToCell={onRequestAddToCell}
-                        onEqualizeColumns={onEqualizeColumns}
-                        onUpdateDoc={updateDoc}
-                        onConfigure={openConfigure}
-                        onRemove={removeRegion}
-                      />
-                    ))
-                  )}
-                </div>
-              </SortableContext>
-            </DndContext>
+          ) : null}
 
-            {!compact && (
-              <div className="mt-4 flex flex-col gap-4 border-t border-app-border/50 px-4 pb-6 pt-6 sm:flex-row sm:flex-wrap sm:items-center">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={handleSaveDraft}
-                  className="inline-flex items-center justify-center gap-2 rounded-app-md border border-app-accent/45 bg-app-accent-muted px-4 py-2.5 text-sm font-medium hover:bg-app-accent/20 disabled:opacity-50"
-                >
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                  Save draft layout
-                </button>
-                <button
-                  type="button"
-                  disabled={activating || bindingCount < 1 || regionCount < 1}
-                  onClick={handleActivate}
-                  title={
-                    bindingCount < 1
-                      ? 'Add at least one channel binding before activating'
-                      : regionCount < 1
-                        ? 'Add at least one section before activating'
-                        : 'Promote draft layout to active'
-                  }
-                  className="inline-flex items-center justify-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/12 px-4 py-2.5 text-sm font-medium text-emerald-100 hover:bg-emerald-500/18 disabled:opacity-40"
-                >
-                  {activating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                  Activate template
-                </button>
-                {bindingCount < 1 ? (
-                  <span className="text-xs leading-snug text-app-faint sm:max-w-56">
-                    Activation needs at least one channel binding on this template.
-                  </span>
-                ) : null}
+          {workspaceTab === 'editor' ? (
+            <div className="min-w-0 flex flex-col gap-0">
+              <div className="border-b border-white/[0.07] px-4 py-2 text-[12px] text-app-faint">
+                Drag rows, resize gutters, use <span className="text-app-muted">+ Column</span>, and
+                stack blocks with dashed +. Click inside a rich text editor to move the caret — the
+                toolbar directly under the Editor / Preview tabs applies formatting to that block.
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 overflow-auto bg-[#0a0c14] px-4 py-5">
-              <div
-                className={`mx-auto overflow-hidden rounded-[12px] border border-white/[0.09] bg-[#12141e] transition-all duration-300 ease-in ${
-                  previewBp === 'mobile' ? 'w-[375px]' : 'w-[640px]'
-                }`}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleLayoutDragStart}
+                onDragEnd={onDragEnd}
               >
-                <div className="flex h-8 items-center justify-between border-b border-white/[0.07] bg-white/[0.03] px-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                  </div>
-                  <span className="text-[12px] text-app-muted">Email preview</span>
-                  <span className="w-7" />
-                </div>
-                <div className="space-y-2 p-8">
-                  {resolvedPreviewRows.length === 0 ? (
-                    <div className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] p-4 text-[14px] text-app-muted">
-                      Add blocks to start previewing.
-                    </div>
-                  ) : (
-                    resolvedPreviewRows.map((row) => (
-                      <div
-                        key={row.id}
-                        className="grid gap-2"
-                        style={{ gridTemplateColumns: previewBp === 'mobile' ? '1fr' : previewRowGridTemplateColumns(row.cells) }}
-                      >
-                        {row.cells.map((cell) => (
-                          <div key={cell.id} className="space-y-2">
-                            {cell.regions.map((region) => {
-                              const doc = ensureRichDoc(region.props);
-                              const text = extractTextFromDoc(doc);
-                              return (
-                                <div
-                                  key={region.id}
-                                  className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[14px] leading-[1.6] text-white/85"
-                                >
-                                  {text ? <InlineTemplateText text={text} /> : <span className="text-app-faint">Empty block</span>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
+                <SortableContext
+                  items={rows.map((r) => r.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-4 px-4 pb-4">
+                    {rows.length === 0 ? (
+                      <div className="rounded-app-lg border border-dashed border-app-accent/25 bg-app-accent-muted/10 px-4 py-10 text-center">
+                        <p className="m-0 text-[13px] text-app-faint">
+                          Empty — add a block from the bar above.
+                        </p>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              <p className="mt-3 text-center text-[11px] text-app-muted">
-                Read-only · use field values below to test variable substitution
-              </p>
-            </div>
-
-            <div className="grid h-[180px] shrink-0 grid-cols-2 gap-4 border-t border-white/[0.07] bg-[#12141e] p-4">
-              <div className="min-w-0">
-                <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">Preview channel</label>
-                <div className="relative flex h-9 items-center justify-between rounded-[8px] border border-white/[0.1] bg-white/[0.05] px-3 text-[13px]">
-                  <span className="inline-flex items-center gap-2 text-app-text">
-                    <Mail size={13} className="text-app-muted" />
-                    {selectedPreviewChannel ? `${selectedPreviewChannel.channelName} (${selectedPreviewChannel.channelKey})` : 'No channel'}
-                  </span>
-                  <ChevronDown size={14} className="text-app-muted" />
-                  <select
-                    value={previewBindingId}
-                    onChange={(e) => setPreviewBindingId(e.target.value)}
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                    disabled={previewChannels.length < 1}
-                  >
-                    {previewChannels.length < 1 ? (
-                      <option value="">No channel bindings</option>
                     ) : (
-                      previewChannels.map((ch) => (
-                        <option key={ch.bindingId} value={ch.bindingId}>
-                          {ch.channelName} ({ch.channelKey})
-                        </option>
+                      rows.map((row) => (
+                        <SortableLayoutRow
+                          key={row.id}
+                          row={row}
+                          onResizePointerDown={handleResizePointerDown}
+                          onRequestAddColumn={onRequestAddColumn}
+                          onRequestAddToCell={onRequestAddToCell}
+                          onEqualizeColumns={onEqualizeColumns}
+                          onUpdateDoc={updateDoc}
+                          onConfigure={openConfigure}
+                          onRemove={removeRegion}
+                          onEditorFocusRegion={handleEditorFocusRegion}
+                          onEditorBlurRegion={handleEditorBlurRegion}
+                          onRichTextEditorRegister={registerRichTextEditor}
+                        />
                       ))
                     )}
-                  </select>
-                </div>
-                <div className="mt-2 inline-flex items-center gap-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[11px] text-app-muted">
-                  <Eye size={11} />
-                  Layout: {String(selectedPreviewChannel?.layoutConfig?.layout ?? 'responsive')}
-                </div>
-              </div>
+                  </div>
+                </SortableContext>
+              </DndContext>
 
-              <div className="min-w-0">
-                <div className="mb-2 flex items-center gap-2">
-                  <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">Field values</label>
-                  <span className="rounded-[4px] bg-white/[0.07] px-1.5 py-0.5 font-mono text-[11px] text-app-muted">JSON</span>
+              {!compact && (
+                <div className="mt-4 flex flex-col gap-4 border-t border-app-border/50 px-4 pb-6 pt-6 sm:flex-row sm:flex-wrap sm:items-center">
+                  <button
+                    type="button"
+                    disabled={saving || !canSaveDraft}
+                    title={
+                      exceedsCharacterLimit
+                        ? 'Reduce rich text length to satisfy this channel’s limit before saving'
+                        : dirty
+                          ? 'Save draft layout to the server'
+                          : 'No unsaved changes'
+                    }
+                    onClick={handleSaveDraft}
+                    className="inline-flex items-center justify-center gap-2 rounded-app-md border border-app-accent/45 bg-app-accent-muted px-4 py-2.5 text-sm font-medium hover:bg-app-accent/20 disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    Save draft layout
+                  </button>
+                  <button
+                    type="button"
+                    disabled={activating || !canActivate}
+                    onClick={handleActivate}
+                    title={
+                      dirty
+                        ? 'Save draft changes before activating'
+                        : bindingCount < 1
+                          ? 'Add at least one channel binding before activating'
+                          : regionCount < 1
+                            ? 'Add at least one section before activating'
+                            : exceedsCharacterLimit
+                              ? 'Reduce content length to satisfy channel character limit'
+                              : 'Promote draft layout to active'
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/12 px-4 py-2.5 text-sm font-medium text-emerald-100 hover:bg-emerald-500/18 disabled:opacity-40"
+                  >
+                    {activating ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={16} />
+                    )}
+                    Activate template
+                  </button>
+                  {bindingCount < 1 ? (
+                    <span className="text-xs leading-snug text-app-faint sm:max-w-56">
+                      Activation needs at least one channel binding on this template.
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="text-[11px] text-app-muted">Available:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {previewTokens.field.map((key) => (
-                      <span
-                        key={key}
-                        className="rounded-[4px] border border-[rgba(124,111,247,0.2)] bg-[rgba(124,111,247,0.12)] px-2 py-0.5 font-mono text-[11px] text-[#9d94f5]"
-                      >
-                        {`{{${key}}}`}
-                      </span>
-                    ))}
+              )}
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-auto bg-[#0a0c14] px-4 py-5">
+                <div
+                  className={`mx-auto overflow-hidden rounded-[12px] border border-white/[0.09] bg-[#12141e] transition-all duration-300 ease-in ${
+                    previewBp === 'mobile' ? 'w-[375px]' : 'w-[640px]'
+                  }`}
+                >
+                  <div className="flex h-8 items-center justify-between border-b border-white/[0.07] bg-white/[0.03] px-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                    </div>
+                    <span className="text-[12px] text-app-muted">Email preview</span>
+                    <span className="w-7" />
+                  </div>
+                  <div className="space-y-2 p-8">
+                    {resolvedPreviewRows.length === 0 ? (
+                      <div className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] p-4 text-[14px] text-app-muted">
+                        Add blocks to start previewing.
+                      </div>
+                    ) : (
+                      resolvedPreviewRows.map((row) => (
+                        <div
+                          key={row.id}
+                          className="grid gap-2"
+                          style={{
+                            gridTemplateColumns:
+                              previewBp === 'mobile'
+                                ? '1fr'
+                                : previewRowGridTemplateColumns(row.cells),
+                          }}
+                        >
+                          {row.cells.map((cell) => (
+                            <div key={cell.id} className="space-y-2">
+                              {cell.regions.map((region) => {
+                                const doc = ensureRichDoc(region.props);
+                                const text = extractTextFromDoc(doc);
+                                return (
+                                  <div
+                                    key={region.id}
+                                    className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[14px] leading-[1.6] text-white/85"
+                                  >
+                                    {text ? (
+                                      <InlineTemplateText text={text} />
+                                    ) : (
+                                      <span className="text-app-faint">Empty block</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
-                <div className="relative h-[90px] overflow-hidden rounded-[8px] border border-white/[0.09] bg-[#0d0f18]">
-                  <pre
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12px] leading-[1.6] text-white/30"
-                    dangerouslySetInnerHTML={{ __html: previewFieldJsonHighlighted }}
-                  />
-                  <textarea
-                    value={previewFieldJson}
-                    onChange={(e) => setPreviewFieldJson(e.target.value)}
-                    placeholder={'{\n  "firstName": "Praneeth"\n}'}
-                    className="absolute inset-0 h-full w-full resize-none bg-transparent px-3 py-2 font-mono text-[12px] leading-[1.6] text-transparent caret-white outline-none"
-                  />
+                <p className="mt-3 text-center text-[11px] text-app-muted">
+                  Read-only · use field values below to test variable substitution
+                </p>
+              </div>
+
+              <div className="grid h-[180px] shrink-0 grid-cols-2 gap-4 border-t border-white/[0.07] bg-[#12141e] p-4">
+                <div className="min-w-0">
+                  <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">
+                    Preview channel
+                  </label>
+                  <div className="relative flex h-9 items-center justify-between rounded-[8px] border border-white/[0.1] bg-white/[0.05] px-3 text-[13px]">
+                    <span className="inline-flex items-center gap-2 text-app-text">
+                      <Mail size={13} className="text-app-muted" />
+                      {selectedPreviewChannel
+                        ? `${selectedPreviewChannel.channelName} (${selectedPreviewChannel.channelKey})`
+                        : 'No channel'}
+                    </span>
+                    <ChevronDown size={14} className="text-app-muted" />
+                    <select
+                      value={previewBindingId}
+                      onChange={(e) => setPreviewBindingId(e.target.value)}
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      disabled={previewChannels.length < 1}
+                    >
+                      {previewChannels.length < 1 ? (
+                        <option value="">No channel bindings</option>
+                      ) : (
+                        previewChannels.map((ch) => (
+                          <option key={ch.bindingId} value={ch.bindingId}>
+                            {ch.channelName} ({ch.channelKey})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <div className="mt-2 inline-flex items-center gap-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[11px] text-app-muted">
+                    <Eye size={11} />
+                    Layout: {String(selectedPreviewChannel?.layoutConfig?.layout ?? 'responsive')}
+                  </div>
                 </div>
-                {previewFieldJsonError ? <p className="mt-1 text-[11px] text-amber-200/85">{previewFieldJsonError}</p> : null}
+
+                <div className="min-w-0">
+                  <div className="mb-2 flex items-center gap-2">
+                    <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">
+                      Field values
+                    </label>
+                    <span className="rounded-[4px] bg-white/[0.07] px-1.5 py-0.5 font-mono text-[11px] text-app-muted">
+                      JSON
+                    </span>
+                  </div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-[11px] text-app-muted">Available:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {previewTokens.field.map((key) => (
+                        <span
+                          key={key}
+                          className="rounded-[4px] border border-[rgba(124,111,247,0.2)] bg-[rgba(124,111,247,0.12)] px-2 py-0.5 font-mono text-[11px] text-[#9d94f5]"
+                        >
+                          {`{{${key}}}`}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="relative h-[90px] overflow-hidden rounded-[8px] border border-white/[0.09] bg-[#0d0f18]">
+                    <pre
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12px] leading-[1.6] text-white/30"
+                      dangerouslySetInnerHTML={{ __html: previewFieldJsonHighlighted }}
+                    />
+                    <textarea
+                      value={previewFieldJson}
+                      onChange={(e) => setPreviewFieldJson(e.target.value)}
+                      placeholder={'{\n  "firstName": "Praneeth"\n}'}
+                      className="absolute inset-0 h-full w-full resize-none bg-transparent px-3 py-2 font-mono text-[12px] leading-[1.6] text-transparent caret-white outline-none"
+                    />
+                  </div>
+                  {previewFieldJsonError ? (
+                    <p className="mt-1 text-[11px] text-amber-200/85">{previewFieldJsonError}</p>
+                  ) : null}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <TextBlockModal

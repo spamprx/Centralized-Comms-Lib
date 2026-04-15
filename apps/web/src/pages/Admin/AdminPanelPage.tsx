@@ -1,32 +1,36 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Users, Shield, Activity, LayoutDashboard, ChevronLeft } from "lucide-react";
-import UserManagementTab from "../../components/admin/UserManagementTab";
-import RolesAndGroupsTab from "../../components/admin/RolesAndGroupsTab";
-import MonitoringTab from "../../components/admin/MonitoringTab";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Users, Shield, Activity, LayoutDashboard, ChevronLeft, Radio } from 'lucide-react';
+import UserManagementTab from '../../components/admin/UserManagementTab';
+import RolesAndGroupsTab from '../../components/admin/RolesAndGroupsTab';
+import MonitoringTab from '../../components/admin/MonitoringTab';
+import ChannelManagementTab from '../../components/admin/ChannelManagementTab';
 
-export type AdminTab = "users" | "roles" | "monitoring";
+export type AdminTab = 'users' | 'roles' | 'channels' | 'monitoring';
 
-const ADMIN_TABS: AdminTab[] = ["users", "roles", "monitoring"];
+const ADMIN_TABS: AdminTab[] = ['users', 'roles', 'channels', 'monitoring'];
 
 const TAB_META: Record<AdminTab, { label: string; subtitle: string; icon: React.ElementType }> = {
-  users: { label: "Users", subtitle: "Accounts and access", icon: Users },
-  roles: { label: "Roles & groups", subtitle: "Permissions and groups", icon: Shield },
-  monitoring: { label: "Monitoring", subtitle: "Health and activity", icon: Activity },
+  users: { label: 'Users', subtitle: 'Accounts and access', icon: Users },
+  roles: { label: 'Roles & groups', subtitle: 'Permissions and groups', icon: Shield },
+  channels: { label: 'Channels', subtitle: 'Compatibility and restrictions', icon: Radio },
+  monitoring: { label: 'Monitoring', subtitle: 'Health and activity', icon: Activity },
 };
 
 export default function AdminPanelPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("users");
+  const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
   const renderTab = () => {
     switch (activeTab) {
-      case "users":
+      case 'users':
         return <UserManagementTab />;
-      case "roles":
+      case 'roles':
         return <RolesAndGroupsTab />;
-      case "monitoring":
+      case 'monitoring':
         return <MonitoringTab />;
+      case 'channels':
+        return <ChannelManagementTab />;
     }
   };
 
@@ -40,8 +44,12 @@ export default function AdminPanelPage() {
                 <LayoutDashboard size={18} className="text-app-accent" aria-hidden />
               </div>
               <div className="min-w-0">
-                <h1 className="text-[15px] font-semibold tracking-tight text-app-text">Admin panel</h1>
-                <p className="truncate text-[12px] text-app-muted">{TAB_META[activeTab].subtitle}</p>
+                <h1 className="text-[15px] font-semibold tracking-tight text-app-text">
+                  Admin panel
+                </h1>
+                <p className="truncate text-[12px] text-app-muted">
+                  {TAB_META[activeTab].subtitle}
+                </p>
               </div>
             </div>
             <Link
@@ -67,13 +75,13 @@ export default function AdminPanelPage() {
                   onClick={() => setActiveTab(tab)}
                   className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] font-medium transition-all duration-150 ${
                     isActive
-                      ? "border-app-accent/35 bg-app-accent-muted text-app-accent-hover shadow-[0_0_0_1px_rgba(147,124,248,0.12)]"
-                      : "border-transparent bg-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-text"
+                      ? 'border-app-accent/35 bg-app-accent-muted text-app-accent-hover shadow-[0_0_0_1px_rgba(147,124,248,0.12)]'
+                      : 'border-transparent bg-transparent text-app-muted hover:bg-app-surface-hover hover:text-app-text'
                   }`}
                 >
                   <span
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                      isActive ? "bg-app-accent/20 text-app-accent-hover" : "text-app-muted"
+                      isActive ? 'bg-app-accent/20 text-app-accent-hover' : 'text-app-muted'
                     }`}
                   >
                     <Icon size={16} aria-hidden />
@@ -102,7 +110,7 @@ export default function AdminPanelPage() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
             >
               {renderTab()}
             </motion.div>

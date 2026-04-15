@@ -1,4 +1,4 @@
-import { LibraryLayout } from "../../layouts";
+import { LibraryLayout } from '../../layouts';
 
 export default function ContentLibraryPage() {
   return <LibraryLayout />;

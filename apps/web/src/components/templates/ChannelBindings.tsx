@@ -9,11 +9,11 @@ interface ChannelBindingsProps {
   onEditBinding?: (binding: Binding) => void;
 }
 
-export default function ChannelBindings({ 
-  templateId, 
+export default function ChannelBindings({
+  templateId,
   bindings,
-  onBindingUpdated, 
-  onEditBinding 
+  onBindingUpdated,
+  onEditBinding,
 }: ChannelBindingsProps) {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -56,7 +56,6 @@ export default function ChannelBindings({
     }
   };
 
-  
   if (error) {
     return (
       <div className="p-4 bg-red-400/10 border border-red-400/20 rounded-lg">
@@ -73,7 +72,9 @@ export default function ChannelBindings({
       <div className="p-6 text-center text-app-faint text-sm border-2 border-dashed border-app-border rounded-lg">
         <Radio size={24} className="mx-auto mb-2 text-app-faint" />
         <p>No channels bound to this template yet</p>
-        <p className="text-xs mt-1">Click "Add Channel" to configure rendering for different platforms</p>
+        <p className="text-xs mt-1">
+          Click "Add Channel" to configure rendering for different platforms
+        </p>
       </div>
     );
   }
@@ -81,10 +82,7 @@ export default function ChannelBindings({
   return (
     <div className="space-y-3">
       {bindings.map((binding) => (
-        <div
-          key={binding.id}
-          className="bg-app-surface border border-app-border rounded-lg p-4"
-        >
+        <div key={binding.id} className="bg-app-surface border border-app-border rounded-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               {/* Channel Header */}

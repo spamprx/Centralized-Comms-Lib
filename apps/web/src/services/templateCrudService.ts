@@ -70,6 +70,17 @@ export type ChannelRecord = {
   name: string;
   key: string;
   description: string;
+  priority: number;
+  compatibility: {
+    fieldTypes?: string[];
+    restrictions?: {
+      maxCharacters?: number;
+      supportsMedia?: boolean;
+      supportsUnderline?: boolean;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
   createdAt: string;
   updatedAt: string;
 };
@@ -79,23 +90,6 @@ export type TemplateBindingRecord = {
   templateId: string;
   channelId: string;
   createdAt: string;
-};
-
-export type TemplateI18nTable = {
-  templateId: string;
-  defaultLocale: string;
-  requiredLocales: string[];
-  keys: string[];
-  translations: Record<string, Record<string, string>>;
-};
-
-export type TemplateI18nResolvedValue = {
-  templateId: string;
-  key: string;
-  locale: string;
-  value: string | null;
-  sourceLocale: string | null;
-  usedFallback: boolean;
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -173,6 +167,41 @@ export const templateCrudService = {
     return request<ChannelRecord[]>('/channels');
   },
 
+  async createChannel(input: {
+    name: string;
+    key?: string;
+    description?: string | null;
+    priority?: number;
+    compatibility?: ChannelRecord['compatibility'];
+  }): Promise<ChannelRecord> {
+    return request<ChannelRecord>('/channels', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async updateChannel(
+    id: string,
+    input: {
+      name?: string;
+      key?: string;
+      description?: string | null;
+      priority?: number;
+      compatibility?: ChannelRecord['compatibility'];
+    },
+  ): Promise<ChannelRecord> {
+    return request<ChannelRecord>(`/channels/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async removeChannel(id: string): Promise<void> {
+    await request<{ message: string }>(`/channels/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   async addChannelBinding(
     templateId: string,
     input: { channelId: string; layoutConfig?: unknown },
@@ -189,29 +218,15 @@ export const templateCrudService = {
     });
   },
 
-  async patchI18n(
-    templateId: string,
-    patch: Record<string, Record<string, string>>,
-  ): Promise<TemplateRecord> {
-    return request<TemplateRecord>(`/templates/${templateId}/i18n`, {
-      method: 'PATCH',
-      body: JSON.stringify(patch),
+  async translateText(
+    text: string,
+    targetLocale: string,
+    sourceLocale?: string,
+  ): Promise<{ translated: string; detectedSource: string | null }> {
+    return request<{ translated: string; detectedSource: string | null }>('/templates/translate', {
+      method: 'POST',
+      body: JSON.stringify({ text, targetLocale, ...(sourceLocale ? { sourceLocale } : {}) }),
     });
-  },
-
-  async getI18nTable(templateId: string): Promise<TemplateI18nTable> {
-    return request<TemplateI18nTable>(`/templates/${templateId}/i18n`);
-  },
-
-  async resolveI18nValue(
-    templateId: string,
-    input: { locale: string; key: string },
-  ): Promise<TemplateI18nResolvedValue> {
-    const qs = new URLSearchParams({
-      locale: input.locale,
-      key: input.key,
-    });
-    return request<TemplateI18nResolvedValue>(`/templates/${templateId}/i18n/resolve?${qs.toString()}`);
   },
 
   async saveDraftLayout(templateId: string, layout: TemplateLayoutConfig): Promise<TemplateRecord> {
@@ -227,4 +242,3 @@ export const templateCrudService = {
     });
   },
 };
-

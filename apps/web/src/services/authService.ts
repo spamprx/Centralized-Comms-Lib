@@ -42,7 +42,11 @@ export const authService = {
       body: JSON.stringify({ email, password }),
     });
   },
-  register: async (email: string, displayName: string, password: string): Promise<LoginResponse> => {
+  register: async (
+    email: string,
+    displayName: string,
+    password: string,
+  ): Promise<LoginResponse> => {
     return request<LoginResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, displayName, password }),
@@ -55,4 +59,3 @@ export const authService = {
     return request<LoginResponse>('/auth/me');
   },
 };
-

@@ -1,4 +1,4 @@
-import Slot from "../ui/Slot";
+import Slot from '../ui/Slot';
 
 export function AdminSidebar() {
   return <Slot className="h-full w-56 shrink-0" />;

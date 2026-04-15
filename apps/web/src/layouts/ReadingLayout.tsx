@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Bookmark, Share2, MessageSquare, ThumbsUp, ChevronLeft, ChevronRight, Type } from 'lucide-react';
+import {
+  Bookmark,
+  Share2,
+  MessageSquare,
+  ThumbsUp,
+  ChevronLeft,
+  ChevronRight,
+  Type,
+} from 'lucide-react';
 import { Surface } from '../components/ui/Surface';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
 import { contentService, type ContentComment } from '../services/contentService';
@@ -95,20 +103,24 @@ export default function ReadingLayout() {
   const [title, setTitle] = useState<string>('Loading…');
   const [bodyDoc, setBodyDoc] = useState<unknown>(null);
   const [authorName, setAuthorName] = useState<string>('—');
-  const [currentType, setCurrentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>('ARTICLE');
+  const [currentType, setCurrentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>(
+    'ARTICLE',
+  );
   const [related, setRelated] = useState<
     Array<{ id: string; title: string; type: string; authorName: string; readTime: string }>
   >([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
-  const [annotations, setAnnotations] = useState<Array<{
-    id: string;
-    body: string;
-    authorName: string;
-    createdAt: string;
-    selectionText: string | null;
-    selectionFrom: number | null;
-    selectionTo: number | null;
-  }>>([]);
+  const [annotations, setAnnotations] = useState<
+    Array<{
+      id: string;
+      body: string;
+      authorName: string;
+      createdAt: string;
+      selectionText: string | null;
+      selectionFrom: number | null;
+      selectionTo: number | null;
+    }>
+  >([]);
   const [annotationsLoading, setAnnotationsLoading] = useState(false);
   const [annotationBody, setAnnotationBody] = useState('');
   const [annotationSaving, setAnnotationSaving] = useState(false);
@@ -141,7 +153,8 @@ export default function ReadingLayout() {
 
         // Pick latest body-carrying version (same logic as review, but keep the doc, don't flatten).
         const bodyVersions = (details.versions ?? []).filter(
-          (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+          (v) =>
+            (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
         );
         if (bodyVersions.length === 0) {
           setBodyDoc(null);
@@ -333,7 +346,11 @@ export default function ReadingLayout() {
       await contentService.addAnnotation(contentId, {
         body,
         ...(opts.attachToSelection && canAttachSelection
-          ? { selectionFrom: selection.from, selectionTo: selection.to, selectionText: selection.text }
+          ? {
+              selectionFrom: selection.from,
+              selectionTo: selection.to,
+              selectionText: selection.text,
+            }
           : {}),
       });
       setAnnotationBody('');
@@ -361,11 +378,15 @@ export default function ReadingLayout() {
             ids.map(async (id) => {
               const d = await contentService.getById(id);
               const bodyVersions = (d.versions ?? []).filter(
-                (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+                (v) =>
+                  (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') &&
+                  v.body != null,
               );
               const latestWithBody =
                 bodyVersions.length > 0
-                  ? bodyVersions.reduce((prev, curr) => (curr.versionNumber > prev.versionNumber ? curr : prev))
+                  ? bodyVersions.reduce((prev, curr) =>
+                      curr.versionNumber > prev.versionNumber ? curr : prev,
+                    )
                   : null;
               const doc = latestWithBody?.body ?? null;
               return {
@@ -445,7 +466,10 @@ export default function ReadingLayout() {
   }, [contentId, currentType, bodyDoc]);
 
   const hasTipTapDoc =
-    bodyDoc && typeof bodyDoc === 'object' && bodyDoc !== null && 'type' in (bodyDoc as Record<string, unknown>);
+    bodyDoc &&
+    typeof bodyDoc === 'object' &&
+    bodyDoc !== null &&
+    'type' in (bodyDoc as Record<string, unknown>);
 
   const readTimeLabel = useMemo(() => (hasTipTapDoc ? 'Read' : '—'), [hasTipTapDoc]);
 
@@ -592,7 +616,11 @@ export default function ReadingLayout() {
                   onClick={() => void toggleLike()}
                   title={engagementLoading ? 'Loading…' : likedByMe ? 'Unlike' : 'Like'}
                 >
-                  <ThumbsUp size={16} className={likedByMe ? 'fill-app-accent text-app-accent' : ''} /> Helpful
+                  <ThumbsUp
+                    size={16}
+                    className={likedByMe ? 'fill-app-accent text-app-accent' : ''}
+                  />{' '}
+                  Helpful
                   <span className="ml-1 text-[11px] text-app-faint">({likesCount})</span>
                 </button>
                 <button
@@ -633,7 +661,9 @@ export default function ReadingLayout() {
                     className="mt-2 w-full rounded-app-md border border-app-border bg-app-bg/40 px-3 py-2 text-xs text-app-text outline-none"
                     rows={3}
                   />
-                  {commentError ? <p className="mt-2 mb-0 text-[11px] text-red-300">{commentError}</p> : null}
+                  {commentError ? (
+                    <p className="mt-2 mb-0 text-[11px] text-red-300">{commentError}</p>
+                  ) : null}
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
@@ -657,7 +687,10 @@ export default function ReadingLayout() {
                     </div>
                   ) : (
                     comments.map((c) => (
-                      <div key={c.id} className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3">
+                      <div
+                        key={c.id}
+                        className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3"
+                      >
                         <p className="mb-2 text-xs text-app-muted">{c.body}</p>
                         <div className="text-[10px] text-app-faint">
                           {(c.author?.displayName || c.author?.email || '—') as string} ·{' '}
@@ -691,7 +724,9 @@ export default function ReadingLayout() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <h3 className="mb-1 truncate text-sm font-semibold text-app-text">{item.title}</h3>
+                          <h3 className="mb-1 truncate text-sm font-semibold text-app-text">
+                            {item.title}
+                          </h3>
                           <span className="text-xs text-app-faint">
                             {item.type} · {item.readTime} · {item.authorName}
                           </span>
@@ -725,18 +760,26 @@ export default function ReadingLayout() {
               id="reading-new-annotation"
               value={annotationBody}
               onChange={(e) => setAnnotationBody(e.target.value)}
-              placeholder={canAttachSelection ? 'Add a note for the selected text…' : 'Add a general note…'}
+              placeholder={
+                canAttachSelection ? 'Add a note for the selected text…' : 'Add a general note…'
+              }
               className="mt-2 w-full rounded-app-md border border-app-border bg-app-bg/40 px-3 py-2 text-xs text-app-text outline-none"
               rows={3}
             />
-            {annotationError ? <p className="mt-2 mb-0 text-[11px] text-red-300">{annotationError}</p> : null}
+            {annotationError ? (
+              <p className="mt-2 mb-0 text-[11px] text-red-300">{annotationError}</p>
+            ) : null}
             <div className="mt-3 flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => void submitAnnotation({ attachToSelection: true })}
                 disabled={annotationSaving || !canAttachSelection}
                 className="w-full rounded-app-md border border-app-accent/35 bg-app-accent-muted px-4 py-2 text-xs font-medium text-app-accent transition-colors hover:bg-app-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
-                title={canAttachSelection ? 'Attach to selected text' : 'Select text in the article to enable'}
+                title={
+                  canAttachSelection
+                    ? 'Attach to selected text'
+                    : 'Select text in the article to enable'
+                }
               >
                 {annotationSaving ? 'Saving…' : 'Add annotation to selection'}
               </button>

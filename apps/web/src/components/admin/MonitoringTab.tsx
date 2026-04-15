@@ -87,7 +87,8 @@ export default function MonitoringTab() {
       const matchesSeverity = severity === 'all' || log.severity === severity;
       if (!matchesSeverity) return false;
       if (!q) return true;
-      const haystack = `${log.action} ${log.resource} ${log.resourceId ?? ''} ${log.ipAddress} ${log.userAgent ?? ''}`.toLowerCase();
+      const haystack =
+        `${log.action} ${log.resource} ${log.resourceId ?? ''} ${log.ipAddress} ${log.userAgent ?? ''}`.toLowerCase();
       return haystack.includes(q);
     });
   }, [logs, query, severity]);
@@ -97,17 +98,19 @@ export default function MonitoringTab() {
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-app-border bg-app-bg-subtle p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
-        <div>
+          <div>
             <h2 className="text-lg font-medium text-app-text mb-1">Monitoring</h2>
-            <p className="text-[13px] text-app-faint m-0">System health, metrics, and detailed audit activity</p>
-        </div>
-        <button
+            <p className="text-[13px] text-app-faint m-0">
+              System health, metrics, and detailed audit activity
+            </p>
+          </div>
+          <button
             className="flex items-center gap-1.5 px-3 py-[7px] rounded-xl border border-app-border bg-app-surface text-app-muted text-[13px] transition-colors hover:border-app-border-strong hover:text-app-text disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={refetch}
-          disabled={loading}
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+            onClick={refetch}
+            disabled={loading}
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
         </div>
       </div>
 
@@ -115,7 +118,11 @@ export default function MonitoringTab() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[110px] rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }} />
+              <div
+                key={i}
+                className="h-[110px] rounded-xl animate-pulse"
+                style={{ background: 'rgba(255,255,255,0.03)' }}
+              />
             ))
           : metrics.map((m, idx) => <MetricCard key={m.label} metric={m} index={idx} />)}
       </div>
@@ -161,39 +168,51 @@ export default function MonitoringTab() {
 // ─── Metric Card ─────────────────────────────────────────────────────
 
 function MetricCard({ metric, index }: { metric: SystemMetric; index: number }) {
-  const numericValue = typeof metric.value === 'number' ? metric.value : parseFloat(String(metric.value));
+  const numericValue =
+    typeof metric.value === 'number' ? metric.value : parseFloat(String(metric.value));
 
   const animatedVal = useAnimatedNumber(isNaN(numericValue) ? 0 : numericValue);
   const animatedDisplay = isNaN(numericValue)
     ? metric.value
     : Number.isInteger(numericValue)
-    ? Math.round(animatedVal)
-    : animatedVal.toFixed(2);
+      ? Math.round(animatedVal)
+      : animatedVal.toFixed(2);
 
-  const changePercent = metric.changePercent !== undefined ? parseFloat(metric.changePercent.toFixed(2)) : undefined;
+  const changePercent =
+    metric.changePercent !== undefined ? parseFloat(metric.changePercent.toFixed(2)) : undefined;
 
-  const TrendIcon = metric.trend === 'up' ? TrendingUp : metric.trend === 'down' ? TrendingDown : Minus;
-  const trendColor = metric.trend === 'up' ? '#34d399' : metric.trend === 'down' ? '#f87171' : '#8f96ad';
-  const chipBg = metric.trend === 'up' ? 'rgba(52,211,153,0.1)' : metric.trend === 'down' ? 'rgba(248,113,113,0.1)' : 'rgba(143,150,173,0.1)';
+  const TrendIcon =
+    metric.trend === 'up' ? TrendingUp : metric.trend === 'down' ? TrendingDown : Minus;
+  const trendColor =
+    metric.trend === 'up' ? '#34d399' : metric.trend === 'down' ? '#f87171' : '#8f96ad';
+  const chipBg =
+    metric.trend === 'up'
+      ? 'rgba(52,211,153,0.1)'
+      : metric.trend === 'down'
+        ? 'rgba(248,113,113,0.1)'
+        : 'rgba(143,150,173,0.1)';
 
   const sparkData = generateSparkline(isNaN(numericValue) ? 50 : numericValue);
 
   // Gradient colors for border
-  const gradientFrom = metric.trend === 'up'
-    ? 'rgba(52,211,153,0.35)'
-    : metric.trend === 'down'
-    ? 'rgba(248,113,113,0.3)'
-    : 'rgba(147,124,248,0.3)';
+  const gradientFrom =
+    metric.trend === 'up'
+      ? 'rgba(52,211,153,0.35)'
+      : metric.trend === 'down'
+        ? 'rgba(248,113,113,0.3)'
+        : 'rgba(147,124,248,0.3)';
   const gradientTo = 'rgba(147,124,248,0.1)';
 
   return (
     <div
       className="admin-gradient-border admin-row-enter"
-      style={{
-        '--row-index': index,
-        '--gradient-from': gradientFrom,
-        '--gradient-to': gradientTo,
-      } as React.CSSProperties}
+      style={
+        {
+          '--row-index': index,
+          '--gradient-from': gradientFrom,
+          '--gradient-to': gradientTo,
+        } as React.CSSProperties
+      }
     >
       <div className="p-4 rounded-[15px] bg-app-bg-subtle flex flex-col gap-2 min-w-0 h-full">
         <div className="flex items-start justify-between">
@@ -207,13 +226,16 @@ function MetricCard({ metric, index }: { metric: SystemMetric; index: number }) 
               style={{ color: trendColor, background: chipBg }}
             >
               <TrendIcon size={10} />
-              {changePercent > 0 ? '+' : ''}{changePercent}%
+              {changePercent > 0 ? '+' : ''}
+              {changePercent}%
             </span>
           )}
         </div>
         <div className="text-[24px] font-bold text-app-text leading-tight break-words tabular-nums">
           {animatedDisplay}
-          {metric.unit && <span className="text-[12px] text-app-faint ml-1 font-medium">{metric.unit}</span>}
+          {metric.unit && (
+            <span className="text-[12px] text-app-faint ml-1 font-medium">{metric.unit}</span>
+          )}
         </div>
         {/* Sparkline */}
         <div className="h-[28px] -mx-1 mt-auto">
@@ -241,23 +263,30 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const actionColor = getActionColor(log.action);
   const isSuccess = log.status === 'success';
-  const severityIcon = log.severity === 'error'
-    ? <ShieldAlert size={13} />
-    : log.severity === 'warning'
-      ? <AlertTriangle size={13} />
-      : log.severity === 'success'
-        ? <CheckCircle2 size={13} />
-        : <Clock3 size={13} />;
-  const severityTone = log.severity === 'error'
-    ? 'text-rose-300 bg-rose-500/10 border-rose-400/30'
-    : log.severity === 'warning'
-      ? 'text-amber-300 bg-amber-500/10 border-amber-400/30'
-      : log.severity === 'success'
-        ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/30'
-        : 'text-blue-300 bg-blue-500/10 border-blue-400/30';
+  const severityIcon =
+    log.severity === 'error' ? (
+      <ShieldAlert size={13} />
+    ) : log.severity === 'warning' ? (
+      <AlertTriangle size={13} />
+    ) : log.severity === 'success' ? (
+      <CheckCircle2 size={13} />
+    ) : (
+      <Clock3 size={13} />
+    );
+  const severityTone =
+    log.severity === 'error'
+      ? 'text-rose-300 bg-rose-500/10 border-rose-400/30'
+      : log.severity === 'warning'
+        ? 'text-amber-300 bg-amber-500/10 border-amber-400/30'
+        : log.severity === 'success'
+          ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/30'
+          : 'text-blue-300 bg-blue-500/10 border-blue-400/30';
 
   return (
-    <div className="admin-row-enter rounded-lg border border-app-border bg-app-bg/35" style={{ '--row-index': index } as React.CSSProperties}>
+    <div
+      className="admin-row-enter rounded-lg border border-app-border bg-app-bg/35"
+      style={{ '--row-index': index } as React.CSSProperties}
+    >
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <span
           className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-mono"
@@ -275,11 +304,15 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
             {log.resourceId.slice(0, 12)}
           </span>
         ) : null}
-        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${severityTone}`}>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${severityTone}`}
+        >
           {severityIcon}
           {log.severity}
         </span>
-        <span className="ml-auto text-[11px] text-app-faint">{new Date(log.timestamp).toLocaleString()}</span>
+        <span className="ml-auto text-[11px] text-app-faint">
+          {new Date(log.timestamp).toLocaleString()}
+        </span>
         <button
           className="inline-flex h-6 items-center gap-1 rounded-md border border-app-border px-2 text-[11px] text-app-muted transition-colors hover:border-app-border-strong hover:text-app-text"
           onClick={() => setExpanded((v) => !v)}
@@ -291,10 +324,16 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
       {expanded ? (
         <div className="grid gap-2 border-t border-app-border px-3 py-2.5 md:grid-cols-2">
           <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Actor / Network</div>
-            <div className="text-[12px] text-app-text">Actor: {log.userName} ({log.userId})</div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">
+              Actor / Network
+            </div>
+            <div className="text-[12px] text-app-text">
+              Actor: {log.userName} ({log.userId})
+            </div>
             <div className="text-[12px] text-app-muted">IP: {log.ipAddress}</div>
-            <div className="text-[11px] text-app-faint wrap-break-word">UA: {log.userAgent || '—'}</div>
+            <div className="text-[11px] text-app-faint wrap-break-word">
+              UA: {log.userAgent || '—'}
+            </div>
           </div>
           <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2">
             <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Status</div>
@@ -304,15 +343,21 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
             <div className="text-[11px] text-app-faint">Event ID: {log.id}</div>
           </div>
           <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2 md:col-span-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Change payload</div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">
+              Change payload
+            </div>
             <div className="grid gap-2 md:grid-cols-2">
               <div>
                 <div className="mb-1 text-[11px] text-app-muted">Previous</div>
-                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">{compactJson(log.oldValue)}</pre>
+                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">
+                  {compactJson(log.oldValue)}
+                </pre>
               </div>
               <div>
                 <div className="mb-1 text-[11px] text-app-muted">Current</div>
-                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">{compactJson(log.newValue)}</pre>
+                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">
+                  {compactJson(log.newValue)}
+                </pre>
               </div>
             </div>
           </div>

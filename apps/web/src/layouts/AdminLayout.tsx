@@ -1,4 +1,4 @@
-import Slot from "../components/ui/Slot";
+import Slot from '../components/ui/Slot';
 
 export default function AdminLayout() {
   return (

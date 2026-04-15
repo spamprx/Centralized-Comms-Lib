@@ -145,6 +145,65 @@ export function flattenRegions(
   return out;
 }
 
+/** TipTap `doc` JSON from region props, or an empty doc — mirrors the web editor. */
+function ensureRichDoc(props: Record<string, unknown> | undefined): unknown {
+  const doc = props?.doc;
+  if (
+    doc &&
+    typeof doc === "object" &&
+    !Array.isArray(doc) &&
+    (doc as { type?: string }).type === "doc"
+  ) {
+    return doc;
+  }
+  return { type: "doc", content: [{ type: "paragraph" }] };
+}
+
+/**
+ * Plain text extracted from a TipTap doc — matches
+ * `extractTextFromDoc` in `TemplateLayoutEditor.tsx` (character limit UX).
+ */
+function extractTextFromTipTapDoc(doc: unknown): string {
+  const parts: string[] = [];
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return;
+    const n = node as Record<string, unknown>;
+    if (n.type === "text" && typeof n.text === "string") {
+      parts.push(n.text);
+      return;
+    }
+    if (n.type === "hardBreak") {
+      parts.push("\n");
+      return;
+    }
+    const t = n.type;
+    const isBlock = t === "paragraph" || t === "heading" || t === "blockquote";
+    if (Array.isArray(n.content)) {
+      for (const child of n.content) walk(child);
+      if (isBlock) parts.push("\n");
+    }
+  };
+  walk(doc);
+  return parts.join("").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Total rich-text character count across all `richText` regions (for channel limits). */
+export function countRichTextCharactersInLayout(
+  layout: TemplateLayoutConfig,
+): number {
+  let total = 0;
+  for (const row of layout.rows) {
+    for (const cell of row.cells) {
+      for (const region of cell.regions) {
+        if (region.type !== "richText") continue;
+        const props = region.props as Record<string, unknown> | undefined;
+        total += extractTextFromTipTapDoc(ensureRichDoc(props)).length;
+      }
+    }
+  }
+  return total;
+}
+
 /**
  * Validates and normalizes layout JSON. Returns null if invalid.
  * Accepts v2 `rows` (grid) or legacy v1 flat `regions`.

@@ -24,7 +24,13 @@ export default function UserManagementTab() {
     bulkDelete,
     updateStatus,
     updateUser,
-  } = useAdminUsers({ role: 'all', status: 'all', group: 'all', sortBy: 'createdAt', sortOrder: 'desc' });
+  } = useAdminUsers({
+    role: 'all',
+    status: 'all',
+    group: 'all',
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  });
 
   const { groups, roles } = useAdminRolesAndGroups();
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -45,7 +51,8 @@ export default function UserManagementTab() {
     const ok = await promptTwoStep({
       title: 'Invite user',
       body1: `You are about to create an account for ${data.email}.`,
-      body2: 'Final confirmation: the user will be stored in the database with the role and groups you selected.',
+      body2:
+        'Final confirmation: the user will be stored in the database with the role and groups you selected.',
       confirm2: 'Create user',
     });
     if (!ok) throw new AdminActionCancelled();
@@ -58,7 +65,8 @@ export default function UserManagementTab() {
     const ok = await promptTwoStep({
       title: 'Update user',
       body1: `Save changes for ${editingUser.email}?`,
-      body2: 'Final confirmation: profile, role, status, and group memberships will be updated on the server.',
+      body2:
+        'Final confirmation: profile, role, status, and group memberships will be updated on the server.',
       confirm2: 'Save changes',
     });
     if (!ok) throw new AdminActionCancelled();
@@ -73,7 +81,8 @@ export default function UserManagementTab() {
     const ok = await promptTwoStep({
       title: 'Deactivate user',
       body1: `You are about to deactivate ${label}. They will no longer be able to sign in.`,
-      body2: 'Final confirmation: this account will be marked inactive. You can still see audit history for past actions.',
+      body2:
+        'Final confirmation: this account will be marked inactive. You can still see audit history for past actions.',
       confirm2: 'Deactivate',
     });
     if (!ok) return;
@@ -126,7 +135,8 @@ export default function UserManagementTab() {
     const ok = await promptTwoStep({
       title: 'Password reset',
       body1: `Trigger a password reset flow for ${u?.email ?? id}?`,
-      body2: 'Final confirmation: the server will attempt to send reset instructions if outbound email is configured.',
+      body2:
+        'Final confirmation: the server will attempt to send reset instructions if outbound email is configured.',
       confirm2: 'Send reset',
     });
     if (!ok) return;
@@ -134,7 +144,7 @@ export default function UserManagementTab() {
       const res = await adminUserService.resetUserPassword(id);
       const msg = res.data.emailSent
         ? 'If this account exists, a reset email was sent.'
-        : res.data.message ?? 'Password reset is not configured for this environment.';
+        : (res.data.message ?? 'Password reset is not configured for this environment.');
       setPasswordResetMessage(msg);
       setShowPasswordResetToast(true);
       setTimeout(() => setShowPasswordResetToast(false), 5000);
@@ -147,7 +157,10 @@ export default function UserManagementTab() {
     return (
       <div className="flex flex-col items-center gap-3 p-12 text-red-400 text-sm">
         <p>⚠ {error}</p>
-        <button onClick={refetch} className="px-4 py-1.5 admin-glass-button rounded-lg text-app-text">
+        <button
+          onClick={refetch}
+          className="px-4 py-1.5 admin-glass-button rounded-lg text-app-text"
+        >
           Retry
         </button>
       </div>

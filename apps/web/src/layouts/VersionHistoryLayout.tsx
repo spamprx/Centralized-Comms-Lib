@@ -17,8 +17,7 @@ import TipTapReadonly from '../components/editor/TipTapReadonly';
 
 const PAGE_SIZE = 20;
 
-const NOTICE_STATIC_PENDING =
-  'Sample timeline shown first. Loading live versions from the API…';
+const NOTICE_STATIC_PENDING = 'Sample timeline shown first. Loading live versions from the API…';
 const NOTICE_STATIC_API_FAILED =
   'Sample timeline — could not load live data from the API (you can still explore the UI).';
 const NOTICE_API_FIRST_FALLBACK =
@@ -70,9 +69,7 @@ function versionTipTapDoc(v: ContentVersion): unknown | null {
   return null;
 }
 
-function normalizeServerSegments(
-  segments: Array<{ type: string; text: string }>,
-): WordDiffPart[] {
+function normalizeServerSegments(segments: Array<{ type: string; text: string }>): WordDiffPart[] {
   return segments.map((s) => {
     const t = s.type;
     if (t === 'insert' || t === 'added') return { type: 'insert', text: s.text };
@@ -121,7 +118,7 @@ export default function VersionHistoryLayout() {
 
   const headVersion = sortedVersions[0] ?? null;
   const selected = sortedVersions.find((v) => v.id === selectedId) ?? headVersion;
-  const compareTo = compareId ? sortedVersions.find((v) => v.id === compareId) ?? null : null;
+  const compareTo = compareId ? (sortedVersions.find((v) => v.id === compareId) ?? null) : null;
 
   const refreshCollaboration = useCallback(async () => {
     if (!contentId || usingStaticFallbackRef.current) return;
@@ -349,13 +346,17 @@ export default function VersionHistoryLayout() {
     if (selected.id === headVersion.id) return;
     if (isStaticHistory) return;
     if (collaborationActive) return;
-    if (!window.confirm(`Restore version ${selected.versionNumber} as a new head revision?`)) return;
+    if (!window.confirm(`Restore version ${selected.versionNumber} as a new head revision?`))
+      return;
     setRestoreError(null);
     setRestoreBusy(true);
     try {
       const doc = versionTipTapDoc(selected);
       const isDoc =
-        doc && typeof doc === 'object' && doc !== null && 'type' in (doc as Record<string, unknown>);
+        doc &&
+        typeof doc === 'object' &&
+        doc !== null &&
+        'type' in (doc as Record<string, unknown>);
       if (!isDoc) {
         throw new Error('Selected version has no body to restore.');
       }
@@ -373,7 +374,11 @@ export default function VersionHistoryLayout() {
   if (!contentId) {
     return (
       <PageShell wide className="flex min-h-0 flex-1 flex-col pb-10">
-        <PageHeader title="Version history" accentWord="history" description="Missing content id in URL." />
+        <PageHeader
+          title="Version history"
+          accentWord="history"
+          description="Missing content id in URL."
+        />
       </PageShell>
     );
   }
@@ -387,37 +392,58 @@ export default function VersionHistoryLayout() {
       />
 
       {demoNotice && (
-        <Surface variant="muted" padding="md" className="mb-4 border border-sky-500/25 bg-sky-500/10 text-sm text-sky-100">
+        <Surface
+          variant="muted"
+          padding="md"
+          className="mb-4 border border-sky-500/25 bg-sky-500/10 text-sm text-sky-100"
+        >
           {demoNotice}
         </Surface>
       )}
 
       {loadError && (
-        <Surface variant="muted" padding="md" className="mb-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200">
+        <Surface
+          variant="muted"
+          padding="md"
+          className="mb-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200"
+        >
           {loadError}
         </Surface>
       )}
 
       {collaborationActive && (
-        <Surface variant="muted" padding="md" className="mb-4 flex items-start gap-3 border border-amber-400/25 bg-amber-500/10 text-sm text-amber-100">
+        <Surface
+          variant="muted"
+          padding="md"
+          className="mb-4 flex items-start gap-3 border border-amber-400/25 bg-amber-500/10 text-sm text-amber-100"
+        >
           <Users className="mt-0.5 shrink-0 opacity-90" size={18} />
           <div>
             <p className="m-0 font-semibold">Co-author session active</p>
             <p className="mt-1 mb-0 text-xs text-amber-100/85">
-              Restoring a snapshot is disabled until the live collaboration session ends (F-AUT-004).
+              Restoring a snapshot is disabled until the live collaboration session ends
+              (F-AUT-004).
             </p>
           </div>
         </Surface>
       )}
 
       {restoreError && (
-        <Surface variant="muted" padding="md" className="mb-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200">
+        <Surface
+          variant="muted"
+          padding="md"
+          className="mb-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200"
+        >
           {restoreError}
         </Surface>
       )}
 
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(260px,320px)_1fr]">
-        <Surface variant="glass" padding="none" className="flex max-h-[min(70vh,640px)] flex-col overflow-hidden lg:max-h-none">
+        <Surface
+          variant="glass"
+          padding="none"
+          className="flex max-h-[min(70vh,640px)] flex-col overflow-hidden lg:max-h-none"
+        >
           <div className="border-b border-app-border/80 px-5 py-4">
             <h2 className="m-0 text-sm font-semibold text-app-text">Timeline</h2>
             <p className="mt-1 m-0 text-[11px] text-app-faint">
@@ -460,7 +486,9 @@ export default function VersionHistoryLayout() {
                       aria-hidden
                     />
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <span className={`text-xs font-bold ${active ? 'text-app-accent' : 'text-app-text'}`}>
+                      <span
+                        className={`text-xs font-bold ${active ? 'text-app-accent' : 'text-app-text'}`}
+                      >
                         v{version.versionNumber}
                       </span>
                       {isHeadRow && (
@@ -469,8 +497,12 @@ export default function VersionHistoryLayout() {
                         </span>
                       )}
                     </div>
-                    <p className="mb-1 text-[11px] font-medium text-app-muted">{changeTypeLabel(version.changeType)}</p>
-                    <p className="mb-1.5 line-clamp-2 text-[11px] leading-snug text-app-faint">{version.title}</p>
+                    <p className="mb-1 text-[11px] font-medium text-app-muted">
+                      {changeTypeLabel(version.changeType)}
+                    </p>
+                    <p className="mb-1.5 line-clamp-2 text-[11px] leading-snug text-app-faint">
+                      {version.title}
+                    </p>
                     <div className="flex items-center gap-2 text-[10px] text-app-faint">
                       <Clock size={10} className="shrink-0 opacity-80" />
                       {new Date(version.createdAt).toLocaleString()}
@@ -517,7 +549,11 @@ export default function VersionHistoryLayout() {
         </Surface>
 
         <div className="flex min-h-0 min-w-0 flex-col gap-4">
-          <Surface variant="default" padding="md" className="flex flex-wrap items-center justify-between gap-4">
+          <Surface
+            variant="default"
+            padding="md"
+            className="flex flex-wrap items-center justify-between gap-4"
+          >
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-app-lg bg-app-accent-muted text-app-accent">
                 <FileText size={20} strokeWidth={1.75} />
@@ -576,15 +612,19 @@ export default function VersionHistoryLayout() {
             </div>
           </Surface>
 
-          <Surface variant="muted" padding="md" className="min-h-[280px] flex-1 overflow-auto lg:min-h-0">
+          <Surface
+            variant="muted"
+            padding="md"
+            className="min-h-[280px] flex-1 overflow-auto lg:min-h-0"
+          >
             {!selected ? (
               <p className="m-0 text-sm text-app-muted">No version selected.</p>
             ) : showDiff ? (
               <div>
                 {!compareTo ? (
                   <p className="m-0 text-sm text-app-muted">
-                    Pick a baseline version from the timeline (radio on another row) to compare against v
-                    {selected.versionNumber}.
+                    Pick a baseline version from the timeline (radio on another row) to compare
+                    against v{selected.versionNumber}.
                   </p>
                 ) : diffLoading && !serverDiffParts ? (
                   <p className="m-0 text-sm text-app-muted">Computing diff…</p>
@@ -595,12 +635,20 @@ export default function VersionHistoryLayout() {
                     </h3>
                     <div className="mb-4 flex flex-wrap gap-3">
                       <div className="min-w-[120px] flex-1 rounded-app-md bg-emerald-500/10 px-3 py-2">
-                        <span className="text-[10px] uppercase tracking-wide text-emerald-200/90">Inserted</span>
-                        <p className="m-0 mt-0.5 text-xs text-emerald-100">{diffStats.added} characters</p>
+                        <span className="text-[10px] uppercase tracking-wide text-emerald-200/90">
+                          Inserted
+                        </span>
+                        <p className="m-0 mt-0.5 text-xs text-emerald-100">
+                          {diffStats.added} characters
+                        </p>
                       </div>
                       <div className="min-w-[120px] flex-1 rounded-app-md bg-red-500/10 px-3 py-2">
-                        <span className="text-[10px] uppercase tracking-wide text-red-200/90">Removed</span>
-                        <p className="m-0 mt-0.5 text-xs text-red-100">{diffStats.removed} characters</p>
+                        <span className="text-[10px] uppercase tracking-wide text-red-200/90">
+                          Removed
+                        </span>
+                        <p className="m-0 mt-0.5 text-xs text-red-100">
+                          {diffStats.removed} characters
+                        </p>
                       </div>
                     </div>
                     <div
@@ -636,7 +684,10 @@ export default function VersionHistoryLayout() {
               (() => {
                 const doc = versionTipTapDoc(selected);
                 const isDoc =
-                  doc && typeof doc === 'object' && doc !== null && 'type' in (doc as Record<string, unknown>);
+                  doc &&
+                  typeof doc === 'object' &&
+                  doc !== null &&
+                  'type' in (doc as Record<string, unknown>);
                 if (!isDoc) {
                   const prevWithBody = versions.find(
                     (v) => v.versionNumber < selected.versionNumber && versionTipTapDoc(v) != null,
@@ -651,7 +702,8 @@ export default function VersionHistoryLayout() {
                     return (
                       <div className="space-y-3">
                         <p className="m-0 text-[12px] text-app-faint">
-                          No body was captured for this lifecycle-only snapshot. Showing body from v{prevWithBody.versionNumber}.
+                          No body was captured for this lifecycle-only snapshot. Showing body from v
+                          {prevWithBody.versionNumber}.
                         </p>
                         <div className="tiptap-content">
                           <TipTapReadonly

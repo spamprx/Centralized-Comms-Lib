@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
   Layers,
@@ -8,34 +8,34 @@ import {
   ShieldCheck,
   Zap,
   BarChart3,
-} from "lucide-react";
-import { Button } from "../components/ui";
+} from 'lucide-react';
+import { Button } from '../components/ui';
 
 const highlights = [
   {
     icon: Layers,
-    title: "Unified library",
-    body: "Browse, filter, and share content with a consistent experience across teams.",
-    span: "md:col-span-1",
+    title: 'Unified library',
+    body: 'Browse, filter, and share content with a consistent experience across teams.',
+    span: 'md:col-span-1',
   },
   {
     icon: Users,
-    title: "Built for collaboration",
-    body: "Reviews, version history, and roles keep everyone aligned without noise.",
-    span: "md:col-span-1",
+    title: 'Built for collaboration',
+    body: 'Reviews, version history, and roles keep everyone aligned without noise.',
+    span: 'md:col-span-1',
   },
   {
     icon: ShieldCheck,
-    title: "Governance-ready",
-    body: "Structured workflows and audit-friendly patterns as you scale.",
-    span: "md:col-span-2 lg:col-span-1",
+    title: 'Governance-ready',
+    body: 'Structured workflows and audit-friendly patterns as you scale.',
+    span: 'md:col-span-2 lg:col-span-1',
   },
 ];
 
 const stats = [
-  { value: "99.9%", label: "Uptime mindset", icon: Zap },
-  { value: "50+", label: "Content types", icon: Layers },
-  { value: "24/7", label: "Async workflows", icon: BarChart3 },
+  { value: '99.9%', label: 'Uptime mindset', icon: Zap },
+  { value: '50+', label: 'Content types', icon: Layers },
+  { value: '24/7', label: 'Async workflows', icon: BarChart3 },
 ];
 
 export default function LandingLayout() {
@@ -43,10 +43,7 @@ export default function LandingLayout() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-app-bg text-app-text">
-      <div
-        className="pointer-events-none absolute inset-0 app-hero-grid opacity-60"
-        aria-hidden
-      />
+      <div className="pointer-events-none absolute inset-0 app-hero-grid opacity-60" aria-hidden />
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_90%_70%_at_50%_-20%,rgba(147,124,248,0.28),transparent_55%)]"
         aria-hidden
@@ -63,15 +60,11 @@ export default function LandingLayout() {
               <BookOpen size={22} className="text-white" aria-hidden />
             </div>
             <div>
-              <span className="text-lg font-bold tracking-tight text-app-text">
-                CommsLib
-              </span>
-              <p className="m-0 text-[11px] text-app-faint">
-                Centralized communications library
-              </p>
+              <span className="text-lg font-bold tracking-tight text-app-text">CommsLib</span>
+              <p className="m-0 text-[11px] text-app-faint">Centralized communications library</p>
             </div>
           </div>
-          <Button variant="primary" onClick={() => navigate("/login")}>
+          <Button variant="primary" onClick={() => navigate('/login')}>
             Sign in
           </Button>
         </div>
@@ -86,26 +79,25 @@ export default function LandingLayout() {
             <span className="hidden text-app-faint sm:inline">Built for distributed teams</span>
           </p>
           <h1 className="m-0 text-4xl font-bold tracking-tight text-app-text sm:text-5xl md:text-6xl md:leading-[1.08]">
-            Create. Share.{" "}
-            <span className="app-text-gradient">Inspire.</span>
+            Create. Share. <span className="app-text-gradient">Inspire.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-app-muted sm:text-lg">
-            The all-in-one surface for creating, managing, and distributing content
-            — with clarity for authors and confidence for admins.
+            The all-in-one surface for creating, managing, and distributing content — with clarity
+            for authors and confidence for admins.
           </p>
           <div className="mt-11 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
             <Button
               variant="primary"
               className="px-9 py-3.5 text-base shadow-app-glow"
               rightIcon={<ArrowRight size={18} aria-hidden />}
-              onClick={() => navigate("/login")}
+              onClick={() => navigate('/login')}
             >
               Get started
             </Button>
             <Button
               variant="outline"
               className="px-9 py-3.5 text-base"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate('/login')}
             >
               Sign in
             </Button>

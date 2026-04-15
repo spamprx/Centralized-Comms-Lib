@@ -28,7 +28,11 @@ function escapeCsv(value: string | number | boolean | null | undefined): string 
   return raw;
 }
 
-function section(title: string, headers: string[], rows: Array<Array<string | number | boolean | null | undefined>>): string[] {
+function section(
+  title: string,
+  headers: string[],
+  rows: Array<Array<string | number | boolean | null | undefined>>,
+): string[] {
   return [
     title,
     headers.map(escapeCsv).join(','),
@@ -56,7 +60,13 @@ export function buildAnalyticsCsv(input: AnalyticsCsvInput): string {
     ...section(
       'Engagement',
       ['Label', 'Views', 'Likes', 'Shares', 'Comments'],
-      input.engagementData.map((row) => [row.label, row.views, row.likes, row.shares, row.comments]),
+      input.engagementData.map((row) => [
+        row.label,
+        row.views,
+        row.likes,
+        row.shares,
+        row.comments,
+      ]),
     ),
     ...section(
       'Reading Time',

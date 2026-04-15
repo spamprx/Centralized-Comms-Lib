@@ -1,5 +1,12 @@
 import { joinApiV1Path } from '../lib/apiBase';
-import type { User, SystemMetric, SystemSettings, ApiResponse, UserFilters, PaginationParams } from '../types/admin';
+import type {
+  User,
+  SystemMetric,
+  SystemSettings,
+  ApiResponse,
+  UserFilters,
+  PaginationParams,
+} from '../types/admin';
 import type {
   ApiAuditEntry,
   ApiGroupDetail,
@@ -25,7 +32,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error((err as { error?: string }).error || (err as { message?: string }).message || `HTTP ${res.status}`);
+    throw new Error(
+      (err as { error?: string }).error ||
+        (err as { message?: string }).message ||
+        `HTTP ${res.status}`,
+    );
   }
 
   if (res.status === 204) return undefined as T;
@@ -106,7 +117,10 @@ export const adminUserService = {
     return wrap({ deleted: out.count });
   },
 
-  updateUserStatus: async (id: string, status: 'active' | 'inactive'): Promise<ApiResponse<ApiUserRow>> => {
+  updateUserStatus: async (
+    id: string,
+    status: 'active' | 'inactive',
+  ): Promise<ApiResponse<ApiUserRow>> => {
     const data = await request<ApiUserRow>(`/admin/users/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
@@ -121,10 +135,15 @@ export const adminUserService = {
     });
   },
 
-  resetUserPassword: async (id: string): Promise<ApiResponse<{ emailSent: boolean; message?: string }>> => {
-    const data = await request<{ emailSent: boolean; message?: string }>(`/admin/users/${id}/reset-password`, {
-      method: 'POST',
-    });
+  resetUserPassword: async (
+    id: string,
+  ): Promise<ApiResponse<{ emailSent: boolean; message?: string }>> => {
+    const data = await request<{ emailSent: boolean; message?: string }>(
+      `/admin/users/${id}/reset-password`,
+      {
+        method: 'POST',
+      },
+    );
     return wrap(data);
   },
 };
@@ -142,8 +161,14 @@ export const adminRoleService = {
     return wrap(data);
   },
 
-  createRole: async (body: { name: string; description?: string | null }): Promise<ApiResponse<ApiRoleRow>> => {
-    const data = await request<ApiRoleRow>('/admin/roles', { method: 'POST', body: JSON.stringify(body) });
+  createRole: async (body: {
+    name: string;
+    description?: string | null;
+  }): Promise<ApiResponse<ApiRoleRow>> => {
+    const data = await request<ApiRoleRow>('/admin/roles', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
     return wrap(data);
   },
 
@@ -192,7 +217,10 @@ export const adminGroupService = {
     return wrap(data);
   },
 
-  createGroup: async (body: { name: string; description?: string | null }): Promise<ApiResponse<ApiGroupDetail>> => {
+  createGroup: async (body: {
+    name: string;
+    description?: string | null;
+  }): Promise<ApiResponse<ApiGroupDetail>> => {
     const created = await request<ApiGroupSummary>('/admin/groups', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -276,11 +304,21 @@ export const adminSettingsService = {
   },
 
   testEmailConfig: async (): Promise<ApiResponse<{ success: boolean; message?: string }>> => {
-    const data = await request<{ success: boolean; message?: string }>('/admin/settings/test-email', {
-      method: 'POST',
-    });
+    const data = await request<{ success: boolean; message?: string }>(
+      '/admin/settings/test-email',
+      {
+        method: 'POST',
+      },
+    );
     return wrap(data);
   },
 };
 
-export type { ApiUserRow, ApiPermission, ApiRoleRow, ApiGroupDetail, ApiGroupSummary, ApiAuditEntry };
+export type {
+  ApiUserRow,
+  ApiPermission,
+  ApiRoleRow,
+  ApiGroupDetail,
+  ApiGroupSummary,
+  ApiAuditEntry,
+};

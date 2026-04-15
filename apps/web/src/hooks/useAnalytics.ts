@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { analyticsService } from "../services/analyticsService";
+import { useState, useEffect } from 'react';
+import { analyticsService } from '../services/analyticsService';
 import type {
   KPI,
   TimeSeriesPoint,
@@ -8,14 +8,14 @@ import type {
   ContentTypeBreakdown,
   TopContentItem,
   AIInsight,
-} from "../types/analytics";
-import type { DateRange } from "../lib/dateUtils";
+} from '../types/analytics';
+import type { DateRange } from '../lib/dateUtils';
 
 function dateRangeToApiParam(dateRange: string | DateRange): string | DateRange {
   return dateRange;
 }
 
-export function useAnalytics(dateRange: string | DateRange = "30d") {
+export function useAnalytics(dateRange: string | DateRange = '30d') {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [viewsData, setViewsData] = useState<TimeSeriesPoint[]>([]);
   const [engagementData, setEngagementData] = useState<EngagementData[]>([]);
@@ -62,7 +62,7 @@ export function useAnalytics(dateRange: string | DateRange = "30d") {
         setTopContent(topContentResult);
         setAiInsights(aiInsightsResult);
       } catch (e) {
-        if (mounted) setError(e instanceof Error ? e.message : "Failed to load analytics data");
+        if (mounted) setError(e instanceof Error ? e.message : 'Failed to load analytics data');
       } finally {
         if (mounted) setLoading(false);
       }

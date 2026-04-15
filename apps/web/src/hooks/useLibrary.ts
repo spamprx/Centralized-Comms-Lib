@@ -85,13 +85,16 @@ export function useLibrary() {
   const debouncedQ = useDebouncedValue(searchInput, 380);
 
   useEffect(() => {
-    setSearchParams((prev) => {
-      const f = parseLibrarySearchParams(prev);
-      const qTrim = debouncedQ.trim();
-      const urlQ = f.q.trim();
-      if (qTrim === urlQ) return prev;
-      return mergeLibraryFilters(prev, { q: debouncedQ });
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const f = parseLibrarySearchParams(prev);
+        const qTrim = debouncedQ.trim();
+        const urlQ = f.q.trim();
+        if (qTrim === urlQ) return prev;
+        return mergeLibraryFilters(prev, { q: debouncedQ });
+      },
+      { replace: true },
+    );
   }, [debouncedQ, setSearchParams]);
 
   useEffect(() => {
@@ -197,7 +200,11 @@ export function useLibrary() {
     setLoading(true);
     void (async () => {
       try {
-        const rows = await contentService.list({ lifecycleState: 'PUBLISHED', limit: 200, offset: 0 });
+        const rows = await contentService.list({
+          lifecycleState: 'PUBLISHED',
+          limit: 200,
+          offset: 0,
+        });
         if (cancelled) return;
         setAllContentItems(rows.map(mapApiContentToLibraryItem));
         // Tags are returned per-content via `/content/:id` today; keep catalog empty until
@@ -221,14 +228,17 @@ export function useLibrary() {
 
   const toggleTag = useCallback(
     (tagSlug: string) => {
-      setSearchParams((prev) => {
-        const f = parseLibrarySearchParams(prev);
-        const next = new Set(f.tags.map((t) => t.toLowerCase()));
-        const key = tagSlug.toLowerCase();
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return serializeLibrarySearchParams({ ...f, tags: [...next] });
-      }, { replace: true });
+      setSearchParams(
+        (prev) => {
+          const f = parseLibrarySearchParams(prev);
+          const next = new Set(f.tags.map((t) => t.toLowerCase()));
+          const key = tagSlug.toLowerCase();
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return serializeLibrarySearchParams({ ...f, tags: [...next] });
+        },
+        { replace: true },
+      );
     },
     [setSearchParams],
   );
@@ -250,10 +260,7 @@ export function useLibrary() {
     return [...s].sort((a, b) => a.localeCompare(b));
   }, [allContentItems]);
 
-  const tagSlugCatalog = useMemo(
-    () => new Set(tags.map((t) => t.name.toLowerCase())),
-    [tags],
-  );
+  const tagSlugCatalog = useMemo(() => new Set(tags.map((t) => t.name.toLowerCase())), [tags]);
 
   const filterCatalog = useMemo(
     () => ({ authors, channels, tagSlugs: tagSlugCatalog }),
@@ -291,7 +298,8 @@ export function useLibrary() {
     if (next.dateFrom || next.dateTo) {
       extraIssues.push({
         code: 'unsupported_dates',
-        message: 'Date range filters are not supported for DB-backed library yet. They were ignored.',
+        message:
+          'Date range filters are not supported for DB-backed library yet. They were ignored.',
       });
       next.dateFrom = '';
       next.dateTo = '';
@@ -312,7 +320,8 @@ export function useLibrary() {
       if (!itemMatchesTagFacet(item.tags, effectiveFilters.tags)) return false;
       if (effectiveFilters.author && item.author !== effectiveFilters.author) return false;
       if (effectiveFilters.channel && item.channel !== effectiveFilters.channel) return false;
-      if (effectiveFilters.status !== 'all' && item.status !== effectiveFilters.status) return false;
+      if (effectiveFilters.status !== 'all' && item.status !== effectiveFilters.status)
+        return false;
       if (effectiveFilters.dateFrom && item.createdAt < effectiveFilters.dateFrom) return false;
       if (effectiveFilters.dateTo && item.createdAt > effectiveFilters.dateTo) return false;
       return true;

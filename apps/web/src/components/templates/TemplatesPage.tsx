@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Calendar,
   CheckCircle,
@@ -21,6 +21,7 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  PowerOff,
   Radio,
   Save,
   Search,
@@ -28,21 +29,22 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { decodeTokenPayload } from '../../services/tokenStore';
 import {
   templateCrudService,
   type ChannelRecord,
   type CreateTemplateInput,
-  type TemplateI18nTable,
   type TemplateRecord,
   type TemplateStatus,
   type UpdateTemplateInput,
 } from '../../services/templateCrudService';
 import { PageHeader } from '../ui/PageHeader';
 import { PageShell } from '../ui/PageShell';
-import { layoutRegionCount, parseTemplateLayout } from '../../lib/templateLayout/layoutConfig';
 import TemplateLayoutEditor from './TemplateLayoutEditor';
+
+const TEMPLATES_LIST_SEARCH_KEY = 'templates:listSearch';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
@@ -108,7 +110,9 @@ function renderConfigValue(v: unknown, depth = 0): ReactNode {
             <span className="min-w-0 text-app-muted">{renderConfigValue(o[k], depth + 1)}</span>
           </div>
         ))}
-        {keys.length > 8 ? <span className="text-[9px] text-app-faint">+{keys.length - 8} more</span> : null}
+        {keys.length > 8 ? (
+          <span className="text-[9px] text-app-faint">+{keys.length - 8} more</span>
+        ) : null}
       </div>
     );
   }
@@ -123,7 +127,8 @@ function ChannelBindingConfigSummary({ configText }: { configText: string }) {
   if (!parsed) {
     return (
       <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-2 text-[10px] leading-snug text-amber-100/90">
-        <span className="font-medium">Invalid JSON.</span> Open <strong>Edit</strong> to fix the binding config.
+        <span className="font-medium">Invalid JSON.</span> Open <strong>Edit</strong> to fix the
+        binding config.
       </div>
     );
   }
@@ -159,7 +164,11 @@ function ChannelBindingConfigSummary({ configText }: { configText: string }) {
             {open ? 'Hide' : 'View'} full config
             {entries.length > 0 ? ` · ${entries.length}` : ''}
           </span>
-          <ChevronDown size={14} className={`shrink-0 opacity-70 ${open ? 'rotate-180' : ''}`} aria-hidden />
+          <ChevronDown
+            size={14}
+            className={`shrink-0 opacity-70 ${open ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
         </button>
       ) : null}
       {open ? (
@@ -203,58 +212,6 @@ function writeBindingConfig(bindingId: string, jsonText: string): void {
   localStorage.setItem(bindingConfigKey(bindingId), jsonText);
 }
 
-function normalizeI18n(input: unknown): Record<string, Record<string, string>> {
-  if (!input || typeof input !== 'object') return {};
-  const out: Record<string, Record<string, string>> = {};
-  for (const [locale, bundle] of Object.entries(input as Record<string, unknown>)) {
-    if (!bundle || typeof bundle !== 'object') continue;
-    const row: Record<string, string> = {};
-    for (const [k, v] of Object.entries(bundle as Record<string, unknown>)) {
-      if (typeof v === 'string') row[k] = v;
-    }
-    out[locale] = row;
-  }
-  return out;
-}
-
-function extractTemplateKeys(template: TemplateRecord | null): string[] {
-  if (!template) return [];
-  const source = JSON.stringify({
-    name: template.name,
-    description: template.description,
-    draftLayout: template.draftLayout,
-    activeLayout: template.activeLayout,
-  });
-  const found = new Set<string>();
-  const re = /\{\{([^{}]+)\}\}/g;
-  for (const match of source.matchAll(re)) {
-    const key = match[1]?.trim();
-    if (key) found.add(`{{${key}}}`);
-  }
-  return Array.from(found);
-}
-
-function validLocaleCode(locale: string): boolean {
-  return /^[a-z]{2}(-[A-Z]{2})?$/.test(locale);
-}
-
-function applyI18nFallback(
-  input: string,
-  locale: string,
-  i18n: Record<string, Record<string, string>>,
-  baseLocale: string,
-): string {
-  const current = i18n[locale] ?? {};
-  const base = i18n[baseLocale] ?? {};
-  return input.replace(/\{\{([^{}]+)\}\}/g, (full) => {
-    const translated = current[full];
-    if (translated && translated.trim()) return translated;
-    const fallback = base[full];
-    if (fallback && fallback.trim()) return fallback;
-    return full;
-  });
-}
-
 export default function TemplatesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -287,6 +244,7 @@ export default function TemplatesPage() {
   const [formServerError, setFormServerError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<TemplateRecord | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<TemplateRecord | null>(null);
   const [cloneTarget, setCloneTarget] = useState<TemplateRecord | null>(null);
   const [cloneBanner, setCloneBanner] = useState<string | null>(null);
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
@@ -296,19 +254,11 @@ export default function TemplatesPage() {
   const [channelIdInput, setChannelIdInput] = useState('');
   const [channelConfigInput, setChannelConfigInput] = useState('{\n  "layout": "responsive"\n}');
   const [channelError, setChannelError] = useState<string | null>(null);
-  const [channelToast, setChannelToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
-  const [i18nData, setI18nData] = useState<Record<string, Record<string, string>>>({});
-  const [i18nKeysFromService, setI18nKeysFromService] = useState<string[]>([]);
-  const [i18nRequiredLocales, setI18nRequiredLocales] = useState<string[]>(['en']);
-  const [i18nDefaultLocale, setI18nDefaultLocale] = useState('en');
-  const [localeTab, setLocaleTab] = useState('en');
-  const [newLocaleCode, setNewLocaleCode] = useState('');
-  const [i18nError, setI18nError] = useState<string | null>(null);
-  const [i18nSaving, setI18nSaving] = useState(false);
-  const [previewLocale, setPreviewLocale] = useState('en');
+  const [channelToast, setChannelToast] = useState<{
+    type: 'error' | 'success';
+    message: string;
+  } | null>(null);
   const [channelJsonAdvancedOpen, setChannelJsonAdvancedOpen] = useState(false);
-  const [i18nExpandDraftJson, setI18nExpandDraftJson] = useState(false);
-  const [i18nExpandActiveJson, setI18nExpandActiveJson] = useState(false);
   const [sessionUser, setSessionUser] = useState<{
     id: string;
     email: string;
@@ -325,21 +275,102 @@ export default function TemplatesPage() {
 
   const [layoutSaving, setLayoutSaving] = useState(false);
   const [layoutActivating, setLayoutActivating] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<'info' | 'channels' | 'i18n'>('info');
+  const [layoutToolbar, setLayoutToolbar] = useState({
+    dirty: false,
+    canActivate: false,
+    canSaveDraft: false,
+    exceedsCharacterLimit: false,
+  });
+  const [layoutDraftSavedNotice, setLayoutDraftSavedNotice] = useState(false);
+  const layoutDraftSavedTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'info' | 'channels'>('info');
   /** Below xl: switch between metadata rail and layout canvas */
   const [mobileWorkspace, setMobileWorkspace] = useState<'template' | 'layout'>('layout');
+
+  type InspectorNavItem = {
+    id: 'info' | 'channels';
+    label: string;
+    hint: string;
+    icon: LucideIcon;
+  };
+  const inspectorNavItems = useMemo((): InspectorNavItem[] => {
+    const base: InspectorNavItem[] = [
+      { id: 'info', label: 'Overview', hint: 'Status & identifiers', icon: Info },
+    ];
+    if ((detail?.bindings?.length ?? 0) >= 1) return base;
+    return [
+      ...base,
+      { id: 'channels', label: 'Channels', hint: 'Where this template is used', icon: Link2 },
+    ];
+  }, [detail?.bindings?.length]);
   const saveDraftRef = useRef<(() => Promise<void>) | null>(null);
   const activateDraftRef = useRef<(() => Promise<void>) | null>(null);
 
+  const handleLayoutToolbarState = useCallback(
+    (s: {
+      dirty: boolean;
+      canActivate: boolean;
+      canSaveDraft: boolean;
+      exceedsCharacterLimit: boolean;
+    }) => {
+      setLayoutToolbar((prev) =>
+        prev.dirty === s.dirty &&
+        prev.canActivate === s.canActivate &&
+        prev.canSaveDraft === s.canSaveDraft &&
+        prev.exceedsCharacterLimit === s.exceedsCharacterLimit
+          ? prev
+          : s,
+      );
+    },
+    [],
+  );
+
+  const handleLayoutDraftSaved = useCallback(() => {
+    setLayoutDraftSavedNotice(true);
+    if (layoutDraftSavedTimerRef.current) window.clearTimeout(layoutDraftSavedTimerRef.current);
+    layoutDraftSavedTimerRef.current = window.setTimeout(() => {
+      setLayoutDraftSavedNotice(false);
+      layoutDraftSavedTimerRef.current = null;
+    }, 2200);
+  }, []);
+
   const hasTemplateSelected = Boolean(templateId);
 
-  /** Query string to restore when returning to the list (from list navigation state). */
-  const listSearchRestore = (location.state as { listSearch?: string } | null)?.listSearch ?? '';
+  /** Keep last list filters so "All templates" works after refresh or when router state is missing. */
+  useEffect(() => {
+    if (templateId) return;
+    if (location.pathname !== '/templates') return;
+    try {
+      window.sessionStorage.setItem(TEMPLATES_LIST_SEARCH_KEY, location.search ?? '');
+    } catch {
+      /* ignore */
+    }
+  }, [templateId, location.pathname, location.search]);
 
-  const templatesListHref =
-    listSearchRestore && listSearchRestore.length > 0
-      ? `/templates${listSearchRestore.startsWith('?') ? listSearchRestore : `?${listSearchRestore}`}`
-      : '/templates';
+  /** Query string (with leading `?`) to restore when returning to the list. */
+  const effectiveListSearch = useMemo(() => {
+    const raw = (location.state as { listSearch?: string } | null)?.listSearch;
+    const fromState = typeof raw === 'string' ? raw.trim() : '';
+    if (fromState) return fromState.startsWith('?') ? fromState : `?${fromState}`;
+    if (typeof window === 'undefined') return '';
+    try {
+      const fromStore = (window.sessionStorage.getItem(TEMPLATES_LIST_SEARCH_KEY) ?? '').trim();
+      if (fromStore) return fromStore.startsWith('?') ? fromStore : `?${fromStore}`;
+    } catch {
+      /* ignore */
+    }
+    return '';
+  }, [location.state, location.key, templateId]);
+
+  const templatesListHref = effectiveListSearch ? `/templates${effectiveListSearch}` : '/templates';
+
+  const navigateToTemplatesList = useCallback(() => {
+    if (effectiveListSearch) {
+      void navigate({ pathname: '/templates', search: effectiveListSearch });
+    } else {
+      void navigate('/templates');
+    }
+  }, [navigate, effectiveListSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,6 +433,27 @@ export default function TemplatesPage() {
   }, [templateId]);
 
   useEffect(() => {
+    if (!templateId) return;
+    setLayoutToolbar({
+      dirty: false,
+      canActivate: false,
+      canSaveDraft: false,
+      exceedsCharacterLimit: false,
+    });
+    setLayoutDraftSavedNotice(false);
+    if (layoutDraftSavedTimerRef.current) {
+      window.clearTimeout(layoutDraftSavedTimerRef.current);
+      layoutDraftSavedTimerRef.current = null;
+    }
+  }, [templateId]);
+
+  useEffect(() => {
+    return () => {
+      if (layoutDraftSavedTimerRef.current) window.clearTimeout(layoutDraftSavedTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!templateId) {
       setSessionUser(null);
       return;
@@ -451,63 +503,6 @@ export default function TemplatesPage() {
   }, [detail, location.pathname]);
 
   useEffect(() => {
-    if (!detail) return;
-    const norm = normalizeI18n(detail.i18n);
-    setI18nData(norm);
-    setI18nKeysFromService([]);
-    setI18nRequiredLocales(['en']);
-    setI18nDefaultLocale('en');
-    const locales = Object.keys(norm);
-    if (locales.length > 0) {
-      setLocaleTab((prev) => (locales.includes(prev) ? prev : locales[0]));
-      setPreviewLocale((prev) => (locales.includes(prev) ? prev : locales[0]));
-    } else {
-      setLocaleTab('en');
-      setPreviewLocale('en');
-    }
-    setI18nError(null);
-  }, [detail]);
-
-  useEffect(() => {
-    if (!detail) return;
-    if (sidebarTab === 'channels' && (detail.bindings?.length ?? 0) >= 1) {
-      setSidebarTab('info');
-    }
-  }, [detail, sidebarTab]);
-
-  useEffect(() => {
-    if (!detail) return;
-    let cancelled = false;
-    templateCrudService
-      .getI18nTable(detail.id)
-      .then((table: TemplateI18nTable) => {
-        if (cancelled) return;
-        setI18nDefaultLocale(table.defaultLocale || 'en');
-        const required = table.requiredLocales.length > 0 ? table.requiredLocales : ['en'];
-        setI18nRequiredLocales(required);
-        setI18nKeysFromService(table.keys ?? []);
-        const nextData = normalizeI18n(table.translations);
-        for (const locale of required) {
-          if (!nextData[locale]) nextData[locale] = {};
-        }
-        setI18nData(nextData);
-        const locales = Object.keys(nextData);
-        if (locales.length > 0) {
-          setLocaleTab((prev) => (locales.includes(prev) ? prev : locales[0]));
-          setPreviewLocale((prev) => (locales.includes(prev) ? prev : table.defaultLocale || locales[0]));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setI18nKeysFromService([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [detail]);
-
-  useEffect(() => {
     const clonedFrom = (location.state as { clonedFrom?: string } | null)?.clonedFrom;
     if (clonedFrom) {
       setCloneBanner(clonedFrom);
@@ -550,7 +545,8 @@ export default function TemplatesPage() {
     const name = data.name.trim();
     if (!name) next.name = 'Name is required';
     else if (name.length > 200) next.name = 'Name must be 200 characters or fewer';
-    if (data.description.length > 1000) next.description = 'Description must be 1000 characters or fewer';
+    if (data.description.length > 1000)
+      next.description = 'Description must be 1000 characters or fewer';
     if (mode === 'create' && !data.channelId) next.channelId = 'Please select a channel';
     return next;
   }
@@ -632,7 +628,7 @@ export default function TemplatesPage() {
         setItems((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
         setDetail(updated);
         setShowForm(false);
-        navigate(`/templates/${updated.id}`, { state: { listSearch: listSearchRestore } });
+        navigate(`/templates/${updated.id}`, { state: { listSearch: effectiveListSearch } });
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Operation failed';
@@ -645,8 +641,39 @@ export default function TemplatesPage() {
     }
   }
 
+  async function confirmDeactivate() {
+    if (!deactivateTarget || deactivateTarget.status !== 'ACTIVE') return;
+    setMutating(true);
+    setMutationError(null);
+    try {
+      const updated = await templateCrudService.update(deactivateTarget.id, { status: 'DRAFT' });
+      setItems((prev) =>
+        prev.map((t) =>
+          t.id === updated.id ? { ...updated, bindings: updated.bindings ?? t.bindings } : t,
+        ),
+      );
+      if (detail?.id === updated.id) {
+        setDetail((prev) =>
+          prev && prev.id === updated.id
+            ? { ...updated, bindings: updated.bindings ?? prev.bindings }
+            : prev,
+        );
+      }
+      setDeactivateTarget(null);
+      setChannelToast({
+        type: 'success',
+        message: 'Template deactivated (draft). You can delete it if it is not in use.',
+      });
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : 'Deactivate failed');
+    } finally {
+      setMutating(false);
+    }
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return;
+    if (deleteTarget.status === 'ACTIVE') return;
     setMutating(true);
     setMutationError(null);
     try {
@@ -655,8 +682,8 @@ export default function TemplatesPage() {
       if (detail?.id === deleteTarget.id) {
         setDetail(null);
         navigate(
-          listSearchRestore
-            ? { pathname: '/templates', search: listSearchRestore }
+          effectiveListSearch
+            ? { pathname: '/templates', search: effectiveListSearch }
             : '/templates',
         );
       }
@@ -687,7 +714,7 @@ export default function TemplatesPage() {
       setItems((prev) => [cloned, ...prev]);
       setCloneTarget(null);
       navigate(`/templates/${cloned.id}/edit`, {
-        state: { clonedFrom: sourceName, listSearch: listSearchRestore },
+        state: { clonedFrom: sourceName, listSearch: effectiveListSearch },
       });
     } catch (e) {
       setMutationError(e instanceof Error ? e.message : 'Clone failed');
@@ -707,14 +734,8 @@ export default function TemplatesPage() {
   }, []);
 
   function openAddChannelDialog() {
-    if (detail?.bindings && detail.bindings.length >= 1) {
-      setMutationError('This template is already bound to a channel.');
-      return;
-    }
     setEditingBindingId(null);
-    const firstUnbound = channels.find(
-      (c) => !detail?.bindings?.some((b) => b.channelId === c.id),
-    );
+    const firstUnbound = channels.find((c) => !detail?.bindings?.some((b) => b.channelId === c.id));
     setChannelIdInput(firstUnbound?.id ?? '');
     setChannelConfigInput('{\n  "layout": "responsive"\n}');
     setChannelError(null);
@@ -731,10 +752,6 @@ export default function TemplatesPage() {
 
   async function submitChannelDialog() {
     if (!detail) return;
-    if (!editingBindingId && detail.bindings && detail.bindings.length >= 1) {
-      setChannelError('This template can only be bound to one channel.');
-      return;
-    }
     if (!channelIdInput) {
       setChannelError('Please select a channel.');
       return;
@@ -806,52 +823,14 @@ export default function TemplatesPage() {
     }
   }
 
-  const baseLocale = i18nData[i18nDefaultLocale] ? i18nDefaultLocale : Object.keys(i18nData)[0] ?? 'en';
-  const baseKeys = useMemo(() => {
-    const set = new Set<string>([
-      ...i18nKeysFromService,
-      ...Object.keys(i18nData[baseLocale] ?? {}),
-      ...extractTemplateKeys(detail),
-    ]);
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [i18nData, baseLocale, detail, i18nKeysFromService]);
-  const selectedBundle = i18nData[localeTab] ?? {};
-  const missingCount = baseKeys.filter((k) => !selectedBundle[k]?.trim()).length;
-  const draftLayoutParsed = useMemo(() => parseTemplateLayout(detail?.draftLayout ?? null), [detail?.draftLayout]);
-  const activeLayoutParsed = useMemo(() => parseTemplateLayout(detail?.activeLayout ?? null), [detail?.activeLayout]);
-  const previewName = useMemo(
-    () => (detail ? applyI18nFallback(detail.name, previewLocale, i18nData, baseLocale) : ''),
-    [detail, previewLocale, i18nData, baseLocale],
+  const channelFormParsed = useMemo(
+    () => parseChannelLayoutConfig(channelConfigInput),
+    [channelConfigInput],
   );
-  const previewDesc = useMemo(
-    () => (detail ? applyI18nFallback(detail.description ?? '', previewLocale, i18nData, baseLocale) : ''),
-    [detail, previewLocale, i18nData, baseLocale],
+  const channelConfigValid = useMemo(
+    () => parseChannelLayoutConfig(channelConfigInput) !== null,
+    [channelConfigInput],
   );
-  const draftJsonForI18n = useMemo(() => {
-    try {
-      return JSON.stringify(detail?.draftLayout ?? null, null, 2);
-    } catch {
-      return '';
-    }
-  }, [detail?.draftLayout]);
-  const activeJsonForI18n = useMemo(() => {
-    try {
-      return JSON.stringify(detail?.activeLayout ?? null, null, 2);
-    } catch {
-      return '';
-    }
-  }, [detail?.activeLayout]);
-  const draftJsonTranslated = useMemo(
-    () => applyI18nFallback(draftJsonForI18n, previewLocale, i18nData, baseLocale),
-    [draftJsonForI18n, previewLocale, i18nData, baseLocale],
-  );
-  const activeJsonTranslated = useMemo(
-    () => applyI18nFallback(activeJsonForI18n, previewLocale, i18nData, baseLocale),
-    [activeJsonForI18n, previewLocale, i18nData, baseLocale],
-  );
-
-  const channelFormParsed = useMemo(() => parseChannelLayoutConfig(channelConfigInput), [channelConfigInput]);
-  const channelConfigValid = useMemo(() => parseChannelLayoutConfig(channelConfigInput) !== null, [channelConfigInput]);
   const channelFieldsJoined = useMemo(() => {
     const f = channelFormParsed?.fields;
     if (!Array.isArray(f)) return '';
@@ -889,6 +868,11 @@ export default function TemplatesPage() {
       };
     });
   }, [channels, detail?.bindings]);
+  const activeEditorChannel = useMemo(() => {
+    const channelId = detail?.bindings?.[0]?.channelId;
+    if (!channelId) return null;
+    return channels.find((c) => c.id === channelId) ?? null;
+  }, [channels, detail?.bindings]);
 
   const mergeChannelConfig = useCallback((updates: Record<string, unknown | undefined | null>) => {
     setChannelConfigInput((prev) => {
@@ -917,75 +901,36 @@ export default function TemplatesPage() {
     if (showChannelDialog) setChannelJsonAdvancedOpen(false);
   }, [showChannelDialog]);
 
-  function updateTranslation(key: string, value: string) {
-    setI18nData((prev) => ({
-      ...prev,
-      [localeTab]: {
-        ...(prev[localeTab] ?? {}),
-        [key]: value,
-      },
-    }));
-  }
-
-  function addLocaleTab() {
-    const code = newLocaleCode.trim();
-    if (!validLocaleCode(code)) {
-      setI18nError('Locale must look like "en" or "en-US".');
-      return;
-    }
-    if (i18nData[code]) {
-      setI18nError('Locale already exists.');
-      return;
-    }
-    setI18nData((prev) => ({ ...prev, [code]: {} }));
-    setLocaleTab(code);
-    setNewLocaleCode('');
-    setI18nError(null);
-  }
-
-  async function saveLocaleTranslations() {
-    if (!detail) return;
-    if (!validLocaleCode(localeTab)) {
-      setI18nError('Invalid locale code.');
-      return;
-    }
-    setI18nSaving(true);
-    setI18nError(null);
-    try {
-      const patch = { [localeTab]: i18nData[localeTab] ?? {} };
-      const updated = await templateCrudService.patchI18n(detail.id, patch);
-      setDetail(updated);
-      setItems((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      setChannelToast({ type: 'success', message: `Saved translations for ${localeTab}.` });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to save translations';
-      setI18nError(msg);
-      setChannelToast({ type: 'error', message: msg });
-    } finally {
-      setI18nSaving(false);
-    }
-  }
-
   return (
     <>
       {hasTemplateSelected ? (
         /* Full-height editor — same shell rhythm as content editor */
         <div className="relative flex h-screen flex-col overflow-hidden bg-app-bg">
-          <header className="relative z-20 shrink-0 border-b border-app-border bg-app-bg-subtle px-4 py-3 sm:px-6">
+          <header className="relative z-40 shrink-0 border-b border-app-border bg-app-bg-subtle px-4 py-3 sm:px-6">
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] leading-tight">
-                  <Link
-                    to={templatesListHref}
-                    className="group flex shrink-0 items-center gap-1 rounded-app-md border border-transparent px-2 py-1.5 text-app-muted hover:border-app-border hover:bg-app-surface-hover hover:text-app-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/35"
+                <nav
+                  aria-label="Breadcrumb"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] leading-tight"
+                >
+                  <button
+                    type="button"
+                    title={templatesListHref}
+                    aria-label="Back to all templates"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => navigateToTemplatesList()}
+                    className="group flex shrink-0 cursor-pointer items-center gap-1 rounded-app-md border border-transparent px-2 py-1.5 text-left text-app-muted hover:border-app-border hover:bg-app-surface-hover hover:text-app-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/35"
                   >
                     <ChevronLeft size={15} className="shrink-0" aria-hidden />
                     <span className="hidden sm:inline">All templates</span>
                     <span className="sm:hidden">List</span>
-                  </Link>
+                  </button>
                   <ChevronRight size={13} className="shrink-0 text-app-faint" aria-hidden />
                   {detailLoading ? (
-                    <span className="h-4 w-36 max-w-[50vw] rounded-md bg-app-border/50" aria-hidden />
+                    <span
+                      className="h-4 w-36 max-w-[50vw] rounded-md bg-app-border/50"
+                      aria-hidden
+                    />
                   ) : detail ? (
                     <span
                       className="min-w-0 truncate font-semibold tracking-tight text-app-text"
@@ -1036,57 +981,98 @@ export default function TemplatesPage() {
                         <Pencil size={14} />
                         <span className="hidden md:inline">Details</span>
                       </button>
+                      {detail.status === 'ACTIVE' ? (
+                        <button
+                          type="button"
+                          title="Unpublish: set template to draft so it can be deleted or edited safely"
+                          onClick={() => {
+                            setDeactivateTarget(detail);
+                            setMutationError(null);
+                          }}
+                          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-amber-200/95 hover:bg-amber-500/15 hover:text-amber-100"
+                        >
+                          <PowerOff size={14} />
+                          <span className="hidden md:inline">Deactivate</span>
+                        </button>
+                      ) : null}
                     </div>
 
                     <span className="hidden h-6 w-px bg-app-border/50 md:block" aria-hidden />
 
                     <button
                       type="button"
-                      title="Save layout draft"
+                      title={
+                        layoutToolbar.exceedsCharacterLimit && layoutToolbar.dirty
+                          ? 'Reduce rich text to satisfy this channel’s character limit before saving'
+                          : layoutToolbar.dirty
+                            ? 'Save layout draft to the server'
+                            : 'No unsaved layout changes'
+                      }
                       onClick={() => saveDraftRef.current?.()}
-                      disabled={layoutSaving || detailLoading}
+                      disabled={layoutSaving || detailLoading || !layoutToolbar.canSaveDraft}
                       className={`flex items-center gap-1.5 rounded-app-md border px-3.5 py-2 text-[13px] font-medium ${
                         layoutSaving
                           ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-70'
-                          : 'border-app-border/90 bg-app-bg/45 text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted hover:text-app-accent'
+                          : !layoutToolbar.canSaveDraft
+                            ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-50'
+                            : 'border-app-border/90 bg-app-bg/45 text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted hover:text-app-accent'
                       }`}
                     >
-                      {layoutSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      {layoutSaving ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Save size={14} />
+                      )}
                       <span className="hidden sm:inline">Save draft</span>
                     </button>
                     <button
                       type="button"
                       title={
-                        (detail?.bindings?.length ?? 0) < 1
-                          ? 'Add at least one channel binding before activating'
-                          : 'Publish layout as active'
+                        layoutToolbar.dirty
+                          ? 'Save draft changes before activating'
+                          : !layoutToolbar.canActivate
+                            ? 'Fix layout or channel requirements before activating'
+                            : 'Publish layout as active'
                       }
                       onClick={() => activateDraftRef.current?.()}
-                      disabled={layoutActivating || (detail?.bindings?.length ?? 0) < 1}
+                      disabled={layoutActivating || !layoutToolbar.canActivate}
                       className={`flex items-center gap-1.5 rounded-app-md border px-3 py-1.5 text-[12px] font-semibold ${
                         layoutActivating
                           ? 'cursor-not-allowed border-emerald-500/20 bg-emerald-500/10 text-emerald-300/50 opacity-70'
-                          : (detail?.bindings?.length ?? 0) < 1
+                          : !layoutToolbar.canActivate
                             ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-50'
                             : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20'
                       }`}
                     >
-                      {layoutActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                      {layoutActivating ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <CheckCircle size={14} />
+                      )}
                       <span className="hidden sm:inline">Activate</span>
                     </button>
                   </div>
                 )}
               </div>
 
-              {(layoutSaving || layoutActivating || cloneBanner || mutationError) ? (
+              {layoutSaving ||
+              layoutActivating ||
+              cloneBanner ||
+              mutationError ||
+              (layoutDraftSavedNotice && !layoutSaving) ? (
                 <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-app-border/40 pt-2 text-[11px] sm:text-[12px]">
                   {(layoutSaving || layoutActivating) && (
                     <span className="text-app-faint">
                       {layoutSaving ? 'Saving draft…' : 'Activating template…'}
                     </span>
                   )}
+                  {layoutDraftSavedNotice && !layoutSaving && !layoutActivating && (
+                    <span className="text-emerald-300/90">Draft saved on server.</span>
+                  )}
                   {cloneBanner && (
-                    <span className="text-emerald-300/95">Cloned from &quot;{cloneBanner}&quot;</span>
+                    <span className="text-emerald-300/95">
+                      Cloned from &quot;{cloneBanner}&quot;
+                    </span>
                   )}
                   {mutationError && <span className="text-red-300">{mutationError}</span>}
                 </div>
@@ -1146,64 +1132,65 @@ export default function TemplatesPage() {
               } xl:flex`}
             >
               <div className="flex shrink-0 flex-col gap-2 border-b border-white/[0.07] px-2.5 pb-2.5 pt-2.5 sm:px-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">Inspector</p>
-                <nav
-                  className="flex w-full gap-1"
-                  role="tablist"
-                  aria-label="Template details sections"
-                >
-                  {(
-                    [
-                      {
-                        id: 'info' as const,
-                        label: 'Overview',
-                        hint: 'Status & identifiers',
-                        icon: Info,
-                      },
-                      ...((detail?.bindings?.length ?? 0) >= 1
-                        ? ([] as const)
-                        : ([
-                            {
-                              id: 'channels' as const,
-                              label: 'Channels',
-                              hint: 'Where this template is used',
-                              icon: Link2,
-                            },
-                          ] as const)),
-                      {
-                        id: 'i18n' as const,
-                        label: 'i18n',
-                        hint: 'Locales & strings',
-                        icon: Globe,
-                      },
-                    ] as const
-                  ).map(({ id, label, hint, icon: Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      role="tab"
-                      title={hint}
-                      aria-selected={sidebarTab === id}
-                      onClick={() => setSidebarTab(id)}
-                      className={`relative flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center ${
-                        sidebarTab === id
-                          ? 'border-app-accent/45 bg-app-accent-muted/70 text-app-text'
-                          : 'border-transparent bg-app-bg text-app-muted hover:border-app-border hover:bg-app-surface-hover'
-                      }`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">
+                  Inspector
+                </p>
+                {inspectorNavItems.length === 1 ? (
+                  (() => {
+                    const {
+                      icon: StripIcon,
+                      label: stripLabel,
+                      hint: stripHint,
+                    } = inspectorNavItems[0];
+                    return (
+                      <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-app-bg px-2.5 py-2">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-app-accent/25 bg-app-accent-muted/35 text-app-accent">
+                          <StripIcon size={15} strokeWidth={1.75} aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold leading-tight text-app-text">
+                            {stripLabel}
+                          </p>
+                          <p className="mt-0.5 text-[9px] leading-snug text-app-faint">
+                            {stripHint}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <nav
+                    className="flex w-full gap-1"
+                    role="tablist"
+                    aria-label="Template details sections"
+                  >
+                    {inspectorNavItems.map(({ id, label, hint, icon: Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        title={hint}
+                        aria-selected={sidebarTab === id}
+                        onClick={() => setSidebarTab(id)}
+                        className={`relative flex min-h-0 min-w-0 flex-1 flex-row items-center justify-start gap-2 rounded-lg border px-2.5 py-2 text-left ${
                           sidebarTab === id
-                            ? 'border-app-accent/40 bg-black/25 text-app-accent'
-                            : 'border-white/[0.08] bg-black/20 text-app-faint'
+                            ? 'border-app-accent/45 bg-app-accent-muted/70 text-app-text'
+                            : 'border-transparent bg-app-bg text-app-muted hover:border-app-border hover:bg-app-surface-hover'
                         }`}
                       >
-                        <Icon size={15} strokeWidth={1.75} aria-hidden />
-                      </span>
-                      <span className="w-full truncate text-[10px] font-semibold leading-tight">{label}</span>
-                    </button>
-                  ))}
-                </nav>
+                        <Icon
+                          size={14}
+                          strokeWidth={1.75}
+                          className={`shrink-0 ${sidebarTab === id ? 'text-app-accent' : 'text-app-faint'}`}
+                          aria-hidden
+                        />
+                        <span className="min-w-0 truncate text-[11px] font-semibold leading-tight">
+                          {label}
+                        </span>
+                      </button>
+                    ))}
+                  </nav>
+                )}
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 text-xs sm:px-3.5">
@@ -1223,12 +1210,18 @@ export default function TemplatesPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <Sparkles size={14} className="text-app-accent/85" aria-hidden />
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">About</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">
+                              About
+                            </p>
                           </div>
                           {detail.description ? (
-                            <p className="mt-2 leading-relaxed text-[12px] text-app-muted">{detail.description}</p>
+                            <p className="mt-2 leading-relaxed text-[12px] text-app-muted">
+                              {detail.description}
+                            </p>
                           ) : (
-                            <p className="mt-2 text-[11px] italic text-app-faint">No description yet. Use Details in the header to add one.</p>
+                            <p className="mt-2 text-[11px] italic text-app-faint">
+                              No description yet. Use Details in the header to add one.
+                            </p>
                           )}
                         </div>
 
@@ -1277,11 +1270,14 @@ export default function TemplatesPage() {
                               <p className="text-[10px] text-app-faint">Bound channel</p>
                               {(() => {
                                 const binding = detail.bindings?.[0];
-                                if (!binding) return <p className="mt-1 text-[11px] text-app-faint">—</p>;
+                                if (!binding)
+                                  return <p className="mt-1 text-[11px] text-app-faint">—</p>;
                                 const channel = channels.find((c) => c.id === binding.channelId);
                                 return (
                                   <p className="mt-1 text-[12px] text-app-text">
-                                    <span className="font-semibold">{channel?.name ?? 'Channel'}</span>{' '}
+                                    <span className="font-semibold">
+                                      {channel?.name ?? 'Channel'}
+                                    </span>{' '}
                                     <span className="text-app-faint">
                                       ({channel?.key ?? binding.channelId})
                                     </span>
@@ -1339,7 +1335,11 @@ export default function TemplatesPage() {
                                   onClick={() => copyTemplateMeta(detail.workspaceId, 'ws')}
                                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/30 hover:text-app-accent"
                                 >
-                                  {copiedMeta === 'ws' ? <CheckCircle size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                  {copiedMeta === 'ws' ? (
+                                    <CheckCircle size={14} className="text-emerald-400" />
+                                  ) : (
+                                    <Copy size={14} />
+                                  )}
                                 </button>
                               </div>
                             </div>
@@ -1379,7 +1379,11 @@ export default function TemplatesPage() {
                                   onClick={() => copyTemplateMeta(detail.id, 'id')}
                                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/30 hover:text-app-accent"
                                 >
-                                  {copiedMeta === 'id' ? <CheckCircle size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                  {copiedMeta === 'id' ? (
+                                    <CheckCircle size={14} className="text-emerald-400" />
+                                  ) : (
+                                    <Copy size={14} />
+                                  )}
                                 </button>
                               </div>
                             </div>
@@ -1397,7 +1401,9 @@ export default function TemplatesPage() {
                                 Delivery
                               </p>
                               <p className="mt-2 text-[10px] text-app-faint">
-                                <span className="font-medium text-app-muted">{detail.bindings?.length ?? 0}</span>{' '}
+                                <span className="font-medium text-app-muted">
+                                  {detail.bindings?.length ?? 0}
+                                </span>{' '}
                                 bound
                                 {(detail.bindings?.length ?? 0) === 1 ? '' : 's'}
                               </p>
@@ -1423,7 +1429,9 @@ export default function TemplatesPage() {
                             <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.1] bg-white/[0.04] text-app-faint">
                               <Link2 size={20} strokeWidth={1.5} aria-hidden />
                             </div>
-                            <p className="text-[12px] font-medium text-app-muted">No channels linked yet</p>
+                            <p className="text-[12px] font-medium text-app-muted">
+                              No channels linked yet
+                            </p>
                             <p className="mx-auto mt-1.5 max-w-[14rem] text-[11px] leading-relaxed text-app-faint">
                               Add at least one channel before you can activate this template.
                             </p>
@@ -1459,6 +1467,19 @@ export default function TemplatesPage() {
                                           {channel.description}
                                         </p>
                                       ) : null}
+                                      {Array.isArray(channel?.compatibility?.fieldTypes) ? (
+                                        <p className="mt-1 line-clamp-2 text-[10px] text-app-faint">
+                                          Compatible:{' '}
+                                          {channel?.compatibility?.fieldTypes?.join(', ')}
+                                        </p>
+                                      ) : null}
+                                      {typeof channel?.compatibility?.restrictions
+                                        ?.maxCharacters === 'number' ? (
+                                        <p className="mt-1 text-[10px] text-amber-200/80">
+                                          Max characters:{' '}
+                                          {channel.compatibility.restrictions.maxCharacters}
+                                        </p>
+                                      ) : null}
                                       <p className="mt-2 text-[9px] font-medium uppercase tracking-[0.14em] text-app-faint">
                                         Linked{' '}
                                         {new Date(b.createdAt).toLocaleDateString(undefined, {
@@ -1491,232 +1512,15 @@ export default function TemplatesPage() {
                                     <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                                       Rendering options
                                     </p>
-                                    <ChannelBindingConfigSummary configText={readBindingConfig(b.id)} />
+                                    <ChannelBindingConfigSummary
+                                      configText={readBindingConfig(b.id)}
+                                    />
                                   </div>
                                 </li>
                               );
                             })}
                           </ul>
                         )}
-                      </div>
-                    )}
-
-                    {sidebarTab === 'i18n' && (
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-app-faint">Strings</p>
-                            <p className="mt-0.5 text-[11px] text-app-muted">Locale bundles & preview</p>
-                          </div>
-                          <span className="shrink-0 rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200/95">
-                            {missingCount} missing
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {Object.keys(i18nData).length === 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setI18nData({ en: {} })}
-                              className="rounded border border-app-border/70 px-1.5 py-0.5 text-[10px] hover:bg-app-surface-hover"
-                            >
-                              Init en
-                            </button>
-                          )}
-                          {Object.keys(i18nData).map((loc) => (
-                            <button
-                              key={loc}
-                              type="button"
-                              onClick={() => setLocaleTab(loc)}
-                              className={`rounded border px-1.5 py-0.5 text-[10px] ${
-                                localeTab === loc
-                                  ? 'border-app-accent/50 bg-app-accent-muted text-app-accent'
-                                  : 'border-app-border/70 hover:bg-app-surface-hover'
-                              }`}
-                            >
-                              {loc}
-                              {i18nRequiredLocales.includes(loc) ? ' *' : ''}
-                            </button>
-                          ))}
-                          <div className="flex items-center gap-1">
-                            <input
-                              value={newLocaleCode}
-                              onChange={(e) => setNewLocaleCode(e.target.value)}
-                              placeholder="en-US"
-                              title="New locale code"
-                              className="w-14 rounded border border-app-border/70 bg-app-bg-subtle px-1 py-0.5 text-[10px] outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={addLocaleTab}
-                              className="rounded border border-app-border/70 px-1.5 py-0.5 text-[10px] hover:bg-app-surface-hover"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-app-faint">
-                          Default locale: <span className="font-medium text-app-muted">{i18nDefaultLocale}</span>. Missing
-                          values in other locales fall back to this locale at render time. Required locales:{' '}
-                          <span className="font-medium text-app-muted">{i18nRequiredLocales.join(', ')}</span>.
-                        </p>
-                        {i18nError && (
-                          <div className="rounded border border-red-400/30 bg-red-500/5 px-2 py-1 text-[10px] text-red-200">
-                            {i18nError}
-                          </div>
-                        )}
-                        <div className="max-h-48 overflow-auto rounded border border-app-border/60">
-                          <table className="w-full text-[10px]">
-                            <thead className="sticky top-0 bg-app-surface text-app-faint">
-                              <tr>
-                                <th className="px-1.5 py-1 text-left">Key</th>
-                                <th className="px-1.5 py-1 text-left">{localeTab}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {baseKeys.length === 0 && (
-                                <tr>
-                                  <td colSpan={2} className="px-1.5 py-3 text-center text-app-faint">No keys yet.</td>
-                                </tr>
-                              )}
-                              {baseKeys.map((key) => {
-                                const current = selectedBundle[key] ?? '';
-                                const missing = current.trim() === '';
-                                return (
-                                  <tr key={key} className={missing ? 'bg-amber-500/5' : ''}>
-                                    <td className="px-1.5 py-0.5 align-top font-mono text-[9px] text-app-faint">{key}</td>
-                                    <td className="px-1.5 py-0.5">
-                                      <input
-                                        value={current}
-                                        onChange={(e) => updateTranslation(key, e.target.value)}
-                                        placeholder="…"
-                                        className="w-full rounded border border-app-border/60 bg-app-bg-subtle px-1 py-0.5 text-[9px] outline-none"
-                                      />
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={saveLocaleTranslations}
-                          disabled={i18nSaving || !detail}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-app-border/70 bg-app-surface/40 py-1.5 text-[11px] text-app-muted hover:bg-app-surface-hover disabled:opacity-50"
-                        >
-                          {i18nSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
-                          Save {localeTab}
-                        </button>
-                        <div className="rounded border border-app-border/60 bg-black/10 p-2">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-medium text-app-muted">Translation preview</span>
-                            <label className="flex items-center gap-1 text-[10px] text-app-faint">
-                              Locale
-                              <select
-                                value={previewLocale}
-                                onChange={(e) => setPreviewLocale(e.target.value)}
-                                title="Preview locale"
-                                className="rounded border border-app-border/60 bg-app-bg-subtle px-1.5 py-0.5 text-[10px] outline-none"
-                              >
-                                {Object.keys(i18nData).map((loc) => (
-                                  <option key={loc} value={loc}>{loc}</option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                          <div className="space-y-2 text-[10px] leading-snug">
-                            <div>
-                              <div className="mb-0.5 text-app-faint">Name</div>
-                              <div className="rounded border border-white/[0.06] bg-black/20 px-2 py-1.5 text-app-text">
-                                {previewName || '—'}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="mb-0.5 text-app-faint">Description</div>
-                              <div className="max-h-16 overflow-y-auto rounded border border-white/[0.06] bg-black/20 px-2 py-1.5 text-app-muted">
-                                {previewDesc || '—'}
-                              </div>
-                            </div>
-                            <div className="rounded border border-white/[0.06] bg-black/15">
-                              <button
-                                type="button"
-                                onClick={() => setI18nExpandDraftJson((x) => !x)}
-                                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-app-muted hover:bg-white/[0.04]"
-                              >
-                                <span>
-                                  Draft layout
-                                  {draftLayoutParsed
-                                    ? ` · v${draftLayoutParsed.version} · ${layoutRegionCount(draftLayoutParsed)} blocks`
-                                    : detail?.draftLayout == null
-                                      ? ' · none'
-                                      : ' · unparsed'}
-                                </span>
-                                <ChevronDown
-                                  size={14}
-                                  className={`shrink-0 ${i18nExpandDraftJson ? 'rotate-180' : ''}`}
-                                  aria-hidden
-                                />
-                              </button>
-                              {i18nExpandDraftJson ? (
-                                <div className="border-t border-white/[0.06] px-2 py-1.5">
-                                  <div className="mb-1 flex justify-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        void navigator.clipboard.writeText(draftJsonTranslated);
-                                      }}
-                                      className="inline-flex items-center gap-1 rounded border border-white/[0.08] px-1.5 py-0.5 text-[9px] text-app-muted hover:bg-white/[0.06]"
-                                    >
-                                      <Copy size={10} aria-hidden /> Copy
-                                    </button>
-                                  </div>
-                                  <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded border border-app-border/50 bg-black/25 p-1.5 font-mono text-[9px] text-app-faint">
-                                    {draftJsonTranslated || '—'}
-                                  </pre>
-                                </div>
-                              ) : null}
-                            </div>
-                            <div className="rounded border border-white/[0.06] bg-black/15">
-                              <button
-                                type="button"
-                                onClick={() => setI18nExpandActiveJson((x) => !x)}
-                                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-app-muted hover:bg-white/[0.04]"
-                              >
-                                <span>
-                                  Active layout
-                                  {activeLayoutParsed
-                                    ? ` · v${activeLayoutParsed.version} · ${layoutRegionCount(activeLayoutParsed)} blocks`
-                                    : detail?.activeLayout == null
-                                      ? ' · none'
-                                      : ' · unparsed'}
-                                </span>
-                                <ChevronDown
-                                  size={14}
-                                  className={`shrink-0 ${i18nExpandActiveJson ? 'rotate-180' : ''}`}
-                                  aria-hidden
-                                />
-                              </button>
-                              {i18nExpandActiveJson ? (
-                                <div className="border-t border-white/[0.06] px-2 py-1.5">
-                                  <div className="mb-1 flex justify-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        void navigator.clipboard.writeText(activeJsonTranslated);
-                                      }}
-                                      className="inline-flex items-center gap-1 rounded border border-white/[0.08] px-1.5 py-0.5 text-[9px] text-app-muted hover:bg-white/[0.06]"
-                                    >
-                                      <Copy size={10} aria-hidden /> Copy
-                                    </button>
-                                  </div>
-                                  <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded border border-app-border/50 bg-black/25 p-1.5 font-mono text-[9px] text-app-faint">
-                                    {activeJsonTranslated || '—'}
-                                  </pre>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
                       </div>
                     )}
                   </>
@@ -1737,7 +1541,10 @@ export default function TemplatesPage() {
                 <div className="flex flex-col items-center justify-center gap-3 py-24 text-app-muted">
                   <div className="relative">
                     <div className="h-12 w-12 rounded-full border-2 border-app-border/30" />
-                    <Loader2 size={24} className="absolute inset-0 m-auto animate-spin text-app-accent" />
+                    <Loader2
+                      size={24}
+                      className="absolute inset-0 m-auto animate-spin text-app-accent"
+                    />
                   </div>
                   <p className="text-sm">Preparing editor…</p>
                 </div>
@@ -1755,15 +1562,33 @@ export default function TemplatesPage() {
                     draftLayout={detail.draftLayout}
                     bindingCount={detail.bindings?.length ?? 0}
                     previewChannels={layoutPreviewChannels}
+                    channelCompatibility={activeEditorChannel?.compatibility ?? null}
+                    channelLabel={
+                      activeEditorChannel
+                        ? `${activeEditorChannel.name} (${activeEditorChannel.key})`
+                        : undefined
+                    }
                     onLayoutSaved={(saved) => {
-                      setDetail(saved);
-                      setItems((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+                      setDetail((prev) =>
+                        prev && prev.id === saved.id
+                          ? { ...saved, bindings: saved.bindings ?? prev.bindings }
+                          : saved,
+                      );
+                      setItems((prev) =>
+                        prev.map((t) =>
+                          t.id === saved.id
+                            ? { ...saved, bindings: saved.bindings ?? t.bindings }
+                            : t,
+                        ),
+                      );
                     }}
                     compact
                     saveRef={saveDraftRef}
                     activateRef={activateDraftRef}
                     onSavingChange={setLayoutSaving}
                     onActivatingChange={setLayoutActivating}
+                    onToolbarState={handleLayoutToolbarState}
+                    onDraftSaved={handleLayoutDraftSaved}
                   />
                 </div>
               ) : null}
@@ -1796,7 +1621,10 @@ export default function TemplatesPage() {
               <div className="mb-5 rounded-app-lg border border-app-border bg-app-surface/50 p-4 sm:p-5">
                 <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
                   <div className="min-w-[min(100%,220px)] flex-1">
-                    <label htmlFor="templates-search" className="mb-1.5 block text-xs font-medium text-app-muted">
+                    <label
+                      htmlFor="templates-search"
+                      className="mb-1.5 block text-xs font-medium text-app-muted"
+                    >
                       Search
                     </label>
                     <div className="relative">
@@ -1823,7 +1651,10 @@ export default function TemplatesPage() {
                     </div>
                   </div>
                   <div className="w-[min(100%,8.5rem)]">
-                    <label htmlFor="templates-status" className="mb-1.5 block text-xs font-medium text-app-muted">
+                    <label
+                      htmlFor="templates-status"
+                      className="mb-1.5 block text-xs font-medium text-app-muted"
+                    >
                       Status
                     </label>
                     <select
@@ -1846,7 +1677,10 @@ export default function TemplatesPage() {
                     </select>
                   </div>
                   <div className="w-[min(100%,5.5rem)]">
-                    <label htmlFor="templates-page-size" className="mb-1.5 block text-xs font-medium text-app-muted">
+                    <label
+                      htmlFor="templates-page-size"
+                      className="mb-1.5 block text-xs font-medium text-app-muted"
+                    >
                       Per page
                     </label>
                     <select
@@ -1884,9 +1718,15 @@ export default function TemplatesPage() {
               {loading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="overflow-hidden rounded-2xl border border-app-border/70 bg-app-surface/50">
+                    <div
+                      key={i}
+                      className="overflow-hidden rounded-2xl border border-app-border/70 bg-app-surface/50"
+                    >
                       <div className="flex items-center gap-5 px-6 py-4 pl-6">
-                        <div className="absolute left-0 h-full w-[3px] rounded-l-2xl bg-app-border/60" aria-hidden />
+                        <div
+                          className="absolute left-0 h-full w-[3px] rounded-l-2xl bg-app-border/60"
+                          aria-hidden
+                        />
                         <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-app-border" />
                         <div className="flex-1 space-y-2.5">
                           <div className="flex items-center justify-between gap-4">
@@ -1912,7 +1752,9 @@ export default function TemplatesPage() {
                   <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-app-border/80 bg-app-elevated ring-1 ring-app-border/40">
                     <FileText className="h-7 w-7 text-app-faint" />
                   </div>
-                  <h3 className="mb-2 text-[15px] font-semibold tracking-tight text-app-text">No templates found</h3>
+                  <h3 className="mb-2 text-[15px] font-semibold tracking-tight text-app-text">
+                    No templates found
+                  </h3>
                   <p className="max-w-xs text-[13px] leading-relaxed text-app-muted">
                     Nothing matches your current filters. Try adjusting the search or status.
                   </p>
@@ -1991,7 +1833,10 @@ export default function TemplatesPage() {
 
                           <div className="mt-2.5 flex items-center gap-3 text-[11px] text-app-faint">
                             <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 shrink-0 text-app-accent-2/75" aria-hidden />
+                              <Clock
+                                className="h-3 w-3 shrink-0 text-app-accent-2/75"
+                                aria-hidden
+                              />
                               <span>
                                 {new Date(t.updatedAt).toLocaleDateString(undefined, {
                                   month: 'short',
@@ -2010,7 +1855,10 @@ export default function TemplatesPage() {
                       <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 group-hover:opacity-100">
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); openEditForm(t); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditForm(t);
+                          }}
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-app-border bg-app-bg text-app-faint hover:border-app-accent/40 hover:text-app-accent"
                           title="Edit template"
                         >
@@ -2018,15 +1866,37 @@ export default function TemplatesPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); setCloneTarget(t); setMutationError(null); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCloneTarget(t);
+                            setMutationError(null);
+                          }}
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-app-border bg-app-bg text-app-faint hover:border-app-accent/40 hover:text-app-accent"
                           title="Clone template"
                         >
                           <Copy size={12} />
                         </button>
+                        {t.status === 'ACTIVE' ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeactivateTarget(t);
+                              setMutationError(null);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-400/30 bg-app-bg text-app-faint hover:border-amber-400/50 hover:text-amber-200"
+                            title="Deactivate (unpublish) template"
+                          >
+                            <PowerOff size={12} />
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(t); setMutationError(null); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(t);
+                            setMutationError(null);
+                          }}
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-red-400/25 bg-app-bg text-app-faint hover:border-red-400/50 hover:text-red-400"
                           title="Delete template"
                         >
@@ -2038,8 +1908,8 @@ export default function TemplatesPage() {
 
                   <div className="mt-5 flex items-center justify-between px-1 text-xs text-app-faint">
                     <div>
-                      Showing <span className="font-medium text-app-text">{pageRows.length}</span> of{' '}
-                      <span className="font-medium text-app-text">{items.length}</span>
+                      Showing <span className="font-medium text-app-text">{pageRows.length}</span>{' '}
+                      of <span className="font-medium text-app-text">{items.length}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -2094,7 +1964,8 @@ export default function TemplatesPage() {
                       Template Studio
                     </h3>
                     <p className="text-[13px] leading-relaxed text-app-muted">
-                      Click any template to open the full-height editor with layout blocks, channel bindings, and i18n translations.
+                      Click any template to open the full-height editor with layout blocks, channel
+                      bindings, and i18n translations.
                     </p>
                   </div>
                 </div>
@@ -2102,9 +1973,21 @@ export default function TemplatesPage() {
                 {/* Feature hints */}
                 {(
                   [
-                    { icon: Layout, label: 'Layout blocks', desc: 'Drag-and-drop visual regions for your content structure.' },
-                    { icon: Link2, label: 'Channel bindings', desc: 'Publish to email, web, or any configured channel.' },
-                    { icon: Globe, label: 'Translations', desc: 'Manage i18n keys and preview locale-specific output.' },
+                    {
+                      icon: Layout,
+                      label: 'Layout blocks',
+                      desc: 'Drag-and-drop visual regions for your content structure.',
+                    },
+                    {
+                      icon: Link2,
+                      label: 'Channel bindings',
+                      desc: 'Publish to email, web, or any configured channel.',
+                    },
+                    {
+                      icon: Globe,
+                      label: 'Translations',
+                      desc: 'Manage i18n keys and preview locale-specific output.',
+                    },
                   ] as const
                 ).map(({ icon: Icon, label, desc }) => (
                   <div
@@ -2205,7 +2088,8 @@ export default function TemplatesPage() {
                   placeholder="Optional description"
                   onChange={(e) => {
                     setFormData((prev) => ({ ...prev, description: e.target.value }));
-                    if (formErrors.description) setFormErrors((prev) => ({ ...prev, description: undefined }));
+                    if (formErrors.description)
+                      setFormErrors((prev) => ({ ...prev, description: undefined }));
                     if (formServerError) setFormServerError(null);
                   }}
                   rows={4}
@@ -2262,26 +2146,95 @@ export default function TemplatesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
             <h3 className="m-0 text-base font-semibold text-app-text">Delete Template</h3>
+            {deleteTarget.status === 'ACTIVE' ? (
+              <>
+                <p className="mt-2 text-sm text-app-muted">
+                  <span className="font-medium text-app-text">{deleteTarget.name}</span> is still{' '}
+                  <span className="font-semibold text-emerald-200/90">ACTIVE</span>. Published
+                  templates cannot be deleted until they are deactivated.
+                </p>
+                <p className="mt-2 text-xs text-app-faint">
+                  Deactivate moves it back to draft; you can delete afterward if no content
+                  references it.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(null)}
+                    className="rounded-lg border border-app-border px-3.5 py-2 text-sm text-app-muted hover:bg-app-surface-hover"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = deleteTarget;
+                      setDeleteTarget(null);
+                      setDeactivateTarget(t);
+                    }}
+                    className="rounded-lg border border-amber-400/45 bg-amber-500/15 px-3.5 py-2 text-sm text-amber-100 hover:bg-amber-500/25"
+                  >
+                    Deactivate…
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-app-muted">
+                  Are you sure you want to delete{' '}
+                  <span className="font-medium text-app-text">{deleteTarget.name}</span>?
+                </p>
+                <p className="mt-1 text-xs text-app-faint">
+                  Deletion may be blocked if this template is in use.
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(null)}
+                    className="rounded-lg border border-app-border px-3.5 py-2 text-sm text-app-muted hover:bg-app-surface-hover"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={mutating}
+                    onClick={confirmDelete}
+                    className="rounded-lg border border-red-400/40 bg-red-500/15 px-3.5 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    {mutating ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {deactivateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
+            <h3 className="m-0 text-base font-semibold text-app-text">Deactivate template</h3>
             <p className="mt-2 text-sm text-app-muted">
-              Are you sure you want to delete{' '}
-              <span className="font-medium text-app-text">{deleteTarget.name}</span>?
+              Unpublish <span className="font-medium text-app-text">{deactivateTarget.name}</span>?
+              It will become a <span className="font-medium text-amber-200/90">DRAFT</span> and will
+              no longer be the active layout for new sends. You can edit or delete it afterward (if
+              nothing references it).
             </p>
-            <p className="mt-1 text-xs text-app-faint">Deletion may be blocked if this template is active or in use.</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => setDeactivateTarget(null)}
                 className="rounded-lg border border-app-border px-3.5 py-2 text-sm text-app-muted hover:bg-app-surface-hover"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={mutating}
-                onClick={confirmDelete}
-                className="rounded-lg border border-red-400/40 bg-red-500/15 px-3.5 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50"
+                disabled={mutating || deactivateTarget.status !== 'ACTIVE'}
+                onClick={confirmDeactivate}
+                className="rounded-lg border border-amber-400/45 bg-amber-500/15 px-3.5 py-2 text-sm text-amber-100 hover:bg-amber-500/25 disabled:opacity-50"
               >
-                {mutating ? 'Deleting…' : 'Delete'}
+                {mutating ? 'Deactivating…' : 'Deactivate'}
               </button>
             </div>
           </div>
@@ -2296,7 +2249,9 @@ export default function TemplatesPage() {
               Create a deep copy of{' '}
               <span className="font-medium text-app-text">{cloneTarget.name}</span>?
             </p>
-            <p className="mt-1 text-xs text-app-faint">A new draft template will be created with a copy suffix.</p>
+            <p className="mt-1 text-xs text-app-faint">
+              A new draft template will be created with a copy suffix.
+            </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
@@ -2391,20 +2346,25 @@ export default function TemplatesPage() {
                     <input
                       value={channelFieldsJoined}
                       onChange={(e) => {
-                        const parts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                        const parts = e.target.value
+                          .split(',')
+                          .map((s) => s.trim())
+                          .filter(Boolean);
                         mergeChannelConfig({ fields: parts.length ? parts : undefined });
                       }}
                       placeholder="title, content, image"
                       title="Comma-separated field names stored in config"
                       className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm outline-none placeholder:text-app-faint"
                     />
-                    <p className="mt-1 text-[10px] text-app-faint">Separate with commas. Leave empty to omit.</p>
+                    <p className="mt-1 text-[10px] text-app-faint">
+                      Separate with commas. Leave empty to omit.
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
-                  Config isn&apos;t valid JSON yet. Edit the raw JSON below until it parses, then the short form will
-                  return.
+                  Config isn&apos;t valid JSON yet. Edit the raw JSON below until it parses, then
+                  the short form will return.
                 </div>
               )}
               <div>
@@ -2427,7 +2387,7 @@ export default function TemplatesPage() {
                 ) : (
                   <div className="text-[11px] font-medium text-app-muted">Raw JSON</div>
                 )}
-                {(channelJsonAdvancedOpen || !channelConfigValid) ? (
+                {channelJsonAdvancedOpen || !channelConfigValid ? (
                   <textarea
                     rows={!channelConfigValid ? 10 : 8}
                     value={channelConfigInput}

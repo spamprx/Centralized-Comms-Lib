@@ -8,5 +8,19 @@ export interface ChannelRepository {
     name: string;
     key: string;
     description?: string | null;
+    priority?: number;
+    compatibility?: Record<string, unknown>;
   }): Promise<Channel>;
+  update(
+    id: string,
+    input: {
+      name?: string;
+      key?: string;
+      description?: string | null;
+      priority?: number;
+      compatibility?: Record<string, unknown>;
+    },
+  ): Promise<Channel>;
+  countBindings(id: string): Promise<number>;
+  delete(id: string): Promise<boolean>;
 }

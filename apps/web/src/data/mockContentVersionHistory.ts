@@ -60,7 +60,9 @@ export function getStaticVersionHistory(contentId: string): {
         `## Screenshots`,
         `[Screenshot 1: Dashboard view]`,
         `[Screenshot 2: Settings panel]`,
-      ].join('\n').split('\n'),
+      ]
+        .join('\n')
+        .split('\n'),
     ),
     metadataSnapshot: null,
     contentId,
@@ -85,7 +87,9 @@ export function getStaticVersionHistory(contentId: string): {
         `## Screenshots`,
         `[Screenshot 1: Dashboard view]`,
         `[Screenshot 2: Settings panel]`,
-      ].join('\n').split('\n'),
+      ]
+        .join('\n')
+        .split('\n'),
     ),
     metadataSnapshot: null,
     contentId,
@@ -117,7 +121,9 @@ export function getStaticVersionHistory(contentId: string): {
         `[Screenshot 3: Advanced settings]`,
         `## Troubleshooting`,
         `Common issues and solutions...`,
-      ].join('\n').split('\n'),
+      ]
+        .join('\n')
+        .split('\n'),
     ),
     metadataSnapshot: null,
     contentId,

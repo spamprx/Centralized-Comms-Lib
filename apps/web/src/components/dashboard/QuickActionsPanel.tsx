@@ -1,5 +1,5 @@
-import type { QuickAction } from "../../data/mockDashboardData";
-import { Surface } from "../ui";
+import type { QuickAction } from '../../data/mockDashboardData';
+import { Surface } from '../ui';
 
 export function QuickActionsPanel({ actions }: { actions: QuickAction[] }) {
   return (
@@ -22,7 +22,7 @@ export function QuickActionsPanel({ actions }: { actions: QuickAction[] }) {
                 color: action.color,
               }}
             >
-              {action.icon === "plus" && (
+              {action.icon === 'plus' && (
                 <svg
                   width="20"
                   height="20"
@@ -35,7 +35,7 @@ export function QuickActionsPanel({ actions }: { actions: QuickAction[] }) {
                   <path d="M12 5v14M5 12h14" />
                 </svg>
               )}
-              {action.icon === "upload" && (
+              {action.icon === 'upload' && (
                 <svg
                   width="20"
                   height="20"
@@ -50,7 +50,7 @@ export function QuickActionsPanel({ actions }: { actions: QuickAction[] }) {
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
               )}
-              {action.icon === "calendar" && (
+              {action.icon === 'calendar' && (
                 <svg
                   width="20"
                   height="20"
@@ -66,7 +66,7 @@ export function QuickActionsPanel({ actions }: { actions: QuickAction[] }) {
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
               )}
-              {action.icon === "user" && (
+              {action.icon === 'user' && (
                 <svg
                   width="20"
                   height="20"

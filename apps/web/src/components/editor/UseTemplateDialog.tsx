@@ -124,7 +124,9 @@ export default function UseTemplateDialog({ onClose, onSelectTemplate }: UseTemp
             <p className="px-2 py-4 text-[13px] text-red-600/90">{error}</p>
           ) : filtered.length === 0 ? (
             <p className="px-2 py-6 text-center text-[12px] text-[var(--editor-faint)]">
-              {templates.length === 0 ? 'No templates available.' : 'No templates match your search.'}
+              {templates.length === 0
+                ? 'No templates available.'
+                : 'No templates match your search.'}
             </p>
           ) : (
             <ul className="m-0 list-none space-y-1 p-0">
@@ -135,8 +137,12 @@ export default function UseTemplateDialog({ onClose, onSelectTemplate }: UseTemp
                     onClick={() => pick(t)}
                     className="flex w-full flex-col items-start gap-0.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-transparent px-3 py-2.5 text-left transition-colors hover:border-[var(--editor-border)] hover:bg-[var(--editor-canvas-bg)]"
                   >
-                    <span className="text-[13px] font-medium text-[var(--editor-doc-text)]">{t.name}</span>
-                    <span className="font-mono text-[11px] text-[var(--editor-muted)]">{t.slug}</span>
+                    <span className="text-[13px] font-medium text-[var(--editor-doc-text)]">
+                      {t.name}
+                    </span>
+                    <span className="font-mono text-[11px] text-[var(--editor-muted)]">
+                      {t.slug}
+                    </span>
                     {t.description ? (
                       <span className="line-clamp-2 text-[11px] leading-snug text-[var(--editor-muted)]">
                         {t.description}

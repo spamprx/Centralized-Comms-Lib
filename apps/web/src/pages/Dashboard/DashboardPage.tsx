@@ -1,4 +1,4 @@
-import { DashboardLayout } from "../../layouts";
+import { DashboardLayout } from '../../layouts';
 
 export default function DashboardPage() {
   return <DashboardLayout />;

@@ -266,8 +266,8 @@ export default function SlashCommandMenu({ editor, onOpenCitation }: SlashComman
       aria-label="Insert block"
     >
       <div className="border-b border-[var(--editor-border)] px-2.5 py-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
-        Type <span className="font-mono text-[var(--editor-muted)]">/</span> in a paragraph or heading to open this
-        menu. 
+        Type <span className="font-mono text-[var(--editor-muted)]">/</span> in a paragraph or
+        heading to open this menu.
       </div>
       {filtered.length === 0 ? (
         <div className="px-2.5 py-2 text-[var(--editor-faint)]">No matching blocks</div>

@@ -42,7 +42,8 @@ export default function PreviewLayout() {
         if (cancelled) return;
         setTitle(details.content.title || 'Untitled');
         const bodyVersions = (details.versions ?? []).filter(
-          (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+          (v) =>
+            (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
         );
         if (bodyVersions.length === 0) {
           setBodyDoc(null);
@@ -67,7 +68,11 @@ export default function PreviewLayout() {
   }, [contentId]);
 
   const hasTipTapDoc = useMemo(
-    () => bodyDoc && typeof bodyDoc === 'object' && bodyDoc !== null && 'type' in (bodyDoc as Record<string, unknown>),
+    () =>
+      bodyDoc &&
+      typeof bodyDoc === 'object' &&
+      bodyDoc !== null &&
+      'type' in (bodyDoc as Record<string, unknown>),
     [bodyDoc],
   );
 
@@ -128,7 +133,9 @@ export default function PreviewLayout() {
             <div
               style={{ width: getPreviewWidth() }}
               className={`max-w-full overflow-hidden border border-app-border/60 bg-app-surface/90 shadow-app-lift backdrop-blur-sm ${
-                activeChannel === 'web' ? 'rounded-app-xl' : 'rounded-[2rem] ring-2 ring-app-border-strong'
+                activeChannel === 'web'
+                  ? 'rounded-app-xl'
+                  : 'rounded-[2rem] ring-2 ring-app-border-strong'
               }`}
             >
               <div className="bg-gradient-to-br from-app-accent to-app-accent-2 px-6 py-6 text-white sm:px-8 sm:py-8">
@@ -181,7 +188,11 @@ export default function PreviewLayout() {
                 className="flex cursor-pointer items-center justify-between rounded-app-md border border-app-border/60 bg-app-bg/35 px-3 py-2.5 transition-colors hover:border-app-accent/25"
               >
                 <span className="text-xs text-app-muted">{section.name}</span>
-                <input type="checkbox" defaultChecked={section.enabled} className="accent-app-accent" />
+                <input
+                  type="checkbox"
+                  defaultChecked={section.enabled}
+                  className="accent-app-accent"
+                />
               </label>
             ))}
           </div>

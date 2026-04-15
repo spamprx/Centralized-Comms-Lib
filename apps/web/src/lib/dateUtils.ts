@@ -24,7 +24,7 @@ export function parsePresetRange(value: string): DateRange | null {
     case '14d':
     case '30d':
     case '90d': {
-      const preset = PRESET_RANGES.find(r => r.value === value);
+      const preset = PRESET_RANGES.find((r) => r.value === value);
       if (!preset?.days) return null;
       return {
         from: new Date(today.getTime() - preset.days! * 24 * 60 * 60 * 1000),
@@ -32,7 +32,7 @@ export function parsePresetRange(value: string): DateRange | null {
         label: preset.label,
       };
     }
-    
+
     case 'month': {
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       return {
@@ -41,7 +41,7 @@ export function parsePresetRange(value: string): DateRange | null {
         label: 'This month',
       };
     }
-    
+
     case 'last-month': {
       const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
@@ -51,7 +51,7 @@ export function parsePresetRange(value: string): DateRange | null {
         label: 'Last month',
       };
     }
-    
+
     default:
       return null;
   }
@@ -89,8 +89,18 @@ export function getWeekDays(): string[] {
 
 export function getMonths(): string[] {
   return [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 }
 

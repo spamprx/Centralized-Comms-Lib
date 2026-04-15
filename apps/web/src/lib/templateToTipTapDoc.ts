@@ -5,7 +5,12 @@ import { flattenRegions, parseTemplateLayout } from './templateLayout/layoutConf
 function extractRichDoc(props: Record<string, unknown> | undefined): JSONContent | null {
   if (!props || typeof props !== 'object') return null;
   const doc = props.doc;
-  if (doc && typeof doc === 'object' && !Array.isArray(doc) && (doc as JSONContent).type === 'doc') {
+  if (
+    doc &&
+    typeof doc === 'object' &&
+    !Array.isArray(doc) &&
+    (doc as JSONContent).type === 'doc'
+  ) {
     return doc as JSONContent;
   }
   return null;
@@ -52,7 +57,9 @@ export function tipTapDocFromTemplateRecord(record: TemplateRecord): JSONContent
     } else if (region.type === 'field') {
       const props = region.props as { label?: string } | undefined;
       const label =
-        props && typeof props.label === 'string' && props.label.trim() ? props.label.trim() : 'Field';
+        props && typeof props.label === 'string' && props.label.trim()
+          ? props.label.trim()
+          : 'Field';
       merged.push({
         type: 'heading',
         attrs: { level: 3 },

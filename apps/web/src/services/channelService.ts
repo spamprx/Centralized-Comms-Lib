@@ -29,35 +29,43 @@ const API_AVAILABILITY_KEY = 'channel_api_available';
 // Fallback static channels data
 const FALLBACK_CHANNELS: Channel[] = [
   {
-    id: "dbb11a78-f158-4e26-b375-f2893c3ef868",
-    name: "Email",
-    key: "email",
-    description: "Email clients",
-    createdAt: "2026-04-06T07:12:12.161Z",
-    updatedAt: "2026-04-06T07:12:12.161Z"
+    id: 'dbb11a78-f158-4e26-b375-f2893c3ef868',
+    name: 'Email',
+    key: 'email',
+    description: 'Email clients',
+    createdAt: '2026-04-06T07:12:12.161Z',
+    updatedAt: '2026-04-06T07:12:12.161Z',
   },
   {
-    id: "90eac80c-e23b-438d-ad3f-f1086929c4c8",
-    name: "Mobile",
-    key: "mobile",
-    description: "Native / in-app surfaces",
-    createdAt: "2026-04-06T07:12:12.165Z",
-    updatedAt: "2026-04-06T07:12:12.165Z"
+    id: '90eac80c-e23b-438d-ad3f-f1086929c4c8',
+    name: 'WhatsApp',
+    key: 'whatsapp',
+    description: 'WhatsApp messages',
+    createdAt: '2026-04-06T07:12:12.165Z',
+    updatedAt: '2026-04-06T07:12:12.165Z',
   },
   {
-    id: "3c9e4b1e-fe88-41a1-8211-f752c0320d3d",
-    name: "Web",
-    key: "web",
-    description: "Browser / responsive surfaces",
-    createdAt: "2026-04-06T07:12:12.153Z",
-    updatedAt: "2026-04-06T07:12:12.153Z"
-  }
+    id: '3c9e4b1e-fe88-41a1-8211-f752c0320d3d',
+    name: 'SMS',
+    key: 'sms',
+    description: 'SMS text messages',
+    createdAt: '2026-04-06T07:12:12.153Z',
+    updatedAt: '2026-04-06T07:12:12.153Z',
+  },
+  {
+    id: '8f35b2f4-2d07-42cd-a0c4-f6d28f77f6d5',
+    name: 'Push Notification',
+    key: 'push',
+    description: 'Mobile and browser push notifications',
+    createdAt: '2026-04-06T07:12:12.171Z',
+    updatedAt: '2026-04-06T07:12:12.171Z',
+  },
 ];
 
 async function isApiAvailable(): Promise<boolean> {
   const cached = localStorage.getItem(API_AVAILABILITY_KEY);
   if (cached !== null) return cached === 'true';
-  
+
   try {
     await request<Channel[]>('/api/v1/channels', { method: 'GET' });
     localStorage.setItem(API_AVAILABILITY_KEY, 'true');
@@ -113,7 +121,10 @@ async function apiListChannels(): Promise<Channel[]> {
   return request<Channel[]>('/api/v1/channels');
 }
 
-async function apiCreateBinding(templateId: string, binding: CreateBindingRequest): Promise<Binding> {
+async function apiCreateBinding(
+  templateId: string,
+  binding: CreateBindingRequest,
+): Promise<Binding> {
   return request<Binding>(`/api/v1/templates/${templateId}/bindings`, {
     method: 'POST',
     body: JSON.stringify(binding),
@@ -133,8 +144,8 @@ function localStorageListChannels(): Channel[] {
 
 function localStorageCreateBinding(templateId: string, binding: CreateBindingRequest): Binding {
   const bindings = getBindingsFromStorage(templateId);
-  const channel = FALLBACK_CHANNELS.find(c => c.id === binding.channelId);
-  
+  const channel = FALLBACK_CHANNELS.find((c) => c.id === binding.channelId);
+
   if (!channel) {
     throw new Error('Channel not found');
   }
@@ -146,7 +157,7 @@ function localStorageCreateBinding(templateId: string, binding: CreateBindingReq
     layoutConfig: binding.layoutConfig,
     createdAt: new Date().toISOString(),
   };
-  
+
   const updated = [...bindings, newBinding];
   saveBindingsToStorage(templateId, updated);
   return newBinding;
@@ -154,10 +165,10 @@ function localStorageCreateBinding(templateId: string, binding: CreateBindingReq
 
 function localStorageDeleteBinding(templateId: string, bindingId: string): boolean {
   const bindings = getBindingsFromStorage(templateId);
-  const filtered = bindings.filter(b => b.id !== bindingId);
-  
+  const filtered = bindings.filter((b) => b.id !== bindingId);
+
   if (filtered.length === bindings.length) return false;
-  
+
   saveBindingsToStorage(templateId, filtered);
   return true;
 }

@@ -211,9 +211,7 @@ export default function SimilarContentWidget({
               {subtitle}
             </p>
           )}
-          {error && (
-            <p className="m-0 mt-1 text-[11px] text-red-500/90">{error}</p>
-          )}
+          {error && <p className="m-0 mt-1 text-[11px] text-red-500/90">{error}</p>}
           {shouldQuery && !loading && count === 0 && !error && (
             <p
               className={`m-0 mt-1 text-[11px] ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'}`}
@@ -227,7 +225,9 @@ export default function SimilarContentWidget({
                 <Link
                   to={`/library/${h.contentId}`}
                   className={`min-w-0 flex-1 truncate no-underline hover:underline ${
-                    neutral ? 'text-[var(--editor-primary)]' : 'text-app-accent/95 hover:text-app-accent'
+                    neutral
+                      ? 'text-[var(--editor-primary)]'
+                      : 'text-app-accent/95 hover:text-app-accent'
                   }`}
                   title={h.title}
                 >

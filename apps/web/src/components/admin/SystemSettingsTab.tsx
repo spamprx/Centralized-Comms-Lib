@@ -6,10 +6,10 @@ import type { SystemSettings } from '../../types/admin';
 type Section = keyof SystemSettings;
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType }[] = [
-  { id: 'general',       label: 'General',       icon: Globe      },
-  { id: 'security',      label: 'Security',      icon: Lock       },
-  { id: 'notifications', label: 'Notifications', icon: Bell       },
-  { id: 'storage',       label: 'Storage',        icon: HardDrive  },
+  { id: 'general', label: 'General', icon: Globe },
+  { id: 'security', label: 'Security', icon: Lock },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'storage', label: 'Storage', icon: HardDrive },
 ];
 
 export default function SystemSettingsTab() {
@@ -31,7 +31,8 @@ export default function SystemSettingsTab() {
     setLocalChanges({});
   };
 
-  const patch = (key: string, value: unknown) => setLocalChanges(prev => ({ ...prev, [key]: value }));
+  const patch = (key: string, value: unknown) =>
+    setLocalChanges((prev) => ({ ...prev, [key]: value }));
   const current = settings ? { ...settings[activeSection], ...localChanges } : null;
 
   return (
@@ -43,14 +44,13 @@ export default function SystemSettingsTab() {
         </div>
         <button
           className={`flex items-center gap-1.5 px-3.5 py-2 admin-glass-button rounded-xl text-[13px] font-medium transition-all duration-200 ${
-            saved
-              ? 'text-emerald-400 !border-emerald-400/30 !bg-emerald-400/10'
-              : 'text-app-accent'
+            saved ? 'text-emerald-400 !border-emerald-400/30 !bg-emerald-400/10' : 'text-app-accent'
           } disabled:opacity-40 disabled:cursor-not-allowed`}
           onClick={handleSave}
           disabled={saving || !isDirty}
         >
-          <Save size={13} />{saving ? 'Saving…' : saved ? 'Saved!' : 'Save changes'}
+          <Save size={13} />
+          {saving ? 'Saving…' : saved ? 'Saved!' : 'Save changes'}
         </button>
       </div>
 
@@ -88,7 +88,10 @@ export default function SystemSettingsTab() {
                     ? 'bg-app-accent-muted text-app-accent'
                     : 'bg-transparent text-app-faint hover:bg-app-surface-hover hover:text-app-muted'
                 }`}
-                onClick={() => { setActiveSection(id); setLocalChanges({}); }}
+                onClick={() => {
+                  setActiveSection(id);
+                  setLocalChanges({});
+                }}
                 title={label}
               >
                 <Icon size={18} />
@@ -109,22 +112,42 @@ export default function SystemSettingsTab() {
         </nav>
 
         {/* Content */}
-        <div className="flex-1 p-5 admin-glass rounded-xl" style={{ background: 'rgba(15, 20, 32, 0.5)' }}>
+        <div
+          className="flex-1 p-5 admin-glass rounded-xl"
+          style={{ background: 'rgba(15, 20, 32, 0.5)' }}
+        >
           {/* Section label */}
           <div className="text-[11px] font-semibold uppercase tracking-wider text-app-faint mb-4">
-            {SECTIONS.find(s => s.id === activeSection)?.label}
+            {SECTIONS.find((s) => s.id === activeSection)?.label}
           </div>
 
           {loading || !current ? (
             <div className="flex flex-col gap-3">
-              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[56px] rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }} />)}
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-[56px] rounded-xl animate-pulse"
+                  style={{ background: 'rgba(255,255,255,0.03)' }}
+                />
+              ))}
             </div>
           ) : (
             <>
-              {activeSection === 'general'       && <GeneralSection       data={current as SystemSettings['general']}       patch={patch} />}
-              {activeSection === 'security'      && <SecuritySection      data={current as SystemSettings['security']}      patch={patch} />}
-              {activeSection === 'notifications' && <NotificationsSection data={current as SystemSettings['notifications']} patch={patch} />}
-              {activeSection === 'storage'       && <StorageSection       data={current as SystemSettings['storage']}       patch={patch} />}
+              {activeSection === 'general' && (
+                <GeneralSection data={current as SystemSettings['general']} patch={patch} />
+              )}
+              {activeSection === 'security' && (
+                <SecuritySection data={current as SystemSettings['security']} patch={patch} />
+              )}
+              {activeSection === 'notifications' && (
+                <NotificationsSection
+                  data={current as SystemSettings['notifications']}
+                  patch={patch}
+                />
+              )}
+              {activeSection === 'storage' && (
+                <StorageSection data={current as SystemSettings['storage']} patch={patch} />
+              )}
             </>
           )}
         </div>
@@ -146,7 +169,15 @@ function FloatField({ label, children }: { label: string; children: React.ReactN
 
 // ─── Inline Toggle Field ──────────────────────────────────────────────
 
-function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-white/[0.04] last:border-b-0">
       <span className="text-[13px] font-medium text-app-muted">{label}</span>
@@ -170,56 +201,144 @@ const inputSmClass = `${inputClass} w-[140px]`;
 
 // ─── Section Components ───────────────────────────────────────────────
 
-function GeneralSection({ data, patch }: { data: SystemSettings['general']; patch: (k: string, v: unknown) => void }) {
+function GeneralSection({
+  data,
+  patch,
+}: {
+  data: SystemSettings['general'];
+  patch: (k: string, v: unknown) => void;
+}) {
   return (
     <div className="flex flex-col gap-5">
       <FloatField label="Application Name">
-        <input className={inputClass} value={data.appName} onChange={e => patch('appName', e.target.value)} placeholder=" " />
+        <input
+          className={inputClass}
+          value={data.appName}
+          onChange={(e) => patch('appName', e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
       <FloatField label="Support Email">
-        <input className={inputClass} type="email" value={data.supportEmail} onChange={e => patch('supportEmail', e.target.value)} placeholder=" " />
+        <input
+          className={inputClass}
+          type="email"
+          value={data.supportEmail}
+          onChange={(e) => patch('supportEmail', e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
       <FloatField label="Max Users per Group">
-        <input className={inputSmClass} type="number" value={data.maxUsersPerGroup} onChange={e => patch('maxUsersPerGroup', +e.target.value)} placeholder=" " />
+        <input
+          className={inputSmClass}
+          type="number"
+          value={data.maxUsersPerGroup}
+          onChange={(e) => patch('maxUsersPerGroup', +e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
 
       <div className="border-t border-white/[0.04] pt-3 mt-1">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-app-faint mb-2">Toggles</div>
-        <ToggleField label="Maintenance Mode" checked={data.maintenanceMode} onChange={v => patch('maintenanceMode', v)} />
-        <ToggleField label="Allow Public Registration" checked={data.allowRegistration} onChange={v => patch('allowRegistration', v)} />
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-app-faint mb-2">
+          Toggles
+        </div>
+        <ToggleField
+          label="Maintenance Mode"
+          checked={data.maintenanceMode}
+          onChange={(v) => patch('maintenanceMode', v)}
+        />
+        <ToggleField
+          label="Allow Public Registration"
+          checked={data.allowRegistration}
+          onChange={(v) => patch('allowRegistration', v)}
+        />
       </div>
     </div>
   );
 }
 
-function SecuritySection({ data, patch }: { data: SystemSettings['security']; patch: (k: string, v: unknown) => void }) {
+function SecuritySection({
+  data,
+  patch,
+}: {
+  data: SystemSettings['security'];
+  patch: (k: string, v: unknown) => void;
+}) {
   return (
     <div className="flex flex-col gap-5">
-      <ToggleField label="Require MFA" checked={data.mfaRequired} onChange={v => patch('mfaRequired', v)} />
+      <ToggleField
+        label="Require MFA"
+        checked={data.mfaRequired}
+        onChange={(v) => patch('mfaRequired', v)}
+      />
       <FloatField label="Session Timeout (minutes)">
-        <input className={inputSmClass} type="number" value={data.sessionTimeoutMinutes} onChange={e => patch('sessionTimeoutMinutes', +e.target.value)} placeholder=" " />
+        <input
+          className={inputSmClass}
+          type="number"
+          value={data.sessionTimeoutMinutes}
+          onChange={(e) => patch('sessionTimeoutMinutes', +e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
       <FloatField label="Minimum Password Length">
-        <input className={inputSmClass} type="number" value={data.passwordMinLength} onChange={e => patch('passwordMinLength', +e.target.value)} placeholder=" " />
+        <input
+          className={inputSmClass}
+          type="number"
+          value={data.passwordMinLength}
+          onChange={(e) => patch('passwordMinLength', +e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
-      <ToggleField label="Require Special Characters" checked={data.passwordRequireSpecialChars} onChange={v => patch('passwordRequireSpecialChars', v)} />
+      <ToggleField
+        label="Require Special Characters"
+        checked={data.passwordRequireSpecialChars}
+        onChange={(v) => patch('passwordRequireSpecialChars', v)}
+      />
       <FloatField label="Max Login Attempts">
-        <input className={inputSmClass} type="number" value={data.maxLoginAttempts} onChange={e => patch('maxLoginAttempts', +e.target.value)} placeholder=" " />
+        <input
+          className={inputSmClass}
+          type="number"
+          value={data.maxLoginAttempts}
+          onChange={(e) => patch('maxLoginAttempts', +e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
     </div>
   );
 }
 
-function NotificationsSection({ data, patch }: { data: SystemSettings['notifications']; patch: (k: string, v: unknown) => void }) {
+function NotificationsSection({
+  data,
+  patch,
+}: {
+  data: SystemSettings['notifications'];
+  patch: (k: string, v: unknown) => void;
+}) {
   return (
     <div className="flex flex-col gap-5">
-      <ToggleField label="Email Notifications" checked={data.emailNotifications} onChange={v => patch('emailNotifications', v)} />
+      <ToggleField
+        label="Email Notifications"
+        checked={data.emailNotifications}
+        onChange={(v) => patch('emailNotifications', v)}
+      />
       <FloatField label="Slack Webhook URL">
-        <input className={inputClass} value={data.slackWebhookUrl} onChange={e => patch('slackWebhookUrl', e.target.value)} placeholder=" " />
+        <input
+          className={inputClass}
+          value={data.slackWebhookUrl}
+          onChange={(e) => patch('slackWebhookUrl', e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
-      <ToggleField label="Alert on Failed Login" checked={data.alertOnFailedLogin} onChange={v => patch('alertOnFailedLogin', v)} />
+      <ToggleField
+        label="Alert on Failed Login"
+        checked={data.alertOnFailedLogin}
+        onChange={(v) => patch('alertOnFailedLogin', v)}
+      />
       <FloatField label="Digest Frequency">
-        <select className={inputClass} value={data.digestFrequency} onChange={e => patch('digestFrequency', e.target.value)}>
+        <select
+          className={inputClass}
+          value={data.digestFrequency}
+          onChange={(e) => patch('digestFrequency', e.target.value)}
+        >
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="never">Never</option>
@@ -229,21 +348,47 @@ function NotificationsSection({ data, patch }: { data: SystemSettings['notificat
   );
 }
 
-function StorageSection({ data, patch }: { data: SystemSettings['storage']; patch: (k: string, v: unknown) => void }) {
+function StorageSection({
+  data,
+  patch,
+}: {
+  data: SystemSettings['storage'];
+  patch: (k: string, v: unknown) => void;
+}) {
   return (
     <div className="flex flex-col gap-5">
       <FloatField label="Storage Provider">
-        <select className={inputClass} value={data.storageProvider} onChange={e => patch('storageProvider', e.target.value)}>
+        <select
+          className={inputClass}
+          value={data.storageProvider}
+          onChange={(e) => patch('storageProvider', e.target.value)}
+        >
           <option value="local">Local</option>
           <option value="s3">Amazon S3</option>
           <option value="gcs">Google Cloud Storage</option>
         </select>
       </FloatField>
       <FloatField label="Max File Size (MB)">
-        <input className={inputSmClass} type="number" value={data.maxFileSizeMb} onChange={e => patch('maxFileSizeMb', +e.target.value)} placeholder=" " />
+        <input
+          className={inputSmClass}
+          type="number"
+          value={data.maxFileSizeMb}
+          onChange={(e) => patch('maxFileSizeMb', +e.target.value)}
+          placeholder=" "
+        />
       </FloatField>
       <FloatField label="Allowed File Types">
-        <input className={inputClass} value={data.allowedFileTypes.join(', ')} onChange={e => patch('allowedFileTypes', e.target.value.split(',').map(s => s.trim()))} placeholder=" " />
+        <input
+          className={inputClass}
+          value={data.allowedFileTypes.join(', ')}
+          onChange={(e) =>
+            patch(
+              'allowedFileTypes',
+              e.target.value.split(',').map((s) => s.trim()),
+            )
+          }
+          placeholder=" "
+        />
       </FloatField>
     </div>
   );

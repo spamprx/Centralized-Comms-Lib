@@ -21,7 +21,8 @@ function hitTitle(hit: ContentSearchHit): string {
 function metaLine(hit: ContentSearchHit): string {
   const w = toCitationWork(hit);
   const parts: string[] = [];
-  if (w.authors?.length) parts.push(w.authors.slice(0, 2).join(', ') + (w.authors.length > 2 ? '…' : ''));
+  if (w.authors?.length)
+    parts.push(w.authors.slice(0, 2).join(', ') + (w.authors.length > 2 ? '…' : ''));
   else parts.push('[Author unknown]');
   parts.push(w.year != null && String(w.year) !== '' ? String(w.year) : 'n.d.');
   if (hit.score != null && !Number.isNaN(hit.score)) parts.push(`score ${hit.score.toFixed(2)}`);
@@ -120,15 +121,18 @@ export default function CitationSearchDialog({
       <div className="flex max-h-[85vh] w-full max-w-[820px] flex-col overflow-hidden rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 shadow-app-lift backdrop-blur-xl">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-app-border/70 px-5 py-4">
           <div className="min-w-0">
-            <h2 id="citation-dialog-title" className="m-0 flex items-center gap-2 text-lg font-semibold text-app-text">
+            <h2
+              id="citation-dialog-title"
+              className="m-0 flex items-center gap-2 text-lg font-semibold text-app-text"
+            >
               <BookMarked size={20} className="shrink-0 text-cyan-400/90" />
               Insert citation from references
             </h2>
             <p className="mt-1 text-[12px] leading-snug text-app-muted">
               Put the cursor where you want the marker, search, then insert. Use{' '}
-              <span className="font-semibold text-app-text">Refs block</span> (toolbar or below) to place the numbered
-              list where you want — otherwise the first citation appends References at the bottom. Formats: APA, IEEE,
-              MLA.
+              <span className="font-semibold text-app-text">Refs block</span> (toolbar or below) to
+              place the numbered list where you want — otherwise the first citation appends
+              References at the bottom. Formats: APA, IEEE, MLA.
             </p>
           </div>
           <button
@@ -143,11 +147,17 @@ export default function CitationSearchDialog({
 
         <div className="flex shrink-0 flex-col gap-3 border-b border-app-border/50 px-5 py-4 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
-            <label htmlFor="citation-search-q" className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+            <label
+              htmlFor="citation-search-q"
+              className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-app-faint"
+            >
               Search references
             </label>
             <div className="relative">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-faint"
+              />
               <input
                 id="citation-search-q"
                 value={query}
@@ -166,7 +176,10 @@ export default function CitationSearchDialog({
           </div>
           <div className="flex shrink-0 flex-wrap items-end gap-2">
             <div>
-              <label htmlFor="citation-style" className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+              <label
+                htmlFor="citation-style"
+                className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-app-faint"
+              >
                 List format
               </label>
               <select
@@ -219,14 +232,19 @@ export default function CitationSearchDialog({
           )}
           {unavailable && (
             <div className="mb-3 rounded-app-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200/95">
-              Search service is unavailable right now. Results may be empty; you can still insert once search is back.
+              Search service is unavailable right now. Results may be empty; you can still insert
+              once search is back.
             </div>
           )}
           {error && <div className="mb-3 text-[12px] text-red-400">{error}</div>}
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-[11px] text-app-faint">
             <span>
               {loading ? 'Searching…' : hits.length ? `${hits.length} shown` : 'No results'}
-              {total > hits.length ? ` of ${total} matches` : total > 0 && !loading ? ` · ${total} total` : null}
+              {total > hits.length
+                ? ` of ${total} matches`
+                : total > 0 && !loading
+                  ? ` · ${total} total`
+                  : null}
             </span>
             <span>{existingCitationCount} citation(s) in this draft</span>
           </div>
@@ -250,10 +268,15 @@ export default function CitationSearchDialog({
                   const preview = formatCitationLocal(citationStyle, work);
                   const busy = insertingId === hit.contentId;
                   return (
-                    <li key={hit.contentId} className="p-4 transition-colors hover:bg-app-elevated/40">
+                    <li
+                      key={hit.contentId}
+                      className="p-4 transition-colors hover:bg-app-elevated/40"
+                    >
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0 flex-1">
-                          <div className="text-[13px] font-semibold leading-snug text-app-text">{hitTitle(hit)}</div>
+                          <div className="text-[13px] font-semibold leading-snug text-app-text">
+                            {hitTitle(hit)}
+                          </div>
                           <div className="mt-0.5 text-[11px] text-app-faint">{metaLine(hit)}</div>
                           {hit.snippetHtml ? (
                             <div
@@ -261,10 +284,14 @@ export default function CitationSearchDialog({
                               dangerouslySetInnerHTML={{ __html: hit.snippetHtml }}
                             />
                           ) : (
-                            <div className="mt-2 text-[12px] text-app-faint">No snippet — metadata may be incomplete.</div>
+                            <div className="mt-2 text-[12px] text-app-faint">
+                              No snippet — metadata may be incomplete.
+                            </div>
                           )}
                           <div className="mt-2 border-l-2 border-cyan-500/35 pl-2 text-[11px] leading-snug text-app-muted">
-                            <span className="font-semibold text-app-faint">Preview ({citationStyle}): </span>
+                            <span className="font-semibold text-app-faint">
+                              Preview ({citationStyle}):{' '}
+                            </span>
                             {preview}
                           </div>
                         </div>

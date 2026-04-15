@@ -10,7 +10,9 @@
 export type VersionHistoryMode = 'static' | 'static-then-api' | 'api-first';
 
 export function getVersionHistoryMode(): VersionHistoryMode {
-  const v = String(import.meta.env.VITE_VERSION_HISTORY_MODE ?? '').trim().toLowerCase();
+  const v = String(import.meta.env.VITE_VERSION_HISTORY_MODE ?? '')
+    .trim()
+    .toLowerCase();
   if (v === 'static') return 'static';
   if (v === 'api' || v === 'api-first' || v === 'live') return 'api-first';
   return 'static-then-api';

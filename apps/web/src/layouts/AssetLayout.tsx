@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   Download,
@@ -13,10 +13,10 @@ import {
   Trash2,
   Upload,
   Video,
-} from "lucide-react";
-import { Button, PageHeader, PageShell, Surface } from "../components/ui";
+} from 'lucide-react';
+import { Button, PageHeader, PageShell, Surface } from '../components/ui';
 
-type AssetType = "image" | "video" | "audio" | "document";
+type AssetType = 'image' | 'video' | 'audio' | 'document';
 
 type Asset = {
   id: string;
@@ -37,27 +37,27 @@ const TYPE_ICON = {
 } as const;
 
 const TYPE_COLOR = {
-  image: "text-app-accent",
-  video: "text-amber-400",
-  audio: "text-emerald-400",
-  document: "text-blue-400",
+  image: 'text-app-accent',
+  video: 'text-amber-400',
+  audio: 'text-emerald-400',
+  document: 'text-blue-400',
 } as const;
 
 const EXT_BY_TYPE: Record<AssetType, string[]> = {
-  image: ["PNG", "JPG", "WEBP"],
-  video: ["MP4", "MOV"],
-  audio: ["MP3", "WAV"],
-  document: ["PDF", "DOCX"],
+  image: ['PNG', 'JPG', 'WEBP'],
+  video: ['MP4', 'MOV'],
+  audio: ['MP3', 'WAV'],
+  document: ['PDF', 'DOCX'],
 };
 
 function buildMockAssets(): Asset[] {
-  const types: AssetType[] = ["image", "image", "document", "video", "audio"];
+  const types: AssetType[] = ['image', 'image', 'document', 'video', 'audio'];
   const base = Date.now() - 45 * 24 * 60 * 60 * 1000;
   return Array.from({ length: 24 }, (_, i) => {
     const type = types[i % types.length];
     const extPool = EXT_BY_TYPE[type];
     const extLabel = extPool[i % extPool.length];
-    const name = `campaign_${String(i + 1).padStart(2, "0")}.${extLabel.toLowerCase()}`;
+    const name = `campaign_${String(i + 1).padStart(2, '0')}.${extLabel.toLowerCase()}`;
     const mb = 0.3 + (i % 7) * 0.4 + (i % 3) * 0.15;
     const dateAdded = base + i * 36 * 60 * 60 * 1000;
     return {
@@ -68,9 +68,9 @@ function buildMockAssets(): Asset[] {
       size: `${mb.toFixed(1)} MB`,
       sizeBytes: mb * 1024 * 1024,
       uploadedAt: new Date(dateAdded).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       }),
       dateAdded,
     };
@@ -80,10 +80,10 @@ function buildMockAssets(): Asset[] {
 export default function AssetLayout() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [allAssets, setAllAssets] = useState<Asset[]>(() => buildMockAssets());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | AssetType>("all");
-  const [sortKey, setSortKey] = useState<"date" | "name" | "size">("date");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | AssetType>('all');
+  const [sortKey, setSortKey] = useState<'date' | 'name' | 'size'>('date');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
 
@@ -91,12 +91,12 @@ export default function AssetLayout() {
     let list = allAssets.filter((a) => {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch = !q || a.name.toLowerCase().includes(q);
-      const matchesType = filterType === "all" || a.type === filterType;
+      const matchesType = filterType === 'all' || a.type === filterType;
       return matchesSearch && matchesType;
     });
-    if (sortKey === "date") list = [...list].sort((a, b) => b.dateAdded - a.dateAdded);
-    if (sortKey === "name") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
-    if (sortKey === "size") list = [...list].sort((a, b) => b.sizeBytes - a.sizeBytes);
+    if (sortKey === 'date') list = [...list].sort((a, b) => b.dateAdded - a.dateAdded);
+    if (sortKey === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortKey === 'size') list = [...list].sort((a, b) => b.sizeBytes - a.sizeBytes);
     return list;
   }, [allAssets, searchQuery, filterType, sortKey]);
 
@@ -121,7 +121,7 @@ export default function AssetLayout() {
   const addPlaceholderFiles = useCallback(
     (count: number) => {
       const start = allAssets.length;
-      const types: AssetType[] = ["image", "video", "audio", "document"];
+      const types: AssetType[] = ['image', 'video', 'audio', 'document'];
       const next: Asset[] = [...allAssets];
       for (let i = 0; i < count; i++) {
         const type = types[(start + i) % 4];
@@ -131,12 +131,12 @@ export default function AssetLayout() {
           name: `upload_${start + i + 1}.${ext.toLowerCase()}`,
           extLabel: ext,
           type,
-          size: "0.2 MB",
+          size: '0.2 MB',
           sizeBytes: 0.2 * 1024 * 1024,
           uploadedAt: new Date().toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
           }),
           dateAdded: Date.now(),
         });
@@ -155,12 +155,12 @@ export default function AssetLayout() {
     });
   }, []);
 
-  const filterChips: { key: "all" | AssetType; label: string; icon: typeof LayoutGrid }[] = [
-    { key: "all", label: "All", icon: LayoutGrid },
-    { key: "image", label: "Images", icon: Image },
-    { key: "video", label: "Video", icon: Video },
-    { key: "document", label: "Documents", icon: FileText },
-    { key: "audio", label: "Audio", icon: Music },
+  const filterChips: { key: 'all' | AssetType; label: string; icon: typeof LayoutGrid }[] = [
+    { key: 'all', label: 'All', icon: LayoutGrid },
+    { key: 'image', label: 'Images', icon: Image },
+    { key: 'video', label: 'Video', icon: Video },
+    { key: 'document', label: 'Documents', icon: FileText },
+    { key: 'audio', label: 'Audio', icon: Music },
   ];
 
   const selectionCount = selectedIds.size;
@@ -178,7 +178,7 @@ export default function AssetLayout() {
           setIsUploading(true);
           addPlaceholderFiles(Math.min(n, 8));
           setTimeout(() => setIsUploading(false), 550);
-          e.target.value = "";
+          e.target.value = '';
         }}
       />
 
@@ -224,22 +224,22 @@ export default function AssetLayout() {
               <div className="inline-flex rounded-app-md border border-app-border p-0.5">
                 <button
                   type="button"
-                  onClick={() => setViewMode("grid")}
+                  onClick={() => setViewMode('grid')}
                   className={`flex size-9 items-center justify-center rounded-app-sm transition-colors ${
-                    viewMode === "grid"
-                      ? "bg-app-surface text-app-text"
-                      : "text-app-muted hover:bg-app-surface hover:text-app-text"
+                    viewMode === 'grid'
+                      ? 'bg-app-surface text-app-text'
+                      : 'text-app-muted hover:bg-app-surface hover:text-app-text'
                   }`}
                 >
                   <Grid3x3 size={16} />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode("list")}
+                  onClick={() => setViewMode('list')}
                   className={`flex size-9 items-center justify-center rounded-app-sm transition-colors ${
-                    viewMode === "list"
-                      ? "bg-app-surface text-app-text"
-                      : "text-app-muted hover:bg-app-surface hover:text-app-text"
+                    viewMode === 'list'
+                      ? 'bg-app-surface text-app-text'
+                      : 'text-app-muted hover:bg-app-surface hover:text-app-text'
                   }`}
                 >
                   <List size={16} />
@@ -266,8 +266,8 @@ export default function AssetLayout() {
                     onClick={() => setFilterType(key)}
                     className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors ${
                       active
-                        ? "border-app-accent bg-app-accent-muted text-app-accent-hover"
-                        : "border-app-border text-app-muted hover:border-app-border-strong hover:bg-app-surface hover:text-app-text"
+                        ? 'border-app-accent bg-app-accent-muted text-app-accent-hover'
+                        : 'border-app-border text-app-muted hover:border-app-border-strong hover:bg-app-surface hover:text-app-text'
                     }`}
                   >
                     <Icon size={15} />
@@ -291,8 +291,8 @@ export default function AssetLayout() {
         <Surface>
           {allAssets.length === 0 && (
             <div className="mb-4 rounded-app-md border border-app-border bg-app-bg/40 px-4 py-3 text-[13px] text-app-muted">
-              Drag files here or use <span className="text-app-text">Upload files</span> to add
-              to your library.
+              Drag files here or use <span className="text-app-text">Upload files</span> to add to
+              your library.
             </div>
           )}
 
@@ -317,7 +317,7 @@ export default function AssetLayout() {
             <div className="py-16 text-center text-[13px] text-app-muted">
               No assets match your search or filters.
             </div>
-          ) : viewMode === "grid" ? (
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-6">
               {filteredAssets.map((asset) => (
                 <AssetCard
@@ -350,10 +350,10 @@ export default function AssetLayout() {
         <div
           className={`sticky bottom-0 z-20 rounded-app-md border bg-app-bg-subtle px-4 py-3 transition-all ${
             selectionCount > 0
-              ? "translate-y-0 opacity-100"
-              : "pointer-events-none translate-y-4 opacity-0"
+              ? 'translate-y-0 opacity-100'
+              : 'pointer-events-none translate-y-4 opacity-0'
           }`}
-          style={{ borderColor: "rgba(124, 111, 247, 0.45)" }}
+          style={{ borderColor: 'rgba(124, 111, 247, 0.45)' }}
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[13px] text-app-text">{selectionCount} items selected</span>
@@ -394,8 +394,8 @@ function AssetCard({
     <div
       className={`group overflow-hidden rounded-app-xl border bg-app-surface/55 shadow-app-soft transition-all duration-200 ${
         selected
-          ? "border-app-accent/70"
-          : "border-app-border/90 hover:-translate-y-0.5 hover:border-app-accent/35"
+          ? 'border-app-accent/70'
+          : 'border-app-border/90 hover:-translate-y-0.5 hover:border-app-accent/35'
       }`}
     >
       <div className="relative aspect-4/3 bg-app-bg-subtle">
@@ -466,8 +466,8 @@ function AssetListRow({
     <div
       className={`flex items-center gap-3 rounded-app-md border px-3 py-2 transition-colors ${
         selected
-          ? "border-app-accent bg-app-accent-muted/30"
-          : "border-app-border bg-app-bg-subtle hover:border-app-border-strong"
+          ? 'border-app-accent bg-app-accent-muted/30'
+          : 'border-app-border bg-app-bg-subtle hover:border-app-border-strong'
       }`}
     >
       <input

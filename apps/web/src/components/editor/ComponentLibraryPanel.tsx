@@ -2,10 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/core';
 import { Copy, Link2, Search, X } from 'lucide-react';
-import {
-  componentService,
-  type ComponentLibraryEntry,
-} from '../../services/componentService';
+import { componentService, type ComponentLibraryEntry } from '../../services/componentService';
 import { mockEditorComponents } from '../../data/mockEditorComponents';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
@@ -26,7 +23,10 @@ function isInsertableTipTapDoc(json: unknown): json is JSONContent {
   return o.type === 'doc' && Array.isArray(o.content);
 }
 
-function insertFragmentForComponent(mode: 'linked' | 'detached', comp: ComponentLibraryEntry): JSONContent {
+function insertFragmentForComponent(
+  mode: 'linked' | 'detached',
+  comp: ComponentLibraryEntry,
+): JSONContent {
   const badge = mode === 'linked' ? 'Linked' : 'Snapshot';
   return {
     type: 'paragraph',
@@ -56,7 +56,11 @@ function deepCloneJson<T>(v: T): T {
  * **Linked** — insert a `componentReference` node that stores `componentVersionId`; on save the API
  * replaces it with the latest canonical blocks from the registry.
  */
-function insertFromLibrary(editor: Editor | null, mode: 'linked' | 'detached', comp: ComponentLibraryEntry) {
+function insertFromLibrary(
+  editor: Editor | null,
+  mode: 'linked' | 'detached',
+  comp: ComponentLibraryEntry,
+) {
   if (!editor) return;
 
   if (mode === 'detached') {
@@ -96,7 +100,10 @@ type ComponentLibraryPanelProps = {
   onCatalogSourceChange?: (source: 'loading' | 'api' | 'demo') => void;
 };
 
-export default function ComponentLibraryPanel({ editor, onCatalogSourceChange }: ComponentLibraryPanelProps) {
+export default function ComponentLibraryPanel({
+  editor,
+  onCatalogSourceChange,
+}: ComponentLibraryPanelProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 280);
   const [items, setItems] = useState<ComponentLibraryEntry[]>([]);
@@ -177,7 +184,9 @@ export default function ComponentLibraryPanel({ editor, onCatalogSourceChange }:
                   <div className="truncate text-[12px] font-semibold text-[var(--editor-doc-text)]">
                     {comp.name}
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-[var(--editor-muted)]">{comp.key}</div>
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-[var(--editor-muted)]">
+                    {comp.key}
+                  </div>
                   {comp.description ? (
                     <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[var(--editor-muted)]">
                       {comp.description}

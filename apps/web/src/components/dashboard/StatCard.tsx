@@ -1,28 +1,23 @@
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import type { StatCard as StatCardModel } from "../../data/mockDashboardData";
-import { Surface } from "../ui";
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { StatCard as StatCardModel } from '../../data/mockDashboardData';
+import { Surface } from '../ui';
 
 const iconColors: Record<string, string> = {
-  content: "#8b5cf6",
-  review: "#f59e0b",
-  users: "#06b6d4",
-  engagement: "#10b981",
+  content: '#8b5cf6',
+  review: '#f59e0b',
+  users: '#06b6d4',
+  engagement: '#10b981',
 };
 
 export function StatCard({ stat }: { stat: StatCardModel }) {
-  const TrendIcon =
-    stat.trend === "up"
-      ? TrendingUp
-      : stat.trend === "down"
-        ? TrendingDown
-        : Minus;
+  const TrendIcon = stat.trend === 'up' ? TrendingUp : stat.trend === 'down' ? TrendingDown : Minus;
   const trendColor =
-    stat.trend === "up"
-      ? "text-emerald-400"
-      : stat.trend === "down"
-        ? "text-red-400"
-        : "text-app-faint";
-  const accent = iconColors[stat.icon] ?? "#937cf8";
+    stat.trend === 'up'
+      ? 'text-emerald-400'
+      : stat.trend === 'down'
+        ? 'text-red-400'
+        : 'text-app-faint';
+  const accent = iconColors[stat.icon] ?? '#937cf8';
 
   return (
     <Surface
@@ -60,13 +55,13 @@ export function StatCard({ stat }: { stat: StatCardModel }) {
             strokeWidth="2"
             aria-hidden
           >
-            {stat.icon === "content" && (
+            {stat.icon === 'content' && (
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             )}
-            {stat.icon === "review" && (
+            {stat.icon === 'review' && (
               <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
             )}
-            {stat.icon === "users" && (
+            {stat.icon === 'users' && (
               <>
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
@@ -74,9 +69,7 @@ export function StatCard({ stat }: { stat: StatCardModel }) {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </>
             )}
-            {stat.icon === "engagement" && (
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            )}
+            {stat.icon === 'engagement' && <path d="M22 12h-4l-3 9L9 3l-3 9H2" />}
           </svg>
         </div>
       </div>
@@ -86,7 +79,7 @@ export function StatCard({ stat }: { stat: StatCardModel }) {
       <div className={`relative flex items-center gap-1.5 text-xs ${trendColor}`}>
         <TrendIcon size={12} aria-hidden className="shrink-0" />
         <span>
-          {stat.change > 0 ? "+" : ""}
+          {stat.change > 0 ? '+' : ''}
           {stat.change.toFixed(1)}% from last month
         </span>
       </div>

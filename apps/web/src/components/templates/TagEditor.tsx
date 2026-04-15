@@ -10,7 +10,13 @@ interface TagEditorProps {
   templateTags?: Tag[]; // Add this to get current template tags
 }
 
-export default function TagEditor({ templateId, isEditing, tags, onTagsChange, templateTags: _initialTemplateTags }: TagEditorProps) {
+export default function TagEditor({
+  templateId,
+  isEditing,
+  tags,
+  onTagsChange,
+  templateTags: _initialTemplateTags,
+}: TagEditorProps) {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [filteredSuggestions, setFilteredSuggestions] = useState<Tag[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -29,7 +35,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
         const allTags = await tagService.list();
         setAvailableTags(allTags);
         setFilteredSuggestions(allTags); // Initially show all tags
-        
+
         console.log('Loaded tags:', allTags);
       } catch (err) {
         console.error('Failed to load tags:', err);
@@ -47,17 +53,16 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
   // Filter suggestions based on input
   useEffect(() => {
     if (newTagName.trim()) {
-      const filtered = availableTags.filter(tag => 
-        !tags.some(t => t.id === tag.id) && // Exclude already added tags
-        tag.name.toLowerCase().includes(newTagName.trim().toLowerCase())
+      const filtered = availableTags.filter(
+        (tag) =>
+          !tags.some((t) => t.id === tag.id) && // Exclude already added tags
+          tag.name.toLowerCase().includes(newTagName.trim().toLowerCase()),
       );
       setFilteredSuggestions(filtered);
       setShowSuggestions(true);
     } else {
       // Show all available tags when input is empty
-      const filtered = availableTags.filter(tag => 
-        !tags.some(t => t.id === tag.id)
-      );
+      const filtered = availableTags.filter((tag) => !tags.some((t) => t.id === tag.id));
       setFilteredSuggestions(filtered);
       setShowSuggestions(false);
     }
@@ -71,20 +76,24 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
       setError(null);
 
       // Check if tag already exists
-      let tag = availableTags.find(t => t.name.toLowerCase() === newTagName.trim().toLowerCase());
-      
+      let tag = availableTags.find((t) => t.name.toLowerCase() === newTagName.trim().toLowerCase());
+
       // Create new tag if it doesn't exist
       if (!tag) {
         try {
           tag = await tagService.create({ name: newTagName.trim() });
-          setAvailableTags(prev => [...prev, tag!]);
+          setAvailableTags((prev) => [...prev, tag!]);
         } catch (createErr) {
           console.error('Failed to create tag:', createErr);
           // Create a temporary tag object for localStorage fallback
           tag = {
             id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: newTagName.trim(),
-            slug: newTagName.trim().toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'),
+            slug: newTagName
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9\s-]/g, '')
+              .replace(/\s+/g, '-'),
           };
         }
       }
@@ -92,7 +101,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
       // Add tag to template
       try {
         const templateTag = await tagService.addTagToTemplate(templateId, tag.id, tag);
-        setTemplateTags(prev => [...prev, templateTag]);
+        setTemplateTags((prev) => [...prev, templateTag]);
       } catch (addErr) {
         console.error('Failed to add tag to template:', addErr);
         // Create a temporary template tag for localStorage fallback
@@ -102,13 +111,13 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
           tagId: tag.id,
           tag,
         };
-        setTemplateTags(prev => [...prev, templateTag]);
+        setTemplateTags((prev) => [...prev, templateTag]);
       }
-      
+
       // Update tags list
       const updatedTags = [...tags, tag];
       onTagsChange(updatedTags);
-      
+
       setNewTagName('');
     } catch (err) {
       console.error('Unexpected error in handleAddTag:', err);
@@ -125,19 +134,19 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
 
       try {
         await tagService.removeTagFromTemplate(templateId, tagId);
-        
+
         // Update template tags
-        const updatedTemplateTags = templateTags.filter(tt => tt.tagId !== tagId);
+        const updatedTemplateTags = templateTags.filter((tt) => tt.tagId !== tagId);
         setTemplateTags(updatedTemplateTags);
       } catch (removeErr) {
         console.error('Failed to remove tag from template:', removeErr);
         // Fallback: just update local state
-        const updatedTemplateTags = templateTags.filter(tt => tt.tagId !== tagId);
+        const updatedTemplateTags = templateTags.filter((tt) => tt.tagId !== tagId);
         setTemplateTags(updatedTemplateTags);
       }
-      
+
       // Update tags list
-      const updatedTags = tags.filter(t => t.id !== tagId);
+      const updatedTags = tags.filter((t) => t.id !== tagId);
       onTagsChange(updatedTags);
     } catch (err) {
       console.error('Unexpected error in handleRemoveTag:', err);
@@ -154,7 +163,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
           {tags.length === 0 ? (
             <span className="text-app-faint text-sm">No tags</span>
           ) : (
-            tags.map(tag => (
+            tags.map((tag) => (
               <span
                 key={tag.id}
                 className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
@@ -171,13 +180,13 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
   return (
     <div className="mb-6">
       <label className="block text-sm font-medium text-app-muted mb-2">Tags</label>
-      
+
       {error && (
         <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
           {error}
         </div>
       )}
-      
+
       {/* Existing Tags */}
       <div className="flex flex-wrap gap-2 mb-3">
         {tags.length === 0 ? (
@@ -201,7 +210,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
           ))
         )}
       </div>
-      
+
       {/* Add New Tag */}
       <div className="relative">
         <div className="flex gap-2">
@@ -230,12 +239,12 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
             Add
           </button>
         </div>
-        
+
         {/* Suggestions Dropdown */}
         {showSuggestions && (
           <div className="absolute z-10 w-full mt-1 bg-app-surface border border-app-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
             {filteredSuggestions.length > 0 ? (
-              filteredSuggestions.slice(0, 10).map(tag => (
+              filteredSuggestions.slice(0, 10).map((tag) => (
                 <button
                   key={tag.id}
                   onClick={() => {
@@ -253,9 +262,7 @@ export default function TagEditor({ templateId, isEditing, tags, onTagsChange, t
                 No matching tags. Press "Add" to create "{newTagName.trim()}"
               </div>
             ) : (
-              <div className="px-3 py-2 text-sm text-app-faint">
-                No available tags to add
-              </div>
+              <div className="px-3 py-2 text-sm text-app-faint">No available tags to add</div>
             )}
           </div>
         )}

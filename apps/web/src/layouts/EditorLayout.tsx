@@ -80,7 +80,9 @@ export default function EditorLayout() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedSnapshot, setSavedSnapshot] = useState<{ title: string; content: string } | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState<{ title: string; content: string } | null>(
+    null,
+  );
   const [showSaveComponentModal, setShowSaveComponentModal] = useState(false);
   const [componentName, setComponentName] = useState('');
   const [componentKey, setComponentKey] = useState('');
@@ -101,13 +103,19 @@ export default function EditorLayout() {
   const [rightPanelTab, setRightPanelTab] = useState<'library' | 'properties' | 'similar' | 'refs'>(
     'library',
   );
-  const [libraryCatalogSource, setLibraryCatalogSource] = useState<'loading' | 'api' | 'demo'>('loading');
+  const [libraryCatalogSource, setLibraryCatalogSource] = useState<'loading' | 'api' | 'demo'>(
+    'loading',
+  );
   const [wordCount, setWordCount] = useState(0);
   const [showUseTemplateDialog, setShowUseTemplateDialog] = useState(false);
   /** Passed to create draft only for new content (first save) so formatting rules bind to the template. */
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
-  const [contentType, setContentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>('ARTICLE');
-  const [lifecycleState, setLifecycleState] = useState<'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT');
+  const [contentType, setContentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>(
+    'ARTICLE',
+  );
+  const [lifecycleState, setLifecycleState] = useState<
+    'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'
+  >('DRAFT');
   const hydratedIdRef = useRef<string | null>(null);
 
   const persistedContentId = useMemo(
@@ -131,40 +139,43 @@ export default function EditorLayout() {
     setDraftContent(content);
   }, [content, setDraftContent]);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      CitationMarker,
-      ComponentReference,
-      ...templateLayoutDocExtensions,
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        linkOnPaste: true,
-        HTMLAttributes: {
-          rel: 'noopener noreferrer nofollow',
-          target: '_blank',
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit,
+        Underline,
+        CitationMarker,
+        ComponentReference,
+        ...templateLayoutDocExtensions,
+        Link.configure({
+          openOnClick: false,
+          autolink: true,
+          linkOnPaste: true,
+          HTMLAttributes: {
+            rel: 'noopener noreferrer nofollow',
+            target: '_blank',
+          },
+        }),
+        Placeholder.configure({
+          placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Press / to insert a block' : ''),
+        }),
+      ],
+      content,
+      onUpdate: ({ editor: ed }) => setContent(ed.getHTML()),
+      onSelectionUpdate: ({ editor: ed }) => {
+        const { from, to } = ed.state.selection;
+        const text = from === to ? '' : ed.state.doc.textBetween(from, to, ' ').trim();
+        setSelectionText(text);
+      },
+      editorProps: {
+        attributes: {
+          class:
+            'editor-prose min-h-[360px] px-8 py-6 text-[15px] leading-relaxed text-[var(--editor-doc-text)] outline-none box-border',
         },
-      }),
-      Placeholder.configure({
-        placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Press / to insert a block' : ''),
-      }),
-    ],
-    content,
-    onUpdate: ({ editor: ed }) => setContent(ed.getHTML()),
-    onSelectionUpdate: ({ editor: ed }) => {
-      const { from, to } = ed.state.selection;
-      const text = from === to ? '' : ed.state.doc.textBetween(from, to, ' ').trim();
-      setSelectionText(text);
-    },
-    editorProps: {
-      attributes: {
-        class:
-          'editor-prose min-h-[360px] px-8 py-6 text-[15px] leading-relaxed text-[var(--editor-doc-text)] outline-none box-border',
       },
     },
-  }, []);
+    [],
+  );
 
   // When opening an existing content item (`/editor/:contentId`), hydrate the editor from the latest saved body.
   // Without this, the editor starts blank and a "Save Draft" would create a new content item, making it look
@@ -189,13 +200,17 @@ export default function EditorLayout() {
         const nextType = details.content.contentType ?? 'ARTICLE';
         const nextLifecycle = details.content.lifecycleState ?? 'DRAFT';
         const bodyVersions = (details.versions ?? []).filter(
-          (v) => (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
+          (v) =>
+            (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') && v.body != null,
         );
         const latestWithBody =
           bodyVersions.length > 0
-            ? bodyVersions.reduce((prev, curr) => (curr.versionNumber > prev.versionNumber ? curr : prev))
+            ? bodyVersions.reduce((prev, curr) =>
+                curr.versionNumber > prev.versionNumber ? curr : prev,
+              )
             : null;
-        const doc = latestWithBody?.body ?? ({ type: 'doc', content: [{ type: 'paragraph' }] } as const);
+        const doc =
+          latestWithBody?.body ?? ({ type: 'doc', content: [{ type: 'paragraph' }] } as const);
 
         setTitle(nextTitle);
         setContentType(nextType);
@@ -278,7 +293,11 @@ export default function EditorLayout() {
         setContentId(result.content.id);
         setPendingTemplateId(null);
       } else {
-        await contentService.saveDraft(contentId, { title: title.trim(), body: bodyDoc, contentType });
+        await contentService.saveDraft(contentId, {
+          title: title.trim(),
+          body: bodyDoc,
+          contentType,
+        });
       }
       const t = title.trim();
       setSavedSnapshot({ title: t, content: editor?.getHTML() ?? content });
@@ -296,12 +315,17 @@ export default function EditorLayout() {
       if (!editor) return;
       const emptyTitle = !title.trim();
       const editorEmpty = editor.isEmpty;
-      if ((!editorEmpty || !emptyTitle) && !window.confirm('Replace the current title and body with this template?')) {
+      if (
+        (!editorEmpty || !emptyTitle) &&
+        !window.confirm('Replace the current title and body with this template?')
+      ) {
         return;
       }
       const parsed =
         parseTemplateLayout(record.activeLayout) ?? parseTemplateLayout(record.draftLayout);
-      const doc = parsed ? layoutConfigToTipTapDoc(parsed) : { type: 'doc', content: [{ type: 'paragraph' }] };
+      const doc = parsed
+        ? layoutConfigToTipTapDoc(parsed)
+        : { type: 'doc', content: [{ type: 'paragraph' }] };
       editor.chain().focus().setContent(doc).run();
       const html = editor.getHTML();
       setContent(html);
@@ -390,7 +414,9 @@ export default function EditorLayout() {
 
       setShowSaveComponentModal(false);
       setRightPanelTab('library');
-      setComponentNotice(`Saved “${componentName.trim()}” as ${componentMode === 'linked' ? 'linked' : 'snapshot'}`);
+      setComponentNotice(
+        `Saved “${componentName.trim()}” as ${componentMode === 'linked' ? 'linked' : 'snapshot'}`,
+      );
       window.setTimeout(() => setComponentNotice(null), 3500);
     } catch (err) {
       setComponentSaveError(err instanceof Error ? err.message : 'Failed to save component');
@@ -543,9 +569,7 @@ export default function EditorLayout() {
   );
 
   const draftLabel = title.trim() || 'Untitled draft';
-  const versionLabel = persistedContentId
-    ? `ID ${persistedContentId.slice(0, 8)}…`
-    : 'New draft';
+  const versionLabel = persistedContentId ? `ID ${persistedContentId.slice(0, 8)}…` : 'New draft';
 
   const autosaveLabel = saving
     ? 'Saving…'
@@ -803,13 +827,16 @@ export default function EditorLayout() {
         <aside className="flex w-[240px] shrink-0 flex-col border-l-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] px-3 py-3">
           {rightTabs}
           {rightPanelTab === 'library' && (
-            <ComponentLibraryPanel editor={editor} onCatalogSourceChange={setLibraryCatalogSource} />
+            <ComponentLibraryPanel
+              editor={editor}
+              onCatalogSourceChange={setLibraryCatalogSource}
+            />
           )}
           {rightPanelTab === 'similar' && user ? (
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-[12px] text-[var(--editor-muted)]">
               <p className="m-0 shrink-0 text-[11px] leading-snug text-[var(--editor-faint)]">
-                Suggestions update as you edit the title or body. Indexed drafts use search; otherwise we match
-                against your other titles.
+                Suggestions update as you edit the title or body. Indexed drafts use search;
+                otherwise we match against your other titles.
               </p>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <SimilarContentWidget
@@ -852,7 +879,9 @@ export default function EditorLayout() {
                     value={contentType}
                     onChange={(e) =>
                       setContentType(
-                        e.target.value === 'VIDEO' || e.target.value === 'PODCAST' || e.target.value === 'DOCUMENT'
+                        e.target.value === 'VIDEO' ||
+                          e.target.value === 'PODCAST' ||
+                          e.target.value === 'DOCUMENT'
                           ? e.target.value
                           : 'ARTICLE',
                       )
@@ -869,7 +898,9 @@ export default function EditorLayout() {
                   </p>
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Tags</label>
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">
+                    Tags
+                  </label>
                   <div className="flex flex-wrap gap-1">
                     {['tutorial', 'guide', '2026'].map((tag) => (
                       <span
@@ -889,7 +920,9 @@ export default function EditorLayout() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Visibility</label>
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">
+                    Visibility
+                  </label>
                   <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
                     <option>Public</option>
                     <option>Team only</option>
@@ -897,7 +930,9 @@ export default function EditorLayout() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">Featured image</label>
+                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">
+                    Featured image
+                  </label>
                   <div className="flex h-[100px] cursor-pointer items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] border-dashed border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] text-[var(--editor-faint)]">
                     Upload
                   </div>
@@ -947,7 +982,9 @@ export default function EditorLayout() {
                     key={`${c.marker}-${c.sourceId}`}
                     className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-1.5"
                   >
-                    <span className="font-mono text-[10px] text-[var(--editor-primary)]">[{c.marker}]</span>{' '}
+                    <span className="font-mono text-[10px] text-[var(--editor-primary)]">
+                      [{c.marker}]
+                    </span>{' '}
                     <span className="text-[var(--editor-doc-text)]">{c.title}</span>
                   </li>
                 ))}
@@ -1054,7 +1091,9 @@ export default function EditorLayout() {
                   Snapshot
                 </button>
               </div>
-              {componentSaveError && <div className="text-[12px] text-red-500">{componentSaveError}</div>}
+              {componentSaveError && (
+                <div className="text-[12px] text-red-500">{componentSaveError}</div>
+              )}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">

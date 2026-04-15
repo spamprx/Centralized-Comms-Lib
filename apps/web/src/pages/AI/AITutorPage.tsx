@@ -173,7 +173,9 @@ export default function AITutorPage() {
                 >
                   <GraduationCap size={18} className="text-white" strokeWidth={2} />
                 </div>
-                <span className="truncate text-[15px] font-medium tracking-tight text-white">LearnAI</span>
+                <span className="truncate text-[15px] font-medium tracking-tight text-white">
+                  LearnAI
+                </span>
               </div>
               <button
                 type="button"
@@ -206,7 +208,10 @@ export default function AITutorPage() {
             </nav> */}
 
             <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin]">
-              <p className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: MUTED }}>
+              <p
+                className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide"
+                style={{ color: MUTED }}
+              >
                 Recent sessions
               </p>
               <ul className="m-0 list-none p-0">
@@ -231,7 +236,10 @@ export default function AITutorPage() {
               </ul>
             </div>
 
-            <div className="mt-auto flex items-center gap-2 border-t px-3 pt-3" style={{ borderColor: BORDER }}>
+            <div
+              className="mt-auto flex items-center gap-2 border-t px-3 pt-3"
+              style={{ borderColor: BORDER }}
+            >
               <div
                 className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-medium text-white"
                 style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}` }}
@@ -379,8 +387,14 @@ export default function AITutorPage() {
           </div>
         </div>
 
-        <div className="shrink-0 border-t px-5 py-3" style={{ borderColor: BORDER, backgroundColor: BG }}>
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide" style={{ color: MUTED }}>
+        <div
+          className="shrink-0 border-t px-5 py-3"
+          style={{ borderColor: BORDER, backgroundColor: BG }}
+        >
+          <p
+            className="mb-2 text-[11px] font-medium uppercase tracking-wide"
+            style={{ color: MUTED }}
+          >
             Quick actions
           </p>
           <div className="flex flex-wrap gap-2">
@@ -391,14 +405,22 @@ export default function AITutorPage() {
                 onClick={() => handleQuickAction(action.prompt)}
                 className="flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.1)] bg-transparent px-3 py-2 text-[13px] font-medium text-[#eceef4] transition-colors hover:border-[#7C6FF7] hover:bg-[rgba(124,111,247,0.15)]"
               >
-                <action.icon size={14} className="shrink-0" strokeWidth={2} style={{ color: MUTED }} />
+                <action.icon
+                  size={14}
+                  className="shrink-0"
+                  strokeWidth={2}
+                  style={{ color: MUTED }}
+                />
                 {action.label}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="shrink-0 border-t px-5 pb-4 pt-3" style={{ borderColor: BORDER, backgroundColor: BG }}>
+        <div
+          className="shrink-0 border-t px-5 pb-4 pt-3"
+          style={{ borderColor: BORDER, backgroundColor: BG }}
+        >
           <div
             className="mx-auto flex h-11 max-w-[720px] items-center gap-2 rounded-full border pl-4 pr-1"
             style={{ borderColor: BORDER, backgroundColor: SURFACE }}
@@ -428,8 +450,12 @@ export default function AITutorPage() {
               <Send size={16} strokeWidth={2} className="text-white" />
             </button>
           </div>
-          <p className="mx-auto mt-2 max-w-[720px] text-center text-[11px] font-normal" style={{ color: MUTED }}>
-            {topicsMastered} / {topicsTotal} topics mastered · {streakDays} day streak · {questionsCount} questions
+          <p
+            className="mx-auto mt-2 max-w-[720px] text-center text-[11px] font-normal"
+            style={{ color: MUTED }}
+          >
+            {topicsMastered} / {topicsTotal} topics mastered · {streakDays} day streak ·{' '}
+            {questionsCount} questions
           </p>
         </div>
       </main>
@@ -472,7 +498,12 @@ export default function AITutorPage() {
                       {topic.category}
                     </span>
                   </div>
-                  <ChevronRight size={16} className="mt-0.5 shrink-0" style={{ color: MUTED }} aria-hidden />
+                  <ChevronRight
+                    size={16}
+                    className="mt-0.5 shrink-0"
+                    style={{ color: MUTED }}
+                    aria-hidden
+                  />
                 </button>
               </li>
             ))}
@@ -490,8 +521,14 @@ export default function AITutorPage() {
                   {topicsMastered} of {topicsTotal}
                 </span>
               </div>
-              <div className="h-[3px] w-full overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <div className="h-full rounded-full" style={{ width: `${topicsPct}%`, backgroundColor: TEAL }} />
+              <div
+                className="h-[3px] w-full overflow-hidden rounded-full"
+                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${topicsPct}%`, backgroundColor: TEAL }}
+                />
               </div>
             </div>
 
@@ -500,8 +537,14 @@ export default function AITutorPage() {
                 <span style={{ color: MUTED }}>Learning streak</span>
                 <span className="font-medium text-white">{streakDays} days</span>
               </div>
-              <div className="h-[3px] w-full overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <div className="h-full rounded-full" style={{ width: `${streakPct}%`, backgroundColor: AMBER }} />
+              <div
+                className="h-[3px] w-full overflow-hidden rounded-full"
+                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${streakPct}%`, backgroundColor: AMBER }}
+                />
               </div>
             </div>
 

@@ -15,7 +15,8 @@ export const mockCitationSearchHits: ContentSearchHit[] = [
       year: 2024,
       doi: '10.1000/mock.001',
     },
-    snippetHtml: '…<em>resilient</em> messaging layers and <em>search</em>-first discovery for distributed teams…',
+    snippetHtml:
+      '…<em>resilient</em> messaging layers and <em>search</em>-first discovery for distributed teams…',
   },
   {
     contentId: 'mock-cite-002',

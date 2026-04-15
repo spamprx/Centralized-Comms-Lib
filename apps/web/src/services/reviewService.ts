@@ -90,15 +90,27 @@ export const reviewService = {
     });
   },
 
-  getRequestById: async (requestId: string): Promise<ReviewRequest & { assignments?: Array<ReviewAssignment & { decisions?: Array<{ verdict: string; comment: string; createdAt: string }> }> }> => {
+  getRequestById: async (
+    requestId: string,
+  ): Promise<
+    ReviewRequest & {
+      assignments?: Array<
+        ReviewAssignment & {
+          decisions?: Array<{ verdict: string; comment: string; createdAt: string }>;
+        }
+      >;
+    }
+  > => {
     return request(`/reviews/requests/${requestId}`);
   },
 
-  addComment: async (assignmentId: string, body: string): Promise<{ id: string; body: string; authorId: string; createdAt: string }> => {
+  addComment: async (
+    assignmentId: string,
+    body: string,
+  ): Promise<{ id: string; body: string; authorId: string; createdAt: string }> => {
     return request(`/reviews/assignments/${assignmentId}/comment`, {
       method: 'POST',
       body: JSON.stringify({ body }),
     });
   },
-
 };

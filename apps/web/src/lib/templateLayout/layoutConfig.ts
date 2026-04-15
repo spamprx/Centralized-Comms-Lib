@@ -208,7 +208,11 @@ export function addRowWithRegion(rows: LayoutRow[], region: TemplateLayoutRegion
   return [...rows, row];
 }
 
-export function addColumnToRow(rows: LayoutRow[], rowId: string, region: TemplateLayoutRegion): LayoutRow[] {
+export function addColumnToRow(
+  rows: LayoutRow[],
+  rowId: string,
+  region: TemplateLayoutRegion,
+): LayoutRow[] {
   return rows.map((row) => {
     if (row.id !== rowId) return row;
     const cell: LayoutCell = {

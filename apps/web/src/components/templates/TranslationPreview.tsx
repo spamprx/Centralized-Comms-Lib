@@ -1,7 +1,23 @@
-import { useState, useEffect } from 'react';
-import { Globe, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { getTranslations, applyTranslations } from '../../services/translationService.js';
-import type { TranslationData } from '../../types/translation.js';
+import { useState } from 'react';
+import { Globe, X, Loader2, Copy } from 'lucide-react';
+import { templateCrudService } from '../../services/templateCrudService';
+
+const LANGUAGES = [
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'zh-CN', name: 'Chinese (Simplified)' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'it', name: 'Italian' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'te', name: 'Telugu' },
+  { code: 'ta', name: 'Tamil' },
+];
 
 interface TranslationPreviewProps {
   templateId: string;
@@ -10,152 +26,50 @@ interface TranslationPreviewProps {
   onClose: () => void;
 }
 
-// Supported languages configuration
-const SUPPORTED_LANGUAGES = [
-  { code: 'en', name: 'English', flag: 'English' },
-  { code: 'es', name: 'Español', flag: 'Español' },
-  { code: 'fr', name: 'Français', flag: 'Français' },
-  { code: 'de', name: 'Deutsch', flag: 'Deutsch' },
-  { code: 'it', name: 'Italiano', flag: 'Italiano' },
-  { code: 'pt', name: 'Português', flag: 'Português' },
-];
-
-export default function TranslationPreview({ 
-  templateId, 
-  templateName, 
+export default function TranslationPreview({
+  templateName,
   templateContent,
-  onClose
+  onClose,
 }: TranslationPreviewProps) {
-  const [translations, setTranslations] = useState<TranslationData | null>(null);
-  const [selectedLocale, setSelectedLocale] = useState<string>('en');
-  const [loading, setLoading] = useState(true);
-  const [apiStatus, setApiStatus] = useState<'loading' | 'success' | 'failed'>('loading');
-  
-  // Load translations from API on mount
-  useEffect(() => {
-    loadTranslations();
-  }, [templateId]);
+  const [targetLocale, setTargetLocale] = useState('es');
+  const [translated, setTranslated] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Update preview when translations or selected locale changes
-  useEffect(() => {
-    if (translations) {
-      // This will trigger re-render with new translations
-    }
-  }, [translations, selectedLocale]);
-
-  const loadTranslations = async () => {
+  async function handleTranslate() {
+    if (!templateContent.trim()) return;
+    setLoading(true);
+    setError(null);
+    setTranslated(null);
     try {
-      setLoading(true);
-      setApiStatus('loading');
-      
-      console.log('Loading translations from API...');
-      const data = await getTranslations(templateId);
-      
-      setTranslations(data);
-      setApiStatus('success');
-      setSelectedLocale('en'); // Default to English
-      console.log('API successful, using remote translations');
-    } catch (err) {
-      console.log('API failed, using local translations');
-      setApiStatus('failed');
-      
-      // Use local static translations
-      const localTranslations: TranslationData = {
-        en: {
-          '{{title}}': '{{title}}',
-          '{{author}}': '{{author}}',
-          '{{content}}': '{{content}}',
-          '{{date}}': '{{date}}',
-          '{{tags}}': '{{tags}}'
-        },
-        es: {
-          '{{title}}': 'Título del Blog',
-          '{{author}}': 'Autor del Blog',
-          '{{content}}': 'Contenido del Blog',
-          '{{date}}': 'Fecha del Blog',
-          '{{tags}}': 'Etiquetas del Blog'
-        },
-        fr: {
-          '{{title}}': 'Titre du Blog',
-          '{{author}}': 'Auteur du Blog',
-          '{{content}}': 'Contenu du Blog',
-          '{{date}}': 'Date du Blog',
-          '{{tags}}': 'Étiquettes du Blog'
-        },
-        de: {
-          '{{title}}': 'Blog-Titel',
-          '{{author}}': 'Blog-Autor',
-          '{{content}}': 'Blog-Inhalt',
-          '{{date}}': 'Blog-Datum',
-          '{{tags}}': 'Blog-Tags'
-        },
-        it: {
-          '{{title}}': 'Titolo del Blog',
-          '{{author}}': 'Autore del Blog',
-          '{{content}}': 'Contenuto del Blog',
-          '{{date}}': 'Data del Blog',
-          '{{tags}}': 'Tag del Blog'
-        },
-        pt: {
-          '{{title}}': 'Título do Blog',
-          '{{author}}': 'Autor do Blog',
-          '{{content}}': 'Conteúdo do Blog',
-          '{{date}}': 'Data do Blog',
-          '{{tags}}': 'Tags do Blog'
-        }
-      };
-      
-      setTranslations(localTranslations);
+      const res = await templateCrudService.translateText(templateContent, targetLocale);
+      setTranslated(res.translated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Translation failed');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleLocaleChange = (locale: string) => {
-    setSelectedLocale(locale);
-  };
-
-  const currentLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === selectedLocale);
-  
-  // Handle empty template content
   if (!templateContent || templateContent.trim() === '') {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-app-surface rounded-lg p-6 w-full max-w-2xl">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+        <div className="w-full max-w-2xl rounded-xl border border-app-border/90 bg-app-bg-subtle p-6 shadow-app-lift">
           <div className="text-center">
-            <Globe className="text-blue-600 mx-auto mb-4" size={48} />
-            <h3 className="text-lg font-semibold text-app-text mb-2">Translation Preview</h3>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800">
-                <strong>Template Content is Empty</strong>
-              </p>
-              <p className="text-sm text-yellow-700 mt-2">
-                Add template content with placeholders like <code className="bg-yellow-100 px-1 py-1 rounded">{"{{title}}"}</code>, <code className="bg-yellow-100 px-1 py-1 rounded">{"{{content}}"}</code> to see translations.
+            <Globe className="mx-auto mb-4 text-app-accent" size={40} />
+            <h3 className="mb-2 text-lg font-semibold text-app-text">Translation Preview</h3>
+            <div className="rounded-lg border border-amber-400/25 bg-amber-500/10 p-4">
+              <p className="font-medium text-amber-200">Template Content is Empty</p>
+              <p className="mt-2 text-sm text-amber-200/70">
+                Add template content first to translate it.
               </p>
             </div>
-            <div className="mt-6">
-              <button
-                onClick={onClose}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  const translatedContent = translations ? applyTranslations(templateContent, selectedLocale, translations) : templateContent;
-
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-app-surface rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="animate-spin text-blue-600" size={24} />
-            <span className="ml-3 text-app-muted">Loading translations from API...</span>
+            <button
+              onClick={onClose}
+              className="mt-6 rounded-lg bg-app-accent px-6 py-2 text-sm font-medium text-white hover:bg-app-accent/80"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -163,115 +77,78 @@ export default function TranslationPreview({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-app-surface rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+      <div className="w-full max-w-4xl rounded-xl border border-app-border/90 bg-app-bg-subtle shadow-app-lift">
+        <div className="flex items-center justify-between border-b border-app-border/60 px-6 py-4">
           <div className="flex items-center gap-3">
-            <Globe className="text-blue-600" size={20} />
-            <h3 className="text-lg font-semibold text-app-text">Translation Preview</h3>
+            <Globe className="text-app-accent" size={20} />
+            <h3 className="text-lg font-semibold text-app-text">Translate</h3>
             <span className="text-sm text-app-faint">({templateName})</span>
           </div>
-          
           <button
             onClick={onClose}
-            className="p-2 text-app-faint hover:text-app-muted rounded-lg"
+            className="rounded-lg p-2 text-app-faint hover:bg-app-surface-hover hover:text-app-text"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* API Status */}
-        <div className={`p-4 rounded-lg mb-6 flex items-center gap-3 ${
-          apiStatus === 'success' 
-            ? 'bg-green-50 border border-green-200' 
-            : apiStatus === 'failed'
-            ? 'bg-orange-50 border border-orange-200'
-            : 'bg-blue-50 border border-blue-200'
-        }`}>
-          {apiStatus === 'success' && (
-            <>
-              <CheckCircle className="text-green-600" size={20} />
-              <div className="text-green-800">
-                <div className="font-medium">API Connected Successfully</div>
-                <div className="text-sm">Using remote translations from backend</div>
-              </div>
-            </>
-          )}
-          {apiStatus === 'failed' && (
-            <>
-              <AlertCircle className="text-orange-600" size={20} />
-              <div className="text-orange-800">
-                <div className="font-medium">Using Local Translations</div>
-                <div className="text-sm">Unable to connect to backend API - showing static translations</div>
-              </div>
-            </>
-          )}
-          {apiStatus === 'loading' && (
-            <>
-              <Loader2 className="animate-spin text-blue-600" size={20} />
-              <div className="text-blue-800">
-                <div className="font-medium">Connecting to API...</div>
-                <div className="text-sm">Loading translations from backend</div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Language Selector */}
-        <div className="p-4 bg-app-surface rounded-lg mb-6">
-          <h4 className="font-medium text-app-text mb-4">Select Preview Language</h4>
-          <div className="max-w-md">
-            <select
-              value={selectedLocale}
-              onChange={(e) => handleLocaleChange(e.target.value)}
-              className="w-full rounded-lg border-2 border-app-border bg-app-surface px-4 py-3 text-lg text-app-text outline-none focus:ring-2 focus:ring-app-accent"
+        <div className="max-h-[75vh] overflow-y-auto p-6">
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-app-muted">Target language</span>
+              <select
+                value={targetLocale}
+                onChange={(e) => {
+                  setTargetLocale(e.target.value);
+                  setTranslated(null);
+                  setError(null);
+                }}
+                className="w-48 rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm text-app-text outline-none focus:ring-2 focus:ring-app-accent/50"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name} ({lang.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleTranslate}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
             >
-              {SUPPORTED_LANGUAGES.map(lang => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.flag} - {lang.name}
-                </option>
-              ))}
-            </select>
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
+              {loading ? 'Translating…' : 'Translate'}
+            </button>
           </div>
-        </div>
 
-        {/* Template Preview */}
-        <div className="p-4 bg-app-surface rounded-lg">
-          <h4 className="font-medium text-app-text mb-2">
-            Template Preview in {currentLanguage?.flag} ({currentLanguage?.name})
-          </h4>
-          <div className="bg-app-surface border border-app-border rounded-lg p-4">
-            <pre className="text-sm text-app-text whitespace-pre-wrap font-mono">
-              {translatedContent}
-            </pre>
-          </div>
-          
-          {/* Translation Status */}
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <h5 className="font-medium text-blue-900 mb-2">Translation Status</h5>
-            <div className="text-sm text-blue-800">
-              <div className="mb-2">
-                <strong>API Status:</strong> 
-                {apiStatus === 'success' ? (
-                  <span className="text-green-700"> Connected to backend</span>
-                ) : (
-                  <span className="text-orange-700"> Using local translations</span>
-                )}
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-200">
+              {error}
+            </div>
+          )}
+
+          {translated && (
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-xs font-medium text-app-muted">Result</label>
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard.writeText(translated)}
+                  className="inline-flex items-center gap-1 rounded border border-white/[0.08] px-2 py-1 text-xs text-app-muted hover:bg-white/[0.06]"
+                >
+                  <Copy size={12} /> Copy
+                </button>
               </div>
-              <div className="mb-2">
-                <strong>Current Language:</strong> {currentLanguage?.flag} - {currentLanguage?.name}
-              </div>
-              <div>
-                <strong>Translation Source:</strong> 
-                {apiStatus === 'success' ? (
-                  <span className="text-green-700"> Remote API</span>
-                ) : (
-                  <span className="text-orange-700"> Local Static</span>
-                )}
+              <div className="rounded-lg border border-app-border/60 bg-black/20 p-4">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-app-text">
+                  {translated}
+                </pre>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

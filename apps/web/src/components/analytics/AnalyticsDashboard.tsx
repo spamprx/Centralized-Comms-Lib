@@ -1,5 +1,16 @@
-import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Download, FileText, Loader2, Moon, TrendingUp, Trophy, Video, Sparkles } from "lucide-react";
+import { useMemo } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Download,
+  FileText,
+  Loader2,
+  Moon,
+  TrendingUp,
+  Trophy,
+  Video,
+  Sparkles,
+} from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -13,7 +24,7 @@ import {
   PieChart,
   Pie,
   Cell,
-} from "recharts";
+} from 'recharts';
 import type {
   KPI,
   TimeSeriesPoint,
@@ -22,24 +33,24 @@ import type {
   ContentTypeBreakdown,
   TopContentItem,
   AIInsight,
-} from "../../types/analytics";
-import { EnhancedDateRangePicker } from "./EnhancedDateRangePicker";
-import type { DateRange } from "../../lib/dateUtils";
-import { formatDate, parsePresetRange } from "../../lib/dateUtils";
+} from '../../types/analytics';
+import { EnhancedDateRangePicker } from './EnhancedDateRangePicker';
+import type { DateRange } from '../../lib/dateUtils';
+import { formatDate, parsePresetRange } from '../../lib/dateUtils';
 
-const BG = "#0d0f18";
-const SURFACE = "#12141e";
-const INNER = "#15172a";
-const BORDER = "rgba(255,255,255,0.07)";
-const BORDER_SUBTLE = "rgba(255,255,255,0.05)";
-const MUTED = "rgba(255,255,255,0.45)";
-const MUTED2 = "rgba(255,255,255,0.35)";
-const PURPLE = "#7C6FF7";
-const AMBER = "#EF9F27";
-const TEAL = "#1D9E75";
-const BLUE = "#378ADD";
-const RED = "#E24B4A";
-const GRAY = "#888780";
+const BG = '#0d0f18';
+const SURFACE = '#12141e';
+const INNER = '#15172a';
+const BORDER = 'rgba(255,255,255,0.07)';
+const BORDER_SUBTLE = 'rgba(255,255,255,0.05)';
+const MUTED = 'rgba(255,255,255,0.45)';
+const MUTED2 = 'rgba(255,255,255,0.35)';
+const PURPLE = '#7C6FF7';
+const AMBER = '#EF9F27';
+const TEAL = '#1D9E75';
+const BLUE = '#378ADD';
+const RED = '#E24B4A';
+const GRAY = '#888780';
 
 const TYPE_FILLS: Record<string, string> = {
   articles: PURPLE,
@@ -55,15 +66,15 @@ function typeFill(type: string): string {
 }
 
 function formatShortDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return iso;
-  const mm = String(m).padStart(2, "0");
-  const dd = String(d).padStart(2, "0");
+  const mm = String(m).padStart(2, '0');
+  const dd = String(d).padStart(2, '0');
   return `${mm}-${dd}`;
 }
 
 function rangeDisplayLabel(dateRange: string | DateRange): string {
-  if (typeof dateRange === "string") {
+  if (typeof dateRange === 'string') {
     const parsed = parsePresetRange(dateRange);
     if (parsed) {
       return `${formatDate(parsed.from)} — ${formatDate(parsed.to)}`;
@@ -88,10 +99,17 @@ function Sparkline({ values }: { values: number[] }) {
       const y = h - ((v - min) / rng) * (h - 2) - 1;
       return `${x},${y}`;
     })
-    .join(" ");
+    .join(' ');
   return (
     <svg width={w} height={h} className="shrink-0" aria-hidden>
-      <polyline fill="none" stroke={PURPLE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={pts} />
+      <polyline
+        fill="none"
+        stroke={PURPLE}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={pts}
+      />
     </svg>
   );
 }
@@ -107,7 +125,11 @@ function MetricCardsRow({
 }) {
   const sparkByIndex = useMemo(() => {
     const v = viewsData.slice(-7).map((d) => d.value);
-    const eng = engagementData.slice(-7).map((d) => (d.views ? Math.round(((d.likes + d.shares + d.comments) / d.views) * 1000) / 10 : 0));
+    const eng = engagementData
+      .slice(-7)
+      .map((d) =>
+        d.views ? Math.round(((d.likes + d.shares + d.comments) / d.views) * 1000) / 10 : 0,
+      );
     const act = engagementData.slice(-7).map((d) => Math.round(d.views / 12));
     const pub = engagementData.slice(-7).map((d) => d.shares * 3 + d.comments * 2);
     return [v, eng, act, pub];
@@ -122,14 +144,18 @@ function MetricCardsRow({
           style={{ backgroundColor: SURFACE, borderColor: BORDER }}
         >
           <div className="flex min-w-0 flex-1 flex-col justify-between">
-            <div className="text-[11px] font-medium uppercase tracking-[0.06em]" style={{ color: MUTED }}>
+            <div
+              className="text-[11px] font-medium uppercase tracking-[0.06em]"
+              style={{ color: MUTED }}
+            >
               {kpi.label}
             </div>
             <div className="text-[28px] font-medium leading-none text-white">{kpi.value}</div>
             <div className="flex items-center gap-1 text-[12px] font-medium">
               {kpi.change > 0 ? (
                 <span className="inline-flex items-center gap-0.5" style={{ color: TEAL }}>
-                  <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden />+{kpi.change.toFixed(1)}%
+                  <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden />+
+                  {kpi.change.toFixed(1)}%
                 </span>
               ) : kpi.change < 0 ? (
                 <span className="inline-flex items-center gap-0.5" style={{ color: RED }}>
@@ -154,11 +180,11 @@ function MetricCardsRow({
 
 const tooltipStyle = {
   backgroundColor: INNER,
-  border: "none",
+  border: 'none',
   borderRadius: 8,
   fontSize: 12,
-  color: "#fff",
-  padding: "8px 12px",
+  color: '#fff',
+  padding: '8px 12px',
 };
 
 function ViewsOverTimeCard({ data }: { data: TimeSeriesPoint[] }) {
@@ -176,8 +202,12 @@ function ViewsOverTimeCard({ data }: { data: TimeSeriesPoint[] }) {
     const avgN = data.length ? Math.round(totalN / data.length) : 0;
     const peakN = data.length ? Math.max(...data.map((d) => d.value)) : 0;
     const n = data.length;
-    const rawIdxs = n ? [0, Math.round(n * 0.25), Math.round(n * 0.5), Math.round(n * 0.75), n - 1] : [];
-    const idxs = [...new Set(rawIdxs.map((i) => Math.min(Math.max(0, i), n - 1)))].sort((a, b) => a - b);
+    const rawIdxs = n
+      ? [0, Math.round(n * 0.25), Math.round(n * 0.5), Math.round(n * 0.75), n - 1]
+      : [];
+    const idxs = [...new Set(rawIdxs.map((i) => Math.min(Math.max(0, i), n - 1)))].sort(
+      (a, b) => a - b,
+    );
     const ticks = idxs.map((i) => data[i]?.date).filter(Boolean) as string[];
     return { total: totalN, avg: avgN, peak: peakN, tickDates: ticks };
   }, [data]);
@@ -186,7 +216,10 @@ function ViewsOverTimeCard({ data }: { data: TimeSeriesPoint[] }) {
 
   if (!chartData.length) {
     return (
-      <div className="flex min-h-[240px] flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+      <div
+        className="flex min-h-[240px] flex-col rounded-xl border p-5"
+        style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+      >
         <h2 className="text-[15px] font-medium text-white">Views over time</h2>
         <p className="mt-4 text-[12px] font-normal" style={{ color: MUTED }}>
           No view data for this range.
@@ -196,17 +229,29 @@ function ViewsOverTimeCard({ data }: { data: TimeSeriesPoint[] }) {
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+    <div
+      className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5"
+      style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[15px] font-medium text-white">Views over time</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: BORDER, color: MUTED }}>
+          <span
+            className="rounded-md border px-2.5 py-1 text-[11px] font-medium"
+            style={{ borderColor: BORDER, color: MUTED }}
+          >
             {total.toLocaleString()} total
           </span>
-          <span className="rounded-md border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: BORDER, color: MUTED }}>
+          <span
+            className="rounded-md border px-2.5 py-1 text-[11px] font-medium"
+            style={{ borderColor: BORDER, color: MUTED }}
+          >
             {avg.toLocaleString()} avg/day
           </span>
-          <span className="rounded-md border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: BORDER, color: MUTED }}>
+          <span
+            className="rounded-md border px-2.5 py-1 text-[11px] font-medium"
+            style={{ borderColor: BORDER, color: MUTED }}
+          >
             {peak.toLocaleString()} peak
           </span>
         </div>
@@ -224,17 +269,24 @@ function ViewsOverTimeCard({ data }: { data: TimeSeriesPoint[] }) {
               tickLine={false}
               dy={8}
             />
-            <YAxis hide domain={["auto", "auto"]} />
+            <YAxis hide domain={['auto', 'auto']} />
             <Tooltip
-              cursor={{ stroke: "rgba(255,255,255,0.08)" }}
+              cursor={{ stroke: 'rgba(255,255,255,0.08)' }}
               contentStyle={tooltipStyle}
               formatter={(value) => [
-                typeof value === "number" ? value.toLocaleString() : String(value ?? ""),
-                "Views",
+                typeof value === 'number' ? value.toLocaleString() : String(value ?? ''),
+                'Views',
               ]}
               labelFormatter={(label) => formatShortDate(String(label))}
             />
-            <Line type="monotone" dataKey="value" stroke={PURPLE} strokeWidth={2} dot={false} activeDot={{ r: 3, fill: PURPLE }} />
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke={PURPLE}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 3, fill: PURPLE }}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -267,7 +319,10 @@ function EngagementCard({ data }: { data: EngagementData[] }) {
 
   if (!data.length) {
     return (
-      <div className="flex min-h-[200px] flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+      <div
+        className="flex min-h-[200px] flex-col rounded-xl border p-5"
+        style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+      >
         <h2 className="text-[15px] font-medium text-white">Engagement metrics</h2>
         <p className="mt-4 text-[12px] font-normal" style={{ color: MUTED }}>
           No engagement data for this range.
@@ -277,19 +332,26 @@ function EngagementCard({ data }: { data: EngagementData[] }) {
   }
 
   const legend = [
-    { key: "views", label: "Views", color: PURPLE },
-    { key: "likes", label: "Likes", color: AMBER },
-    { key: "shares", label: "Shares", color: TEAL },
-    { key: "comments", label: "Comments", color: BLUE },
+    { key: 'views', label: 'Views', color: PURPLE },
+    { key: 'likes', label: 'Likes', color: AMBER },
+    { key: 'shares', label: 'Shares', color: TEAL },
+    { key: 'comments', label: 'Comments', color: BLUE },
   ] as const;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+    <div
+      className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5"
+      style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[15px] font-medium text-white">Engagement metrics</h2>
         <div className="flex flex-wrap items-center gap-4">
           {legend.map((item) => (
-            <span key={item.key} className="inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: MUTED }}>
+            <span
+              key={item.key}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium"
+              style={{ color: MUTED }}
+            >
               <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />
               {item.label}
             </span>
@@ -299,9 +361,19 @@ function EngagementCard({ data }: { data: EngagementData[] }) {
       <div className="analytics-chart-scroll min-h-[200px] w-full overflow-x-auto pb-1">
         <div style={{ minWidth: Math.max(320, data.length * 48) }}>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData} barCategoryGap={12} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart
+              data={chartData}
+              barCategoryGap={12}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
               <CartesianGrid stroke={BORDER_SUBTLE} vertical={false} strokeWidth={1} />
-              <XAxis dataKey="labelShort" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} dy={8} />
+              <XAxis
+                dataKey="labelShort"
+                tick={{ fill: MUTED, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                dy={8}
+              />
               <YAxis hide />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="views" fill={PURPLE} barSize={6} radius={0} />
@@ -312,15 +384,21 @@ function EngagementCard({ data }: { data: EngagementData[] }) {
           </ResponsiveContainer>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 border-t pt-4 sm:grid-cols-4" style={{ borderColor: BORDER }}>
+      <div
+        className="mt-4 grid grid-cols-2 gap-3 border-t pt-4 sm:grid-cols-4"
+        style={{ borderColor: BORDER }}
+      >
         {[
-          { label: "VIEWS", value: totals.views, color: PURPLE },
-          { label: "LIKES", value: totals.likes, color: AMBER },
-          { label: "SHARES", value: totals.shares, color: TEAL },
-          { label: "COMMENTS", value: totals.comments, color: BLUE },
+          { label: 'VIEWS', value: totals.views, color: PURPLE },
+          { label: 'LIKES', value: totals.likes, color: AMBER },
+          { label: 'SHARES', value: totals.shares, color: TEAL },
+          { label: 'COMMENTS', value: totals.comments, color: BLUE },
         ].map((t) => (
           <div key={t.label} className="text-center sm:text-left">
-            <div className="text-[10px] font-medium uppercase tracking-wide" style={{ color: t.color }}>
+            <div
+              className="text-[10px] font-medium uppercase tracking-wide"
+              style={{ color: t.color }}
+            >
               {t.label}
             </div>
             <div className="text-[16px] font-medium text-white">{t.value.toLocaleString()}</div>
@@ -344,7 +422,10 @@ function ReadingTimeCard({ data }: { data: ReadingTimeBucket[] }) {
 
   if (!data.length) {
     return (
-      <div className="flex min-h-[200px] flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+      <div
+        className="flex min-h-[200px] flex-col rounded-xl border p-5"
+        style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+      >
         <h2 className="text-[15px] font-medium text-white">Reading time distribution</h2>
         <p className="mt-4 text-[12px] font-normal" style={{ color: MUTED }}>
           No reading time data.
@@ -354,7 +435,10 @@ function ReadingTimeCard({ data }: { data: ReadingTimeBucket[] }) {
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+    <div
+      className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5"
+      style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+    >
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-[15px] font-medium text-white">Reading time distribution</h2>
         <span className="text-[12px] font-medium" style={{ color: MUTED }}>
@@ -401,7 +485,7 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
   );
 
   const top = useMemo(() => {
-    if (!pieData.length) return { name: "—", pct: 0 };
+    if (!pieData.length) return { name: '—', pct: 0 };
     const m = pieData.reduce((a, b) => (b.value > a.value ? b : a));
     return { name: m.name, pct: m.value };
   }, [pieData]);
@@ -410,7 +494,10 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
 
   if (!data.length) {
     return (
-      <div className="flex min-h-[200px] flex-col rounded-xl p-5" style={{ backgroundColor: SURFACE }}>
+      <div
+        className="flex min-h-[200px] flex-col rounded-xl p-5"
+        style={{ backgroundColor: SURFACE }}
+      >
         <h2 className="text-[15px] font-medium text-white">Content type breakdown</h2>
         <p className="mt-4 text-[12px] font-normal" style={{ color: MUTED }}>
           No content type data.
@@ -420,7 +507,10 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col rounded-xl p-5" style={{ backgroundColor: SURFACE }}>
+    <div
+      className="flex min-h-0 min-w-0 flex-col rounded-xl p-5"
+      style={{ backgroundColor: SURFACE }}
+    >
       <h2 className="mb-4 text-[15px] font-medium text-white">Content type breakdown</h2>
       <div className="flex flex-wrap items-center justify-center gap-6 lg:flex-nowrap lg:justify-between">
         <div className="relative flex h-[220px] w-[220px] shrink-0 items-center justify-center">
@@ -456,7 +546,10 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
         <ul className="min-w-[200px] flex-1 space-y-2.5">
           {pieData.map((row) => (
             <li key={row.name} className="flex items-center gap-2 text-[12px] font-medium">
-              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: row.fill }} />
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: row.fill }}
+              />
               <span className="flex-1 text-white">{row.name}</span>
               <span style={{ color: MUTED }}>{row.value}%</span>
             </li>
@@ -469,16 +562,19 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
 
 const insightIcons = [TrendingUp, Video, Moon, FileText] as const;
 
-function severityLabel(impact: AIInsight["impact"]): { text: string; color: string } {
-  if (impact === "high") return { text: "HIGH", color: RED };
-  if (impact === "medium") return { text: "MEDIUM", color: AMBER };
-  return { text: "LOW", color: MUTED };
+function severityLabel(impact: AIInsight['impact']): { text: string; color: string } {
+  if (impact === 'high') return { text: 'HIGH', color: RED };
+  if (impact === 'medium') return { text: 'MEDIUM', color: AMBER };
+  return { text: 'LOW', color: MUTED };
 }
 
 function AIInsightsCard({ insights }: { insights: AIInsight[] }) {
   const list = insights.slice(0, 4);
   return (
-    <div className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+    <div
+      className="flex min-h-0 min-w-0 flex-col rounded-xl border p-5"
+      style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+    >
       <div className="mb-4 flex items-center gap-2">
         <Sparkles className="size-4" style={{ color: PURPLE }} aria-hidden />
         <h2 className="text-[15px] font-medium text-white">AI insights</h2>
@@ -493,7 +589,7 @@ function AIInsightsCard({ insights }: { insights: AIInsight[] }) {
         {list.map((row, i) => {
           const Icon = insightIcons[i] ?? FileText;
           const sev = severityLabel(row.impact);
-          const iconColor = row.impact === "high" ? RED : row.impact === "medium" ? AMBER : BLUE;
+          const iconColor = row.impact === 'high' ? RED : row.impact === 'medium' ? AMBER : BLUE;
           return (
             <li key={`${row.title}-${i}`} className="flex gap-3 py-3 first:pt-0">
               <Icon className="mt-0.5 size-4 shrink-0" style={{ color: iconColor }} aria-hidden />
@@ -503,7 +599,10 @@ function AIInsightsCard({ insights }: { insights: AIInsight[] }) {
                   {row.description}
                 </p>
               </div>
-              <div className="shrink-0 self-start text-[11px] font-medium" style={{ color: sev.color }}>
+              <div
+                className="shrink-0 self-start text-[11px] font-medium"
+                style={{ color: sev.color }}
+              >
                 {sev.text}
               </div>
             </li>
@@ -517,7 +616,10 @@ function AIInsightsCard({ insights }: { insights: AIInsight[] }) {
 function TopPerformingContentTable({ rows }: { rows: TopContentItem[] }) {
   const data = rows.slice(0, 6);
   return (
-    <div className="rounded-xl border p-5" style={{ backgroundColor: SURFACE, borderColor: BORDER }}>
+    <div
+      className="rounded-xl border p-5"
+      style={{ backgroundColor: SURFACE, borderColor: BORDER }}
+    >
       <div className="mb-4 flex items-center gap-2">
         <Trophy className="size-4" style={{ color: PURPLE }} aria-hidden />
         <h2 className="text-[15px] font-medium text-white">Top performing content</h2>
@@ -529,10 +631,10 @@ function TopPerformingContentTable({ rows }: { rows: TopContentItem[] }) {
         <table className="w-full min-w-[520px] border-collapse text-left">
           <thead>
             <tr>
-              {["RANK", "TITLE", "VIEWS", "ENGAGEMENT"].map((h) => (
+              {['RANK', 'TITLE', 'VIEWS', 'ENGAGEMENT'].map((h) => (
                 <th
                   key={h}
-                  className={`pb-3 text-[10px] font-medium uppercase tracking-[0.06em] ${h === "VIEWS" || h === "ENGAGEMENT" ? "text-right" : ""}`}
+                  className={`pb-3 text-[10px] font-medium uppercase tracking-[0.06em] ${h === 'VIEWS' || h === 'ENGAGEMENT' ? 'text-right' : ''}`}
                   style={{ color: MUTED }}
                 >
                   {h}
@@ -553,14 +655,14 @@ function TopPerformingContentTable({ rows }: { rows: TopContentItem[] }) {
                     {rank === 1 ? (
                       <span
                         className="inline-flex size-7 items-center justify-center rounded-full text-[13px] font-medium"
-                        style={{ backgroundColor: "rgba(124,111,247,0.2)", color: PURPLE }}
+                        style={{ backgroundColor: 'rgba(124,111,247,0.2)', color: PURPLE }}
                       >
                         #1
                       </span>
                     ) : rank <= 3 ? (
                       <span
                         className="inline-flex size-7 items-center justify-center rounded-full text-[13px] font-medium"
-                        style={{ backgroundColor: "rgba(255,255,255,0.06)", color: MUTED }}
+                        style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: MUTED }}
                       >
                         #{rank}
                       </span>
@@ -575,13 +677,27 @@ function TopPerformingContentTable({ rows }: { rows: TopContentItem[] }) {
                       {row.title}
                     </div>
                   </td>
-                  <td className="py-3 pr-3 text-right align-middle text-[13px] font-medium text-white">{row.views.toLocaleString()}</td>
+                  <td className="py-3 pr-3 text-right align-middle text-[13px] font-medium text-white">
+                    {row.views.toLocaleString()}
+                  </td>
                   <td className="py-3 align-middle">
                     <div className="flex items-center justify-end gap-2">
-                      <div className="h-1 min-w-[72px] flex-1 overflow-hidden rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, row.engagement)}%`, backgroundColor: PURPLE }} />
+                      <div
+                        className="h-1 min-w-[72px] flex-1 overflow-hidden rounded-full"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, row.engagement)}%`,
+                            backgroundColor: PURPLE,
+                          }}
+                        />
                       </div>
-                      <span className="w-9 shrink-0 text-right text-[12px] font-medium tabular-nums" style={{ color: MUTED }}>
+                      <span
+                        className="w-9 shrink-0 text-right text-[12px] font-medium tabular-nums"
+                        style={{ color: MUTED }}
+                      >
                         {row.engagement}%
                       </span>
                     </div>
@@ -625,7 +741,7 @@ export function AnalyticsDashboard({
   exportError,
   onExportCsv,
 }: AnalyticsDashboardProps) {
-  const presetValue = typeof dateRange === "string" ? dateRange : "custom";
+  const presetValue = typeof dateRange === 'string' ? dateRange : 'custom';
   const rangeLabel = rangeDisplayLabel(dateRange);
 
   const pill = (key: string, label: string) => {
@@ -637,8 +753,8 @@ export function AnalyticsDashboard({
         onClick={() => onDateRangeChange(key)}
         className="rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors duration-150"
         style={{
-          backgroundColor: active ? PURPLE : "transparent",
-          color: active ? "#fff" : MUTED,
+          backgroundColor: active ? PURPLE : 'transparent',
+          color: active ? '#fff' : MUTED,
         }}
       >
         {label}
@@ -651,7 +767,7 @@ export function AnalyticsDashboard({
       className="analytics-dashboard min-h-screen font-sans text-white antialiased"
       style={{
         backgroundColor: BG,
-        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
         padding: 0,
       }}
     >
@@ -681,9 +797,9 @@ export function AnalyticsDashboard({
             onChange={onDateRangeChange}
             triggerClassName="flex h-[34px] items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-colors duration-150"
             triggerStyle={{
-              backgroundColor: "transparent",
+              backgroundColor: 'transparent',
               borderColor: BORDER,
-              color: "rgba(255,255,255,0.85)",
+              color: 'rgba(255,255,255,0.85)',
             }}
             displayLabelOverride={rangeLabel}
             chevronDown
@@ -693,42 +809,53 @@ export function AnalyticsDashboard({
             onClick={onExportCsv}
             disabled={exporting}
             className="flex h-[34px] items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-colors duration-150 hover:bg-white/[0.03] disabled:opacity-50"
-            style={{ borderColor: BORDER, color: "rgba(255,255,255,0.85)", backgroundColor: "transparent" }}
+            style={{
+              borderColor: BORDER,
+              color: 'rgba(255,255,255,0.85)',
+              backgroundColor: 'transparent',
+            }}
           >
-            {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" aria-hidden />}
+            {exporting ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5" aria-hidden />
+            )}
             Export CSV
           </button>
-          <div className="flex items-center rounded-full border p-0.5" style={{ borderColor: BORDER, backgroundColor: INNER }}>
-            {pill("30d", "30 days")}
-            {pill("7d", "7 days")}
-            {pill("90d", "90 days")}
+          <div
+            className="flex items-center rounded-full border p-0.5"
+            style={{ borderColor: BORDER, backgroundColor: INNER }}
+          >
+            {pill('30d', '30 days')}
+            {pill('7d', '7 days')}
+            {pill('90d', '90 days')}
           </div>
         </div>
       </header>
 
-      <div style={{ padding: "20px 24px" }}>
-      {exportError ? (
-        <p className="text-[12px] font-medium" style={{ color: RED }} role="alert">
-          {exportError}
-        </p>
-      ) : null}
+      <div style={{ padding: '20px 24px' }}>
+        {exportError ? (
+          <p className="text-[12px] font-medium" style={{ color: RED }} role="alert">
+            {exportError}
+          </p>
+        ) : null}
 
-      <div className="mt-6 space-y-6">
-        <MetricCardsRow kpis={kpis} viewsData={viewsData} engagementData={engagementData} />
+        <div className="mt-6 space-y-6">
+          <MetricCardsRow kpis={kpis} viewsData={viewsData} engagementData={engagementData} />
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[55fr_45fr]">
-          <ViewsOverTimeCard data={viewsData} />
-          <EngagementCard data={engagementData} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[55fr_45fr]">
+            <ViewsOverTimeCard data={viewsData} />
+            <EngagementCard data={engagementData} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <ReadingTimeCard data={readingTimeData} />
+            <ContentTypeCard data={contentTypeData} />
+            <AIInsightsCard insights={aiInsights} />
+          </div>
+
+          <TopPerformingContentTable rows={topContent} />
         </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <ReadingTimeCard data={readingTimeData} />
-          <ContentTypeCard data={contentTypeData} />
-          <AIInsightsCard insights={aiInsights} />
-        </div>
-
-        <TopPerformingContentTable rows={topContent} />
-      </div>
       </div>
     </div>
   );

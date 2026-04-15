@@ -129,7 +129,10 @@ export function formatCitationLocal(style: CitationStyle, work: CitationWork): s
   }
 }
 
-export async function renderCitationWithFallback(style: CitationStyle, work: CitationWork): Promise<string> {
+export async function renderCitationWithFallback(
+  style: CitationStyle,
+  work: CitationWork,
+): Promise<string> {
   try {
     return await renderCitation(style, work);
   } catch {

@@ -1,8 +1,8 @@
 /** Thrown when the user backs out of a two-step admin confirmation (do not show as error). */
 export class AdminActionCancelled extends Error {
   constructor() {
-    super("AdminActionCancelled");
-    this.name = "AdminActionCancelled";
+    super('AdminActionCancelled');
+    this.name = 'AdminActionCancelled';
   }
 }
 

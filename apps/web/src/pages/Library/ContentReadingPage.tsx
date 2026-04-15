@@ -1,4 +1,4 @@
-import { ReadingLayout } from "../../layouts";
+import { ReadingLayout } from '../../layouts';
 
 export default function ContentReadingPage() {
   return <ReadingLayout />;

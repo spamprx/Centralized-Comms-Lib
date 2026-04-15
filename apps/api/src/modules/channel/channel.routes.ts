@@ -67,15 +67,19 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
  */
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { name, key, description } = req.body as {
+    const { name, key, description, priority, compatibility } = req.body as {
       name?: string;
       key?: string;
       description?: string | null;
+      priority?: number;
+      compatibility?: Record<string, unknown>;
     };
     const result = await channelService.create(auditContext(req), {
       name: name ?? "",
       key,
       description,
+      priority,
+      compatibility,
     });
     if (result.conflict) {
       res
@@ -114,6 +118,67 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     res.status(200).json(ch);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, key, description, priority, compatibility } = req.body as {
+      name?: string;
+      key?: string;
+      description?: string | null;
+      priority?: number;
+      compatibility?: Record<string, unknown>;
+    };
+    const result = await channelService.update(auditContext(req), req.params.id, {
+      name,
+      key,
+      description,
+      priority,
+      compatibility,
+    });
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Channel not found" });
+      return;
+    }
+    if ("conflict" in result && result.conflict) {
+      res.status(409).json({ error: "Channel key already exists" });
+      return;
+    }
+    if ("ok" in result && result.ok) {
+      res.status(200).json(result.channel);
+      return;
+    }
+    res.status(500).json({ error: "Unexpected channel update result" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("admin")) {
+      res.status(403).json({ error: message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await channelService.remove(auditContext(req), req.params.id);
+    if ("notFound" in result && result.notFound) {
+      res.status(404).json({ error: "Channel not found" });
+      return;
+    }
+    if ("conflict" in result && result.conflict) {
+      res.status(409).json({ error: result.message });
+      return;
+    }
+    res.status(200).json({ message: "Channel removed" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("admin")) {
+      res.status(403).json({ error: message });
+      return;
+    }
     res.status(500).json({ error: message });
   }
 });

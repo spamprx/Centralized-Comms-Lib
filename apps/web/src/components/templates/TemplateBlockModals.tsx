@@ -59,7 +59,9 @@ function ModalChrome({
           </button>
         </div>
         <div className="space-y-3">{children}</div>
-        <div className="mt-4 flex justify-end gap-2 border-t border-app-border/60 pt-3">{footer}</div>
+        <div className="mt-4 flex justify-end gap-2 border-t border-app-border/60 pt-3">
+          {footer}
+        </div>
       </div>
     </div>
   );
@@ -124,7 +126,9 @@ export function TextBlockModal({ open, mode, initial, onClose, onSubmit }: TextM
           placeholder="e.g. Introduction"
           className="w-full rounded-lg border border-app-border bg-app-bg px-3 py-2 text-sm"
         />
-        <p className="mt-1 mb-0 text-[11px] text-app-faint">Shown in the block header; not sent as content by itself.</p>
+        <p className="mt-1 mb-0 text-[11px] text-app-faint">
+          Shown in the block header; not sent as content by itself.
+        </p>
       </div>
       <div>
         <label className="mb-1 block text-[12px] text-app-muted">Editor placeholder</label>
@@ -309,7 +313,9 @@ export function FieldBlockModal({ open, mode, initial, onClose, onSubmit }: Fiel
       }
     >
       {error ? (
-        <div className="rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">{error}</div>
+        <div className="rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          {error}
+        </div>
       ) : null}
       <div>
         <label className="mb-1 block text-[12px] text-app-muted">Field key</label>

@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Eye, Copy, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+} from 'lucide-react';
 import { tagService, templateService, type Tag } from '../../services';
 
 interface Template {
@@ -16,17 +26,17 @@ interface Template {
   last_used?: string;
 }
 
-export default function TemplatesList({ 
+export default function TemplatesList({
   templates,
   deletedTemplates,
   setTemplates,
-  onViewTemplate, 
-  onEditTemplate, 
+  onViewTemplate,
+  onEditTemplate,
   onDeleteTemplate,
   onRestoreTemplate,
   onCloneTemplate,
-  deletingId
-}: { 
+  deletingId,
+}: {
   templates: Template[];
   deletedTemplates: Template[];
   setTemplates: React.Dispatch<React.SetStateAction<Template[]>>;
@@ -44,10 +54,13 @@ export default function TemplatesList({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(6);
 
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       template.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = selectedTag === 'all' || (template.tags && template.tags.some(tag => tag.id === selectedTag));
+  const filteredTemplates = templates.filter((template) => {
+    const matchesSearch =
+      template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTag =
+      selectedTag === 'all' ||
+      (template.tags && template.tags.some((tag) => tag.id === selectedTag));
     return matchesSearch && matchesTag;
   });
 
@@ -85,7 +98,7 @@ export default function TemplatesList({
     const now = new Date();
     const diffTime = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return 'today';
     if (diffDays === 1) return 'yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
@@ -115,15 +128,15 @@ Published by {{author}} on {{date}}
 ---
 *Tags: {{tags}}*
 *Last updated: {{date}}*`,
-        status: 'draft'
+        status: 'draft',
       });
-      
+
       // Update local state with the created template
       setTemplates((prev) => {
         const updated = [...prev, newTemplate];
         return updated;
       });
-      
+
       console.log('Template created successfully:', newTemplate);
     } catch (error) {
       console.error('Failed to create template:', error);
@@ -155,19 +168,19 @@ Published by {{author}} on {{date}}
         tags: [
           { id: 'tag_1', name: 'blog', slug: 'blog' },
           { id: 'tag_2', name: 'content', slug: 'content' },
-          { id: 'tag_3', name: 'markdown', slug: 'markdown' }
+          { id: 'tag_3', name: 'markdown', slug: 'markdown' },
         ],
         variables: {
           title: 'The main title or headline',
           author: 'Content author name',
           date: 'Publication date',
           tags: 'Comma-separated tags',
-          content: 'Main body content'
+          content: 'Main body content',
         },
         usage_count: 0,
-        last_used: 'Never'
+        last_used: 'Never',
       };
-      
+
       setTemplates((prev) => {
         const updated = [...prev, fallbackTemplate];
         localStorage.setItem('templates', JSON.stringify(updated));
@@ -180,7 +193,7 @@ Published by {{author}} on {{date}}
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-app-text">Templates</h1>
-        <button 
+        <button
           onClick={handleCreateTemplate}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
         >
@@ -208,8 +221,10 @@ Published by {{author}} on {{date}}
           className="rounded-lg border border-app-border bg-app-bg/40 px-4 py-2 text-app-text outline-none focus:ring-2 focus:ring-app-accent disabled:opacity-50"
         >
           <option value="all">All Tags</option>
-          {availableTags.map(tag => (
-            <option key={tag.id} value={tag.id}>{tag.name}</option>
+          {availableTags.map((tag) => (
+            <option key={tag.id} value={tag.id}>
+              {tag.name}
+            </option>
           ))}
         </select>
       </div>
@@ -235,13 +250,14 @@ Published by {{author}} on {{date}}
               <span className="text-sm font-medium text-app-muted">per page</span>
             </div>
           </div>
-          
+
           {/* Results count */}
           {totalPages > 1 && (
             <div className="flex items-center">
               <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg">
                 <span className="text-sm font-medium">
-                  {startIndex + 1}-{Math.min(endIndex, filteredTemplates.length)} of {filteredTemplates.length} templates
+                  {startIndex + 1}-{Math.min(endIndex, filteredTemplates.length)} of{' '}
+                  {filteredTemplates.length} templates
                 </span>
               </div>
             </div>
@@ -252,7 +268,10 @@ Published by {{author}} on {{date}}
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {paginatedTemplates.map((template) => (
-          <div key={template.id} className="bg-app-surface border border-app-border rounded-lg overflow-hidden">
+          <div
+            key={template.id}
+            className="bg-app-surface border border-app-border rounded-lg overflow-hidden"
+          >
             {/* Header Section */}
             <div className="relative border-b border-app-border bg-app-bg-subtle px-4 py-3">
               <div className="text-center">
@@ -266,10 +285,15 @@ Published by {{author}} on {{date}}
               {/* Tags */}
               {template.tags && template.tags.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs font-medium text-app-faint mb-2 uppercase tracking-wider">Tags</p>
+                  <p className="text-xs font-medium text-app-faint mb-2 uppercase tracking-wider">
+                    Tags
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {template.tags?.map((tag, index) => (
-                      <span key={tag.id || index} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                      <span
+                        key={tag.id || index}
+                        className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium"
+                      >
                         <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-1"></span>
                         {tag.name}
                       </span>
@@ -281,14 +305,20 @@ Published by {{author}} on {{date}}
               {/* Variables */}
               {template.variables && Object.keys(template.variables).length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs font-medium text-app-faint mb-2 uppercase tracking-wider">Variables</p>
+                  <p className="text-xs font-medium text-app-faint mb-2 uppercase tracking-wider">
+                    Variables
+                  </p>
                   <div className="bg-app-surface rounded-lg p-3">
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       {Object.entries(template.variables).map(([key, value], index) => (
                         <div key={index} className="flex items-center">
-                          <span className="font-mono text-app-muted bg-app-border px-2 py-1 rounded">{key}</span>
+                          <span className="font-mono text-app-muted bg-app-border px-2 py-1 rounded">
+                            {key}
+                          </span>
                           <span className="text-app-faint">=</span>
-                          <span className="font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">{value}</span>
+                          <span className="font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {value}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -303,7 +333,7 @@ Published by {{author}} on {{date}}
                   {template.status === 'archived' && (
                     <span className="inline-flex items-center px-3 py-1.5 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
                       <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M5 4a2 2 0 00-2 2v6a2 2 0 002 2H6a2 2 0 00-2-2V6a2 2 0 002-2h2a2 2 0 002-2zm6 0H4v2h12V4z"/>
+                        <path d="M5 4a2 2 0 00-2 2v6a2 2 0 002 2H6a2 2 0 00-2-2V6a2 2 0 002-2h2a2 2 0 002-2zm6 0H4v2h12V4z" />
                       </svg>
                       Archived
                     </span>
@@ -311,7 +341,10 @@ Published by {{author}} on {{date}}
                   {template.status === 'active' && (
                     <span className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-800 text-xs font-medium rounded-full">
                       <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 00-8-8v4a8 8 0 008 8h2a8 8 0 008-8v-4a8 8 0 00-8-8H2a8 8 0 00-8 8z"/>
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 00-8-8v4a8 8 0 008 8h2a8 8 0 008-8v-4a8 8 0 00-8-8H2a8 8 0 00-8 8z"
+                        />
                       </svg>
                       Active
                     </span>
@@ -319,7 +352,7 @@ Published by {{author}} on {{date}}
                   {template.status === 'draft' && (
                     <span className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
                       <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13.586 3.586a2 2 0 112.828 0l-2.829 2.829a2 2 0 11.414 0l2.829 2.829a2 2 0 01.414 0l2.829-2.829a2 2 0 01.414 0l-2.829-2.829a2 2 0 00-2.828-2.828z"/>
+                        <path d="M13.586 3.586a2 2 0 112.828 0l-2.829 2.829a2 2 0 11.414 0l2.829 2.829a2 2 0 01.414 0l2.829-2.829a2 2 0 01.414 0l-2.829-2.829a2 2 0 00-2.828-2.828z" />
                       </svg>
                       Draft
                     </span>
@@ -328,28 +361,28 @@ Published by {{author}} on {{date}}
 
                 {/* Action Buttons */}
                 <div className="flex gap-1">
-                  <button 
+                  <button
                     onClick={() => onViewTemplate(template.id)}
                     className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
                   >
                     <Eye className="w-4 h-4 mr-1" />
                     View
                   </button>
-                  <button 
+                  <button
                     onClick={() => onEditTemplate?.(template.id)}
                     className="inline-flex items-center px-3 py-2 bg-app-muted text-white text-sm font-medium rounded-lg hover:bg-app-bg-subtle"
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
                   </button>
-                  <button 
+                  <button
                     onClick={() => onCloneTemplate?.(template.id)}
                     className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
                   >
                     <Copy className="w-4 h-4 mr-1" />
                     Clone
                   </button>
-                  <button 
+                  <button
                     onClick={() => onDeleteTemplate?.(template.id)}
                     disabled={deletingId === template.id}
                     className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -374,15 +407,35 @@ Published by {{author}} on {{date}}
             <div className="bg-app-surface px-4 py-3 border-t border-app-border">
               <div className="flex justify-between items-center text-xs text-app-faint">
                 <div className="flex items-center">
-                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6 0l3-3m-3 3v4m0-6h-6"/>
+                  <svg
+                    className="w-3 h-3 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6 0l3-3m-3 3v4m0-6h-6"
+                    />
                   </svg>
                   Created {formatRelativeTime(template.createdAt)}
                 </div>
                 <div className="flex items-center">
                   <div className="flex items-center">
-                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h5a2 2 0 002-2V7a2 2 0 00-2-2zm0 0h14v14H0z"/>
+                    <svg
+                      className="w-3 h-3 mr-1"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h5a2 2 0 002-2V7a2 2 0 00-2-2zm0 0h14v14H0z"
+                      />
                     </svg>
                     Updated {formatRelativeTime(template.updatedAt)}
                   </div>
@@ -404,19 +457,19 @@ Published by {{author}} on {{date}}
               {/* Page navigation */}
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
                   className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Previous</span>
                 </button>
-                
+
                 <div className="flex items-center">
                   {(() => {
                     const pages = [];
                     const maxVisible = 7;
-                    
+
                     if (totalPages <= maxVisible) {
                       // Show all pages if total is small
                       for (let i = 1; i <= totalPages; i++) {
@@ -449,16 +502,19 @@ Published by {{author}} on {{date}}
                         pages.push(totalPages);
                       }
                     }
-                    
+
                     return pages.map((page, index) => {
                       if (page === 'ellipsis') {
                         return (
-                          <div key={`ellipsis-${index}`} className="flex items-center justify-center w-10 h-10">
+                          <div
+                            key={`ellipsis-${index}`}
+                            className="flex items-center justify-center w-10 h-10"
+                          >
                             <MoreHorizontal className="w-4 h-4 text-app-faint" />
                           </div>
                         );
                       }
-                      
+
                       return (
                         <button
                           key={page}
@@ -475,9 +531,9 @@ Published by {{author}} on {{date}}
                     });
                   })()}
                 </div>
-                
+
                 <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
                   className="group flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-app-muted bg-app-surface border border-app-border rounded-lg hover:bg-app-surface hover:border-app-border-strong disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -485,7 +541,7 @@ Published by {{author}} on {{date}}
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-              
+
               {/* Page info */}
               <div className="flex items-center gap-3">
                 <div className="rounded-lg border border-app-border bg-app-bg-subtle px-4 py-2 text-app-text">
@@ -518,7 +574,10 @@ Published by {{author}} on {{date}}
           </div>
           <div className="space-y-2">
             {deletedTemplates.map((template) => (
-              <div key={template.id} className="flex justify-between items-center p-3 bg-app-surface rounded border border-app-border">
+              <div
+                key={template.id}
+                className="flex justify-between items-center p-3 bg-app-surface rounded border border-app-border"
+              >
                 <div className="flex-1">
                   <p className="text-sm font-medium text-app-text">{template.name}</p>
                   <p className="text-xs text-app-faint">

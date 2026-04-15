@@ -1,4 +1,4 @@
-import Slot from "../ui/Slot";
+import Slot from '../ui/Slot';
 
 export function VersionTimelineList() {
   return <Slot className="h-full w-72 shrink-0 overflow-auto" />;

@@ -11,10 +11,10 @@ type View = 'roles' | 'groups';
 
 const ROLE_TOP_BORDER: Record<string, string> = {
   'Super Admin': '#fbbf24',
-  'Admin': '#818cf8',
-  'Moderator': '#38bdf8',
-  'Editor': '#a78bfa',
-  'Viewer': '#6b7280',
+  Admin: '#818cf8',
+  Moderator: '#38bdf8',
+  Editor: '#a78bfa',
+  Viewer: '#6b7280',
 };
 
 /** Deterministic hue from name string */
@@ -27,8 +27,19 @@ function nameToHue(name: string): number {
 }
 
 export default function RolesAndGroupsTab() {
-  const { roles, groups, loading, error, deleteRole, deleteGroup, refetch, createRole, updateRole, createGroup, updateGroup } =
-    useAdminRolesAndGroups();
+  const {
+    roles,
+    groups,
+    loading,
+    error,
+    deleteRole,
+    deleteGroup,
+    refetch,
+    createRole,
+    updateRole,
+    createGroup,
+    updateGroup,
+  } = useAdminRolesAndGroups();
   const { users } = useAdminUsers();
   const { promptTwoStep, dialog: twoStepDialog } = useTwoStepAdminConfirm();
   const [view, setView] = useState<View>('roles');
@@ -36,14 +47,19 @@ export default function RolesAndGroupsTab() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [showDeleteRoleConfirm, setShowDeleteRoleConfirm] = useState<{ id: string; name: string; isSystem?: boolean } | null>(
-    null,
-  );
+  const [showDeleteRoleConfirm, setShowDeleteRoleConfirm] = useState<{
+    id: string;
+    name: string;
+    isSystem?: boolean;
+  } | null>(null);
   const [roleActionError, setRoleActionError] = useState<string | null>(null);
 
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const toggleContainerRef = useRef<HTMLDivElement>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
 
   const updateIndicator = useCallback(() => {
     const idx = view === 'roles' ? 0 : 1;
@@ -89,7 +105,8 @@ export default function RolesAndGroupsTab() {
     const ok = await promptTwoStep({
       title: 'Update group',
       body1: `Save changes to “${editingGroup.name}”?`,
-      body2: 'Final confirmation: name, description, and member list will be updated on the server.',
+      body2:
+        'Final confirmation: name, description, and member list will be updated on the server.',
       confirm2: 'Save group',
     });
     if (!ok) throw new AdminActionCancelled();
@@ -167,7 +184,11 @@ export default function RolesAndGroupsTab() {
     return (
       <div className="flex flex-col gap-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-[120px] rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }} />
+          <div
+            key={i}
+            className="h-[120px] rounded-xl animate-pulse"
+            style={{ background: 'rgba(255,255,255,0.03)' }}
+          />
         ))}
       </div>
     );
@@ -175,7 +196,10 @@ export default function RolesAndGroupsTab() {
     return (
       <div className="p-12 text-center text-red-400 text-sm">
         <p>⚠ {error}</p>
-        <button onClick={refetch} className="mt-3 px-4 py-1.5 admin-glass-button rounded-lg text-app-text">
+        <button
+          onClick={refetch}
+          className="mt-3 px-4 py-1.5 admin-glass-button rounded-lg text-app-text"
+        >
           Retry
         </button>
       </div>
@@ -188,7 +212,9 @@ export default function RolesAndGroupsTab() {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold text-app-text mb-1">Roles &amp; Groups</h2>
-          <p className="text-[13px] text-app-faint m-0">Control access levels and team organization</p>
+          <p className="text-[13px] text-app-faint m-0">
+            Control access levels and team organization
+          </p>
         </div>
         <button
           type="button"
@@ -200,7 +226,10 @@ export default function RolesAndGroupsTab() {
       </div>
 
       <div ref={toggleContainerRef} className="admin-pill-toggle w-fit">
-        <div className="admin-pill-toggle-indicator" style={{ left: indicatorStyle.left, width: indicatorStyle.width }} />
+        <div
+          className="admin-pill-toggle-indicator"
+          style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
+        />
         <button
           ref={(el) => {
             btnRefs.current[0] = el;
@@ -235,7 +264,11 @@ export default function RolesAndGroupsTab() {
                 onEdit={() => openEditRole(role)}
                 onDelete={() => {
                   setRoleActionError(null);
-                  setShowDeleteRoleConfirm({ id: role.id, name: role.name, isSystem: role.isSystem });
+                  setShowDeleteRoleConfirm({
+                    id: role.id,
+                    name: role.name,
+                    isSystem: role.isSystem,
+                  });
                 }}
               />
             ))
@@ -251,7 +284,11 @@ export default function RolesAndGroupsTab() {
       </div>
 
       {showRoleModal && (
-        <RoleModal role={editingRole} onClose={closeRoleModal} onSave={editingRole ? handleUpdateRole : handleCreateRole} />
+        <RoleModal
+          role={editingRole}
+          onClose={closeRoleModal}
+          onSave={editingRole ? handleUpdateRole : handleCreateRole}
+        />
       )}
 
       {showGroupModal && (
@@ -280,13 +317,15 @@ export default function RolesAndGroupsTab() {
             <h3 className="m-0 mb-3 text-base font-semibold text-app-text">Delete role</h3>
             {showDeleteRoleConfirm.isSystem ? (
               <p className="m-0 mb-5 text-[13px] leading-relaxed text-amber-200/90">
-                System roles cannot be deleted. Remove the <strong className="text-app-text">Admin</strong> assignment from
-                users in User Management if you need to change access.
+                System roles cannot be deleted. Remove the{' '}
+                <strong className="text-app-text">Admin</strong> assignment from users in User
+                Management if you need to change access.
               </p>
             ) : (
               <p className="m-0 mb-5 text-[13px] leading-relaxed text-app-muted">
-                Are you sure you want to delete <strong className="text-app-text">{showDeleteRoleConfirm.name}</strong>? This
-                cannot be undone.
+                Are you sure you want to delete{' '}
+                <strong className="text-app-text">{showDeleteRoleConfirm.name}</strong>? This cannot
+                be undone.
               </p>
             )}
             {roleActionError ? (
@@ -321,7 +360,17 @@ export default function RolesAndGroupsTab() {
   );
 }
 
-function RoleCard({ role, index, onEdit, onDelete }: { role: Role; index: number; onEdit: () => void; onDelete: () => void }) {
+function RoleCard({
+  role,
+  index,
+  onEdit,
+  onDelete,
+}: {
+  role: Role;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const topColor = ROLE_TOP_BORDER[role.name] || '#6b7280';
   const memberCount = role.userCount;
   const isSystem = Boolean(role.isSystem);
@@ -352,7 +401,9 @@ function RoleCard({ role, index, onEdit, onDelete }: { role: Role; index: number
                 }}
               />
             ))}
-            {memberCount > 4 && <span className="ml-1 text-[10px] text-app-faint">+{memberCount - 4}</span>}
+            {memberCount > 4 && (
+              <span className="ml-1 text-[10px] text-app-faint">+{memberCount - 4}</span>
+            )}
             {memberCount <= 4 && (
               <span className="ml-1.5 text-[10px] text-app-faint">
                 {memberCount} user{memberCount !== 1 ? 's' : ''}
@@ -375,7 +426,9 @@ function RoleCard({ role, index, onEdit, onDelete }: { role: Role; index: number
           </button>
           <button
             type="button"
-            aria-label={isSystem ? `Cannot delete system role ${role.name}` : `Delete role ${role.name}`}
+            aria-label={
+              isSystem ? `Cannot delete system role ${role.name}` : `Delete role ${role.name}`
+            }
             title={isSystem ? 'System roles cannot be deleted' : 'Delete role'}
             className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-app-surface/80 md:opacity-90 ${
               isSystem
@@ -412,7 +465,17 @@ function RoleCard({ role, index, onEdit, onDelete }: { role: Role; index: number
   );
 }
 
-function GroupCard({ group, index, onEdit, onDelete }: { group: Group; index: number; onEdit: () => void; onDelete: () => void }) {
+function GroupCard({
+  group,
+  index,
+  onEdit,
+  onDelete,
+}: {
+  group: Group;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const memberCount = group.members.length;
 
   return (
@@ -438,7 +501,9 @@ function GroupCard({ group, index, onEdit, onDelete }: { group: Group; index: nu
                 }}
               />
             ))}
-            {memberCount > 4 && <span className="ml-1 text-[10px] text-app-faint">+{memberCount - 4}</span>}
+            {memberCount > 4 && (
+              <span className="ml-1 text-[10px] text-app-faint">+{memberCount - 4}</span>
+            )}
             {memberCount <= 4 && (
               <span className="ml-1.5 text-[10px] text-app-faint">
                 {memberCount} member{memberCount !== 1 ? 's' : ''}
@@ -475,12 +540,17 @@ function GroupCard({ group, index, onEdit, onDelete }: { group: Group; index: nu
       <p className="m-0 text-[12px] leading-relaxed text-app-faint">{group.description}</p>
       <div className="flex flex-wrap gap-1">
         {group.roles.slice(0, 3).map((r) => (
-          <span key={r} className="rounded-md bg-sky-400/8 px-2 py-0.5 font-mono text-[10px] text-sky-400">
+          <span
+            key={r}
+            className="rounded-md bg-sky-400/8 px-2 py-0.5 font-mono text-[10px] text-sky-400"
+          >
             {r}
           </span>
         ))}
         {group.roles.length > 3 && (
-          <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-[10px] text-app-faint">+{group.roles.length - 3}</span>
+          <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-[10px] text-app-faint">
+            +{group.roles.length - 3}
+          </span>
         )}
       </div>
     </div>

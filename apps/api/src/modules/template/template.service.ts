@@ -11,12 +11,9 @@ import type {
 } from "../../repository/types";
 import type { LayoutPhase } from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
+import translate from "google-translate-api-x";
 import {
-  mergeI18n,
-  parseI18nPatch,
-  type I18nStrings,
-} from "../../shared/validation/i18nPatch";
-import {
+  countRichTextCharactersInLayout,
   flattenRegions,
   parseAndValidateLayoutConfig,
   regenerateLayoutIds,
@@ -45,88 +42,11 @@ function normalizeLocaleTag(input: string): string {
   return [normalizedBase, ...normalizedRest].join("-");
 }
 
-function getTemplateDefaultLocale(): string {
-  const fromEnv = normalizeLocaleTag(process.env.TEMPLATE_DEFAULT_LOCALE ?? "");
-  return fromEnv || "en";
-}
-
-function getRequiredTemplateLocales(defaultLocale: string): string[] {
-  const fromEnv = (process.env.TEMPLATE_REQUIRED_LOCALES ?? "")
-    .split(",")
-    .map((entry) => normalizeLocaleTag(entry))
-    .filter(Boolean);
-  const deduped = Array.from(new Set([defaultLocale, ...fromEnv]));
-  return deduped.length > 0 ? deduped : [defaultLocale];
-}
-
-function extractLocalizableKeys(
-  template: Pick<
-    Template,
-    "name" | "description" | "draftLayout" | "activeLayout"
-  >,
-): string[] {
-  const source = JSON.stringify({
-    name: template.name,
-    description: template.description,
-    draftLayout: template.draftLayout,
-    activeLayout: template.activeLayout,
-  });
-  const found = new Set<string>();
-  const regex = /\{\{([^{}]+)\}\}/g;
-  for (const match of source.matchAll(regex)) {
-    const key = match[1]?.trim();
-    if (key) found.add(`{{${key}}}`);
-  }
-  return Array.from(found).sort((a, b) => a.localeCompare(b));
-}
-
 function ensureObjectLevelTemplateAccess(
   template: Template,
   ctx: AuditContext,
 ): boolean {
   return ctx.isAdmin || template.authorId === ctx.actorId;
-}
-
-function validateRequiredLocaleCompleteness(
-  merged: I18nStrings,
-  keys: string[],
-  requiredLocales: string[],
-): string | null {
-  for (const locale of requiredLocales) {
-    const bundle = merged[locale] ?? {};
-    const missingKeys = keys.filter((key) => !bundle[key]?.trim());
-    if (missingKeys.length > 0) {
-      const preview = missingKeys.slice(0, 5).join(", ");
-      const suffix =
-        missingKeys.length > 5 ? ` (+${missingKeys.length - 5} more)` : "";
-      return `Missing required translations for locale ${locale}: ${preview}${suffix}`;
-    }
-  }
-  return null;
-}
-
-function coalesceTranslationBundles(
-  base: I18nStrings,
-  rows: Array<{ locale: string; key: string; value: string }>,
-): I18nStrings {
-  const merged: I18nStrings = deepCloneJson(base);
-  for (const row of rows) {
-    if (!merged[row.locale]) merged[row.locale] = {};
-    merged[row.locale][row.key] = row.value;
-  }
-  return merged;
-}
-
-function flattenI18nForRows(
-  strings: I18nStrings,
-): Array<{ locale: string; key: string; value: string }> {
-  const rows: Array<{ locale: string; key: string; value: string }> = [];
-  for (const [locale, bundle] of Object.entries(strings)) {
-    for (const [key, value] of Object.entries(bundle)) {
-      rows.push({ locale, key, value });
-    }
-  }
-  return rows;
 }
 
 async function uniqueTemplateSlug(
@@ -419,7 +339,7 @@ export const templateService = {
         src.activeLayout != null
           ? regenerateLayoutIds(deepCloneJson(src.activeLayout))
           : null;
-      const i18n = deepCloneJson(src.i18n) as I18nStrings;
+      const i18n = deepCloneJson(src.i18n) as Record<string, Record<string, string>>;
 
       const created = await repos.template.create({
         workspaceId,
@@ -436,19 +356,6 @@ export const templateService = {
       const firstBinding = src.bindings[0];
       if (firstBinding) {
         await repos.template.createBinding(created.id, firstBinding.channelId);
-      }
-
-      const translationRows =
-        await repos.templateTranslation.listAllForTemplate(src.id);
-      if (translationRows.length > 0) {
-        await repos.templateTranslation.upsertMany(
-          created.id,
-          translationRows.map((r) => ({
-            locale: r.locale,
-            key: r.key,
-            value: r.value,
-          })),
-        );
       }
 
       for (const phase of LAYOUT_PHASES) {
@@ -510,8 +417,38 @@ export const templateService = {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     return uow.withTransaction(async (repos) => {
-      const current = await repos.template.getById(id);
-      if (!current) return { notFound: true } as const;
+      const withBindings = await repos.template.getByIdWithBindings(id);
+      if (!withBindings) return { notFound: true } as const;
+
+      let strictestMax: number | null = null;
+      for (const b of withBindings.bindings) {
+        const ch = await repos.channel.getById(b.channelId);
+        if (!ch) continue;
+        const restrictions = ch.compatibility?.restrictions as
+          | Record<string, unknown>
+          | undefined;
+        const raw = restrictions?.maxCharacters;
+        if (
+          typeof raw === "number" &&
+          Number.isFinite(raw) &&
+          raw > 0 &&
+          Number.isInteger(raw)
+        ) {
+          strictestMax =
+            strictestMax === null ? raw : Math.min(strictestMax, raw);
+        }
+      }
+
+      if (strictestMax !== null) {
+        const charCount = countRichTextCharactersInLayout(parsed);
+        if (charCount > strictestMax) {
+          return {
+            invalid: true,
+            message: `Rich text is ${charCount} characters; bound channel(s) allow at most ${strictestMax}. Shorten content before saving.`,
+          } as const;
+        }
+      }
+
       const template = await repos.template.update(id, { draftLayout: parsed });
       await repos.audit.append({
         action: "UPDATE",
@@ -526,182 +463,66 @@ export const templateService = {
     });
   },
 
-  async patchI18n(
-    ctx: AuditContext,
-    id: string,
-    rawPatch: unknown,
+  async translateText(
+    text: string,
+    targetLocale: string,
+    sourceLocale?: string,
   ): Promise<
-    | { ok: true; template: Template }
-    | { notFound: true }
-    | { forbidden: true }
+    | { ok: true; translated: string; detectedSource: string | null }
     | { invalid: true; message: string }
   > {
-    let patch: I18nStrings;
-    try {
-      patch = parseI18nPatch(rawPatch);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      return { invalid: true, message } as const;
+    if (!text || !text.trim()) {
+      return { invalid: true, message: "text is required" } as const;
     }
-    const prisma = getPrismaClient();
-    const uow = new PrismaUnitOfWork(prisma);
-    return uow.withTransaction(async (repos) => {
-      const current = await repos.template.getById(id);
-      if (!current) return { notFound: true } as const;
-      if (!ensureObjectLevelTemplateAccess(current, ctx))
-        return { forbidden: true } as const;
-
-      const merged = mergeI18n(current.i18n, patch);
-      const keys = extractLocalizableKeys(current);
-      const defaultLocale = getTemplateDefaultLocale();
-      const requiredLocales = getRequiredTemplateLocales(defaultLocale);
-      const completenessError = validateRequiredLocaleCompleteness(
-        merged,
-        keys,
-        requiredLocales,
-      );
-      if (completenessError) {
-        return { invalid: true, message: completenessError } as const;
-      }
-      const template = await repos.template.update(id, { i18n: merged });
-      const rows = flattenI18nForRows(patch);
-      if (rows.length > 0) {
-        await repos.templateTranslation.upsertMany(id, rows);
-      }
-      await repos.audit.append({
-        action: "UPDATE",
-        resource: "TEMPLATE",
-        resourceId: id,
-        newValue: { i18nLocales: Object.keys(patch) },
-        actorId: ctx.actorId,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
-      });
-      return { ok: true, template } as const;
-    });
-  },
-
-  async getI18nTable(
-    ctx: AuditContext,
-    id: string,
-  ): Promise<
-    | {
-        ok: true;
-        table: {
-          templateId: string;
-          defaultLocale: string;
-          requiredLocales: string[];
-          keys: string[];
-          translations: I18nStrings;
-        };
-      }
-    | { notFound: true }
-    | { forbidden: true }
-  > {
-    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    const template = await repos.template.getById(id);
-    if (!template) return { notFound: true } as const;
-    if (!ensureObjectLevelTemplateAccess(template, ctx))
-      return { forbidden: true } as const;
-
-    const rows = await repos.templateTranslation.listAllForTemplate(id);
-    const translations = coalesceTranslationBundles(template.i18n, rows);
-    const defaultLocale = getTemplateDefaultLocale();
-    const requiredLocales = getRequiredTemplateLocales(defaultLocale);
-    for (const locale of requiredLocales) {
-      if (!translations[locale]) translations[locale] = {};
+    const tgt = normalizeLocaleTag(targetLocale);
+    if (!tgt) {
+      return { invalid: true, message: "targetLocale is required" } as const;
     }
-    const keys = extractLocalizableKeys(template);
+    const src = sourceLocale ? normalizeLocaleTag(sourceLocale) : undefined;
 
-    return {
-      ok: true,
-      table: {
-        templateId: id,
-        defaultLocale,
-        requiredLocales,
-        keys,
-        translations,
-      },
-    } as const;
-  },
+    const opts: { to: string; from?: string } = { to: tgt };
+    if (src) opts.from = src;
 
-  async resolveI18nValue(
-    ctx: AuditContext,
-    input: { templateId: string; locale: string; key: string },
-  ): Promise<
-    | {
-        ok: true;
-        resolved: {
-          templateId: string;
-          key: string;
-          locale: string;
-          value: string | null;
-          sourceLocale: string | null;
-          usedFallback: boolean;
-        };
+    const MAX_CHUNK = 4500;
+    let detectedSource: string | null = null;
+
+    if (text.length <= MAX_CHUNK) {
+      try {
+        const res = await translate(text, opts);
+        detectedSource = res.from?.language?.iso ?? null;
+        return { ok: true, translated: res.text, detectedSource } as const;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { invalid: true, message: `Translation failed: ${msg}` } as const;
       }
-    | { notFound: true }
-    | { forbidden: true }
-    | { invalid: true; message: string }
-  > {
-    const locale = normalizeLocaleTag(input.locale);
-    const key = input.key.trim();
-    if (!locale)
-      return { invalid: true, message: "locale is required" } as const;
-    if (!key) return { invalid: true, message: "key is required" } as const;
-
-    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    const template = await repos.template.getById(input.templateId);
-    if (!template) return { notFound: true } as const;
-    if (!ensureObjectLevelTemplateAccess(template, ctx))
-      return { forbidden: true } as const;
-
-    const rows = await repos.templateTranslation.listAllForTemplate(
-      input.templateId,
-    );
-    const translations = coalesceTranslationBundles(template.i18n, rows);
-    const defaultLocale = getTemplateDefaultLocale();
-    const localized = translations[locale]?.[key];
-    if (localized && localized.trim()) {
-      return {
-        ok: true,
-        resolved: {
-          templateId: input.templateId,
-          key,
-          locale,
-          value: localized,
-          sourceLocale: locale,
-          usedFallback: false,
-        },
-      } as const;
     }
 
-    const fallback = translations[defaultLocale]?.[key];
-    if (fallback && fallback.trim()) {
-      return {
-        ok: true,
-        resolved: {
-          templateId: input.templateId,
-          key,
-          locale,
-          value: fallback,
-          sourceLocale: defaultLocale,
-          usedFallback: true,
-        },
-      } as const;
+    const chunks: string[] = [];
+    let remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= MAX_CHUNK) {
+        chunks.push(remaining);
+        break;
+      }
+      let splitAt = remaining.lastIndexOf("\n", MAX_CHUNK);
+      if (splitAt < MAX_CHUNK * 0.3) splitAt = remaining.lastIndexOf(" ", MAX_CHUNK);
+      if (splitAt < MAX_CHUNK * 0.3) splitAt = MAX_CHUNK;
+      chunks.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt);
     }
 
-    return {
-      ok: true,
-      resolved: {
-        templateId: input.templateId,
-        key,
-        locale,
-        value: null,
-        sourceLocale: null,
-        usedFallback: false,
-      },
-    } as const;
+    const translated: string[] = [];
+    for (const chunk of chunks) {
+      try {
+        const res = await translate(chunk, opts);
+        if (!detectedSource) detectedSource = res.from?.language?.iso ?? null;
+        translated.push(res.text);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { invalid: true, message: `Translation failed: ${msg}` } as const;
+      }
+    }
+    return { ok: true, translated: translated.join(""), detectedSource } as const;
   },
 
   async activate(
@@ -795,12 +616,6 @@ export const templateService = {
       if (!channel) return { notFound: true } as const;
 
       const existing = await repos.template.listBindings(templateId);
-      if (existing.length >= 1) {
-        return {
-          invalid: true,
-          message: "Template is already bound to a channel",
-        } as const;
-      }
       if (existing.some((b) => b.channelId === channelId)) {
         return { conflict: true } as const;
       }

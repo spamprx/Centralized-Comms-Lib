@@ -1,4 +1,4 @@
-import Slot from "../ui/Slot";
+import Slot from '../ui/Slot';
 
 export function EditorTopbar() {
   return <Slot className="h-14 w-full shrink-0" />;

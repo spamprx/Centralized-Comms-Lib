@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, XCircle, MessageSquare, AlertCircle, Loader2, FileText, Send, Check, History } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  MessageSquare,
+  AlertCircle,
+  Loader2,
+  FileText,
+  Send,
+  Check,
+  History,
+} from 'lucide-react';
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService } from '../services/contentService';
 import { adminUserService } from '../services/adminService';
@@ -46,16 +56,24 @@ export default function ReviewLayout() {
     setDraftComment,
     clearDrafts,
   } = useReviewStore();
-  const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; time: string; resolved: boolean }>>([]);
+  const [comments, setComments] = useState<
+    Array<{ id: string; author: string; text: string; time: string; resolved: boolean }>
+  >([]);
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionSuccess, setDecisionSuccess] = useState(false);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
-  
+
   const currentAssignmentId = selectedItem?.assignmentId;
-  const decision = selectedItem?.verdict || (currentAssignmentId ? draftDecisions[currentAssignmentId] : null) || null;
-  const decisionComment = selectedItem?.savedComment || (currentAssignmentId ? draftDecisionComments[currentAssignmentId] : '') || '';
+  const decision =
+    selectedItem?.verdict ||
+    (currentAssignmentId ? draftDecisions[currentAssignmentId] : null) ||
+    null;
+  const decisionComment =
+    selectedItem?.savedComment ||
+    (currentAssignmentId ? draftDecisionComments[currentAssignmentId] : '') ||
+    '';
   const commentText = (currentAssignmentId ? draftComments[currentAssignmentId] : '') || '';
   const [loading, setLoading] = useState(true);
   const [loadingContent, setLoadingContent] = useState(false);
@@ -76,7 +94,11 @@ export default function ReviewLayout() {
       let userMap: Record<string, { displayName: string; email: string }> = {};
       try {
         const usersRes = await adminUserService.getUsers();
-        const rawUsers = usersRes.data as unknown as Array<{ id: string; displayName?: string; email: string }>;
+        const rawUsers = usersRes.data as unknown as Array<{
+          id: string;
+          displayName?: string;
+          email: string;
+        }>;
         for (const u of rawUsers) {
           userMap[u.id] = { displayName: u.displayName || u.email, email: u.email };
         }
@@ -155,11 +177,14 @@ export default function ReviewLayout() {
         const versions = details.versions;
         if (versions && versions.length > 0) {
           const bodyVersions = versions.filter(
-            (v) => v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED'
+            (v) => v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED',
           );
-          const versionWithBody = bodyVersions.length > 0
-            ? bodyVersions.reduce((prev, curr) => curr.versionNumber > prev.versionNumber ? curr : prev)
-            : null;
+          const versionWithBody =
+            bodyVersions.length > 0
+              ? bodyVersions.reduce((prev, curr) =>
+                  curr.versionNumber > prev.versionNumber ? curr : prev,
+                )
+              : null;
 
           if (versionWithBody) {
             bodyDoc = (versionWithBody as unknown as { body?: unknown })?.body ?? null;
@@ -169,12 +194,10 @@ export default function ReviewLayout() {
         setSelectedItem((prev) =>
           prev && prev.contentId === selectedItem.contentId
             ? { ...prev, contentBody: bodyDoc }
-            : prev
+            : prev,
         );
       } catch {
-        setSelectedItem((prev) =>
-          prev ? { ...prev, contentBody: null } : prev
-        );
+        setSelectedItem((prev) => (prev ? { ...prev, contentBody: null } : prev));
       } finally {
         setLoadingContent(false);
       }
@@ -184,13 +207,15 @@ export default function ReviewLayout() {
   useEffect(() => {
     if (!selectedItem?.assignmentId) return;
     const storedComments = ctxGetComments(selectedItem.assignmentId);
-    let loadedComments: any[] = storedComments.map((c: { text: string; time: string | number | Date }, index: number) => ({
-      id: `ctx_${index}_${Date.now()}`,
-      author: 'You',
-      text: c.text,
-      time: new Date(c.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      resolved: false,
-    }));
+    let loadedComments: any[] = storedComments.map(
+      (c: { text: string; time: string | number | Date }, index: number) => ({
+        id: `ctx_${index}_${Date.now()}`,
+        author: 'You',
+        text: c.text,
+        time: new Date(c.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        resolved: false,
+      }),
+    );
 
     if (selectedItem.verdict && selectedItem.savedComment) {
       loadedComments.push({
@@ -203,7 +228,12 @@ export default function ReviewLayout() {
     }
 
     setComments(loadedComments);
-  }, [selectedItem?.assignmentId, selectedItem?.verdict, selectedItem?.savedComment, ctxGetComments]);
+  }, [
+    selectedItem?.assignmentId,
+    selectedItem?.verdict,
+    selectedItem?.savedComment,
+    ctxGetComments,
+  ]);
 
   const handleSelectItem = (item: ReviewItem) => {
     setSelectedItem(item);
@@ -230,7 +260,7 @@ export default function ReviewLayout() {
       try {
         await reviewService.addComment(
           selectedItem.assignmentId,
-          `[${decision}] ${decisionComment.trim()}`
+          `[${decision}] ${decisionComment.trim()}`,
         );
       } catch {
         // Non-critical — decision was already recorded
@@ -266,11 +296,7 @@ export default function ReviewLayout() {
       ctxAddDecision(selectedItem.assignmentId, decision, decisionComment.trim());
 
       setReviewItems((prev) =>
-        prev.map((item) =>
-          item.assignmentId === selectedItem.assignmentId
-            ? updatedItem
-            : item
-        )
+        prev.map((item) => (item.assignmentId === selectedItem.assignmentId ? updatedItem : item)),
       );
       setSelectedItem(updatedItem);
       clearDrafts(selectedItem.assignmentId);
@@ -307,7 +333,11 @@ export default function ReviewLayout() {
   if (loading) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4">
-        <Surface variant="glass" padding="lg" className="flex max-w-md flex-col items-center gap-4 text-center">
+        <Surface
+          variant="glass"
+          padding="lg"
+          className="flex max-w-md flex-col items-center gap-4 text-center"
+        >
           <Loader2 size={32} className="animate-spin text-app-accent" aria-hidden />
           <p className="m-0 text-[13px] text-app-muted">Loading your review assignments…</p>
         </Surface>
@@ -318,7 +348,11 @@ export default function ReviewLayout() {
   if (reviewItems.length === 0) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4">
-        <Surface variant="glass" padding="lg" className="flex max-w-md flex-col items-center gap-3 text-center">
+        <Surface
+          variant="glass"
+          padding="lg"
+          className="flex max-w-md flex-col items-center gap-3 text-center"
+        >
           <div className="flex h-14 w-14 items-center justify-center rounded-app-xl bg-app-accent-muted text-app-accent">
             <FileText size={28} strokeWidth={1.75} />
           </div>
@@ -386,17 +420,21 @@ export default function ReviewLayout() {
                       : 'border-transparent bg-app-bg/25 hover:border-app-border/80 hover:bg-app-elevated'
                   } ${isPending ? 'opacity-100' : 'opacity-65'}`}
                 >
-                  <div className={`text-[13px] font-semibold mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap ${isActive ? 'text-app-text' : 'text-app-muted'}`}>
+                  <div
+                    className={`text-[13px] font-semibold mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap ${isActive ? 'text-app-text' : 'text-app-muted'}`}
+                  >
                     {item.title}
                   </div>
-                  <div className="text-[11px] text-app-faint mb-1">
-                    by {item.author}
-                  </div>
+                  <div className="text-[11px] text-app-faint mb-1">by {item.author}</div>
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-app-faint">{item.submittedAt}</span>
-                    <span className={`rounded-lg px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                      isPending ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
-                    }`}>
+                    <span
+                      className={`rounded-lg px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                        isPending
+                          ? 'bg-amber-400/15 text-amber-300'
+                          : 'bg-emerald-500/15 text-emerald-300'
+                      }`}
+                    >
                       {isPending ? 'PENDING' : 'REVIEWED'}
                     </span>
                   </div>
@@ -416,9 +454,7 @@ export default function ReviewLayout() {
             <Surface variant="default" padding="lg" className="mx-auto max-w-[800px]">
               {/* Content header */}
               <div className="mb-6">
-                <h2 className="text-[22px] font-bold text-app-text mb-2">
-                  {selectedItem?.title}
-                </h2>
+                <h2 className="text-[22px] font-bold text-app-text mb-2">{selectedItem?.title}</h2>
                 <div className="flex gap-4 flex-wrap items-center">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-white text-xs font-semibold">
@@ -429,9 +465,7 @@ export default function ReviewLayout() {
                         {selectedItem?.author}
                       </div>
                       {selectedItem?.authorEmail && (
-                        <div className="text-[10px] text-app-faint">
-                          {selectedItem.authorEmail}
-                        </div>
+                        <div className="text-[10px] text-app-faint">{selectedItem.authorEmail}</div>
                       )}
                     </div>
                   </div>
@@ -440,9 +474,7 @@ export default function ReviewLayout() {
                     Shared by {selectedItem?.requestedBy}
                   </span>
                   <span className="text-app-faint">·</span>
-                  <span className="text-[11px] text-app-faint">
-                    {selectedItem?.submittedAt}
-                  </span>
+                  <span className="text-[11px] text-app-faint">{selectedItem?.submittedAt}</span>
                 </div>
               </div>
 
@@ -476,40 +508,56 @@ export default function ReviewLayout() {
         >
           {/* Review Decision */}
           <div className="p-5 border-b border-app-border/80">
-            <h3 className="text-xs font-semibold text-app-faint uppercase mb-3">
-              Review Decision
-            </h3>
+            <h3 className="text-xs font-semibold text-app-faint uppercase mb-3">Review Decision</h3>
 
             {isAlreadyDecided || decisionSuccess ? (
-              <div className={`p-4 rounded-app-lg text-center ${
-                selectedItem?.verdict === 'DENIED'
-                  ? 'bg-red-500/10 border border-red-500/20'
-                  : 'bg-emerald-500/10 border border-emerald-500/20'
-              }`}>
+              <div
+                className={`p-4 rounded-app-lg text-center ${
+                  selectedItem?.verdict === 'DENIED'
+                    ? 'bg-red-500/10 border border-red-500/20'
+                    : 'bg-emerald-500/10 border border-emerald-500/20'
+                }`}
+              >
                 {selectedItem?.verdict === 'DENIED' ? (
                   <XCircle size={24} color="#f87171" className="mb-2 mx-auto" />
                 ) : (
                   <CheckCircle size={24} color="#10b981" className="mb-2 mx-auto" />
                 )}
-                <p className={`mb-1 text-[13px] font-semibold ${
-                  selectedItem?.verdict === 'DENIED' ? 'text-red-300' : 'text-emerald-300'
-                }`}>
-                  {selectedItem?.verdict === 'APPROVED' ? 'Approved' : selectedItem?.verdict === 'DENIED' ? 'Denied' : 'Decision Submitted'}
+                <p
+                  className={`mb-1 text-[13px] font-semibold ${
+                    selectedItem?.verdict === 'DENIED' ? 'text-red-300' : 'text-emerald-300'
+                  }`}
+                >
+                  {selectedItem?.verdict === 'APPROVED'
+                    ? 'Approved'
+                    : selectedItem?.verdict === 'DENIED'
+                      ? 'Denied'
+                      : 'Decision Submitted'}
                 </p>
 
                 {/* Review Request Status */}
                 {selectedItem?.reviewRequestStatus && (
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md mb-2 ${
-                    selectedItem.reviewRequestStatus === 'CLOSED'
-                      ? 'bg-violet-500/15'
-                      : 'bg-amber-400/15'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      selectedItem.reviewRequestStatus === 'CLOSED' ? 'bg-violet-400' : 'bg-amber-400'
-                    }`} />
-                    <span className={`text-[11px] font-semibold ${
-                      selectedItem.reviewRequestStatus === 'CLOSED' ? 'text-violet-400' : 'text-amber-400'
-                    }`}>
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md mb-2 ${
+                      selectedItem.reviewRequestStatus === 'CLOSED'
+                        ? 'bg-violet-500/15'
+                        : 'bg-amber-400/15'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        selectedItem.reviewRequestStatus === 'CLOSED'
+                          ? 'bg-violet-400'
+                          : 'bg-amber-400'
+                      }`}
+                    />
+                    <span
+                      className={`text-[11px] font-semibold ${
+                        selectedItem.reviewRequestStatus === 'CLOSED'
+                          ? 'text-violet-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
                       Review Request: {selectedItem.reviewRequestStatus}
                     </span>
                   </div>
@@ -519,10 +567,16 @@ export default function ReviewLayout() {
                 {selectedItem?.savedComment && (
                   <div
                     className="mt-2.5 px-3.5 py-2.5 bg-app-surface rounded-lg text-left"
-                    style={{ borderLeft: `3px solid ${selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981'}` }}
+                    style={{
+                      borderLeft: `3px solid ${selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981'}`,
+                    }}
                   >
-                    <span className="text-[10px] text-app-faint uppercase font-semibold">Your Comment</span>
-                    <p className="text-xs text-app-muted mt-1.5 mb-0 leading-normal">{selectedItem.savedComment}</p>
+                    <span className="text-[10px] text-app-faint uppercase font-semibold">
+                      Your Comment
+                    </span>
+                    <p className="text-xs text-app-muted mt-1.5 mb-0 leading-normal">
+                      {selectedItem.savedComment}
+                    </p>
                   </div>
                 )}
               </div>
@@ -530,7 +584,10 @@ export default function ReviewLayout() {
               <>
                 <div className="flex gap-2 mb-3">
                   <button
-                    onClick={() => { if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'APPROVED'); setDecisionError(null); }}
+                    onClick={() => {
+                      if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'APPROVED');
+                      setDecisionError(null);
+                    }}
                     className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
                       decision === 'APPROVED'
                         ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
@@ -540,7 +597,10 @@ export default function ReviewLayout() {
                     <CheckCircle size={16} /> Approve
                   </button>
                   <button
-                    onClick={() => { if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'DENIED'); setDecisionError(null); }}
+                    onClick={() => {
+                      if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'DENIED');
+                      setDecisionError(null);
+                    }}
                     className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
                       decision === 'DENIED'
                         ? 'border-red-400/70 bg-red-500/20 text-red-200'
@@ -558,10 +618,16 @@ export default function ReviewLayout() {
                     </label>
                     <textarea
                       value={decisionComment}
-                      onChange={(e) => { if (currentAssignmentId) setDraftDecisionComment(currentAssignmentId, e.target.value); setDecisionError(null); }}
-                      placeholder={decision === 'APPROVED'
-                        ? 'Why are you approving this content...'
-                        : 'What needs to be changed...'}
+                      onChange={(e) => {
+                        if (currentAssignmentId)
+                          setDraftDecisionComment(currentAssignmentId, e.target.value);
+                        setDecisionError(null);
+                      }}
+                      placeholder={
+                        decision === 'APPROVED'
+                          ? 'Why are you approving this content...'
+                          : 'What needs to be changed...'
+                      }
                       rows={3}
                       className={`w-full p-2.5 bg-app-surface rounded-lg text-app-text text-xs resize-none box-border outline-none ${
                         decisionError ? 'border border-red-400/50' : 'border border-app-border'
@@ -589,9 +655,13 @@ export default function ReviewLayout() {
                     }`}
                   >
                     {submittingDecision ? (
-                      <><Loader2 size={14} className="animate-spin" /> Submitting...</>
+                      <>
+                        <Loader2 size={14} className="animate-spin" /> Submitting...
+                      </>
                     ) : (
-                      <><Send size={14} /> Submit {decision === 'APPROVED' ? 'Approval' : 'Denial'}</>
+                      <>
+                        <Send size={14} /> Submit {decision === 'APPROVED' ? 'Approval' : 'Denial'}
+                      </>
                     )}
                   </button>
                 )}
@@ -601,13 +671,13 @@ export default function ReviewLayout() {
 
           {/* AI Screening Panel */}
           <div className="border-b border-app-border/80 p-5">
-            <h3 className="mb-3 text-xs font-semibold uppercase text-app-faint">
-              AI screening
-            </h3>
+            <h3 className="mb-3 text-xs font-semibold uppercase text-app-faint">AI screening</h3>
             <div className="mb-3">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs text-app-muted">Quality Score</span>
-                <span className={`text-lg font-bold ${screeningData.score > 80 ? 'text-emerald-500' : 'text-amber-400'}`}>
+                <span
+                  className={`text-lg font-bold ${screeningData.score > 80 ? 'text-emerald-500' : 'text-amber-400'}`}
+                >
                   {screeningData.score}/100
                 </span>
               </div>
@@ -624,9 +694,15 @@ export default function ReviewLayout() {
             <div className="flex flex-col gap-2">
               {screeningData.issues.map((issue, i) => (
                 <div key={i} className="flex gap-2 items-start">
-                  {issue.type === 'warning' && <AlertCircle size={14} color="#fbbf24" className="mt-0.5" />}
-                  {issue.type === 'info' && <AlertCircle size={14} color="#06b6d4" className="mt-0.5" />}
-                  {issue.type === 'success' && <CheckCircle size={14} color="#10b981" className="mt-0.5" />}
+                  {issue.type === 'warning' && (
+                    <AlertCircle size={14} color="#fbbf24" className="mt-0.5" />
+                  )}
+                  {issue.type === 'info' && (
+                    <AlertCircle size={14} color="#06b6d4" className="mt-0.5" />
+                  )}
+                  {issue.type === 'success' && (
+                    <CheckCircle size={14} color="#10b981" className="mt-0.5" />
+                  )}
                   <span className="text-[11px] text-app-muted">{issue.text}</span>
                 </div>
               ))}
@@ -640,7 +716,10 @@ export default function ReviewLayout() {
             </h3>
             <div className="flex flex-col gap-3 mb-4">
               {comments.map((comment) => (
-                <div key={comment.id} className={`p-3 bg-app-surface rounded-lg ${comment.resolved ? 'opacity-50' : ''}`}>
+                <div
+                  key={comment.id}
+                  className={`p-3 bg-app-surface rounded-lg ${comment.resolved ? 'opacity-50' : ''}`}
+                >
                   <div className="flex justify-between mb-1.5">
                     <span className="text-xs font-semibold text-app-text">{comment.author}</span>
                     <span className="text-[10px] text-app-faint">{comment.time}</span>
@@ -663,7 +742,9 @@ export default function ReviewLayout() {
             <div>
               <textarea
                 value={commentText}
-                onChange={(e) => { if (currentAssignmentId) setDraftComment(currentAssignmentId, e.target.value); }}
+                onChange={(e) => {
+                  if (currentAssignmentId) setDraftComment(currentAssignmentId, e.target.value);
+                }}
                 placeholder="Add a comment or feedback..."
                 rows={3}
                 className="w-full p-3 bg-app-surface border border-app-border rounded-lg text-app-text text-xs resize-none mb-2 box-border"

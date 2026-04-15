@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { authService } from "../services/authService";
-import { setAuthToken, decodeTokenPayload } from "../services/tokenStore";
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { authService } from '../services/authService';
+import { setAuthToken, decodeTokenPayload } from '../services/tokenStore';
 
 type AuthUser = {
   id: string;
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }

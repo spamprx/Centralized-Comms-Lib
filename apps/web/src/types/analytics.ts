@@ -9,7 +9,7 @@ export interface KPI {
   label: string;
   value: string | number;
   change: number;
-  trend: "up" | "down" | "stable";
+  trend: 'up' | 'down' | 'stable';
 }
 
 export interface EngagementData {
@@ -44,6 +44,6 @@ export interface TopContentItem {
 export interface AIInsight {
   title: string;
   description: string;
-  sentiment: "positive" | "neutral" | "negative";
-  impact: "high" | "medium" | "low";
+  sentiment: 'positive' | 'neutral' | 'negative';
+  impact: 'high' | 'medium' | 'low';
 }

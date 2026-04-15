@@ -1,22 +1,16 @@
-import { useDashboard } from "../hooks/useDashboard";
+import { useDashboard } from '../hooks/useDashboard';
 import {
   StatCardsRow,
   QuickActionsPanel,
   RecentActivityFeed,
   PendingItemsList,
   NotificationsSummary,
-} from "../components/dashboard";
-import { PageHeader, PageShell } from "../components/ui";
+} from '../components/dashboard';
+import { PageHeader, PageShell } from '../components/ui';
 
 export default function DashboardLayout() {
-  const {
-    statCards,
-    quickActions,
-    recentActivity,
-    pendingItems,
-    notifications,
-    loading,
-  } = useDashboard();
+  const { statCards, quickActions, recentActivity, pendingItems, notifications, loading } =
+    useDashboard();
 
   if (loading) {
     return (

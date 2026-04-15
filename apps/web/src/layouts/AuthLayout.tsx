@@ -1,30 +1,20 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Lock,
-  Mail,
-  ArrowRight,
-  Github,
-  Chrome,
-  Eye,
-  EyeOff,
-  BookOpen,
-  Check,
-} from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import { authService } from "../services/authService";
-import { Button, Surface, formInputClass, formLabelClass } from "../components/ui";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Lock, Mail, ArrowRight, Github, Chrome, Eye, EyeOff, BookOpen, Check } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/authService';
+import { Button, Surface, formInputClass, formLabelClass } from '../components/ui';
 
 const perks = [
-  "Role-aware library and templates",
-  "Review flows without leaving context",
-  "Analytics tuned for content teams",
+  'Role-aware library and templates',
+  'Review flows without leaving context',
+  'Analytics tuned for content teams',
 ];
 
 export default function AuthLayout() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [isSignup, setIsSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -44,9 +34,9 @@ export default function AuthLayout() {
       } else {
         await login(email, password);
       }
-      navigate("/dashboard");
+      navigate('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -54,11 +44,11 @@ export default function AuthLayout() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-app-bg">
-      <div className="pointer-events-none absolute inset-0 app-main-canvas opacity-80" aria-hidden />
       <div
-        className="pointer-events-none absolute inset-0 opacity-90"
+        className="pointer-events-none absolute inset-0 app-main-canvas opacity-80"
         aria-hidden
-      >
+      />
+      <div className="pointer-events-none absolute inset-0 opacity-90" aria-hidden>
         <div className="absolute -left-40 top-0 h-[28rem] w-[28rem] rounded-full bg-app-accent/18 blur-3xl" />
         <div className="absolute -right-32 bottom-0 h-96 w-96 rounded-full bg-cyan-500/12 blur-3xl" />
       </div>
@@ -73,18 +63,16 @@ export default function AuthLayout() {
               <p className="m-0 text-xs font-semibold uppercase tracking-[0.2em] text-app-faint">
                 CommsLib
               </p>
-              <p className="m-0 text-lg font-bold text-app-text">
-                Your content command center
-              </p>
+              <p className="m-0 text-lg font-bold text-app-text">Your content command center</p>
             </div>
           </div>
           <h2 className="m-0 text-3xl font-bold leading-tight tracking-tight text-app-text md:text-4xl md:leading-tight">
-            Sign in to a workspace designed for{" "}
-            <span className="app-text-gradient">clarity</span> at scale.
+            Sign in to a workspace designed for <span className="app-text-gradient">clarity</span>{' '}
+            at scale.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-app-muted">
-            One library for drafts, reviews, and published work — with guardrails
-            your org can trust.
+            One library for drafts, reviews, and published work — with guardrails your org can
+            trust.
           </p>
           <ul className="mt-8 flex flex-col gap-3">
             {perks.map((p) => (
@@ -109,12 +97,12 @@ export default function AuthLayout() {
                 <Lock size={24} className="text-white" aria-hidden />
               </div>
               <h1 className="m-0 text-xl font-bold text-app-text">
-                {isSignup ? "Create your account" : "Welcome back"}
+                {isSignup ? 'Create your account' : 'Welcome back'}
               </h1>
               <p className="mt-2 text-sm text-app-muted">
                 {isSignup
-                  ? "Set up your profile to start collaborating."
-                  : "Sign in to continue to CommsLib."}
+                  ? 'Set up your profile to start collaborating.'
+                  : 'Sign in to continue to CommsLib.'}
               </p>
             </div>
 
@@ -176,18 +164,18 @@ export default function AuthLayout() {
                 <div className="relative password-input-hide-reveal">
                   <input
                     id="auth-password"
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    autoComplete={isSignup ? "new-password" : "current-password"}
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
                     className={`${formInputClass} pr-11`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-app-md border border-app-border bg-app-bg/80 text-app-muted transition-colors hover:border-app-border-strong hover:text-app-text"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -221,17 +209,15 @@ export default function AuthLayout() {
                 variant="primary"
                 disabled={loading}
                 className="w-full py-3"
-                rightIcon={
-                  !loading ? <ArrowRight size={16} aria-hidden /> : undefined
-                }
+                rightIcon={!loading ? <ArrowRight size={16} aria-hidden /> : undefined}
               >
                 {loading
                   ? isSignup
-                    ? "Creating account…"
-                    : "Signing in…"
+                    ? 'Creating account…'
+                    : 'Signing in…'
                   : isSignup
-                    ? "Sign up"
-                    : "Sign in"}
+                    ? 'Sign up'
+                    : 'Sign in'}
               </Button>
             </form>
 
@@ -259,7 +245,7 @@ export default function AuthLayout() {
             </div>
 
             <p className="mt-6 text-center text-[13px] text-app-muted lg:text-left">
-              {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+              {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -268,7 +254,7 @@ export default function AuthLayout() {
                 }}
                 className="border-none bg-transparent p-0 font-semibold text-app-accent hover:text-app-accent-hover"
               >
-                {isSignup ? "Sign in" : "Sign up"}
+                {isSignup ? 'Sign in' : 'Sign up'}
               </button>
             </p>
           </Surface>

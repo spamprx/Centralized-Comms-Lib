@@ -43,36 +43,38 @@ export function useMyContent() {
       setLoading(true);
       const contents = await contentService.list(user?.id ? { authorId: user.id } : {});
 
-      const mapped: MyContentItem[] = await Promise.all(contents.map(async (c) => {
-        let status = mapLifecycleToStatus(c.lifecycleState);
+      const mapped: MyContentItem[] = await Promise.all(
+        contents.map(async (c) => {
+          let status = mapLifecycleToStatus(c.lifecycleState);
 
-        // FE Workaround for backend sequential quorum bug:
-        // Even if the DB says PUBLISHED, check if there are other pending review requests.
-        // If there are OPEN requests, enforce 'in_review' status.
-        if (status === 'published') {
-          try {
-            // Lazy load reviewService to prevent circular dependencies if they exist
-            const { reviewService } = await import('../services/reviewService');
-            const requests = await reviewService.listForContent(c.id);
-            if (requests.some(req => req.status === 'OPEN')) {
-              status = 'in_review';
+          // FE Workaround for backend sequential quorum bug:
+          // Even if the DB says PUBLISHED, check if there are other pending review requests.
+          // If there are OPEN requests, enforce 'in_review' status.
+          if (status === 'published') {
+            try {
+              // Lazy load reviewService to prevent circular dependencies if they exist
+              const { reviewService } = await import('../services/reviewService');
+              const requests = await reviewService.listForContent(c.id);
+              if (requests.some((req) => req.status === 'OPEN')) {
+                status = 'in_review';
+              }
+            } catch {
+              // fallback to original status if fetch fails
             }
-          } catch {
-            // fallback to original status if fetch fails
           }
-        }
 
-        return {
-          id: c.id,
-          title: c.title,
-          type: 'document',
-          status,
-          views: 0,
-          lastModified: c.updatedAt,
-          createdAt: c.createdAt,
-          collaborators: 0,
-        };
-      }));
+          return {
+            id: c.id,
+            title: c.title,
+            type: 'document',
+            status,
+            views: 0,
+            lastModified: c.updatedAt,
+            createdAt: c.createdAt,
+            collaborators: 0,
+          };
+        }),
+      );
 
       setContentItems(mapped);
       setStats(buildStats(mapped));
@@ -89,33 +91,35 @@ export function useMyContent() {
         setLoading(true);
         const contents = await contentService.list(user?.id ? { authorId: user.id } : {});
 
-        const mapped: MyContentItem[] = await Promise.all(contents.map(async (c) => {
-          let status = mapLifecycleToStatus(c.lifecycleState);
+        const mapped: MyContentItem[] = await Promise.all(
+          contents.map(async (c) => {
+            let status = mapLifecycleToStatus(c.lifecycleState);
 
-          // FE Workaround for backend sequential quorum bug
-          if (status === 'published') {
-            try {
-              const { reviewService } = await import('../services/reviewService');
-              const requests = await reviewService.listForContent(c.id);
-              if (requests.some(req => req.status === 'OPEN')) {
-                status = 'in_review';
+            // FE Workaround for backend sequential quorum bug
+            if (status === 'published') {
+              try {
+                const { reviewService } = await import('../services/reviewService');
+                const requests = await reviewService.listForContent(c.id);
+                if (requests.some((req) => req.status === 'OPEN')) {
+                  status = 'in_review';
+                }
+              } catch {
+                // fallback
               }
-            } catch {
-              // fallback
             }
-          }
 
-          return {
-            id: c.id,
-            title: c.title,
-            type: 'document',
-            status,
-            views: 0,
-            lastModified: c.updatedAt,
-            createdAt: c.createdAt,
-            collaborators: 0,
-          };
-        }));
+            return {
+              id: c.id,
+              title: c.title,
+              type: 'document',
+              status,
+              views: 0,
+              lastModified: c.updatedAt,
+              createdAt: c.createdAt,
+              collaborators: 0,
+            };
+          }),
+        );
 
         if (!isMounted) return;
         setContentItems(mapped);
@@ -130,7 +134,7 @@ export function useMyContent() {
     };
   }, [user?.id]);
 
-  const filteredItems = contentItems.filter(item => {
+  const filteredItems = contentItems.filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -147,4 +151,3 @@ export function useMyContent() {
     refreshContent: fetchContent,
   };
 }
-

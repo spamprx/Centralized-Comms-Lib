@@ -1,4 +1,4 @@
-import Slot from "../ui/Slot";
+import Slot from '../ui/Slot';
 
 export function ReadingProgressBar() {
   return <Slot className="h-1 w-full shrink-0" />;

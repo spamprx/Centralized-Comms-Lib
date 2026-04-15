@@ -1,4 +1,4 @@
-import { ProfileLayout } from "../../layouts";
+import { ProfileLayout } from '../../layouts';
 
 export default function ProfilePage() {
   return <ProfileLayout />;

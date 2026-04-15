@@ -1,4 +1,4 @@
-import Slot from "../ui/Slot";
+import Slot from '../ui/Slot';
 
 export function PageHeader() {
   return <Slot className="h-12 w-full" />;

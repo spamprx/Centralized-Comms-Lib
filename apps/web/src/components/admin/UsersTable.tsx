@@ -258,9 +258,7 @@ export default function UsersTable({
                     </td>
 
                     <td className="px-4 py-3 align-middle border-b border-white/[0.03] relative group-hover:bg-app-elevated/30">
-                      <div
-                        className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-app-accent opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                      />
+                      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-app-accent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                       <div className="flex items-center gap-3">
                         <div
                           className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0"
@@ -304,7 +302,9 @@ export default function UsersTable({
                     <td className="px-4 py-3 align-middle border-b border-white/[0.03] group-hover:bg-app-elevated/30">
                       <div className="flex items-center gap-2">
                         <span className={STATUS_DOT_CLASS[user.status]} />
-                        <span className="text-[12px] text-app-muted">{STATUS_LABEL[user.status]}</span>
+                        <span className="text-[12px] text-app-muted">
+                          {STATUS_LABEL[user.status]}
+                        </span>
                       </div>
                     </td>
 

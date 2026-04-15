@@ -1,4 +1,4 @@
-import { MyContentLayout } from "../../layouts";
+import { MyContentLayout } from '../../layouts';
 
 export default function MyContentPage() {
   return <MyContentLayout />;

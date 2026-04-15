@@ -1,4 +1,4 @@
-const API_BASE = "http://168.144.22.124:8000";
+const API_BASE = 'http://168.144.22.124:8000';
 import { getAuthToken } from './tokenStore';
 import type { Tag } from './tagService';
 import type { Binding } from './channelService';
@@ -38,7 +38,7 @@ async function isApiAvailable(): Promise<boolean> {
   // Check if we've already determined API availability
   const cached = localStorage.getItem(API_AVAILABILITY_KEY);
   if (cached !== null) return cached === 'true';
-  
+
   try {
     // Try to make a simple API call to check availability
     await request<Template[]>('/templates', { method: 'GET' });
@@ -92,32 +92,32 @@ function generateCopyName(name: string, existingTemplates: Template[]): string {
   // Check if name already has (Copy) suffix
   const copyRegex = /^(.*) \(Copy(?: (\d+))?\)$/;
   const match = name.match(copyRegex);
-  
+
   if (match) {
     // Already a copy, increment the number
     const baseName = match[1];
     const copyNumber = match[2] ? parseInt(match[2]) + 1 : 2;
-    
+
     // Find the next available number
     let newName = `${baseName} (Copy ${copyNumber})`;
     let counter = copyNumber + 1;
-    
-    while (existingTemplates.some(t => t.name === newName)) {
+
+    while (existingTemplates.some((t) => t.name === newName)) {
       newName = `${baseName} (Copy ${counter})`;
       counter++;
     }
-    
+
     return newName;
   } else {
     // Original template, add (Copy)
     let newName = `${name} (Copy)`;
     let counter = 2;
-    
-    while (existingTemplates.some(t => t.name === newName)) {
+
+    while (existingTemplates.some((t) => t.name === newName)) {
       newName = `${name} (Copy ${counter})`;
       counter++;
     }
-    
+
     return newName;
   }
 }
@@ -182,7 +182,7 @@ function localStorageList(): Template[] {
 
 function localStorageGetById(id: string): Template | null {
   const templates = getTemplatesFromStorage();
-  return templates.find(t => t.id === id) || null;
+  return templates.find((t) => t.id === id) || null;
 }
 
 function localStorageCreate(template: CreateTemplateRequest): Template {
@@ -195,7 +195,7 @@ function localStorageCreate(template: CreateTemplateRequest): Template {
     updatedAt: new Date().toISOString(),
     tags: [],
   };
-  
+
   const updated = [...templates, newTemplate];
   saveTemplatesToStorage(updated);
   return newTemplate;
@@ -203,16 +203,16 @@ function localStorageCreate(template: CreateTemplateRequest): Template {
 
 function localStorageUpdate(id: string, updates: UpdateTemplateRequest): Template | null {
   const templates = getTemplatesFromStorage();
-  const index = templates.findIndex(t => t.id === id);
-  
+  const index = templates.findIndex((t) => t.id === id);
+
   if (index === -1) return null;
-  
+
   const updated = {
     ...templates[index],
     ...updates,
     updatedAt: new Date().toISOString(),
   };
-  
+
   templates[index] = updated;
   saveTemplatesToStorage(templates);
   return updated;
@@ -220,24 +220,24 @@ function localStorageUpdate(id: string, updates: UpdateTemplateRequest): Templat
 
 function localStorageDelete(id: string): boolean {
   const templates = getTemplatesFromStorage();
-  const filtered = templates.filter(t => t.id !== id);
-  
+  const filtered = templates.filter((t) => t.id !== id);
+
   if (filtered.length === templates.length) return false;
-  
+
   saveTemplatesToStorage(filtered);
   return true;
 }
 
 function localStorageClone(id: string): Template | null {
   const templates = getTemplatesFromStorage();
-  const original = templates.find(t => t.id === id);
-  
+  const original = templates.find((t) => t.id === id);
+
   if (!original) return null;
-  
+
   const cloned = createDeepCopy(original);
   // Clone the tags as well
   cloned.tags = [...(original.tags || [])];
-  
+
   const updated = [...templates, cloned];
   saveTemplatesToStorage(updated);
   return cloned;

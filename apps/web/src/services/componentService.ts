@@ -63,7 +63,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: 'Request failed' }));
-    const baseMsg = typeof err.error === 'string' ? err.error : typeof err.message === 'string' ? err.message : `HTTP ${res.status}`;
+    const baseMsg =
+      typeof err.error === 'string'
+        ? err.error
+        : typeof err.message === 'string'
+          ? err.message
+          : `HTTP ${res.status}`;
     const method = (options.method ?? 'GET').toUpperCase();
     const withUrl =
       baseMsg === 'Route not found' || import.meta.env.DEV
@@ -92,7 +97,9 @@ export const componentService = {
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     const suffix = params.toString();
-    return request<ComponentLibraryEntry[]>(suffix ? `/components/search?${suffix}` : '/components/search');
+    return request<ComponentLibraryEntry[]>(
+      suffix ? `/components/search?${suffix}` : '/components/search',
+    );
   },
 
   createVersion: async (
@@ -105,4 +112,3 @@ export const componentService = {
     });
   },
 };
-

@@ -61,7 +61,10 @@ export function LibraryFilterBar({
             Search
           </label>
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint pointer-events-none" />
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint pointer-events-none"
+            />
             <input
               id="library-search"
               type="text"
@@ -109,7 +112,7 @@ export function LibraryFilterBar({
               id="library-filter-channel"
               value={appliedFacetValues.channel}
               onChange={(e) => onChannelChange(e.target.value)}
-            aria-label="Filter by channel"
+              aria-label="Filter by channel"
               title="Filter by channel"
               className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
             >
@@ -176,7 +179,7 @@ export function LibraryFilterBar({
               id="library-filter-type"
               value={appliedFacetValues.type}
               onChange={(e) => onTypeChange(e.target.value)}
-            aria-label="Filter by type"
+              aria-label="Filter by type"
               title="Filter by type"
               className="w-full px-3 py-2.5 bg-app-surface border border-app-border rounded-lg text-app-text text-[13px] cursor-pointer box-border"
             >
@@ -251,7 +254,10 @@ export function LibraryFilterBar({
                   }`}
                   style={
                     on
-                      ? { background: `${tag.color}33`, boxShadow: `inset 0 0 0 1px ${tag.color}55` }
+                      ? {
+                          background: `${tag.color}33`,
+                          boxShadow: `inset 0 0 0 1px ${tag.color}55`,
+                        }
                       : undefined
                   }
                 >

@@ -19,11 +19,7 @@ export function LibraryFilterInvalidBanner({
       className="flex flex-col gap-3 rounded-app-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
     >
       <div className="flex gap-3 min-w-0">
-        <AlertTriangle
-          size={20}
-          className="shrink-0 text-amber-400 mt-0.5"
-          aria-hidden
-        />
+        <AlertTriangle size={20} className="shrink-0 text-amber-400 mt-0.5" aria-hidden />
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-app-text">
             Some filters could not be applied

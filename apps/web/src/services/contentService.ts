@@ -99,7 +99,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return res.json();
 }
 
-async function fetchOptionalJson<T>(endpoint: string, options: RequestInit = {}): Promise<{ ok: true; data: T } | { ok: false; status: number }> {
+async function fetchOptionalJson<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<{ ok: true; data: T } | { ok: false; status: number }> {
   const token = getAuthToken();
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
@@ -117,17 +120,26 @@ async function fetchOptionalJson<T>(endpoint: string, options: RequestInit = {})
 }
 
 /** Supports plain arrays or paginated envelopes once the API adds them. */
-export function normalizeVersionListPayload(data: unknown): { items: ContentVersion[]; total: number | null } {
+export function normalizeVersionListPayload(data: unknown): {
+  items: ContentVersion[];
+  total: number | null;
+} {
   if (Array.isArray(data)) {
     return { items: data as ContentVersion[], total: data.length };
   }
   if (data && typeof data === 'object') {
     const o = data as Record<string, unknown>;
     if (Array.isArray(o.items)) {
-      return { items: o.items as ContentVersion[], total: typeof o.total === 'number' ? o.total : null };
+      return {
+        items: o.items as ContentVersion[],
+        total: typeof o.total === 'number' ? o.total : null,
+      };
     }
     if (Array.isArray(o.versions)) {
-      return { items: o.versions as ContentVersion[], total: typeof o.total === 'number' ? o.total : null };
+      return {
+        items: o.versions as ContentVersion[],
+        total: typeof o.total === 'number' ? o.total : null,
+      };
     }
   }
   return { items: [], total: 0 };
@@ -149,7 +161,11 @@ export const contentService = {
   createDraft: async (
     title: string,
     body?: unknown,
-    options?: { templateId?: string | null; aiGenerated?: boolean; contentType?: Content['contentType'] },
+    options?: {
+      templateId?: string | null;
+      aiGenerated?: boolean;
+      contentType?: Content['contentType'];
+    },
   ): Promise<{ content: Content }> => {
     return request<{ content: Content }>('/content', {
       method: 'POST',
@@ -184,7 +200,9 @@ export const contentService = {
     });
   },
 
-  getById: async (id: string): Promise<{
+  getById: async (
+    id: string,
+  ): Promise<{
     content: Content;
     versions: ContentVersion[];
     tags: Array<{ id: string; name: string; slug: string }>;
@@ -231,11 +249,15 @@ export const contentService = {
   },
 
   like: async (contentId: string): Promise<{ liked: true; likes: number }> => {
-    return request<{ liked: true; likes: number }>(`/content/${contentId}/like`, { method: 'POST' });
+    return request<{ liked: true; likes: number }>(`/content/${contentId}/like`, {
+      method: 'POST',
+    });
   },
 
   unlike: async (contentId: string): Promise<{ liked: false; likes: number }> => {
-    return request<{ liked: false; likes: number }>(`/content/${contentId}/like`, { method: 'DELETE' });
+    return request<{ liked: false; likes: number }>(`/content/${contentId}/like`, {
+      method: 'DELETE',
+    });
   },
 
   listComments: async (contentId: string): Promise<ContentComment[]> => {
@@ -253,7 +275,10 @@ export const contentService = {
    * Optional `limit` / `offset` for server-side pagination when supported.
    * Response may be a bare array or `{ items, total }`.
    */
-  listVersions: async (id: string, opts?: { limit?: number; offset?: number }): Promise<unknown> => {
+  listVersions: async (
+    id: string,
+    opts?: { limit?: number; offset?: number },
+  ): Promise<unknown> => {
     const params = new URLSearchParams();
     if (typeof opts?.limit === 'number') params.set('limit', String(opts.limit));
     if (typeof opts?.offset === 'number') params.set('offset', String(opts.offset));
@@ -309,7 +334,10 @@ export const contentService = {
     if (res.status === 409) {
       const err = await res.json().catch(() => ({}));
       throw new Error(
-        typeof err === 'object' && err && 'error' in err && typeof (err as { error: string }).error === 'string'
+        typeof err === 'object' &&
+          err &&
+          'error' in err &&
+          typeof (err as { error: string }).error === 'string'
           ? (err as { error: string }).error
           : 'Restore blocked while a co-author session is active.',
       );

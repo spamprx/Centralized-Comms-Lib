@@ -100,7 +100,9 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
-          <h2 className="m-0 text-lg font-semibold text-app-text">{user ? 'Edit User' : 'Invite User'}</h2>
+          <h2 className="m-0 text-lg font-semibold text-app-text">
+            {user ? 'Edit User' : 'Invite User'}
+          </h2>
           <button
             className="bg-transparent border-none text-app-faint cursor-pointer p-1.5 flex rounded-lg hover:bg-app-surface-hover hover:text-app-text transition-colors"
             onClick={onClose}
@@ -111,7 +113,9 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
 
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
-            <div className="bg-red-400/10 border border-red-400/25 rounded-xl p-3 text-red-400 text-[13px] mb-4">{error}</div>
+            <div className="bg-red-400/10 border border-red-400/25 rounded-xl p-3 text-red-400 text-[13px] mb-4">
+              {error}
+            </div>
           )}
 
           <div className="mb-5 admin-float-field">

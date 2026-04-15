@@ -1,6 +1,6 @@
-import { AppRoutes } from "../routes";
-import Sidebar from "../components/Sidebar";
-import { useAuth } from "../context/AuthContext";
+import { AppRoutes } from '../routes';
+import Sidebar from '../components/Sidebar';
+import { useAuth } from '../context/AuthContext';
 
 export default function App() {
   const { isAuthenticated } = useAuth();
@@ -10,7 +10,7 @@ export default function App() {
       {isAuthenticated ? <Sidebar /> : null}
       <main
         className={`relative min-h-screen w-full transition-[padding] duration-300 ease-out ${
-          isAuthenticated ? "app-main-canvas md:pl-16" : ""
+          isAuthenticated ? 'app-main-canvas md:pl-16' : ''
         }`}
       >
         <AppRoutes />

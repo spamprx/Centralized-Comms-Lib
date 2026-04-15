@@ -1,4 +1,12 @@
-import type { ActivityLog, Group, Permission, Role, User, UserRole, UserStatus } from '../types/admin';
+import type {
+  ActivityLog,
+  Group,
+  Permission,
+  Role,
+  User,
+  UserRole,
+  UserStatus,
+} from '../types/admin';
 
 /** Raw shapes from GET /admin/users (with associations). */
 export type ApiUserRow = {
@@ -163,13 +171,15 @@ export function mapRoleWithPermissions(
 export function auditEntryToActivityLog(entry: ApiAuditEntry): ActivityLog {
   const actor = entry.actorId ?? 'system';
   const upperAction = entry.action.toUpperCase();
-  const severity: ActivityLog['severity'] = upperAction.includes("FAILED")
-    ? "error"
-    : upperAction.startsWith("DELETE")
-      ? "warning"
-      : upperAction.includes("LOGIN") || upperAction.startsWith("CREATE") || upperAction.startsWith("UPDATE")
-        ? "success"
-        : "info";
+  const severity: ActivityLog['severity'] = upperAction.includes('FAILED')
+    ? 'error'
+    : upperAction.startsWith('DELETE')
+      ? 'warning'
+      : upperAction.includes('LOGIN') ||
+          upperAction.startsWith('CREATE') ||
+          upperAction.startsWith('UPDATE')
+        ? 'success'
+        : 'info';
   return {
     id: entry.id,
     userId: actor,
@@ -183,6 +193,6 @@ export function auditEntryToActivityLog(entry: ApiAuditEntry): ActivityLog {
     oldValue: entry.oldValue ?? null,
     newValue: entry.newValue ?? null,
     severity,
-    status: upperAction.includes("FAILED") ? "failure" : "success",
+    status: upperAction.includes('FAILED') ? 'failure' : 'success',
   };
 }

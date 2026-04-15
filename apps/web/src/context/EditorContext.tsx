@@ -20,7 +20,9 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <EditorContext.Provider value={{ draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft }}>
+    <EditorContext.Provider
+      value={{ draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft }}
+    >
       {children}
     </EditorContext.Provider>
   );

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLibrary } from "../hooks/useLibrary";
+import { useEffect, useMemo, useState } from 'react';
+import { useLibrary } from '../hooks/useLibrary';
 import {
   LibraryFilterBar,
   LibraryFilterChips,
@@ -8,12 +8,12 @@ import {
   ContentGrid,
   Pagination,
   SearchResultsList,
-} from "../components/library";
-import { serializeLibrarySearchParams } from "../lib/libraryUrlState";
-import { PageHeader, PageShell } from "../components/ui";
-import type { ContentItem } from "../data/mockLibraryData";
+} from '../components/library';
+import { serializeLibrarySearchParams } from '../lib/libraryUrlState';
+import { PageHeader, PageShell } from '../components/ui';
+import type { ContentItem } from '../data/mockLibraryData';
 
-const LIBRARY_PAGE_SIZE_STORAGE_KEY = "library.itemsPerPage";
+const LIBRARY_PAGE_SIZE_STORAGE_KEY = 'library.itemsPerPage';
 
 function readStoredItemsPerPage(): number {
   if (!globalThis.window) return 10;
@@ -32,10 +32,7 @@ function LibraryPaginatedContent({
 }>) {
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.ceil(items.length / itemsPerPage);
-  const paginatedItems = items.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
+  const paginatedItems = items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -125,10 +122,7 @@ export default function LibraryLayout() {
       />
 
       <div className="animate-fade-in space-y-6">
-        <LibraryFilterInvalidBanner
-          issues={filterIssues}
-          onRemoveInvalid={removeInvalidFilters}
-        />
+        <LibraryFilterInvalidBanner issues={filterIssues} onRemoveInvalid={removeInvalidFilters} />
 
         <LibraryFilterBar
           searchInput={searchInput}
@@ -158,23 +152,23 @@ export default function LibraryLayout() {
           channels={channels}
         />
 
-        {(hasActiveFilters || searchInput.trim() !== "") && (
+        {(hasActiveFilters || searchInput.trim() !== '') && (
           <LibraryFilterChips
             filters={filters}
             searchDisplay={searchInput.trim() || filters.q.trim()}
             tagCatalog={tags}
             enableAdvancedFacets={true}
             onRemoveSearch={() => {
-              setSearchInput("");
-              patchFilters({ q: "" });
+              setSearchInput('');
+              patchFilters({ q: '' });
             }}
             onRemoveTag={(slug) => toggleTag(slug)}
-            onRemoveAuthor={() => patchFilters({ author: "" })}
-            onRemoveChannel={() => patchFilters({ channel: "" })}
-            onRemoveStatus={() => patchFilters({ status: "all" })}
-            onRemoveType={() => patchFilters({ type: "all" })}
-            onRemoveDateFrom={() => patchFilters({ dateFrom: "" })}
-            onRemoveDateTo={() => patchFilters({ dateTo: "" })}
+            onRemoveAuthor={() => patchFilters({ author: '' })}
+            onRemoveChannel={() => patchFilters({ channel: '' })}
+            onRemoveStatus={() => patchFilters({ status: 'all' })}
+            onRemoveType={() => patchFilters({ type: 'all' })}
+            onRemoveDateFrom={() => patchFilters({ dateFrom: '' })}
+            onRemoveDateTo={() => patchFilters({ dateTo: '' })}
             onClearAll={clearAllFilters}
           />
         )}
@@ -190,8 +184,8 @@ export default function LibraryLayout() {
           pageSize={searchPageSize}
           onPageChange={setSearchPage}
           onClearSearch={() => {
-            setSearchInput("");
-            patchFilters({ q: "" });
+            setSearchInput('');
+            patchFilters({ q: '' });
           }}
         />
 
@@ -208,7 +202,7 @@ export default function LibraryLayout() {
           if (totalInLibrary > 0) {
             return (
               <LibraryNoResults
-                hasActiveFilters={hasActiveFilters || searchInput.trim() !== ""}
+                hasActiveFilters={hasActiveFilters || searchInput.trim() !== ''}
                 onClearFilters={clearAllFilters}
               />
             );

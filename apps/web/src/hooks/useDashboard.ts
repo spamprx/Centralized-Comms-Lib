@@ -27,7 +27,7 @@ export function useDashboard() {
   useEffect(() => {
     async function fetchData() {
       if (USE_MOCK_DATA) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 200));
         setStatCards(mockStatCards);
         setQuickActions(mockQuickActions);
         setRecentActivity(mockRecentActivity);

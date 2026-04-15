@@ -1,4 +1,4 @@
-import Slot from "../ui/Slot";
+import Slot from '../ui/Slot';
 
 export function UploadZone() {
   return <Slot className="h-32 w-full" />;

@@ -3,6 +3,8 @@ export interface Channel {
   name: string;
   key: string;
   description: string | null;
+  priority: number;
+  compatibility: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }

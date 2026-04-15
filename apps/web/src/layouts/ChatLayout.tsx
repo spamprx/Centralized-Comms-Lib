@@ -3,9 +3,19 @@ import { Send, Paperclip, Smile, MoreVertical } from 'lucide-react';
 
 const mockMessages = [
   { id: '1', text: "Hey! How's the content review going?", sender: 'them', time: '10:30 AM' },
-  { id: '2', text: 'Pretty good! Just finished reviewing the Q1 marketing plan.', sender: 'me', time: '10:32 AM' },
+  {
+    id: '2',
+    text: 'Pretty good! Just finished reviewing the Q1 marketing plan.',
+    sender: 'me',
+    time: '10:32 AM',
+  },
   { id: '3', text: 'Great! Any feedback?', sender: 'them', time: '10:33 AM' },
-  { id: '4', text: 'Just a few minor suggestions. Overall it looks fantastic!', sender: 'me', time: '10:35 AM' },
+  {
+    id: '4',
+    text: 'Just a few minor suggestions. Overall it looks fantastic!',
+    sender: 'me',
+    time: '10:35 AM',
+  },
   { id: '5', text: 'Awesome! When can we schedule a follow-up?', sender: 'them', time: '10:36 AM' },
 ];
 
@@ -60,7 +70,10 @@ export default function ChatLayout() {
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+          <div
+            key={msg.id}
+            className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
+          >
             <div
               className={`max-w-[85%] px-4 py-3 text-sm leading-normal text-app-text sm:max-w-[70%] ${
                 msg.sender === 'me'
@@ -76,7 +89,9 @@ export default function ChatLayout() {
       </div>
 
       <div className="shrink-0 border-t border-app-border/80 bg-app-bg/60 px-4 py-3 backdrop-blur-md sm:px-6">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-app-faint">Suggested</p>
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-app-faint">
+          Suggested
+        </p>
         <div className="flex flex-wrap gap-2">
           {suggestedQuestions.map((q, i) => (
             <button

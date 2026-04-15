@@ -29,7 +29,10 @@ export default function SearchAndFilterBar({
   // Active status chip index for sliding indicator
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
 
   const currentStatus = filters.status || 'all';
   const activeIdx = STATUS_CHIPS.findIndex((c) => c.value === currentStatus);
@@ -92,7 +95,6 @@ export default function SearchAndFilterBar({
           ) : null}
         </div>
 
-
         {/* Sort */}
         <select
           value={`${filters.sortBy ?? 'createdAt'}:${filters.sortOrder ?? 'desc'}`}
@@ -116,9 +118,7 @@ export default function SearchAndFilterBar({
         {groups.length > 0 && (
           <select
             value={filters.group ?? 'all'}
-            onChange={(e) =>
-              onFilterChange({ ...filters, group: e.target.value as any })
-            }
+            onChange={(e) => onFilterChange({ ...filters, group: e.target.value as any })}
             className={selectClass}
           >
             <option value="all">All groups</option>
@@ -151,7 +151,9 @@ export default function SearchAndFilterBar({
           {STATUS_CHIPS.map((chip, idx) => (
             <button
               key={chip.value}
-              ref={(el) => { chipRefs.current[idx] = el; }}
+              ref={(el) => {
+                chipRefs.current[idx] = el;
+              }}
               type="button"
               data-active={currentStatus === chip.value}
               onClick={() => onFilterChange({ ...filters, status: chip.value as any })}

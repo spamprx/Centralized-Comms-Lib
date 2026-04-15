@@ -20,7 +20,12 @@ const sizes = {
   large: 'h-[200px]',
 };
 
-export function EmptyState({ type, title, description = 'No data available for the selected time period', size = 'medium' }: EmptyStateProps) {
+export function EmptyState({
+  type,
+  title,
+  description = 'No data available for the selected time period',
+  size = 'medium',
+}: EmptyStateProps) {
   const Icon = icons[type];
   const heightClass = sizes[size];
 

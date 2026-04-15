@@ -16,13 +16,19 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
 
-  const addDecision = useCallback((assignmentId: string, verdict: 'APPROVED' | 'DENIED', comment: string) => {
-    setDecisions((prev) => ({ ...prev, [assignmentId]: { verdict, comment } }));
-  }, []);
+  const addDecision = useCallback(
+    (assignmentId: string, verdict: 'APPROVED' | 'DENIED', comment: string) => {
+      setDecisions((prev) => ({ ...prev, [assignmentId]: { verdict, comment } }));
+    },
+    [],
+  );
 
-  const getDecision = useCallback((assignmentId: string): Decision | null => {
-    return decisions[assignmentId] ?? null;
-  }, [decisions]);
+  const getDecision = useCallback(
+    (assignmentId: string): Decision | null => {
+      return decisions[assignmentId] ?? null;
+    },
+    [decisions],
+  );
 
   const addComment = useCallback((assignmentId: string, text: string) => {
     setComments((prev) => ({
@@ -31,9 +37,12 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const getComments = useCallback((assignmentId: string): Comment[] => {
-    return comments[assignmentId] || [];
-  }, [comments]);
+  const getComments = useCallback(
+    (assignmentId: string): Comment[] => {
+      return comments[assignmentId] || [];
+    },
+    [comments],
+  );
 
   return (
     <ReviewContext.Provider value={{ addDecision, getDecision, addComment, getComments }}>

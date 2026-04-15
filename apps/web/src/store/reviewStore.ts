@@ -78,6 +78,6 @@ export const useReviewStore = create<ReviewState>()(
     {
       name: 'review-storage',
       storage: createJSONStorage(() => sessionStorage),
-    }
-  )
+    },
+  ),
 );

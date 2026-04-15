@@ -55,7 +55,9 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
       if (exists) {
         return {
           ...prev,
-          permissions: prev.permissions.filter((p) => !(p.resource === resource && p.action === action)),
+          permissions: prev.permissions.filter(
+            (p) => !(p.resource === resource && p.action === action),
+          ),
         };
       }
       return {
@@ -82,7 +84,9 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-5">
-          <h2 className="m-0 text-lg font-semibold text-app-text">{role ? 'Edit Role' : 'Create Role'}</h2>
+          <h2 className="m-0 text-lg font-semibold text-app-text">
+            {role ? 'Edit Role' : 'Create Role'}
+          </h2>
           <button
             type="button"
             className="flex cursor-pointer rounded-lg border-none bg-transparent p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
@@ -95,11 +99,14 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
         <form onSubmit={handleSubmit} className="p-6">
           {isSystem ? (
             <p className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200/95">
-              This is a system role. The name cannot be changed; you can still adjust description and permissions.
+              This is a system role. The name cannot be changed; you can still adjust description
+              and permissions.
             </p>
           ) : null}
           {error ? (
-            <div className="mb-4 rounded-xl border border-red-400/25 bg-red-400/10 p-3 text-[13px] text-red-400">{error}</div>
+            <div className="mb-4 rounded-xl border border-red-400/25 bg-red-400/10 p-3 text-[13px] text-red-400">
+              {error}
+            </div>
           ) : null}
 
           <div className="admin-float-field mb-5">
@@ -163,7 +170,11 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
           </div>
 
           <div className="mt-6 flex justify-end gap-2.5 border-t border-white/[0.06] pt-5">
-            <button type="button" className="rounded-xl px-5 py-2.5 text-[13px] text-app-muted admin-glass-button" onClick={onClose}>
+            <button
+              type="button"
+              className="rounded-xl px-5 py-2.5 text-[13px] text-app-muted admin-glass-button"
+              onClick={onClose}
+            >
               Cancel
             </button>
             <button

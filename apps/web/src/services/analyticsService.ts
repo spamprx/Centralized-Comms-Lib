@@ -34,13 +34,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 // Helper function to build date parameters for API requests
 function buildDateParams(dateRange?: string | DateRange): string {
   if (!dateRange) return '';
-  
+
   if (typeof dateRange === 'string') {
     return `?range=${dateRange}`;
   }
-  
+
   // For custom DateRange, calculate the number of days and use as range
-  const days = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+  const days = Math.ceil(
+    (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24),
+  );
   return `?range=${days}d`;
 }
 

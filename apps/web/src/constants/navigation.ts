@@ -10,36 +10,36 @@ export interface NavCategory {
 
 export const navCategories: NavCategory[] = [
   {
-    label: "Core",
+    label: 'Core',
     items: [
-      { path: "/dashboard", label: "Dashboard" },
-      { path: "/my-content", label: "My Content" },
+      { path: '/dashboard', label: 'Dashboard' },
+      { path: '/my-content', label: 'My Content' },
     ],
   },
   {
-    label: "Content",
+    label: 'Content',
     items: [
-      { path: "/library", label: "Library" },
-      { path: "/templates", label: "Templates" },
-      { path: "/assets", label: "Assets" },
+      { path: '/library', label: 'Library' },
+      { path: '/templates', label: 'Templates' },
+      { path: '/assets', label: 'Assets' },
     ],
   },
   {
-    label: "Review",
-    items: [{ path: "/review", label: "Review" }],
+    label: 'Review',
+    items: [{ path: '/review', label: 'Review' }],
   },
   {
-    label: "Insights",
+    label: 'Insights',
     items: [
-      { path: "/analytics", label: "Analytics" },
-      { path: "/ai-tutor", label: "AI Tutor" },
+      { path: '/analytics', label: 'Analytics' },
+      { path: '/ai-tutor', label: 'AI Tutor' },
     ],
   },
   {
-    label: "System",
+    label: 'System',
     items: [
-      { path: "/profile", label: "Profile" },
-      { path: "/admin", label: "Admin" },
+      { path: '/profile', label: 'Profile' },
+      { path: '/admin', label: 'Admin' },
     ],
   },
 ];

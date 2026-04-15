@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, type ReactNode } from 'react';
 
 type Pending = {
   step: 1 | 2;
@@ -26,25 +26,28 @@ export function useTwoStepAdminConfirm(): {
 } {
   const [pending, setPending] = useState<Pending | null>(null);
 
-  const promptTwoStep = useCallback((opts: {
-    title: string;
-    body1: string;
-    body2: string;
-    confirm1?: string;
-    confirm2?: string;
-  }) => {
-    return new Promise<boolean>((resolve) => {
-      setPending({
-        step: 1,
-        title: opts.title,
-        body1: opts.body1,
-        body2: opts.body2,
-        confirm1: opts.confirm1 ?? "Continue",
-        confirm2: opts.confirm2 ?? "Confirm",
-        resolve,
+  const promptTwoStep = useCallback(
+    (opts: {
+      title: string;
+      body1: string;
+      body2: string;
+      confirm1?: string;
+      confirm2?: string;
+    }) => {
+      return new Promise<boolean>((resolve) => {
+        setPending({
+          step: 1,
+          title: opts.title,
+          body1: opts.body1,
+          body2: opts.body2,
+          confirm1: opts.confirm1 ?? 'Continue',
+          confirm2: opts.confirm2 ?? 'Confirm',
+          resolve,
+        });
       });
-    });
-  }, []);
+    },
+    [],
+  );
 
   const cancel = useCallback(() => {
     setPending((p) => {
@@ -77,7 +80,7 @@ export function useTwoStepAdminConfirm(): {
     >
       <div
         className="admin-glass w-full max-w-[440px] rounded-2xl p-6 shadow-app-soft"
-        style={{ background: "rgba(15, 20, 32, 0.94)" }}
+        style={{ background: 'rgba(15, 20, 32, 0.94)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id="two-step-admin-title" className="m-0 mb-2 text-base font-semibold text-app-text">

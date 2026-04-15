@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
-import { ArrowUpRight, FileText, Video, Mic, File, ThumbsUp } from "lucide-react";
-import type { ContentItem } from "../../data/mockLibraryData";
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, FileText, Video, Mic, File, ThumbsUp } from 'lucide-react';
+import type { ContentItem } from '../../data/mockLibraryData';
 
 const typeIcons = {
   article: FileText,
@@ -10,16 +10,16 @@ const typeIcons = {
 };
 
 const typeColors = {
-  article: "#8b5cf6",
-  video: "#06b6d4",
-  podcast: "#f59e0b",
-  document: "#10b981",
+  article: '#8b5cf6',
+  video: '#06b6d4',
+  podcast: '#f59e0b',
+  document: '#10b981',
 };
 
 const statusColors = {
-  draft: "#6b7280",
-  review: "#fbbf24",
-  published: "#10b981",
+  draft: '#6b7280',
+  review: '#fbbf24',
+  published: '#10b981',
 };
 
 interface ContentCardProps {
@@ -85,12 +85,12 @@ export function ContentCard({ item }: ContentCardProps) {
 
         <div className="flex items-center justify-between gap-2 border-t border-app-border/70 pt-3">
           <span className="text-[11px] text-app-faint">
-            {item.type === "video" || item.type === "article"
+            {item.type === 'video' || item.type === 'article'
               ? `${item.views.toLocaleString()} views`
-              : "New"}
+              : 'New'}
           </span>
           <span className="flex items-center gap-1 text-[11px] text-app-faint">
-            <ThumbsUp size={14} className={item.likes ? "text-app-accent" : ""} />
+            <ThumbsUp size={14} className={item.likes ? 'text-app-accent' : ''} />
             {(item.likes ?? 0).toLocaleString()}
           </span>
           <div className="relative min-h-[1.25rem] shrink-0 text-right">

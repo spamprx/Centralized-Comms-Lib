@@ -1,4 +1,4 @@
-const API_BASE = "http://168.144.22.124:8000";
+const API_BASE = 'http://168.144.22.124:8000';
 import { getAuthToken } from './tokenStore';
 
 export interface Tag {
@@ -24,7 +24,7 @@ const API_AVAILABILITY_KEY = 'tag_api_available';
 async function isApiAvailable(): Promise<boolean> {
   const cached = localStorage.getItem(API_AVAILABILITY_KEY);
   if (cached !== null) return cached === 'true';
-  
+
   try {
     await request<Tag[]>('api/v1/tags', { method: 'GET' });
     localStorage.setItem(API_AVAILABILITY_KEY, 'true');
@@ -94,7 +94,8 @@ function saveTemplateTagsToStorage(templateId: string, templateTags: TemplateTag
 }
 
 function generateSlug(name: string): string {
-  return name.toLowerCase()
+  return name
+    .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
@@ -137,7 +138,7 @@ async function apiAddTagToTemplate(templateId: string, tagId: string): Promise<T
     id: `tt_${templateId}_${tagId}`,
     templateId,
     tagId,
-    tag
+    tag,
   };
 }
 
@@ -160,7 +161,7 @@ function localStorageCreate(tag: CreateTagRequest): Tag {
     name: tag.name,
     slug: generateSlug(tag.name),
   };
-  
+
   const updated = [...tags, newTag];
   saveTagsToStorage(updated);
   return newTag;
@@ -168,10 +169,10 @@ function localStorageCreate(tag: CreateTagRequest): Tag {
 
 function localStorageDelete(tagId: string): boolean {
   const tags = getTagsFromStorage();
-  const filtered = tags.filter(t => t.id !== tagId);
-  
+  const filtered = tags.filter((t) => t.id !== tagId);
+
   if (filtered.length === tags.length) return false;
-  
+
   saveTagsToStorage(filtered);
   return true;
 }
@@ -183,30 +184,30 @@ function localStorageGetTemplateTags(templateId: string): TemplateTag[] {
 function localStorageAddTagToTemplate(templateId: string, tagId: string, tag?: Tag): TemplateTag {
   const templateTags = getTemplateTagsFromStorage(templateId);
   const tags = getTagsFromStorage();
-  
+
   // First try to find tag in localStorage, then use the provided tag
-  let foundTag = tags.find(t => t.id === tagId);
+  let foundTag = tags.find((t) => t.id === tagId);
   if (!foundTag && tag) {
     foundTag = tag;
     // Add the tag to localStorage if it doesn't exist
-    if (!tags.some(t => t.id === tagId)) {
+    if (!tags.some((t) => t.id === tagId)) {
       const updatedTags = [...tags, tag];
       saveTagsToStorage(updatedTags);
     }
   }
-  
+
   if (!foundTag) throw new Error('Tag not found');
-  
-  const existingRelation = templateTags.find(tt => tt.tagId === tagId);
+
+  const existingRelation = templateTags.find((tt) => tt.tagId === tagId);
   if (existingRelation) return existingRelation;
-  
+
   const newTemplateTag: TemplateTag = {
     id: `templateTag_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     templateId,
     tagId,
     tag: foundTag,
   };
-  
+
   const updated = [...templateTags, newTemplateTag];
   saveTemplateTagsToStorage(templateId, updated);
   return newTemplateTag;
@@ -214,10 +215,10 @@ function localStorageAddTagToTemplate(templateId: string, tagId: string, tag?: T
 
 function localStorageRemoveTagFromTemplate(templateId: string, tagId: string): boolean {
   const templateTags = getTemplateTagsFromStorage(templateId);
-  const filtered = templateTags.filter(tt => tt.tagId !== tagId);
-  
+  const filtered = templateTags.filter((tt) => tt.tagId !== tagId);
+
   if (filtered.length === templateTags.length) return false;
-  
+
   saveTemplateTagsToStorage(templateId, filtered);
   return true;
 }

@@ -25,7 +25,9 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
         className={`px-3 py-2 bg-app-surface border border-app-border rounded-md flex items-center gap-1 text-[13px] ${
-          currentPage === totalPages ? 'text-app-faint cursor-not-allowed' : 'text-app-text cursor-pointer'
+          currentPage === totalPages
+            ? 'text-app-faint cursor-not-allowed'
+            : 'text-app-text cursor-pointer'
         }`}
       >
         Next <ChevronRight size={16} />

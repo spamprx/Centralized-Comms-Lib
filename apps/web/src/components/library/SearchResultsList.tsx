@@ -57,9 +57,7 @@ export function SearchResultsList({
           </div>
           {!compact && (
             <div className="text-[11px] text-app-faint mt-0.5 space-x-1">
-              <span>
-                Ranked by relevance{unavailable ? ' (search index unavailable)' : ''}.
-              </span>
+              <span>Ranked by relevance{unavailable ? ' (search index unavailable)' : ''}.</span>
               {!error && !unavailable && !loading && total > 0 && (
                 <span className="text-app-muted">
                   Showing {fromIdx}–{toIdx} of {total}.
@@ -68,14 +66,16 @@ export function SearchResultsList({
             </div>
           )}
         </div>
-        {loading && <Loader2 size={16} className="animate-spin text-app-faint shrink-0" aria-label="Loading results" />}
+        {loading && (
+          <Loader2
+            size={16}
+            className="animate-spin text-app-faint shrink-0"
+            aria-label="Loading results"
+          />
+        )}
       </div>
 
-      {error && (
-        <div className="px-4 py-3 text-[12px] text-red-400/90">
-          {error}
-        </div>
-      )}
+      {error && <div className="px-4 py-3 text-[12px] text-red-400/90">{error}</div>}
 
       {!error && unavailable && (
         <div className="px-4 py-3 text-[12px] text-app-muted">
@@ -130,7 +130,11 @@ export function SearchResultsList({
                         ) : (
                           titlePlain
                         )}
-                        <ArrowUpRight size={14} className="inline-block ml-1 opacity-70 shrink-0 align-middle" aria-hidden />
+                        <ArrowUpRight
+                          size={14}
+                          className="inline-block ml-1 opacity-70 shrink-0 align-middle"
+                          aria-hidden
+                        />
                       </Link>
                       {snippetHtml ? (
                         <div
@@ -144,7 +148,9 @@ export function SearchResultsList({
                       )}
                     </div>
                     <div className="shrink-0 text-right w-[4.5rem]">
-                      <div className="text-[10px] text-app-faint uppercase tracking-wide">Relevance</div>
+                      <div className="text-[10px] text-app-faint uppercase tracking-wide">
+                        Relevance
+                      </div>
                       <div className="text-[12px] font-semibold text-app-text tabular-nums">
                         {relPct}%
                       </div>
@@ -165,11 +171,7 @@ export function SearchResultsList({
           </ul>
           {showPager && (
             <nav className="border-t border-app-border" aria-label="Search results pages">
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                onPageChange={onPageChange}
-              />
+              <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
             </nav>
           )}
         </>

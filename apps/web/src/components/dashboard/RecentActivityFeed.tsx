@@ -1,5 +1,5 @@
-import type { Activity } from "../../data/mockDashboardData";
-import { Surface } from "../ui";
+import type { Activity } from '../../data/mockDashboardData';
+import { Surface } from '../ui';
 
 export function RecentActivityFeed({ activities }: { activities: Activity[] }) {
   return (
@@ -13,14 +13,14 @@ export function RecentActivityFeed({ activities }: { activities: Activity[] }) {
           <div key={activity.id} className="flex items-start gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-app-accent to-cyan-500 text-xs font-semibold text-white">
               {activity.user
-                .split(" ")
+                .split(' ')
                 .map((n) => n[0])
-                .join("")}
+                .join('')}
             </div>
             <div className="min-w-0 flex-1">
               <p className="m-0 truncate text-xs text-app-text">
-                <span className="font-medium">{activity.user}</span>{" "}
-                <span className="text-app-muted">{activity.action}</span>{" "}
+                <span className="font-medium">{activity.user}</span>{' '}
+                <span className="text-app-muted">{activity.action}</span>{' '}
                 <span className="font-medium text-app-accent">{activity.target}</span>
               </p>
               <span className="text-[10px] text-app-faint">{activity.time}</span>

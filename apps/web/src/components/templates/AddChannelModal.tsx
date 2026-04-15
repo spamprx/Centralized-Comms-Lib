@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Loader2, AlertCircle, Check } from 'lucide-react';
-import { channelService, type Channel, type CreateBindingRequest, type Binding } from '../../services';
+import {
+  channelService,
+  type Channel,
+  type CreateBindingRequest,
+  type Binding,
+} from '../../services';
 
 interface AddChannelModalProps {
   templateId: string;
@@ -21,7 +26,9 @@ export default function AddChannelModal({
 }: AddChannelModalProps) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState('');
-  const [layoutConfig, setLayoutConfig] = useState('{\n  "layout": "responsive",\n  "fields": ["title", "content", "image"],\n  "mediaHandling": "optimized"\n}');
+  const [layoutConfig, setLayoutConfig] = useState(
+    '{\n  "layout": "responsive",\n  "fields": ["title", "content", "image"],\n  "mediaHandling": "optimized"\n}',
+  );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +40,7 @@ export default function AddChannelModal({
       try {
         setLoading(true);
         const availableChannels = await channelService.listChannels();
-        
+
         if (editingBinding) {
           // Edit mode: include the current channel
           setChannels(availableChannels);
@@ -42,10 +49,10 @@ export default function AddChannelModal({
         } else {
           // Add mode: filter out already bound channels
           const unboundChannels = availableChannels.filter(
-            channel => !existingChannelIds.includes(channel.id)
+            (channel) => !existingChannelIds.includes(channel.id),
           );
           setChannels(unboundChannels);
-          
+
           // Auto-select first channel if available
           if (unboundChannels.length > 0) {
             setSelectedChannelId(unboundChannels[0].id);
@@ -99,9 +106,9 @@ export default function AddChannelModal({
         // Update existing binding (delete old and create new)
         await channelService.deleteBinding(templateId, editingBinding.id);
       }
-      
+
       await channelService.createBinding(templateId, bindingRequest);
-      
+
       setSuccess(true);
       setTimeout(() => {
         onBindingCreated();
@@ -114,7 +121,7 @@ export default function AddChannelModal({
     }
   };
 
-  const selectedChannel = channels.find(c => c.id === selectedChannelId);
+  const selectedChannel = channels.find((c) => c.id === selectedChannelId);
 
   return (
     <div
@@ -154,10 +161,9 @@ export default function AddChannelModal({
             </div>
           ) : channels.length === 0 ? (
             <div className="p-8 text-center text-app-faint text-[13px]">
-              {existingChannelIds.length > 0 
+              {existingChannelIds.length > 0
                 ? 'All available channels are already bound to this template'
-                : 'No channels available'
-              }
+                : 'No channels available'}
             </div>
           ) : (
             <div className="space-y-4">
@@ -188,13 +194,9 @@ export default function AddChannelModal({
                     <span className="text-sm font-medium text-app-accent">
                       {selectedChannel.name}
                     </span>
-                    <span className="text-xs text-app-accent">
-                      ({selectedChannel.key})
-                    </span>
+                    <span className="text-xs text-app-accent">({selectedChannel.key})</span>
                   </div>
-                  <p className="text-xs text-app-accent">
-                    {selectedChannel.description}
-                  </p>
+                  <p className="text-xs text-app-accent">{selectedChannel.description}</p>
                 </div>
               )}
 
@@ -235,7 +237,13 @@ export default function AddChannelModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!selectedChannelId || !!configError || submitting || success || channels.length === 0}
+              disabled={
+                !selectedChannelId ||
+                !!configError ||
+                submitting ||
+                success ||
+                channels.length === 0
+              }
               className={`flex items-center gap-1.5 px-5 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold ${
                 success
                   ? 'bg-emerald-600 cursor-not-allowed'
@@ -245,11 +253,18 @@ export default function AddChannelModal({
               }`}
             >
               {submitting ? (
-                <><Loader2 size={14} className="animate-spin" /> {editingBinding ? 'Updating...' : 'Creating...'}</>
+                <>
+                  <Loader2 size={14} className="animate-spin" />{' '}
+                  {editingBinding ? 'Updating...' : 'Creating...'}
+                </>
               ) : success ? (
-                <><Check size={14} /> {editingBinding ? 'Updated!' : 'Added!'}</>
+                <>
+                  <Check size={14} /> {editingBinding ? 'Updated!' : 'Added!'}
+                </>
               ) : (
-                <><Plus size={14} /> {editingBinding ? 'Update Channel' : 'Add Channel'}</>
+                <>
+                  <Plus size={14} /> {editingBinding ? 'Update Channel' : 'Add Channel'}
+                </>
               )}
             </button>
           </div>

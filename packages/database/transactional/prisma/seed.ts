@@ -322,17 +322,117 @@ async function seedTags() {
 }
 
 async function seedChannels() {
+  const legacyChannels = await prisma.channel.findMany({
+    where: {
+      key: { in: ["mobile", "web"] },
+    },
+    select: { id: true },
+  });
+  if (legacyChannels.length > 0) {
+    await prisma.templateChannelBinding.deleteMany({
+      where: {
+        channelId: { in: legacyChannels.map((c) => c.id) },
+      },
+    });
+  }
+  await prisma.channel.deleteMany({
+    where: {
+      key: { in: ["mobile", "web"] },
+    },
+  });
   const channels = [
-    { name: "Email", key: "email", description: "Email clients" },
-    { name: "WhatsApp", key: "whatsapp", description: "WhatsApp messages" },
-    { name: "SMS", key: "sms", description: "SMS text messages" },
-    { name: "Push Notification", key: "push", description: "Mobile and browser push notifications" },
+    {
+      name: "Email",
+      key: "email",
+      description: "Email clients",
+      priority: 100,
+      compatibility: {
+        fieldTypes: [
+          "heading1",
+          "heading2",
+          "paragraph",
+          "bold",
+          "italic",
+          "underline",
+          "bullet_list",
+          "ordered_list",
+          "link",
+          "citation",
+          "image",
+          "richText",
+          "media",
+          "field",
+        ],
+        restrictions: {},
+      },
+    },
+    {
+      name: "WhatsApp",
+      key: "whatsapp",
+      description: "WhatsApp messages",
+      priority: 80,
+      compatibility: {
+        fieldTypes: [
+          "heading1",
+          "heading2",
+          "paragraph",
+          "bold",
+          "italic",
+          "bullet_list",
+          "ordered_list",
+          "link",
+          "citation",
+          "image",
+          "richText",
+          "media",
+          "field",
+        ],
+        restrictions: {},
+      },
+    },
+    {
+      name: "SMS",
+      key: "sms",
+      description: "SMS text messages",
+      priority: 60,
+      compatibility: {
+        fieldTypes: ["paragraph", "link", "citation", "richText", "field"],
+        restrictions: {
+          maxCharacters: 160,
+          supportsMedia: false,
+        },
+      },
+    },
+    {
+      name: "Push Notification",
+      key: "push",
+      description: "Mobile and browser push notifications",
+      priority: 70,
+      compatibility: {
+        fieldTypes: ["heading1", "paragraph", "link", "image", "richText", "field"],
+        restrictions: {
+          maxCharacters: 180,
+        },
+      },
+    },
   ];
   for (const c of channels) {
     const row = await prisma.channel.upsert({
       where: { key: c.key },
-      update: { name: c.name, description: c.description },
-      create: { id: randomUUID(), name: c.name, key: c.key, description: c.description },
+      update: {
+        name: c.name,
+        description: c.description,
+        priority: c.priority,
+        compatibility: c.compatibility as Prisma.InputJsonValue,
+      },
+      create: {
+        id: randomUUID(),
+        name: c.name,
+        key: c.key,
+        description: c.description,
+        priority: c.priority,
+        compatibility: c.compatibility as Prisma.InputJsonValue,
+      },
     });
     channelIds[c.key] = row.id;
   }

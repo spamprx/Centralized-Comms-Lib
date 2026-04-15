@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { DateRange } from '../../lib/dateUtils';
-import { 
-  PRESET_RANGES, 
-  parsePresetRange, 
-  formatDate, 
+import {
+  PRESET_RANGES,
+  parsePresetRange,
+  formatDate,
   formatDateRange,
   isSameDay,
   getDaysInMonth,
@@ -40,7 +40,7 @@ export function EnhancedDateRangePicker({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null);
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
-  
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Initialize from preset value
@@ -77,7 +77,11 @@ export function EnhancedDateRangePicker({
   };
 
   const handleCustomRangeApply = () => {
-    if (selectedStartDate && selectedEndDate && isValidDateRange(selectedStartDate, selectedEndDate)) {
+    if (
+      selectedStartDate &&
+      selectedEndDate &&
+      isValidDateRange(selectedStartDate, selectedEndDate)
+    ) {
       const range = { from: selectedStartDate, to: selectedEndDate };
       setCustomRange(range);
       onChange(range);
@@ -108,7 +112,13 @@ export function EnhancedDateRangePicker({
   const isDateSelected = (date: Date): 'start' | 'end' | 'range' | false => {
     if (selectedStartDate && isSameDay(date, selectedStartDate)) return 'start';
     if (selectedEndDate && isSameDay(date, selectedEndDate)) return 'end';
-    if (selectedStartDate && selectedEndDate && date >= selectedStartDate && date <= selectedEndDate) return 'range';
+    if (
+      selectedStartDate &&
+      selectedEndDate &&
+      date >= selectedStartDate &&
+      date <= selectedEndDate
+    )
+      return 'range';
     return false;
   };
 
@@ -124,7 +134,7 @@ export function EnhancedDateRangePicker({
     const daysInMonth = getDaysInMonth(currentMonth);
     const firstDayOfMonth = new Date(year, month, 1);
     const startingDayOfWeek = firstDayOfMonth.getDay();
-    
+
     const days = [];
     const weekDays = getWeekDays();
 
@@ -138,7 +148,7 @@ export function EnhancedDateRangePicker({
       const date = new Date(year, month, day);
       const isSelected = isDateSelected(date);
       const isDisabled = isDateDisabled(date);
-      
+
       days.push(
         <button
           key={day}
@@ -154,7 +164,7 @@ export function EnhancedDateRangePicker({
           `}
         >
           {day}
-        </button>
+        </button>,
       );
     }
 
@@ -168,9 +178,7 @@ export function EnhancedDateRangePicker({
           >
             <ChevronLeft size={16} className="text-[#8b8fa8]" />
           </button>
-          <span className="text-sm font-semibold text-[#e2e4f0]">
-            {getMonthYear(currentMonth)}
-          </span>
+          <span className="text-sm font-semibold text-[#e2e4f0]">{getMonthYear(currentMonth)}</span>
           <button
             type="button"
             onClick={() => setCurrentMonth(new Date(year, month + 1))}
@@ -179,18 +187,16 @@ export function EnhancedDateRangePicker({
             <ChevronRight size={16} className="text-[#8b8fa8]" />
           </button>
         </div>
-        
+
         <div className="grid grid-cols-7 gap-1 mb-2">
-          {weekDays.map(day => (
+          {weekDays.map((day) => (
             <div key={day} className="text-center text-xs font-medium text-[#555870] p-2">
               {day}
             </div>
           ))}
         </div>
-        
-        <div className="grid grid-cols-7 gap-1">
-          {days}
-        </div>
+
+        <div className="grid grid-cols-7 gap-1">{days}</div>
       </div>
     );
   };
@@ -222,7 +228,10 @@ export function EnhancedDateRangePicker({
             className={`shrink-0 text-[#555870] transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
           />
         ) : (
-          <ChevronRight size={14} className={`shrink-0 text-[#555870] transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+          <ChevronRight
+            size={14}
+            className={`shrink-0 text-[#555870] transition-transform ${isOpen ? 'rotate-90' : ''}`}
+          />
         )}
       </button>
 
@@ -249,8 +258,8 @@ export function EnhancedDateRangePicker({
               type="button"
               onClick={() => setMode('preset')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'preset' 
-                  ? 'text-[#e2e4f0] border-b-2 border-violet-500' 
+                mode === 'preset'
+                  ? 'text-[#e2e4f0] border-b-2 border-violet-500'
                   : 'text-[#555870] hover:text-[#8b8fa8]'
               }`}
             >
@@ -260,8 +269,8 @@ export function EnhancedDateRangePicker({
               type="button"
               onClick={() => setMode('custom')}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'custom' 
-                  ? 'text-[#e2e4f0] border-b-2 border-violet-500' 
+                mode === 'custom'
+                  ? 'text-[#e2e4f0] border-b-2 border-violet-500'
                   : 'text-[#555870] hover:text-[#8b8fa8]'
               }`}
             >
@@ -273,7 +282,7 @@ export function EnhancedDateRangePicker({
           <div className="p-4">
             {mode === 'preset' ? (
               <div className="space-y-2">
-                {PRESET_RANGES.map(preset => (
+                {PRESET_RANGES.map((preset) => (
                   <button
                     key={preset.value}
                     type="button"
@@ -292,7 +301,7 @@ export function EnhancedDateRangePicker({
               <div className="space-y-4">
                 {/* Calendar */}
                 {renderCalendar()}
-                
+
                 {/* Selected Range Display */}
                 {selectedStartDate && (
                   <div className="bg-white/5 border border-white/10 rounded-md p-3">

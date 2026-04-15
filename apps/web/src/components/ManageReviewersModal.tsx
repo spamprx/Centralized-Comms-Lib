@@ -57,10 +57,7 @@ export default function ManageReviewersModal({
 
   const filteredUsers = users.filter((u) => {
     const q = searchQuery.toLowerCase();
-    return (
-      (u.displayName || '').toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q)
-    );
+    return (u.displayName || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
   const handleAssign = async () => {
@@ -76,7 +73,7 @@ export default function ManageReviewersModal({
         return;
       }
       const latestVersion = versions.reduce((prev, curr) =>
-        curr.versionNumber > prev.versionNumber ? curr : prev
+        curr.versionNumber > prev.versionNumber ? curr : prev,
       );
 
       const reviewRequest = await reviewService.createRequest(
@@ -86,7 +83,7 @@ export default function ManageReviewersModal({
       );
 
       const assignPromises = Array.from(selectedIds).map((reviewerId) =>
-        reviewService.assignReviewer(reviewRequest.id, reviewerId)
+        reviewService.assignReviewer(reviewRequest.id, reviewerId),
       );
       await Promise.all(assignPromises);
 
@@ -116,9 +113,7 @@ export default function ManageReviewersModal({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Users size={18} color="#a78bfa" />
-              <h2 className="text-base font-bold text-app-text m-0">
-                Manage Reviewers
-              </h2>
+              <h2 className="text-base font-bold text-app-text m-0">Manage Reviewers</h2>
             </div>
             <p className="text-xs text-app-faint m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
               {contentTitle}
@@ -135,10 +130,7 @@ export default function ManageReviewersModal({
         {/* Search */}
         <div className="px-6 py-3 border-b border-app-border/80">
           <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint"
-            />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
             <input
               type="text"
               value={searchQuery}
@@ -156,9 +148,7 @@ export default function ManageReviewersModal({
               <Loader2 size={24} color="#a78bfa" className="animate-spin" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="p-8 text-center text-app-faint text-[13px]">
-              No users found
-            </div>
+            <div className="p-8 text-center text-app-faint text-[13px]">No users found</div>
           ) : (
             <div className="flex flex-col gap-1">
               {filteredUsers.map((user) => {
@@ -197,7 +187,9 @@ export default function ManageReviewersModal({
 
                     {/* User Info */}
                     <div className="flex-1 overflow-hidden">
-                      <div className={`text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap ${isSelected ? 'text-app-text' : 'text-app-muted'}`}>
+                      <div
+                        className={`text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap ${isSelected ? 'text-app-text' : 'text-app-muted'}`}
+                      >
                         {user.displayName || 'No name'}
                       </div>
                       <div className="text-[11px] text-app-faint overflow-hidden text-ellipsis whitespace-nowrap">
@@ -235,11 +227,17 @@ export default function ManageReviewersModal({
               }`}
             >
               {assigning ? (
-                <><Loader2 size={14} className="animate-spin" /> Assigning...</>
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Assigning...
+                </>
               ) : success ? (
-                <><Check size={14} /> Assigned!</>
+                <>
+                  <Check size={14} /> Assigned!
+                </>
               ) : (
-                <><UserPlus size={14} /> Assign Reviewers</>
+                <>
+                  <UserPlus size={14} /> Assign Reviewers
+                </>
               )}
             </button>
           </div>

@@ -1,4 +1,4 @@
-import { AuthLayout } from "../../layouts";
+import { AuthLayout } from '../../layouts';
 
 export default function LoginPage() {
   return <AuthLayout />;

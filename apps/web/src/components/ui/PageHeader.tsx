@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
 export interface PageHeaderProps {
   title: string;
@@ -15,7 +15,7 @@ export function PageHeader({
   description,
   hint,
   actions,
-  className = "",
+  className = '',
   accentWord,
 }: PageHeaderProps) {
   const renderTitle = () => {
@@ -57,9 +57,7 @@ export function PageHeader({
         ) : null}
       </div>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-          {actions}
-        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{actions}</div>
       ) : null}
     </header>
   );

@@ -26,6 +26,7 @@
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
     "express-rate-limit": "^8.2.1",
+    "google-translate-api-x": "^10.7.2",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.3",
     "prom-client": "^15.1.3",

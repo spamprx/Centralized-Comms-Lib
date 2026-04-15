@@ -1,5 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { User, Role, Group, SystemMetric, ActivityLog, SystemSettings, UserFilters, PaginationParams } from '../types/admin';
+import type {
+  User,
+  Role,
+  Group,
+  SystemMetric,
+  ActivityLog,
+  SystemSettings,
+  UserFilters,
+  PaginationParams,
+} from '../types/admin';
 import {
   adminUserService,
   adminRoleService,
@@ -142,7 +151,9 @@ export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
     const created = res.data as unknown as ApiUserRow;
     await syncUserGroups(created.id, data.groups);
     await fetchUsers();
-    return apiUserRowToUser((await adminUserService.getUserById(created.id)).data as unknown as ApiUserRow);
+    return apiUserRowToUser(
+      (await adminUserService.getUserById(created.id)).data as unknown as ApiUserRow,
+    );
   };
 
   const updateUser = async (id: string, data: UserFormPayload) => {
@@ -377,7 +388,10 @@ export function useAdminSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const updateSection = async <K extends keyof SystemSettings>(section: K, data: Partial<SystemSettings[K]>) => {
+  const updateSection = async <K extends keyof SystemSettings>(
+    section: K,
+    data: Partial<SystemSettings[K]>,
+  ) => {
     setSaving(true);
     try {
       const res = await adminSettingsService.updateSettings(section, data);

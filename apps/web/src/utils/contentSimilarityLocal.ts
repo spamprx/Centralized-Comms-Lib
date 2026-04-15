@@ -90,7 +90,9 @@ export function rankLocalSimilarContent(
     const deeper = jaccard(qWords, t);
     const titleSub =
       title.trim().length > 2 &&
-      item.title.toLowerCase().includes(title.trim().toLowerCase().slice(0, Math.min(title.length, 48)))
+      item.title
+        .toLowerCase()
+        .includes(title.trim().toLowerCase().slice(0, Math.min(title.length, 48)))
         ? 0.18
         : 0;
     const raw = Math.min(1, overlap * 0.45 + deeper * 0.45 + titleSub);
