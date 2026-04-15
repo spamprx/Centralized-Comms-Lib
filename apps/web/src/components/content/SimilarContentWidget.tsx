@@ -4,7 +4,7 @@ import { ChevronDown, FileText, FileWarning, Loader2 } from 'lucide-react';
 import { contentService, type Content } from '../../services/contentService';
 import { fetchSimilarByContentId, type ContentCheckHit } from '../../services/searchService';
 import { decodeTokenPayload } from '../../services/tokenStore';
-import { htmlToPlainText, rankLocalSimilarContent } from '../../utils/contentSimilarityLocal';
+import { htmlToPlainText, rankLocalSimilarContent } from '../../lib/contentSimilarityLocal';
 
 type DisplayHit = {
   contentId: string;

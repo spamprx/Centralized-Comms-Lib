@@ -1,7 +1,7 @@
 import { diffWords } from "diff";
 
 import type { ContentSnapshotRecord, ContentVersion } from "../../repository";
-import { tiptapToPlainText } from "../../search/tiptapPlainText";
+import { tiptapToPlainText } from "../search/tiptapPlainText";
 
 export type WordDiffOp = "equal" | "insert" | "delete";
 

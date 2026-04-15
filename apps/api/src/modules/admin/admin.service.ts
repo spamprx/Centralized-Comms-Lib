@@ -1,6 +1,6 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
-import { hashPassword } from "../../utils/hash";
+import { hashPassword } from "../../shared/hash";
 import {
   getSettingsSnapshot,
   mergeSettingsSection,

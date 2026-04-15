@@ -6,6 +6,15 @@ Monorepo for the **Centralized Comms Library** platform:
 - `apps/api` – Express + TypeScript backend
 - `packages/database` – Prisma-based transactional database
 
+### Layout convention
+
+- **`apps/api/src/modules/<domain>/`** – HTTP routes, schemas, types, and domain services for that feature (including search: routes, filters, indexing, and retrieval live together under `modules/search/`).
+- **`apps/api/src/repository/`** – Persistence: Prisma implementations, interfaces, and row/DTO types.
+- **`apps/api/src/shared/`** – Cross-cutting helpers used by many domains (validation, auth context, hashing, cache clients, errors).
+- **`apps/api/src/application/`**, **`bootstrap/`**, **`gateway/`**, **`routes/`** – HTTP composition: mounting routers, public/protected route registration, and the top-level API router.
+- **`apps/api/src/middlewares/`**, **`config/`**, **`jobs/`**, **`observability/`**, **`platform/`**, **`docs/`** – Infra-adjacent code with clear, single-purpose folders.
+- **`apps/web/src/pages/`** – Route-level screens; **`components/`** – UI by area; **`layouts/`** – shell layouts; **`services/`** – API clients; **`lib/`** – shared browser utilities and formatters; **`hooks/`**, **`context/`**, **`store/`**, **`config/`**, **`constants/`**, **`types/`**, **`data/`** – supporting layers as named.
+
 ---
 
 ## Prerequisites

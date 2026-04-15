@@ -1,6 +1,6 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
-import { hashPassword, verifyPassword } from "../../utils/hash";
+import { hashPassword, verifyPassword } from "../../shared/hash";
 
 export const authService = {
   async register(

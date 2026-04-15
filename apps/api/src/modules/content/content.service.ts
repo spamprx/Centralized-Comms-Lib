@@ -19,7 +19,7 @@ import {
   sideSummary,
   type SnapshotWordDiffResult,
 } from "./snapshotWordDiff";
-import { syncContentIndexFromDb } from "../../search/contentSearch.service";
+import { syncContentIndexFromDb } from "../search/contentSearch.service";
 import {
   collectLinkedComponentVersionIds,
   isTipTapDoc,

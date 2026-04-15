@@ -7,9 +7,9 @@ import { getPrismaClient } from "../repository";
 import {
   ensureContentSearchIndex,
   syncContentIndexFromDb,
-} from "../search/contentSearch.service";
+} from "../modules/search/contentSearch.service";
 import { bumpSearchCacheEpoch } from "../shared/cache/redisClient";
-import { refreshTitleEmbeddingForContent } from "../search/contentEmbedding";
+import { refreshTitleEmbeddingForContent } from "../modules/search/contentEmbedding";
 
 /**
  * Rebuilds Elasticsearch documents from Postgres, refreshes embeddings when

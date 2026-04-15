@@ -176,7 +176,7 @@ app.post("/dev/reindex", async (_req: Request, res: Response) => {
       });
       return;
     }
-    const { syncContentIndexFromDb } = await import("./intelligence");
+    const { syncContentIndexFromDb } = await import("./modules/search");
     const prisma = getPrismaClient();
     const rows = await prisma.content.findMany({ select: { id: true } });
     let indexed = 0;

@@ -1,4 +1,4 @@
-import type { ContentSearchFilters } from "../../search/searchTypes";
+import type { ContentSearchFilters } from "./searchTypes";
 
 const LIFECYCLE = new Set(["DRAFT", "IN_REVIEW", "PUBLISHED", "ARCHIVED"]);
 const VISIBILITY = new Set([

@@ -12,7 +12,7 @@ import {
   getSearchCacheEpoch,
   redisGet,
   redisSet,
-} from "../shared/cache/redisClient";
+} from "../../shared/cache/redisClient";
 import {
   buildContentIndexDocument,
   type ContentIndexDocument,
