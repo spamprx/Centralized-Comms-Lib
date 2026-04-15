@@ -49,8 +49,13 @@ export class InMemoryEditorPresenceStore {
     }
   }
 
-  touch(contentId: string, user: { id: string; email: string; displayName: string }, connId: string) {
-    const users = this.byContent.get(contentId) ?? new Map<string, PresenceUser>();
+  touch(
+    contentId: string,
+    user: { id: string; email: string; displayName: string },
+    connId: string,
+  ) {
+    const users =
+      this.byContent.get(contentId) ?? new Map<string, PresenceUser>();
     const existing = users.get(user.id);
     const next: PresenceUser = existing
       ? {
@@ -102,9 +107,17 @@ export class InMemoryEditorPresenceStore {
     const out: PresenceSnapshotUser[] = [];
     for (const u of users.values()) {
       const ageMs = t - u.lastSeenAtMs;
-      const keepDisconnected = u.connections.size === 0 && ageMs <= DISCONNECT_GRACE_MS;
-      if (ageMs <= PRESENCE_TTL_MS && (u.connections.size > 0 || keepDisconnected)) {
-        out.push({ userId: u.userId, email: u.email, displayName: u.displayName });
+      const keepDisconnected =
+        u.connections.size === 0 && ageMs <= DISCONNECT_GRACE_MS;
+      if (
+        ageMs <= PRESENCE_TTL_MS &&
+        (u.connections.size > 0 || keepDisconnected)
+      ) {
+        out.push({
+          userId: u.userId,
+          email: u.email,
+          displayName: u.displayName,
+        });
       }
     }
     return out;
@@ -136,4 +149,3 @@ export async function userMayJoinEditorPresence(
   });
   return co?.status === "ACCEPTED";
 }
-

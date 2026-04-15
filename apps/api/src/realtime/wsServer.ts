@@ -16,7 +16,11 @@ type ClientMsg =
   | { type: "presence:ping"; contentId: string };
 
 type ServerMsg =
-  | { type: "presence:update"; contentId: string; users: PresenceSnapshotUser[] }
+  | {
+      type: "presence:update";
+      contentId: string;
+      users: PresenceSnapshotUser[];
+    }
   | {
       type: "presence:restore_requested";
       contentId: string;
@@ -25,7 +29,8 @@ type ServerMsg =
   | { type: "presence:error"; message: string; status?: number };
 
 const JWT_SECRET_RAW = process.env.JWT_SECRET;
-if (!JWT_SECRET_RAW) throw new Error("JWT_SECRET is not defined in environment");
+if (!JWT_SECRET_RAW)
+  throw new Error("JWT_SECRET is not defined in environment");
 const JWT_SECRET: string = JWT_SECRET_RAW;
 
 const JWT_VERIFY_OPTIONS: jwt.VerifyOptions = {
@@ -57,7 +62,11 @@ function send(ws: WebSocket, msg: ServerMsg): void {
   ws.send(JSON.stringify(msg));
 }
 
-function broadcast(contentId: string, msg: ServerMsg, peers: Set<WebSocket>): void {
+function broadcast(
+  contentId: string,
+  msg: ServerMsg,
+  peers: Set<WebSocket>,
+): void {
   const payload = JSON.stringify(msg);
   for (const ws of peers) {
     if (ws.readyState === ws.OPEN) ws.send(payload);
@@ -100,7 +109,11 @@ export function attachWebsocketServer(server: http.Server): void {
     if (!peers) return;
     broadcast(
       contentId,
-      { type: "presence:update", contentId, users: editorPresenceStore.list(contentId) },
+      {
+        type: "presence:update",
+        contentId,
+        users: editorPresenceStore.list(contentId),
+      },
       peers,
     );
   };
@@ -113,12 +126,20 @@ export function attachWebsocketServer(server: http.Server): void {
       const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
       payload = isJwtPayload(decoded) ? decoded : null;
     } catch {
-      send(ws, { type: "presence:error", message: "Unauthorized", status: 401 });
+      send(ws, {
+        type: "presence:error",
+        message: "Unauthorized",
+        status: 401,
+      });
       ws.close();
       return;
     }
     if (!payload) {
-      send(ws, { type: "presence:error", message: "Unauthorized", status: 401 });
+      send(ws, {
+        type: "presence:error",
+        message: "Unauthorized",
+        status: 401,
+      });
       ws.close();
       return;
     }
@@ -129,7 +150,11 @@ export function attachWebsocketServer(server: http.Server): void {
       select: { id: true, email: true, displayName: true },
     });
     if (!dbUser) {
-      send(ws, { type: "presence:error", message: "User not found", status: 401 });
+      send(ws, {
+        type: "presence:error",
+        message: "User not found",
+        status: 401,
+      });
       ws.close();
       return;
     }
@@ -144,13 +169,18 @@ export function attachWebsocketServer(server: http.Server): void {
       const parsed = safeJsonParse(text);
       if (!parsed || typeof parsed !== "object") return;
       const msg = parsed as Partial<ClientMsg>;
-      if (typeof msg.type !== "string" || typeof msg.contentId !== "string") return;
+      if (typeof msg.type !== "string" || typeof msg.contentId !== "string")
+        return;
 
       const contentId = msg.contentId;
       const isAdmin = payload.role === "ADMIN";
 
       // Validate access before joining/touching.
-      const allowed = await userMayJoinEditorPresence(contentId, payload.id, isAdmin);
+      const allowed = await userMayJoinEditorPresence(
+        contentId,
+        payload.id,
+        isAdmin,
+      );
       if (!allowed) {
         send(ws, {
           type: "presence:error",
@@ -164,7 +194,11 @@ export function attachWebsocketServer(server: http.Server): void {
         // Touch updates TTL and registers this connection.
         editorPresenceStore.touch(
           contentId,
-          { id: dbUser.id, email: dbUser.email, displayName: dbUser.displayName },
+          {
+            id: dbUser.id,
+            email: dbUser.email,
+            displayName: dbUser.displayName,
+          },
           connId,
         );
         addToRoom(contentId, ws);
@@ -174,7 +208,9 @@ export function attachWebsocketServer(server: http.Server): void {
       }
 
       if (msg.type === "presence:leave") {
-        editorPresenceStore.leave(contentId, payload.id, connId, { force: true });
+        editorPresenceStore.leave(contentId, payload.id, connId, {
+          force: true,
+        });
         removeFromRoom(contentId, ws);
         socketJoinedContent.get(ws)!.delete(contentId);
         publishUpdate(contentId);
@@ -185,7 +221,9 @@ export function attachWebsocketServer(server: http.Server): void {
       const joined = socketJoinedContent.get(ws);
       if (!joined) return;
       for (const contentId of joined.values()) {
-        editorPresenceStore.leave(contentId, payload.id, connId, { force: false });
+        editorPresenceStore.leave(contentId, payload.id, connId, {
+          force: false,
+        });
         removeFromRoom(contentId, ws);
         publishUpdate(contentId);
       }
@@ -196,11 +234,13 @@ export function attachWebsocketServer(server: http.Server): void {
 let wsRooms: Map<string, Set<WebSocket>> | null = null;
 
 /** Best-effort server-initiated broadcast to all sockets in a content room. */
-export function broadcastToContentRoom(contentId: string, msg: ServerMsg): void {
+export function broadcastToContentRoom(
+  contentId: string,
+  msg: ServerMsg,
+): void {
   const rooms = wsRooms;
   if (!rooms) return;
   const peers = rooms.get(contentId);
   if (!peers) return;
   broadcast(contentId, msg, peers);
 }
-

@@ -484,8 +484,21 @@ export const templateService = {
             typeof raw.maxTotalRegions === "number"
               ? raw.maxTotalRegions
               : undefined,
+          maxInlineImagesInRichText:
+            typeof raw.maxInlineImagesInRichText === "number"
+              ? raw.maxInlineImagesInRichText
+              : undefined,
+          inlineImagesAfterText: raw.inlineImagesAfterText === true,
           allowedRegionSequences: Array.isArray(raw.allowedRegionSequences)
             ? (raw.allowedRegionSequences as string[][])
+            : undefined,
+          invalidRegionSequences: Array.isArray(raw.invalidRegionSequences)
+            ? (raw.invalidRegionSequences as string[][])
+            : undefined,
+          invalidRegionSequencePatterns: Array.isArray(
+            raw.invalidRegionSequencePatterns,
+          )
+            ? (raw.invalidRegionSequencePatterns as string[])
             : undefined,
           disallowInlineImagesInRichText:
             raw.disallowInlineImagesInRichText === true,

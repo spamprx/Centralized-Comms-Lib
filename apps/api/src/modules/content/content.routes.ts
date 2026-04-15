@@ -155,7 +155,9 @@ router.post(
         return;
       }
       if ("alreadyPending" in result && result.alreadyPending) {
-        res.status(409).json({ error: "A co-author request is already pending" });
+        res
+          .status(409)
+          .json({ error: "A co-author request is already pending" });
         return;
       }
 
@@ -427,9 +429,14 @@ router.get("/workspace", async (req: AuthRequest, res: Response) => {
 
 // Presence is now handled via WebSockets (Phase 1: in-memory TTL sessions).
 // Keep these endpoints for backwards compatibility, but indicate the new mechanism.
-router.post("/:id/presence/heartbeat", async (_req: AuthRequest, res: Response) => {
-  res.status(410).json({ error: "Presence heartbeat moved to WebSockets (/ws)" });
-});
+router.post(
+  "/:id/presence/heartbeat",
+  async (_req: AuthRequest, res: Response) => {
+    res
+      .status(410)
+      .json({ error: "Presence heartbeat moved to WebSockets (/ws)" });
+  },
+);
 router.get("/:id/presence", async (_req: AuthRequest, res: Response) => {
   res.status(410).json({ error: "Presence listing moved to WebSockets (/ws)" });
 });
@@ -463,7 +470,12 @@ router.get(
       }
       res
         .status(200)
-        .json({ active: editorPresenceStore.isCollaborationActive(contentId, req.user!.id) });
+        .json({
+          active: editorPresenceStore.isCollaborationActive(
+            contentId,
+            req.user!.id,
+          ),
+        });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });
@@ -522,106 +534,118 @@ router.post("/:id/restore-request", async (req: AuthRequest, res: Response) => {
  * Restore a previous version as the new head revision.
  * Blocked (409) while another editor is active in the presence session.
  */
-router.post("/:id/versions/:versionId/restore", async (req: AuthRequest, res: Response) => {
-  try {
-    const prisma = getPrismaClient();
-    const contentId = req.params.id;
-    const versionId = req.params.versionId;
-    const baseNRaw = (req.body as { baseVersionNumber?: unknown } | undefined)?.baseVersionNumber;
-    const baseN =
-      baseNRaw === undefined || baseNRaw === null ? undefined : Number(baseNRaw);
-    if (
-      baseN !== undefined &&
-      (typeof baseN !== "number" || !Number.isInteger(baseN) || baseN < 0)
-    ) {
-      res.status(400).json({ error: "baseVersionNumber must be a non-negative integer" });
-      return;
-    }
+router.post(
+  "/:id/versions/:versionId/restore",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const prisma = getPrismaClient();
+      const contentId = req.params.id;
+      const versionId = req.params.versionId;
+      const baseNRaw = (req.body as { baseVersionNumber?: unknown } | undefined)
+        ?.baseVersionNumber;
+      const baseN =
+        baseNRaw === undefined || baseNRaw === null
+          ? undefined
+          : Number(baseNRaw);
+      if (
+        baseN !== undefined &&
+        (typeof baseN !== "number" || !Number.isInteger(baseN) || baseN < 0)
+      ) {
+        res
+          .status(400)
+          .json({ error: "baseVersionNumber must be a non-negative integer" });
+        return;
+      }
 
-    const content = await prisma.content.findUnique({
-      where: { id: contentId },
-      select: { id: true, authorId: true, title: true, lifecycleState: true },
-    });
-    if (!content) {
-      res.status(404).json({ error: "Content not found" });
-      return;
-    }
-    const isAdmin = req.user!.role === "ADMIN";
-    const isAuthor = content.authorId === req.user!.id;
-    if (!isAdmin && !isAuthor) {
-      res.status(403).json({ error: "Only the primary author or an admin can restore versions" });
-      return;
-    }
-
-    // Presence guard: block if any *other* user is in the editor session.
-    if (editorPresenceStore.isCollaborationActive(contentId, req.user!.id)) {
-      res.status(409).json({
-        error:
-          "Cannot restore while other co-authors are in the editor session. Ask them to leave, then retry.",
+      const content = await prisma.content.findUnique({
+        where: { id: contentId },
+        select: { id: true, authorId: true, title: true, lifecycleState: true },
       });
-      return;
-    }
+      if (!content) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      const isAdmin = req.user!.role === "ADMIN";
+      const isAuthor = content.authorId === req.user!.id;
+      if (!isAdmin && !isAuthor) {
+        res
+          .status(403)
+          .json({
+            error: "Only the primary author or an admin can restore versions",
+          });
+        return;
+      }
 
-    if (baseN !== undefined) {
+      // Presence guard: block if any *other* user is in the editor session.
+      if (editorPresenceStore.isCollaborationActive(contentId, req.user!.id)) {
+        res.status(409).json({
+          error:
+            "Cannot restore while other co-authors are in the editor session. Ask them to leave, then retry.",
+        });
+        return;
+      }
+
+      if (baseN !== undefined) {
+        const latest = await prisma.contentVersion.findFirst({
+          where: { contentId },
+          orderBy: { versionNumber: "desc" },
+          select: { versionNumber: true },
+        });
+        const headNum = latest?.versionNumber ?? 0;
+        if (headNum !== baseN) {
+          res.status(409).json({
+            error:
+              "Head revision changed. Refresh history, then retry restore from the latest version.",
+            currentVersionNumber: headNum,
+          });
+          return;
+        }
+      }
+
+      const source = await prisma.contentVersion.findUnique({
+        where: { id: versionId },
+        select: { id: true, contentId: true, title: true, body: true },
+      });
+      if (!source || source.contentId !== contentId) {
+        res.status(404).json({ error: "Version not found for this content" });
+        return;
+      }
+
+      // Restore by creating a new MANUAL_SAVE version with the old body.
       const latest = await prisma.contentVersion.findFirst({
         where: { contentId },
         orderBy: { versionNumber: "desc" },
         select: { versionNumber: true },
       });
-      const headNum = latest?.versionNumber ?? 0;
-      if (headNum !== baseN) {
-        res.status(409).json({
-          error:
-            "Head revision changed. Refresh history, then retry restore from the latest version.",
-          currentVersionNumber: headNum,
-        });
-        return;
-      }
+      const nextVersionNumber = (latest?.versionNumber ?? 0) + 1;
+      const created = await prisma.contentVersion.create({
+        data: {
+          contentId,
+          authorId: req.user!.id,
+          changeType: "MANUAL_SAVE",
+          title: String(source.title ?? content.title ?? "Untitled"),
+          body: source.body as any,
+          metadataSnapshot: { restoredFromVersionId: versionId } as any,
+          versionNumber: nextVersionNumber,
+        },
+      });
+      res.status(200).json({
+        id: created.id,
+        versionNumber: created.versionNumber,
+        title: created.title,
+        changeType: created.changeType,
+        body: created.body,
+        metadataSnapshot: created.metadataSnapshot,
+        createdAt: created.createdAt,
+        contentId: created.contentId,
+        authorId: created.authorId,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-
-    const source = await prisma.contentVersion.findUnique({
-      where: { id: versionId },
-      select: { id: true, contentId: true, title: true, body: true },
-    });
-    if (!source || source.contentId !== contentId) {
-      res.status(404).json({ error: "Version not found for this content" });
-      return;
-    }
-
-    // Restore by creating a new MANUAL_SAVE version with the old body.
-    const latest = await prisma.contentVersion.findFirst({
-      where: { contentId },
-      orderBy: { versionNumber: "desc" },
-      select: { versionNumber: true },
-    });
-    const nextVersionNumber = (latest?.versionNumber ?? 0) + 1;
-    const created = await prisma.contentVersion.create({
-      data: {
-        contentId,
-        authorId: req.user!.id,
-        changeType: "MANUAL_SAVE",
-        title: String(source.title ?? content.title ?? "Untitled"),
-        body: source.body as any,
-        metadataSnapshot: { restoredFromVersionId: versionId } as any,
-        versionNumber: nextVersionNumber,
-      },
-    });
-    res.status(200).json({
-      id: created.id,
-      versionNumber: created.versionNumber,
-      title: created.title,
-      changeType: created.changeType,
-      body: created.body,
-      metadataSnapshot: created.metadataSnapshot,
-      createdAt: created.createdAt,
-      contentId: created.contentId,
-      authorId: created.authorId,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -774,7 +798,9 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       baseN !== undefined &&
       (typeof baseN !== "number" || !Number.isInteger(baseN) || baseN < 0)
     ) {
-      res.status(400).json({ error: "baseVersionNumber must be a non-negative integer" });
+      res
+        .status(400)
+        .json({ error: "baseVersionNumber must be a non-negative integer" });
       return;
     }
     const result = await contentService.saveBody(

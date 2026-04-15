@@ -209,10 +209,7 @@ export const contentService = {
   /**
    * Content the user owns (primary author) plus items where they are an accepted co-author.
    */
-  async listWorkspace(requester: {
-    id: string;
-    isAdmin?: boolean;
-  }): Promise<
+  async listWorkspace(requester: { id: string; isAdmin?: boolean }): Promise<
     Array<
       Content & {
         author: { id: string; displayName: string; email: string } | null;
@@ -277,10 +274,12 @@ export const contentService = {
       }
     }
 
-    const merged = Array.from(byId.values()).filter(({ content: c, workspaceRole }) => {
-      if (workspaceRole === "author") return true;
-      return canViewContent(c, requester, groups, true);
-    });
+    const merged = Array.from(byId.values()).filter(
+      ({ content: c, workspaceRole }) => {
+        if (workspaceRole === "author") return true;
+        return canViewContent(c, requester, groups, true);
+      },
+    );
 
     const contentIds = merged.map((m) => m.content.id);
     const authorIds = Array.from(

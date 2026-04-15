@@ -34,7 +34,11 @@ type FormState = {
   maxFieldRegions: string;
   maxTotalRegions: string;
   allowedRegionSequences: string;
+  invalidRegionSequences: string;
+  invalidRegionSequencePatterns: string;
   disallowInlineImagesInRichText: boolean;
+  maxInlineImagesInRichText: string;
+  inlineImagesAfterText: boolean;
 };
 
 const EMPTY_FORM: FormState = {
@@ -52,7 +56,11 @@ const EMPTY_FORM: FormState = {
   maxFieldRegions: '',
   maxTotalRegions: '',
   allowedRegionSequences: '',
+  invalidRegionSequences: '',
+  invalidRegionSequencePatterns: '',
   disallowInlineImagesInRichText: false,
+  maxInlineImagesInRichText: '',
+  inlineImagesAfterText: false,
 };
 
 function optNum(v: unknown): string {
@@ -65,6 +73,12 @@ function toForm(channel: ChannelRecord): FormState {
     typeof restrictions.maxCharacters === 'number' ? String(restrictions.maxCharacters) : '';
   const seqs = Array.isArray(restrictions.allowedRegionSequences)
     ? JSON.stringify(restrictions.allowedRegionSequences)
+    : '';
+  const badSeqs = Array.isArray(restrictions.invalidRegionSequences)
+    ? JSON.stringify(restrictions.invalidRegionSequences)
+    : '';
+  const patterns = Array.isArray(restrictions.invalidRegionSequencePatterns)
+    ? (restrictions.invalidRegionSequencePatterns as unknown[]).map((x) => String(x)).join('\n')
     : '';
   return {
     name: channel.name,
@@ -83,7 +97,11 @@ function toForm(channel: ChannelRecord): FormState {
     maxFieldRegions: optNum(restrictions.maxFieldRegions),
     maxTotalRegions: optNum(restrictions.maxTotalRegions),
     allowedRegionSequences: seqs,
+    invalidRegionSequences: badSeqs,
+    invalidRegionSequencePatterns: patterns,
     disallowInlineImagesInRichText: restrictions.disallowInlineImagesInRichText === true,
+    maxInlineImagesInRichText: optNum(restrictions.maxInlineImagesInRichText),
+    inlineImagesAfterText: restrictions.inlineImagesAfterText === true,
   };
 }
 
@@ -94,6 +112,7 @@ export default function ChannelManagementTab() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ChannelRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [dslHelpToastVisible, setDslHelpToastVisible] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   async function loadChannels() {
@@ -187,6 +206,39 @@ export default function ChannelManagementTab() {
       }
     }
 
+    let parsedInvalidSeqs: string[][] | undefined;
+    if (form.invalidRegionSequences.trim()) {
+      try {
+        const raw = JSON.parse(form.invalidRegionSequences);
+        if (
+          Array.isArray(raw) &&
+          raw.every(
+            (item: unknown) =>
+              Array.isArray(item) && item.every((s: unknown) => typeof s === 'string'),
+          )
+        ) {
+          parsedInvalidSeqs = raw as string[][];
+        } else {
+          setError(
+            'Invalid region sequences must be a JSON array of string arrays, e.g. [["media","media"],["field","media"]]',
+          );
+          return;
+        }
+      } catch {
+        setError('Invalid region sequences is not valid JSON.');
+        return;
+      }
+    }
+
+    const parsedInvalidPatterns = form.invalidRegionSequencePatterns
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parsedInvalidPatterns.some((p) => p.length > 200)) {
+      setError('Invalid sequence patterns: each line must be <= 200 characters.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -197,13 +249,19 @@ export default function ChannelManagementTab() {
       const mMedia = parseOptInt(form.maxMediaRegions);
       const mField = parseOptInt(form.maxFieldRegions);
       const mTotal = parseOptInt(form.maxTotalRegions);
+      const mInlineImgs = parseOptInt(form.maxInlineImagesInRichText);
       if (mRows !== undefined) structuralRestrictions.maxRows = mRows;
       if (mCols !== undefined) structuralRestrictions.maxColumnsPerRow = mCols;
       if (mRich !== undefined) structuralRestrictions.maxRichTextRegions = mRich;
       if (mMedia !== undefined) structuralRestrictions.maxMediaRegions = mMedia;
       if (mField !== undefined) structuralRestrictions.maxFieldRegions = mField;
       if (mTotal !== undefined) structuralRestrictions.maxTotalRegions = mTotal;
+      if (mInlineImgs !== undefined)
+        structuralRestrictions.maxInlineImagesInRichText = mInlineImgs;
       if (parsedSeqs) structuralRestrictions.allowedRegionSequences = parsedSeqs;
+      if (parsedInvalidSeqs) structuralRestrictions.invalidRegionSequences = parsedInvalidSeqs;
+      if (parsedInvalidPatterns.length > 0)
+        structuralRestrictions.invalidRegionSequencePatterns = parsedInvalidPatterns;
 
       const payload = {
         name: form.name.trim(),
@@ -218,6 +276,7 @@ export default function ChannelManagementTab() {
             supportsUnderline: form.fieldTypes.includes('underline'),
             ...structuralRestrictions,
             disallowInlineImagesInRichText: form.disallowInlineImagesInRichText,
+            inlineImagesAfterText: form.inlineImagesAfterText,
           },
         },
       };
@@ -316,6 +375,8 @@ export default function ChannelManagementTab() {
                   <button
                     type="button"
                     onClick={() => openEdit(ch)}
+                    aria-label="Edit channel"
+                    title="Edit channel"
                     className="rounded-app-md border border-white/[0.1] bg-white/[0.04] p-2 text-app-muted shadow-sm transition-[border-color,background-color] hover:border-app-accent/25 hover:bg-app-accent-muted/30 hover:text-app-accent"
                   >
                     <Pencil size={14} strokeWidth={2} />
@@ -328,8 +389,9 @@ export default function ChannelManagementTab() {
       </div>
 
       {showForm ? (
-        <div className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-          <div className="admin-modal-enter admin-modal-panel max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-app-xl p-5 sm:p-6">
+        <div className="admin-modal-backdrop fixed inset-0 z-50 overflow-y-auto bg-black/75 p-4 pt-24 backdrop-blur-md">
+          <div className="mx-auto w-full max-w-3xl">
+            <div className="admin-modal-enter admin-modal-panel w-full rounded-app-xl p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between border-b border-white/[0.08] pb-4">
               <h3 className="m-0 text-base font-semibold tracking-tight text-app-text">
                 {editing ? 'Edit channel' : 'Create channel'}
@@ -337,6 +399,8 @@ export default function ChannelManagementTab() {
               <button
                 type="button"
                 onClick={closeForm}
+                aria-label="Close"
+                title="Close"
                 className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-white/[0.08] hover:text-app-text"
               >
                 <X size={18} strokeWidth={2} />
@@ -446,21 +510,71 @@ export default function ChannelManagementTab() {
                   />
                 </label>
               </div>
-              <label className="mt-3 block text-[11px] text-app-faint">
-                Allowed region sequences (JSON)
-                <input
-                  value={form.allowedRegionSequences}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, allowedRegionSequences: e.target.value }))
-                  }
-                  placeholder='e.g. [["richText"],["media"],["media","richText"]]'
-                  className={`mt-1 block w-full font-mono ${fieldInput}`}
-                />
-              </label>
-              <p className="mt-1 m-0 text-[10px] leading-snug text-app-faint">
-                Leave blank for no sequence restrictions. Each inner array defines one valid
-                block-type ordering per cell.
-              </p>
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-app-xl border border-white/[0.08] bg-white/[0.02] p-3">
+                  <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-app-muted">
+                    Allow (strict)
+                  </p>
+                  <label className="mt-2 block text-[11px] text-app-faint">
+                    Allowed region sequences (JSON)
+                    <textarea
+                      value={form.allowedRegionSequences}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, allowedRegionSequences: e.target.value }))
+                      }
+                      placeholder='e.g. [["richText"],["media"],["media","richText"]]'
+                      className={`mt-1 block min-h-[90px] w-full font-mono ${fieldInput}`}
+                    />
+                  </label>
+                  <p className="mt-1 m-0 text-[10px] leading-snug text-app-faint">
+                    Use this only when you want to enumerate valid sequences. Leave blank to allow any
+                    sequence (and rely on Deny rules).
+                  </p>
+                </div>
+
+                <div className="rounded-app-xl border border-white/[0.08] bg-white/[0.02] p-3">
+                  <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-app-muted">
+                    Deny (recommended)
+                  </p>
+                  <label className="mt-2 block text-[11px] text-app-faint">
+                    Invalid region sequences (JSON)
+                    <textarea
+                      value={form.invalidRegionSequences}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, invalidRegionSequences: e.target.value }))
+                      }
+                      placeholder='e.g. [["media","media"],["field","media"]]'
+                      className={`mt-1 block min-h-[90px] w-full font-mono ${fieldInput}`}
+                    />
+                  </label>
+
+                  <label className="mt-3 block text-[11px] text-app-faint">
+                    <span className="inline-flex items-center gap-2">
+                      Invalid sequence patterns (DSL, one per line)
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDslHelpToastVisible(true);
+                          window.setTimeout(() => setDslHelpToastVisible(false), 7_000);
+                        }}
+                        className="rounded-app-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-app-muted hover:bg-white/10"
+                        aria-label="Show DSL operators help"
+                        title="Show DSL operators help"
+                      >
+                        DSL help
+                      </button>
+                    </span>
+                    <textarea
+                      value={form.invalidRegionSequencePatterns}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, invalidRegionSequencePatterns: e.target.value }))
+                      }
+                      placeholder={'Examples:\nmedia media\n^media\n[media|field]+ richText\n.* image'}
+                      className={`mt-1 block min-h-[110px] w-full font-mono ${fieldInput}`}
+                    />
+                  </label>
+                </div>
+              </div>
               <label className="mt-3 flex items-center gap-2 text-[12px] text-app-muted">
                 <input
                   type="checkbox"
@@ -473,6 +587,33 @@ export default function ChannelManagementTab() {
                 Disallow embedded media in text blocks (inline images and Add media token
                 placeholders; use layout Media blocks instead)
               </label>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="text-[11px] text-app-faint">
+                  Max inline images inside text blocks
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.maxInlineImagesInRichText}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, maxInlineImagesInRichText: e.target.value }))
+                    }
+                    placeholder="∞"
+                    className={`mt-1 block w-full ${fieldInput}`}
+                  />
+                </label>
+                <label className="mt-6 flex items-center gap-2 text-[12px] text-app-muted">
+                  <input
+                    type="checkbox"
+                    checked={form.inlineImagesAfterText}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, inlineImagesAfterText: e.target.checked }))
+                    }
+                    className="rounded border-app-border"
+                  />
+                  Inline images must be after some text (no leading image in a text block)
+                </label>
+              </div>
             </div>
             <div className="mt-4">
               <p className="mb-2 text-[12px] font-medium text-app-muted">
@@ -517,7 +658,7 @@ export default function ChannelManagementTab() {
                 onClick={closeForm}
                 className="admin-glass-button rounded-app-lg px-4 py-2.5 text-[13px] font-semibold text-app-muted"
               >
-                Cancel
+                Abort changes
               </button>
               <button
                 type="button"
@@ -528,7 +669,60 @@ export default function ChannelManagementTab() {
                 <Save size={14} strokeWidth={2} /> {saving ? 'Saving…' : 'Save channel'}
               </button>
             </div>
+            </div>
           </div>
+        </div>
+      ) : null}
+
+      {dslHelpToastVisible ? (
+        <div
+          className="fixed bottom-6 right-6 z-[8600] max-w-md rounded-app-lg border border-white/10 bg-app-bg/95 px-4 py-3 shadow-app-lift backdrop-blur-xl"
+          role="alert"
+        >
+          <p className="m-0 text-[13px] font-semibold text-app-text">DSL operators</p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-app-muted">
+            <li>
+              <span className="font-semibold text-app-text">Tokens</span>: region types separated by spaces (e.g.{" "}
+              <span className="font-mono">richText media field</span>).
+            </li>
+            <li>
+              <span className="font-semibold text-app-text">Sets</span>:{" "}
+              <span className="font-mono">[a|b]</span> matches either token.
+            </li>
+            <li>
+              <span className="font-semibold text-app-text">Quantifiers</span>:{" "}
+              <span className="font-mono">?</span> optional · <span className="font-mono">*</span> 0+ ·{" "}
+              <span className="font-mono">+</span> 1+ (applies to previous token/set).
+            </li>
+            <li>
+              <span className="font-semibold text-app-text">Wildcards</span>:{" "}
+              <span className="font-mono">.</span> any single token · <span className="font-mono">.*</span> any
+              number of tokens.
+            </li>
+            <li>
+              <span className="font-semibold text-app-text">Anchors</span>:{" "}
+              <span className="font-mono">^</span> start · <span className="font-mono">$</span> end (of the full
+              cell sequence).
+            </li>
+            <li>
+              <span className="font-semibold text-app-text">Media tokens count</span>: a{" "}
+              <span className="font-mono">richText</span> block containing{" "}
+              <span className="font-mono">&lt;photoUrl&gt;</span> (or an inline image) is treated as also
+              contributing <span className="font-mono">media</span> tokens for DSL matching.
+            </li>
+            <li>
+              <span className="font-semibold text-app-text">Examples</span>:{" "}
+              <span className="font-mono">media media</span>, <span className="font-mono">^media</span>,{" "}
+              <span className="font-mono">richText .* media</span>.
+            </li>
+          </ul>
+          <button
+            type="button"
+            onClick={() => setDslHelpToastVisible(false)}
+            className="mt-2 text-[12px] font-semibold text-app-accent hover:underline"
+          >
+            Dismiss
+          </button>
         </div>
       ) : null}
     </div>

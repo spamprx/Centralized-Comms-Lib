@@ -215,7 +215,24 @@ export type StructuralRestrictions = {
   maxFieldRegions?: number;
   maxTotalRegions?: number;
   allowedRegionSequences?: string[][];
+  /** Exact region-type sequences (per cell) that are forbidden. */
+  invalidRegionSequences?: string[][];
+  /**
+   * Forbidden patterns using a safe token DSL.
+   *
+   * Syntax (tokens are region types like `richText`, `media`, `field`):
+   * - Concatenation is space-separated: `media richText`
+   * - Group sets: `[media|field]`
+   * - Quantifiers: `?`, `*`, `+` apply to the previous token/set
+   * - Wildcards: `.` (any single token), `.*` (any sequence)
+   * - Optional anchors: `^` and `$` (match start/end of the cell sequence)
+   */
+  invalidRegionSequencePatterns?: string[];
   disallowInlineImagesInRichText?: boolean;
+  /** Max TipTap inline `image` nodes across all richText regions. */
+  maxInlineImagesInRichText?: number;
+  /** When true, inline images inside richText must come after at least one text character. */
+  inlineImagesAfterText?: boolean;
   /** Channel-level content model to validate rich-text ASTs against on save. */
   contentModel?: "whatsapp" | "sms" | "push";
 };
@@ -232,6 +249,279 @@ function countImageNodesInTipTapDoc(doc: unknown): number {
   };
   walk(doc);
   return n;
+}
+
+function inlineImageBeforeText(doc: unknown): boolean {
+  let sawText = false;
+  let bad = false;
+  const walk = (node: unknown): void => {
+    if (bad) return;
+    if (!node || typeof node !== "object" || Array.isArray(node)) return;
+    const rec = node as Record<string, unknown>;
+    const t = rec.type;
+    if (t === "text" && typeof rec.text === "string") {
+      if (rec.text.trim().length > 0) sawText = true;
+      return;
+    }
+    if (t === "image") {
+      if (!sawText) bad = true;
+      return;
+    }
+    if (Array.isArray(rec.content)) {
+      for (const c of rec.content) walk(c);
+    }
+  };
+  walk(doc);
+  return bad;
+}
+
+type SeqAtom =
+  | { kind: "token"; tokens: string[] }
+  | { kind: "any" }
+  | { kind: "anySeq" };
+
+type SeqPart = {
+  atom: SeqAtom;
+  min: number;
+  max: number; // Number.POSITIVE_INFINITY allowed
+};
+
+type SeqPattern = {
+  anchorStart: boolean;
+  anchorEnd: boolean;
+  parts: SeqPart[];
+};
+
+function parseInvalidSequencePattern(
+  input: string,
+): { ok: true; pattern: SeqPattern } | { ok: false; error: string } {
+  const s = input.trim();
+  if (!s) return { ok: false, error: "Pattern is empty" };
+  let i = 0;
+  const parts: SeqPart[] = [];
+  let anchorStart = false;
+  let anchorEnd = false;
+
+  const skipWs = () => {
+    while (i < s.length && /\s/.test(s[i]!)) i++;
+  };
+
+  skipWs();
+  if (s[i] === "^") {
+    anchorStart = true;
+    i++;
+  }
+
+  const parseSet = (): string[] | null => {
+    // assumes s[i] === '['
+    i++; // '['
+    const buf: string[] = [];
+    let cur = "";
+    while (i < s.length) {
+      const ch = s[i]!;
+      if (ch === "]") {
+        if (cur.trim()) buf.push(cur.trim());
+        i++; // ']'
+        break;
+      }
+      if (ch === "|") {
+        if (!cur.trim()) return null;
+        buf.push(cur.trim());
+        cur = "";
+        i++;
+        continue;
+      }
+      cur += ch;
+      i++;
+    }
+    if (buf.length === 0) return null;
+    if (buf.some((t) => !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(t))) return null;
+    return buf;
+  };
+
+  const parseToken = (): string | null => {
+    const start = i;
+    while (i < s.length && /[a-zA-Z0-9_-]/.test(s[i]!)) i++;
+    const tok = s.slice(start, i).trim();
+    if (!tok) return null;
+    if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(tok)) return null;
+    return tok;
+  };
+
+  const applyQuant = (part: SeqPart) => {
+    if (i >= s.length) return;
+    const q = s[i]!;
+    if (q === "?") {
+      part.min = 0;
+      part.max = 1;
+      i++;
+    } else if (q === "*") {
+      part.min = 0;
+      part.max = Number.POSITIVE_INFINITY;
+      i++;
+    } else if (q === "+") {
+      part.min = 1;
+      part.max = Number.POSITIVE_INFINITY;
+      i++;
+    }
+  };
+
+  while (i < s.length) {
+    skipWs();
+    if (i >= s.length) break;
+    if (s[i] === "$") {
+      anchorEnd = true;
+      i++;
+      skipWs();
+      if (i < s.length)
+        return { ok: false, error: "Unexpected characters after $" };
+      break;
+    }
+    let atom: SeqAtom | null = null;
+    if (s[i] === "." && s[i + 1] === "*") {
+      atom = { kind: "anySeq" };
+      i += 2;
+    } else if (s[i] === ".") {
+      atom = { kind: "any" };
+      i += 1;
+    } else if (s[i] === "[") {
+      const set = parseSet();
+      if (!set) return { ok: false, error: "Invalid set syntax; use [a|b|c]" };
+      atom = { kind: "token", tokens: set };
+    } else if (/[a-zA-Z]/.test(s[i]!)) {
+      const tok = parseToken();
+      if (!tok) return { ok: false, error: "Invalid token" };
+      atom = { kind: "token", tokens: [tok] };
+    } else {
+      return { ok: false, error: `Unexpected character '${s[i]}'` };
+    }
+
+    const part: SeqPart = { atom, min: 1, max: 1 };
+    applyQuant(part);
+    parts.push(part);
+    skipWs();
+  }
+
+  if (parts.length === 0) return { ok: false, error: "Pattern has no tokens" };
+  return { ok: true, pattern: { anchorStart, anchorEnd, parts } };
+}
+
+function patternMatchesSequence(p: SeqPattern, seq: string[]): boolean {
+  // DP matcher with memoization: (partIdx, seqIdx) -> bool
+  const memo = new Map<string, boolean>();
+
+  const atomMatches = (atom: SeqAtom, token: string): boolean => {
+    if (atom.kind === "any") return true;
+    if (atom.kind === "token") return atom.tokens.includes(token);
+    return false;
+  };
+
+  const key = (pi: number, si: number) => `${pi}:${si}`;
+
+  const matchFrom = (pi: number, si: number): boolean => {
+    const k = key(pi, si);
+    const cached = memo.get(k);
+    if (cached !== undefined) return cached;
+
+    // end of pattern
+    if (pi >= p.parts.length) {
+      const ok = p.anchorEnd ? si === seq.length : true;
+      memo.set(k, ok);
+      return ok;
+    }
+
+    const part = p.parts[pi]!;
+    const max = part.max === Number.POSITIVE_INFINITY ? seq.length : part.max;
+
+    // Special: anySeq consumes any number of tokens
+    if (part.atom.kind === "anySeq") {
+      const minTake = part.min;
+      for (
+        let take = minTake;
+        take <=
+        (part.max === Number.POSITIVE_INFINITY
+          ? seq.length - si
+          : Math.min(max, seq.length - si));
+        take++
+      ) {
+        if (matchFrom(pi + 1, si + take)) {
+          memo.set(k, true);
+          return true;
+        }
+      }
+      memo.set(k, false);
+      return false;
+    }
+
+    // Regular atom: repeat match count times
+    let taken = 0;
+    // First satisfy min
+    while (taken < part.min) {
+      if (si + taken >= seq.length) {
+        memo.set(k, false);
+        return false;
+      }
+      if (!atomMatches(part.atom, seq[si + taken]!)) {
+        memo.set(k, false);
+        return false;
+      }
+      taken++;
+    }
+
+    // After min satisfied, try all extensions up to max
+    let si2 = si + taken;
+    if (matchFrom(pi + 1, si2)) {
+      memo.set(k, true);
+      return true;
+    }
+    while (
+      taken < max &&
+      si2 < seq.length &&
+      atomMatches(part.atom, seq[si2]!)
+    ) {
+      taken++;
+      si2++;
+      if (matchFrom(pi + 1, si2)) {
+        memo.set(k, true);
+        return true;
+      }
+    }
+
+    memo.set(k, false);
+    return false;
+  };
+
+  if (p.anchorStart) return matchFrom(0, 0);
+  // Unanchored: allow match starting at any position
+  for (let start = 0; start <= seq.length; start++) {
+    memo.clear();
+    if (matchFrom(0, start)) return true;
+  }
+  return false;
+}
+
+/**
+ * DSL sequence is based on layout region types, but we also treat richText-embedded
+ * media as `media` tokens so deny patterns can block flows that will become media later.
+ *
+ * Expansion rule:
+ * - Always include the region type (e.g. `richText`)
+ * - If a `richText` region contains inline images OR `<mediaKey>` placeholders,
+ *   append one `media` token per occurrence after `richText`.
+ */
+function buildDslSequenceForCell(regions: TemplateLayoutRegion[]): string[] {
+  const seq: string[] = [];
+  for (const region of regions) {
+    seq.push(region.type);
+    if (region.type !== "richText") continue;
+    const props = region.props as Record<string, unknown> | undefined;
+    const doc = ensureRichDoc(props);
+    const embeddedMedia =
+      countImageNodesInTipTapDoc(doc) +
+      countMediaPlaceholderTagsInTipTapDoc(doc);
+    for (let i = 0; i < embeddedMedia; i++) seq.push("media");
+  }
+  return seq;
 }
 
 /** `<mediaKey>` placeholders inserted as plain text (toolbar "Add media token"). */
@@ -701,6 +991,57 @@ export function validateLayoutStructure(
     }
   }
 
+  if (
+    Array.isArray(restrictions.invalidRegionSequences) &&
+    restrictions.invalidRegionSequences.length > 0
+  ) {
+    for (const row of layout.rows) {
+      for (const cell of row.cells) {
+        const seq = cell.regions.map((r) => r.type);
+        if (seq.length === 0) continue;
+        const hit = restrictions.invalidRegionSequences.some(
+          (bad) =>
+            bad.length === seq.length && bad.every((t, idx) => t === seq[idx]),
+        );
+        if (hit) {
+          msgs.push(`Block sequence [${seq.join(" \u2192 ")}] is not allowed.`);
+        }
+      }
+    }
+  }
+
+  if (
+    Array.isArray(restrictions.invalidRegionSequencePatterns) &&
+    restrictions.invalidRegionSequencePatterns.length > 0
+  ) {
+    const compiled: SeqPattern[] = [];
+    for (const raw of restrictions.invalidRegionSequencePatterns) {
+      if (typeof raw !== "string") continue;
+      const p = parseInvalidSequencePattern(raw);
+      if (!p.ok) {
+        msgs.push(`Invalid sequence pattern "${String(raw)}": ${p.error}.`);
+        continue;
+      }
+      compiled.push(p.pattern);
+    }
+    if (compiled.length > 0) {
+      for (const row of layout.rows) {
+        for (const cell of row.cells) {
+          const seqDsl = buildDslSequenceForCell(cell.regions);
+          if (seqDsl.length === 0) continue;
+          const violated = compiled.find((p) =>
+            patternMatchesSequence(p, seqDsl),
+          );
+          if (violated) {
+            msgs.push(
+              `Block sequence [${seqDsl.join(" \u2192 ")}] matches a forbidden pattern.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   // Legacy flag — kept for backwards compat but superseded by contentModel:"whatsapp"
   if (
     restrictions.disallowInlineImagesInRichText === true &&
@@ -720,6 +1061,36 @@ export function validateLayoutStructure(
         );
       msgs.push(
         `This channel does not support embedded media inside text blocks: ${parts.join("; ")}.`,
+      );
+    }
+  }
+
+  if (
+    fin(restrictions.maxInlineImagesInRichText) &&
+    countInlineImageNodesInLayout(layout) >
+      restrictions.maxInlineImagesInRichText
+  ) {
+    const img = countInlineImageNodesInLayout(layout);
+    msgs.push(
+      `Max ${restrictions.maxInlineImagesInRichText} inline image(s) allowed inside text blocks; found ${img}.`,
+    );
+  }
+
+  if (restrictions.inlineImagesAfterText === true) {
+    let badCount = 0;
+    for (const row of layout.rows) {
+      for (const cell of row.cells) {
+        for (const region of cell.regions) {
+          if (region.type !== "richText") continue;
+          const props = region.props as Record<string, unknown> | undefined;
+          const doc = ensureRichDoc(props);
+          if (inlineImageBeforeText(doc)) badCount++;
+        }
+      }
+    }
+    if (badCount > 0) {
+      msgs.push(
+        `Inline images must appear after some text inside a text block; ${badCount} block(s) violate this rule.`,
       );
     }
   }

@@ -7,10 +7,7 @@ import {
   searchContentCheckByText,
 } from "./contentSearch.service";
 import { parseContentSearchFilters } from "./search.filters";
-import {
-  assertValidQueryVector,
-  type RankBlendWeights,
-} from "./rankBlend";
+import { assertValidQueryVector, type RankBlendWeights } from "./rankBlend";
 
 const router = Router();
 
