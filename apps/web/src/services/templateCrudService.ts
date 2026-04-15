@@ -1,6 +1,7 @@
 import { getAuthToken } from './tokenStore';
+import { resolveApiV1Base } from '../lib/apiBase';
 
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = resolveApiV1Base();
 
 export type TemplateStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 

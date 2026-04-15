@@ -1,4 +1,5 @@
-const API_BASE = 'http://168.144.22.124:8000';
+import { resolveApiV1Base } from '../lib/apiBase';
+const API_BASE = resolveApiV1Base();
 import { getAuthToken } from './tokenStore';
 import type { Tag } from './tagService';
 import type { Binding } from './channelService';
@@ -136,41 +137,35 @@ function createDeepCopy(template: Template): Template {
 
 // API methods
 async function apiList(): Promise<Template[]> {
-  console.log('API CALL: GET /api/v1/templates');
-  return request<Template[]>('/api/v1/templates');
+  return request<Template[]>('/templates');
 }
 
 async function apiGetById(id: string): Promise<Template> {
-  console.log(`API CALL: GET /api/v1/templates/${id}`);
-  return request<Template>(`/api/v1/templates/${id}`);
+  return request<Template>(`/templates/${id}`);
 }
 
 async function apiCreate(template: CreateTemplateRequest): Promise<Template> {
-  console.log('API CALL: POST /api/v1/templates', template);
-  return request<Template>('/api/v1/templates', {
+  return request<Template>('/templates', {
     method: 'POST',
     body: JSON.stringify(template),
   });
 }
 
 async function apiUpdate(id: string, template: UpdateTemplateRequest): Promise<Template> {
-  console.log(`API CALL: POST /api/v1/templates/${id}`, template);
-  return request<Template>(`/api/v1/templates/${id}`, {
+  return request<Template>(`/templates/${id}`, {
     method: 'POST',
     body: JSON.stringify(template),
   });
 }
 
 async function apiDelete(id: string): Promise<void> {
-  console.log(`API CALL: DELETE /api/v1/templates/${id}`);
-  return request<void>(`/api/v1/templates/${id}`, {
+  return request<void>(`/templates/${id}`, {
     method: 'DELETE',
   });
 }
 
 async function apiClone(id: string): Promise<Template> {
-  console.log(`API CALL: POST /api/v1/templates/${id}/clone`);
-  return request<Template>(`/api/v1/templates/${id}/clone`, {
+  return request<Template>(`/templates/${id}/clone`, {
     method: 'POST',
   });
 }

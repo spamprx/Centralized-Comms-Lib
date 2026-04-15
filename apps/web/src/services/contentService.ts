@@ -1,4 +1,5 @@
-const API_BASE = String(import.meta.env.VITE_API_URL ?? '').trim();
+import { resolveApiV1Base } from '../lib/apiBase';
+const API_BASE = resolveApiV1Base();
 import { getAuthToken } from './tokenStore';
 
 export type LifecycleState = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
@@ -29,6 +30,15 @@ export type Content = {
   updatedAt: string;
 };
 
+/** `GET /content/workspace` — items you own or co-author. */
+export type WorkspaceContent = Content & {
+  author?: ContentAuthor | null;
+  viewsCount: number;
+  likesCount: number;
+  workspaceRole: 'author' | 'co_author';
+  acceptedCoAuthorCount: number;
+};
+
 /** Mirrors API `ContentVersion` payloads used by the web app. */
 export type ContentVersion = {
   id: string;
@@ -42,6 +52,19 @@ export type ContentVersion = {
   authorId: string;
 };
 
+/** Thrown when POST /content/:id returns 409 (another author saved a newer revision first). */
+export class ContentSaveConflictError extends Error {
+  readonly currentVersionNumber: number;
+
+  constructor(currentVersionNumber: number) {
+    super(
+      'A newer revision was saved elsewhere. Reload to get the latest version, then re-apply your edits.',
+    );
+    this.name = 'ContentSaveConflictError';
+    this.currentVersionNumber = currentVersionNumber;
+  }
+}
+
 export type ContentAnnotation = {
   id: string;
   body: string;
@@ -52,6 +75,14 @@ export type ContentAnnotation = {
   selectionFrom: number | null;
   selectionTo: number | null;
   selectionText: string | null;
+};
+
+/** Recent editor presence (heartbeat); same shape as `GET /content/:id/presence`. */
+export type EditorPresenceUser = {
+  userId: string;
+  displayName: string;
+  email: string;
+  lastSeenAt: string;
 };
 
 export type ContentComment = {
@@ -158,6 +189,11 @@ export const contentService = {
     return request<Content[]>(query ? `/content?${query}` : '/content');
   },
 
+  /** Primary + accepted co-author items for My Content. */
+  listWorkspace: async (): Promise<WorkspaceContent[]> => {
+    return request<WorkspaceContent[]>('/content/workspace');
+  },
+
   createDraft: async (
     title: string,
     body?: unknown,
@@ -166,8 +202,8 @@ export const contentService = {
       aiGenerated?: boolean;
       contentType?: Content['contentType'];
     },
-  ): Promise<{ content: Content }> => {
-    return request<{ content: Content }>('/content', {
+  ): Promise<{ content: Content; version?: ContentVersion }> => {
+    return request<{ content: Content; version?: ContentVersion }>('/content', {
       method: 'POST',
       body: JSON.stringify({
         title,
@@ -181,12 +217,40 @@ export const contentService = {
 
   saveDraft: async (
     id: string,
-    data: { title?: string; body?: unknown; contentType?: Content['contentType'] },
-  ): Promise<unknown> => {
-    return request<unknown>(`/content/${id}`, {
+    data: {
+      title?: string;
+      body?: unknown;
+      contentType?: Content['contentType'];
+      baseVersionNumber?: number;
+    },
+  ): Promise<ContentVersion> => {
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/content/${id}`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
       body: JSON.stringify(data),
     });
+    if (res.status === 409) {
+      const err = (await res.json().catch(() => ({}))) as {
+        currentVersionNumber?: number;
+      };
+      throw new ContentSaveConflictError(
+        typeof err.currentVersionNumber === 'number' ? err.currentVersionNumber : 0,
+      );
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(
+        (errBody as { error?: string; message?: string }).error ||
+          (errBody as { message?: string }).message ||
+          `HTTP ${res.status}`,
+      );
+    }
+    return res.json() as Promise<ContentVersion>;
   },
 
   delete: async (id: string): Promise<void> => {
@@ -209,6 +273,39 @@ export const contentService = {
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
   }> => {
     return request(`/content/${id}`);
+  },
+
+  /** Primary author only: invite someone who already has an account (matches email). */
+  requestCoAuthorByEmail: async (
+    contentId: string,
+    email: string,
+  ): Promise<{ message: string }> => {
+    return request<{ message: string }>(`/content/${contentId}/co-authors/by-email`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  /** Invitee: accept or reject a pending co-author request for this content. */
+  respondToCoAuthorRequest: async (
+    contentId: string,
+    decision: 'APPROVE' | 'REJECT',
+  ): Promise<{ message: string }> => {
+    return request<{ message: string }>(`/content/${contentId}/co-authors/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    });
+  },
+
+  /** Invitee: list documents where you have a pending co-author invitation. */
+  listPendingCoAuthorInvitations: async (): Promise<
+    Array<{
+      contentId: string;
+      title: string;
+      requestedBy: { displayName: string; email: string };
+    }>
+  > => {
+    return request(`/content/co-author-invitations/pending`);
   },
 
   listAnnotations: async (contentId: string): Promise<ContentAnnotation[]> => {
@@ -299,6 +396,41 @@ export const contentService = {
     return false;
   },
 
+  /** Heartbeat while the editor tab is open. No-op on failure (network). */
+  postEditorPresenceHeartbeat: async (contentId: string): Promise<void> => {
+    const token = getAuthToken();
+    try {
+      const res = await fetch(`${API_BASE}/content/${contentId}/presence/heartbeat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+      });
+      if (!res.ok && res.status !== 204) {
+        await res.json().catch(() => ({}));
+      }
+    } catch {
+      /* ignore */
+    }
+  },
+
+  listEditorPresence: async (contentId: string): Promise<EditorPresenceUser[]> => {
+    const r = await fetchOptionalJson<EditorPresenceUser[]>(`/content/${contentId}/presence`);
+    if (!r.ok) return [];
+    return Array.isArray(r.data) ? r.data : [];
+  },
+
+  /** Like `listEditorPresence`, but returns the HTTP status on failure. */
+  listEditorPresenceStatus: async (
+    contentId: string,
+  ): Promise<{ ok: true; items: EditorPresenceUser[] } | { ok: false; status: number }> => {
+    const r = await fetchOptionalJson<EditorPresenceUser[]>(`/content/${contentId}/presence`);
+    if (!r.ok) return { ok: false, status: r.status };
+    return { ok: true, items: Array.isArray(r.data) ? r.data : [] };
+  },
+
   /**
    * Server-computed word diff between two version snapshots. Returns null when the endpoint is unavailable.
    */
@@ -321,7 +453,11 @@ export const contentService = {
   /**
    * Restore a snapshot as the new head revision. Backend must return 409 when a co-author session is active.
    */
-  restoreVersion: async (contentId: string, versionId: string): Promise<unknown> => {
+  restoreVersion: async (
+    contentId: string,
+    versionId: string,
+    opts?: { baseVersionNumber?: number },
+  ): Promise<unknown> => {
     const token = getAuthToken();
     const res = await fetch(`${API_BASE}/content/${contentId}/versions/${versionId}/restore`, {
       method: 'POST',
@@ -330,6 +466,11 @@ export const contentService = {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: 'include',
+      body: JSON.stringify(
+        typeof opts?.baseVersionNumber === 'number'
+          ? { baseVersionNumber: opts.baseVersionNumber }
+          : {},
+      ),
     });
     if (res.status === 409) {
       const err = await res.json().catch(() => ({}));
@@ -347,5 +488,13 @@ export const contentService = {
       throw new Error(err.error || err.message || `HTTP ${res.status}`);
     }
     return res.json().catch(() => ({}));
+  },
+
+  requestRestore: async (contentId: string): Promise<void> => {
+    await request<{ ok: true }>(`/content/${contentId}/restore-request`, {
+      method: 'POST',
+    }).catch(() => {
+      // ignore (best-effort)
+    });
   },
 };

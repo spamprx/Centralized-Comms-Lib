@@ -1,6 +1,7 @@
 import { getAuthToken } from './tokenStore';
+import { resolveApiV1Base } from '../lib/apiBase';
 
-const API_BASE = String(import.meta.env.VITE_API_URL ?? '').trim();
+const API_BASE = resolveApiV1Base();
 
 export type ProfileMe = {
   id: string;

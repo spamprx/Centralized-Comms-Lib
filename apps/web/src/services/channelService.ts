@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL;
+import { resolveApiV1Base } from '../lib/apiBase';
+const API_BASE = resolveApiV1Base();
 import { getAuthToken } from './tokenStore';
 
 export type ChannelCompatibility = {
@@ -74,7 +75,7 @@ async function isApiAvailable(): Promise<boolean> {
   if (cached !== null) return cached === 'true';
 
   try {
-    await request<Channel[]>('/api/v1/channels', { method: 'GET' });
+    await request<Channel[]>('/channels', { method: 'GET' });
     localStorage.setItem(API_AVAILABILITY_KEY, 'true');
     return true;
   } catch (error) {
@@ -125,21 +126,21 @@ function saveBindingsToStorage(templateId: string, bindings: Binding[]): void {
 
 // API methods
 async function apiListChannels(): Promise<Channel[]> {
-  return request<Channel[]>('/api/v1/channels');
+  return request<Channel[]>('/channels');
 }
 
 async function apiCreateBinding(
   templateId: string,
   binding: CreateBindingRequest,
 ): Promise<Binding> {
-  return request<Binding>(`/api/v1/templates/${templateId}/bindings`, {
+  return request<Binding>(`/templates/${templateId}/bindings`, {
     method: 'POST',
     body: JSON.stringify(binding),
   });
 }
 
 async function apiDeleteBinding(templateId: string, bindingId: string): Promise<void> {
-  return request<void>(`/api/v1/templates/${templateId}/bindings/${bindingId}`, {
+  return request<void>(`/templates/${templateId}/bindings/${bindingId}`, {
     method: 'DELETE',
   });
 }
@@ -221,7 +222,7 @@ export const channelService = {
 
   getBindings: async (templateId: string): Promise<Binding[]> => {
     // For now, get from localStorage. In a real implementation, this would
-    // be part of the template data from GET /api/v1/templates/{id}
+    // be part of the template data from GET /templates/{id} (API is mounted under /api/v1)
     return getBindingsFromStorage(templateId);
   },
 

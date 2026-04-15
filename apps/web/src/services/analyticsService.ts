@@ -8,8 +8,9 @@ import type {
   AIInsight,
 } from '../types/analytics';
 import type { DateRange } from '../lib/dateUtils';
+import { resolveApiV1Base } from '../lib/apiBase';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+const API_BASE = resolveApiV1Base();
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const { getAuthToken } = await import('./tokenStore');

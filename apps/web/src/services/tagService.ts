@@ -1,4 +1,5 @@
-const API_BASE = 'http://168.144.22.124:8000';
+import { resolveApiV1Base } from '../lib/apiBase';
+const API_BASE = resolveApiV1Base();
 import { getAuthToken } from './tokenStore';
 
 export interface Tag {
@@ -26,7 +27,7 @@ async function isApiAvailable(): Promise<boolean> {
   if (cached !== null) return cached === 'true';
 
   try {
-    await request<Tag[]>('api/v1/tags', { method: 'GET' });
+    await request<Tag[]>('/tags', { method: 'GET' });
     localStorage.setItem(API_AVAILABILITY_KEY, 'true');
     return true;
   } catch (error) {
@@ -36,9 +37,7 @@ async function isApiAvailable(): Promise<boolean> {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE}${endpoint}`;
-  console.log(`API_BASE: ${API_BASE}`);
-  console.log(`API REQUEST: ${options.method || 'GET'} ${url}`);
+  const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const token = getAuthToken();
   const res = await fetch(url, {
     headers: {
@@ -104,21 +103,18 @@ function generateSlug(name: string): string {
 
 // API methods
 async function apiList(): Promise<Tag[]> {
-  console.log('API CALL: GET /api/v1/tags');
-  return request<Tag[]>('/api/v1/tags');
+  return request<Tag[]>('/tags');
 }
 
 async function apiCreate(tag: CreateTagRequest): Promise<Tag> {
-  console.log('API CALL: POST /api/v1/tags', tag);
-  return request<Tag>('/api/v1/tags', {
+  return request<Tag>('/tags', {
     method: 'POST',
     body: JSON.stringify(tag),
   });
 }
 
 async function apiDelete(tagId: string): Promise<void> {
-  console.log(`API CALL: DELETE /api/v1/tags/${tagId}`);
-  return request<void>(`/api/v1/tags/${tagId}`, {
+  return request<void>(`/tags/${tagId}`, {
     method: 'DELETE',
   });
 }
