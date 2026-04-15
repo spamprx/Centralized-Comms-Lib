@@ -131,13 +131,17 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
       priority?: number;
       compatibility?: Record<string, unknown>;
     };
-    const result = await channelService.update(auditContext(req), req.params.id, {
-      name,
-      key,
-      description,
-      priority,
-      compatibility,
-    });
+    const result = await channelService.update(
+      auditContext(req),
+      req.params.id,
+      {
+        name,
+        key,
+        description,
+        priority,
+        compatibility,
+      },
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Channel not found" });
       return;
@@ -163,7 +167,10 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
 
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const result = await channelService.remove(auditContext(req), req.params.id);
+    const result = await channelService.remove(
+      auditContext(req),
+      req.params.id,
+    );
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Channel not found" });
       return;

@@ -113,19 +113,23 @@ export default function CitationSearchDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
       aria-labelledby="citation-dialog-title"
     >
-      <div className="flex max-h-[85vh] w-full max-w-[820px] flex-col overflow-hidden rounded-app-xl border border-app-border/90 bg-app-bg-subtle/95 shadow-app-lift backdrop-blur-xl">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-app-border/70 px-5 py-4">
+      <div className="relative flex max-h-[85vh] w-full max-w-[820px] flex-col overflow-hidden rounded-app-xl border border-white/10 bg-app-bg/88 shadow-app-lift backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/72">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/45 to-app-accent-2/35"
+          aria-hidden
+        />
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/[0.08] px-5 py-4">
           <div className="min-w-0">
             <h2
               id="citation-dialog-title"
               className="m-0 flex items-center gap-2 text-lg font-semibold text-app-text"
             >
-              <BookMarked size={20} className="shrink-0 text-cyan-400/90" />
+              <BookMarked size={20} className="shrink-0 text-app-accent" />
               Insert citation from references
             </h2>
             <p className="mt-1 text-[12px] leading-snug text-app-muted">
@@ -138,14 +142,14 @@ export default function CitationSearchDialog({
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-app-md p-2 text-app-faint transition-colors hover:bg-app-elevated hover:text-app-text"
+            className="shrink-0 rounded-app-md p-2 text-app-faint transition-colors hover:bg-white/8 hover:text-app-text"
             aria-label="Close"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-3 border-b border-app-border/50 px-5 py-4 sm:flex-row sm:items-end">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-white/[0.06] px-5 py-4 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
             <label
               htmlFor="citation-search-q"
@@ -169,7 +173,7 @@ export default function CitationSearchDialog({
                   }
                 }}
                 placeholder="Title, author, keywords…"
-                className="box-border w-full rounded-app-md border border-app-border/90 bg-app-surface py-2.5 pl-9 pr-3 text-[13px] text-app-text outline-none placeholder:text-app-faint focus:border-cyan-500/35"
+                className="box-border w-full rounded-app-md border border-white/10 bg-white/[0.04] py-2.5 pl-9 pr-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none placeholder:text-app-faint focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/20"
                 autoComplete="off"
               />
             </div>
@@ -186,7 +190,7 @@ export default function CitationSearchDialog({
                 id="citation-style"
                 value={citationStyle}
                 onChange={(e) => onCitationStyleChange(e.target.value as CitationStyle)}
-                className="box-border min-w-[100px] rounded-app-md border border-app-border/90 bg-app-surface px-3 py-2.5 text-[13px] text-app-text outline-none"
+                className="box-border min-w-[100px] rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none focus:border-app-accent/40"
               >
                 <option value="APA">APA</option>
                 <option value="IEEE">IEEE</option>
@@ -204,7 +208,7 @@ export default function CitationSearchDialog({
                 id="citation-marker-mode"
                 value={citationMarkerMode}
                 onChange={(e) => onCitationMarkerModeChange(e.target.value as CitationMarkerMode)}
-                className="box-border min-w-[128px] rounded-app-md border border-app-border/90 bg-app-surface px-3 py-2.5 text-[13px] text-app-text outline-none"
+                className="box-border min-w-[128px] rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none focus:border-app-accent/40"
               >
                 <option value="chip">Chip [n]</option>
                 <option value="raised">Raised [n]</option>
@@ -215,7 +219,7 @@ export default function CitationSearchDialog({
               type="button"
               onClick={() => void performSearch(query)}
               disabled={loading || !query.trim()}
-              className="self-end rounded-app-md border border-violet-500/35 bg-violet-500/15 px-4 py-2.5 text-[13px] font-medium text-violet-200 transition-colors hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+              className="self-end rounded-app-md border border-app-accent/35 bg-app-accent/12 px-4 py-2.5 text-[13px] font-semibold text-app-accent transition-colors hover:bg-app-accent/20 disabled:cursor-not-allowed disabled:opacity-45"
             >
               Search
             </button>
@@ -249,7 +253,7 @@ export default function CitationSearchDialog({
             <span>{existingCitationCount} citation(s) in this draft</span>
           </div>
 
-          <div className="max-h-[min(52vh,420px)] overflow-auto rounded-app-md border border-app-border/70 bg-app-bg/40">
+          <div className="max-h-[min(52vh,420px)] overflow-auto rounded-app-md border border-white/10 bg-app-bg-subtle/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             {loading && hits.length === 0 ? (
               <div className="flex items-center gap-2 p-5 text-[13px] text-app-muted">
                 <Loader2 size={18} className="animate-spin shrink-0" />
@@ -262,16 +266,13 @@ export default function CitationSearchDialog({
                   : 'No references matched. Try different keywords.'}
               </div>
             ) : (
-              <ul className="m-0 list-none divide-y divide-app-border/60 p-0">
+              <ul className="m-0 list-none divide-y divide-white/[0.06] p-0">
                 {hits.map((hit) => {
                   const work = toCitationWork(hit);
                   const preview = formatCitationLocal(citationStyle, work);
                   const busy = insertingId === hit.contentId;
                   return (
-                    <li
-                      key={hit.contentId}
-                      className="p-4 transition-colors hover:bg-app-elevated/40"
-                    >
+                    <li key={hit.contentId} className="p-4 transition-colors hover:bg-white/[0.04]">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="text-[13px] font-semibold leading-snug text-app-text">
@@ -288,7 +289,7 @@ export default function CitationSearchDialog({
                               No snippet — metadata may be incomplete.
                             </div>
                           )}
-                          <div className="mt-2 border-l-2 border-cyan-500/35 pl-2 text-[11px] leading-snug text-app-muted">
+                          <div className="mt-2 border-l-2 border-app-accent/40 pl-2 text-[11px] leading-snug text-app-muted">
                             <span className="font-semibold text-app-faint">
                               Preview ({citationStyle}):{' '}
                             </span>
@@ -299,7 +300,7 @@ export default function CitationSearchDialog({
                           type="button"
                           disabled={busy}
                           onClick={() => void handleInsert(hit)}
-                          className="shrink-0 self-start rounded-app-md border border-cyan-500/35 bg-cyan-500/12 px-3 py-2 text-[12px] font-medium text-cyan-200 transition-colors hover:bg-cyan-500/22 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="shrink-0 self-start rounded-app-md border border-app-accent-2/35 bg-app-accent-2/10 px-3 py-2 text-[12px] font-semibold text-app-accent-2 transition-colors hover:bg-app-accent-2/18 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {busy ? (
                             <span className="flex items-center gap-1.5">
@@ -319,18 +320,18 @@ export default function CitationSearchDialog({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-app-border/60 px-5 py-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-white/[0.08] px-5 py-3">
           <button
             type="button"
             onClick={() => onPlaceReferencesHere()}
-            className="rounded-app-md border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-[12px] font-medium text-cyan-200 transition-colors hover:bg-cyan-500/18"
+            className="rounded-app-md border border-white/12 bg-white/[0.04] px-3 py-2 text-[12px] font-medium text-app-text transition-colors hover:border-app-accent/30 hover:bg-app-accent/10"
           >
             Place References block at cursor
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-app-md border border-app-border/90 bg-app-surface px-4 py-2 text-[13px] text-app-muted transition-colors hover:bg-app-elevated"
+            className="rounded-app-md border border-white/10 bg-white/[0.04] px-4 py-2 text-[13px] text-app-muted transition-colors hover:bg-white/[0.07]"
           >
             Close
           </button>

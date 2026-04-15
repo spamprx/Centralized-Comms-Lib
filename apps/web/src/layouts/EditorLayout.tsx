@@ -170,7 +170,7 @@ export default function EditorLayout() {
       editorProps: {
         attributes: {
           class:
-            'editor-prose min-h-[360px] px-8 py-6 text-[15px] leading-relaxed text-[var(--editor-doc-text)] outline-none box-border',
+            'editor-prose min-h-[360px] px-8 py-6 text-[15px] leading-relaxed text-[var(--editor-doc-text)] outline-none box-border selection:bg-[var(--editor-primary-muted)]',
         },
       },
     },
@@ -524,22 +524,22 @@ export default function EditorLayout() {
   }, [editor]);
 
   const fmtBtn = (active: boolean) =>
-    `flex h-8 min-w-8 items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] px-2 text-[13px] transition-colors ${
+    `flex h-8 min-w-8 items-center justify-center rounded-[var(--editor-radius-input)] px-2 text-[13px] transition-[background-color,border-color,color,box-shadow] duration-200 ${
       active
-        ? 'border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] text-[var(--editor-primary)]'
-        : 'border-transparent bg-transparent text-[var(--editor-muted)] hover:bg-[var(--editor-canvas-bg)]'
+        ? 'border border-[var(--editor-primary)]/45 bg-[var(--editor-primary-muted)] text-[var(--editor-primary)] shadow-[0_0_0_1px_rgba(147,124,248,0.12)]'
+        : 'border border-transparent text-[var(--editor-muted)] hover:border-white/10 hover:bg-white/[0.05] hover:text-[var(--editor-doc-text)]'
     }`;
 
   const tabChip = (active: boolean) =>
-    `rounded-[6px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+    `rounded-[8px] px-3 py-1.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ${
       active
-        ? 'bg-[var(--editor-card-bg)] text-[var(--editor-doc-text)]'
+        ? 'bg-gradient-to-b from-white/[0.14] to-white/[0.04] text-[var(--editor-doc-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
         : 'text-[var(--editor-muted)] hover:text-[var(--editor-doc-text)]'
     }`;
 
   const rightTabs = (
     <div
-      className="mb-2 flex shrink-0 gap-0.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] p-0.5"
+      className="mb-2 flex shrink-0 gap-0.5 rounded-[10px] border border-white/10 bg-[var(--editor-panel-bg)] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md"
       role="tablist"
       aria-label="Side panel"
     >
@@ -550,10 +550,10 @@ export default function EditorLayout() {
           role="tab"
           aria-selected={rightPanelTab === tab}
           onClick={() => setRightPanelTab(tab)}
-          className={`flex-1 rounded-[6px] px-1 py-1.5 text-[10px] font-semibold leading-tight ${
+          className={`flex-1 rounded-[8px] px-1 py-1.5 text-[10px] font-semibold leading-tight transition-colors ${
             rightPanelTab === tab
-              ? 'bg-[var(--editor-card-bg)] text-[var(--editor-doc-text)]'
-              : 'text-[var(--editor-faint)] hover:text-[var(--editor-muted)]'
+              ? 'bg-white/[0.1] text-[var(--editor-doc-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+              : 'text-[var(--editor-faint)] hover:bg-white/[0.04] hover:text-[var(--editor-muted)]'
           }`}
         >
           {tab === 'refs'
@@ -582,8 +582,12 @@ export default function EditorLayout() {
           : `Saved ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
   return (
-    <div className="editor-workspace flex h-screen min-h-0 flex-col">
-      <header className="relative z-20 flex h-[52px] shrink-0 items-center border-b-[0.5px] border-[var(--editor-border)] bg-[var(--editor-topbar-bg)] px-4">
+    <div className="editor-workspace relative flex h-screen min-h-0 flex-col overflow-hidden bg-[var(--editor-canvas-bg)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-app-accent/14 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-app-accent-2/12 blur-[90px]" />
+      </div>
+      <header className="relative z-20 flex h-[52px] shrink-0 items-center border-b border-white/[0.08] bg-[var(--editor-topbar-bg)] px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl supports-backdrop-filter:bg-[var(--editor-topbar-bg)]">
         <div className="flex min-w-0 flex-1 items-center gap-1 text-[13px] text-[var(--editor-muted)]">
           <RouterLink
             to="/library"
@@ -597,7 +601,7 @@ export default function EditorLayout() {
 
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <nav
-            className="pointer-events-auto flex items-center gap-0.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] p-0.5"
+            className="pointer-events-auto flex items-center gap-0.5 rounded-[10px] border border-white/10 bg-[var(--editor-panel-bg)] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
             aria-label="Editor mode"
           >
             <button
@@ -623,7 +627,7 @@ export default function EditorLayout() {
               </RouterLink>
             ) : (
               <span
-                className="cursor-not-allowed rounded-[6px] px-3 py-1.5 text-[13px] font-medium text-[var(--editor-faint)]"
+                className="cursor-not-allowed rounded-[8px] px-3 py-1.5 text-[13px] font-medium text-[var(--editor-faint)]"
                 title="Save the draft first to open version history"
               >
                 History
@@ -638,7 +642,7 @@ export default function EditorLayout() {
               type="button"
               onClick={handleConvertToDraft}
               disabled={saving || !persistedContentId}
-              className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3.5 py-2 text-[13px] font-semibold text-[var(--editor-doc-text)] transition-colors hover:bg-[var(--editor-canvas-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border border-white/12 bg-white/[0.05] px-3.5 py-2 text-[13px] font-semibold text-[var(--editor-doc-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/18 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
               title="Convert to draft to edit"
             >
               Convert to draft
@@ -648,7 +652,7 @@ export default function EditorLayout() {
             type="button"
             onClick={handleSaveDraft}
             disabled={saving || isPublished}
-            className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-[var(--editor-primary)] px-3.5 py-2 text-[13px] font-semibold text-[var(--editor-primary-fg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border border-white/15 bg-gradient-to-r from-app-accent to-app-accent-2 px-3.5 py-2 text-[13px] font-semibold text-app-bg shadow-[0_0_28px_-8px_rgba(147,124,248,0.5)] ring-1 ring-white/12 transition-[filter,transform] hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100"
           >
             {saving ? (
               <Loader2 size={16} className="animate-spin" />
@@ -676,7 +680,7 @@ export default function EditorLayout() {
             Share
           </button> */}
           <div
-            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] font-semibold text-[var(--editor-primary)]"
+            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/12 bg-gradient-to-br from-white/[0.1] to-white/[0.02] text-[11px] font-semibold text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-app-accent/20"
             title={user?.email ?? 'Signed in'}
           >
             {user ? userInitials(user.email, user.displayName) : '?'}
@@ -685,7 +689,7 @@ export default function EditorLayout() {
       </header>
 
       {mainTab === 'edit' && (
-        <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b-[0.5px] border-[var(--editor-border)] bg-[var(--editor-topbar-bg)] px-4">
+        <div className="relative z-10 flex h-9 shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] bg-[var(--editor-topbar-bg)] px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
           <div className="flex min-w-0 flex-wrap items-center gap-0.5">
             <button
               type="button"
@@ -776,10 +780,10 @@ export default function EditorLayout() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <div className="editor-canvas-area min-w-0 flex-1 overflow-auto bg-[var(--editor-canvas-bg)] px-6 py-5">
+      <div className="relative z-10 flex min-h-0 flex-1 gap-0 overflow-hidden">
+        <div className="editor-canvas-area relative min-w-0 flex-1 overflow-auto bg-[var(--editor-canvas-bg)] px-6 py-6">
           <div
-            className="mx-auto max-w-3xl rounded-[var(--editor-radius-card)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)]"
+            className="editor-doc-sheet mx-auto max-w-3xl rounded-[var(--editor-radius-card)] border border-[var(--editor-card-edge)] bg-[var(--editor-card-bg)] backdrop-blur-sm"
             style={{ minHeight: 'calc(100% - 8px)' }}
           >
             {mainTab === 'preview' ? (
@@ -791,7 +795,7 @@ export default function EditorLayout() {
                   <div className="tiptap-content mt-4">
                     <TipTapReadonly
                       doc={editor.getJSON()}
-                      className="ProseMirror text-[15px] leading-relaxed text-[var(--editor-muted)] outline-none"
+                      className="tiptap-readonly-preview ProseMirror text-[15px] leading-relaxed text-[var(--editor-muted)] outline-none selection:bg-app-accent/25"
                     />
                   </div>
                 ) : null}
@@ -813,7 +817,7 @@ export default function EditorLayout() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Title"
-                    className="box-border w-full border-b-[0.5px] border-[var(--editor-border)] bg-transparent px-8 pb-3 pt-6 text-[28px] font-bold leading-tight text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
+                    className="box-border w-full border-b border-white/[0.08] bg-transparent px-8 pb-3 pt-6 text-[28px] font-bold leading-tight tracking-tight text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
                   />
                 )}
                 <div className="tiptap-content px-0 pb-8">
@@ -824,7 +828,7 @@ export default function EditorLayout() {
           </div>
         </div>
 
-        <aside className="flex w-[240px] shrink-0 flex-col border-l-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] px-3 py-3">
+        <aside className="flex w-[240px] shrink-0 flex-col border-l border-white/[0.08] bg-[var(--editor-panel-bg)] px-3 py-3 shadow-[inset_1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl">
           {rightTabs}
           {rightPanelTab === 'library' && (
             <ComponentLibraryPanel
@@ -994,7 +998,7 @@ export default function EditorLayout() {
         </aside>
       </div>
 
-      <footer className="flex h-[26px] shrink-0 items-center justify-between gap-3 border-t-[0.5px] border-[var(--editor-border)] bg-[var(--editor-status-bg)] px-4 text-[10px] leading-none text-[var(--editor-faint)]">
+      <footer className="relative z-20 flex h-[28px] shrink-0 items-center justify-between gap-3 border-t border-white/[0.08] bg-[var(--editor-status-bg)] px-4 text-[10px] leading-none text-[var(--editor-faint)] backdrop-blur-md">
         <span className="min-w-0 truncate">
           {autosaveLabel}
           {componentNotice ? ` · ${componentNotice}` : ''}
@@ -1033,18 +1037,19 @@ export default function EditorLayout() {
         onInsert={applyCitationWithBibliography}
       />
       {showSaveComponentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            className="w-full max-w-[520px] rounded-(--editor-radius-card) border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] p-5 text-[var(--editor-doc-text)]"
-            style={{ color: 'var(--editor-doc-text)' }}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-[520px] overflow-hidden rounded-app-xl border border-white/10 bg-app-bg/92 p-5 text-app-text shadow-app-lift backdrop-blur-2xl">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/50 to-transparent"
+              aria-hidden
+            />
             <h3 className="m-0 text-lg font-semibold">Save selection as component</h3>
-            <p className="mb-4 mt-1 text-[12px] text-(--editor-muted)">
+            <p className="mb-4 mt-1 text-[12px] text-app-muted">
               Create a reusable component from the current selection.
             </p>
 
-            <div className="mb-2 text-[11px] text-(--editor-faint)">Selection preview</div>
-            <div className="mb-4 max-h-[90px] overflow-auto rounded-(--editor-radius-input) border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-canvas-bg)] p-3 text-[12px] text-[var(--editor-muted)]">
+            <div className="mb-2 text-[11px] text-app-faint">Selection preview</div>
+            <div className="mb-4 max-h-[90px] overflow-auto rounded-app-md border border-white/10 bg-app-bg-subtle/80 p-3 text-[12px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               {selectedText || 'No selection'}
             </div>
 
@@ -1053,28 +1058,28 @@ export default function EditorLayout() {
                 value={componentName}
                 onChange={(e) => setComponentName(e.target.value)}
                 placeholder="Component name"
-                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-doc-text)] outline-none"
+                className="rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/20"
               />
               <input
                 value={componentKey}
                 onChange={(e) => setComponentKey(e.target.value)}
                 placeholder="component-key"
-                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-doc-text)] outline-none"
+                className="rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/20"
               />
               <textarea
                 value={componentDescription}
                 onChange={(e) => setComponentDescription(e.target.value)}
                 placeholder="Description (optional)"
-                className="min-h-[72px] rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-doc-text)] outline-none"
+                className="min-h-[72px] rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/20"
               />
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setComponentMode('linked')}
-                  className={`rounded-[var(--editor-radius-input)] border-[0.5px] px-3 py-2 text-[12px] ${
+                  className={`rounded-app-md border px-3 py-2 text-[12px] transition-colors ${
                     componentMode === 'linked'
-                      ? 'border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] text-[var(--editor-primary)]'
-                      : 'border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[var(--editor-muted)]'
+                      ? 'border-app-accent/45 bg-app-accent/15 text-app-accent'
+                      : 'border-white/10 bg-white/[0.03] text-app-muted hover:border-white/16'
                   }`}
                 >
                   Linked
@@ -1082,17 +1087,17 @@ export default function EditorLayout() {
                 <button
                   type="button"
                   onClick={() => setComponentMode('detached')}
-                  className={`rounded-[var(--editor-radius-input)] border-[0.5px] px-3 py-2 text-[12px] ${
+                  className={`rounded-app-md border px-3 py-2 text-[12px] transition-colors ${
                     componentMode === 'detached'
-                      ? 'border-[var(--editor-primary)] bg-[var(--editor-primary-muted)] text-[var(--editor-primary)]'
-                      : 'border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[var(--editor-muted)]'
+                      ? 'border-app-accent/45 bg-app-accent/15 text-app-accent'
+                      : 'border-white/10 bg-white/[0.03] text-app-muted hover:border-white/16'
                   }`}
                 >
                   Snapshot
                 </button>
               </div>
               {componentSaveError && (
-                <div className="text-[12px] text-red-500">{componentSaveError}</div>
+                <div className="text-[12px] text-red-400">{componentSaveError}</div>
               )}
             </div>
 
@@ -1100,7 +1105,7 @@ export default function EditorLayout() {
               <button
                 type="button"
                 onClick={() => setShowSaveComponentModal(false)}
-                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-3 py-2 text-[13px] text-[var(--editor-muted)]"
+                className="rounded-app-md border border-white/12 bg-white/[0.04] px-3 py-2 text-[13px] text-app-muted transition-colors hover:bg-white/[0.07]"
               >
                 Cancel
               </button>
@@ -1108,7 +1113,7 @@ export default function EditorLayout() {
                 type="button"
                 onClick={handleSaveSelectionAsComponent}
                 disabled={componentSaving}
-                className="rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-[var(--editor-primary)] px-3 py-2 text-[13px] font-medium text-[var(--editor-primary-fg)] disabled:opacity-60"
+                className="rounded-app-md border border-white/15 bg-gradient-to-r from-app-accent to-app-accent-2 px-3 py-2 text-[13px] font-semibold text-app-bg shadow-[0_0_20px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {componentSaving ? 'Saving…' : 'Save component'}
               </button>

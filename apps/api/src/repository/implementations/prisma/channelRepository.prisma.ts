@@ -81,9 +81,13 @@ export class PrismaChannelRepository implements ChannelRepository {
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.key !== undefined && { key: input.key }),
-        ...(input.description !== undefined && { description: input.description }),
+        ...(input.description !== undefined && {
+          description: input.description,
+        }),
         ...(input.priority !== undefined && { priority: input.priority }),
-        ...(input.compatibility !== undefined && { compatibility: input.compatibility as object }),
+        ...(input.compatibility !== undefined && {
+          compatibility: input.compatibility as object,
+        }),
       },
     });
     return toChannel(row);

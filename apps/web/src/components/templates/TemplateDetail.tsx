@@ -5,6 +5,7 @@ import AddChannelModal from './AddChannelModal';
 import ChannelBindings from './ChannelBindings';
 import TranslationPreview from './TranslationPreview';
 import { templateService, channelService, type Tag, type Binding } from '../../services';
+import { Surface } from '../ui';
 
 interface Template {
   id: string;
@@ -302,12 +303,12 @@ Published by {{author}} on {{date}}
 
   if (!template) {
     return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
+      <div className="app-main-canvas p-6">
+        <div className="flex h-64 items-center justify-center">
           <div className="text-center">
-            <div className="h-8 bg-app-border rounded w-1/4 mb-4"></div>
-            <div className="h-4 bg-app-border rounded w-1/2 mb-2"></div>
-            <div className="h-4 bg-app-border rounded w-3/4"></div>
+            <div className="mb-4 h-8 w-1/4 rounded-app-md bg-app-border/60" />
+            <div className="mb-2 h-4 w-1/2 rounded-app-md bg-app-border/50" />
+            <div className="h-4 w-3/4 rounded-app-md bg-app-border/40" />
           </div>
         </div>
       </div>
@@ -316,10 +317,14 @@ Published by {{author}} on {{date}}
 
   return (
     <>
-      <div className="mx-auto max-w-6xl px-app-page py-app-page md:px-app-page-lg">
+      <div className="app-main-canvas relative mx-auto max-w-6xl px-app-page py-app-page md:px-app-page-lg">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+          <div className="absolute -left-20 top-10 h-56 w-56 rounded-full bg-app-accent/10 blur-[90px]" />
+          <div className="absolute right-0 top-32 h-48 w-48 rounded-full bg-app-accent-2/10 blur-[80px]" />
+        </div>
         {/* Clone Banner */}
         {showCloneBanner && cloneInfo && (
-          <div className="mb-6 flex items-center justify-between rounded-app-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <div className="mb-6 flex items-center justify-between rounded-app-xl border border-emerald-400/35 bg-emerald-500/10 p-4 shadow-app-soft backdrop-blur-md">
             <div className="flex items-center">
               <Copy className="mr-3 h-5 w-5 text-emerald-400" />
               <span className="font-medium text-emerald-100">
@@ -327,6 +332,7 @@ Published by {{author}} on {{date}}
               </span>
             </div>
             <button
+              type="button"
               onClick={() => setShowCloneBanner(false)}
               className="text-emerald-400 hover:text-emerald-200"
             >
@@ -335,68 +341,76 @@ Published by {{author}} on {{date}}
           </div>
         )}
 
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <button
+            type="button"
             onClick={onBack}
-            className="flex items-center gap-2 text-app-muted hover:text-app-text"
+            className="flex items-center gap-2 rounded-app-md border border-transparent px-2 py-1.5 text-app-muted transition-colors hover:border-white/10 hover:bg-white/5 hover:text-app-text"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
             Back to Templates
           </button>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             {!isEditing ? (
               <>
                 <button
+                  type="button"
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 rounded-app-md bg-app-accent px-4 py-2 text-white"
+                  className="flex items-center gap-2 rounded-app-md bg-gradient-to-r from-app-accent to-app-accent-2 px-4 py-2 text-sm font-semibold text-app-bg shadow-[0_0_20px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/15 transition-[transform,filter] duration-(--duration-app) ease-app-out hover:brightness-105 active:scale-[0.98]"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="h-4 w-4" />
                   Edit Template
                 </button>
                 <button
+                  type="button"
                   onClick={handleClone}
-                  className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-500"
+                  className="flex items-center gap-2 rounded-app-md border border-emerald-400/35 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/25"
                 >
-                  <Copy className="w-4 h-4" />
+                  <Copy className="h-4 w-4" />
                   Clone
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowAddChannelModal(true)}
-                  className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-4 py-2 text-app-text hover:bg-app-surface-hover"
+                  className="flex items-center gap-2 rounded-app-md border border-white/10 bg-app-bg/50 px-4 py-2 text-sm font-medium text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm transition-colors hover:border-white/18 hover:bg-white/6"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="h-4 w-4" />
                   Add Channel
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowTranslationModal(true)}
-                  className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-surface px-4 py-2 text-app-text hover:bg-app-surface-hover"
+                  className="flex items-center gap-2 rounded-app-md border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-app-text backdrop-blur-sm transition-colors hover:border-white/18 hover:bg-white/8"
                 >
-                  <Globe className="w-4 h-4" />
+                  <Globe className="h-4 w-4" />
                   Translation Preview
                 </button>
                 <button
+                  type="button"
                   onClick={handleDelete}
-                  className="flex items-center gap-2 rounded-app-md bg-red-600 px-4 py-2 text-white hover:bg-red-500"
+                  className="flex items-center gap-2 rounded-app-md border border-red-400/35 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 transition-colors hover:bg-red-500/25"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" />
                   Delete
                 </button>
               </>
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={handleSave}
-                  className="flex items-center gap-2 rounded-app-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-500"
+                  className="flex items-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/28"
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className="h-4 w-4" />
                   Save
                 </button>
                 <button
+                  type="button"
                   onClick={handleCancel}
-                  className="flex items-center gap-2 rounded-app-md bg-app-elevated px-4 py-2 text-app-text hover:bg-app-surface-hover"
+                  className="flex items-center gap-2 rounded-app-md border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-app-text transition-colors hover:bg-white/10"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                   Cancel
                 </button>
               </>
@@ -405,20 +419,21 @@ Published by {{author}} on {{date}}
         </div>
 
         {versionHistory.length > 0 && (
-          <div className="mt-6 rounded-app-lg border border-app-border bg-app-surface p-6">
+          <Surface variant="glass" padding="md" className="mt-6 shadow-app-lift">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-app-text">
                 Version History ({versionHistory.length} versions)
               </h3>
               {selectedVersions && (
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedVersions(null);
                     setLastClickedVersion(null);
                   }}
-                  className="text-sm text-app-muted hover:text-app-text"
+                  className="text-sm text-app-muted transition-colors hover:text-app-text"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -426,18 +441,19 @@ Published by {{author}} on {{date}}
               {versionHistory.map((version, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between rounded-app-md border border-app-border bg-app-bg/40 p-3"
+                  className="flex items-center justify-between rounded-app-md border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 >
                   <div className="flex-1">
                     <p className="text-sm font-medium text-app-text">
                       Version {versionHistory.length - index}
                     </p>
                     <p className="text-xs text-app-faint">
-                      {new Date(version.updatedAt || Date.now()).toLocaleString()}
+                      {new Date(version.updatedAt || new Date().toISOString()).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={() => {
                         if (lastClickedVersion === version.id) {
                           // This version was last clicked - hide diff
@@ -450,18 +466,20 @@ Published by {{author}} on {{date}}
                           setLastClickedVersion(version.id);
                         }
                       }}
-                      className="flex items-center gap-1 rounded-app-md bg-app-accent px-3 py-1 text-sm text-white"
+                      className="flex items-center gap-1 rounded-app-md bg-gradient-to-r from-app-accent to-app-accent-2 px-3 py-1.5 text-sm font-semibold text-app-bg shadow-[0_0_16px_-6px_rgba(147,124,248,0.45)] ring-1 ring-white/12 transition-[filter,transform] hover:brightness-105 active:scale-[0.98]"
                     >
-                      <GitCompare className="w-3 h-3" />
+                      <GitCompare className="h-3 w-3" />
                       {lastClickedVersion === version.id ? 'Hide Diff' : 'Show Diff'}
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleRevert(version)}
-                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                      className="rounded-app-md border border-emerald-400/40 bg-emerald-500/20 px-3 py-1.5 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/28"
                     >
                       Revert
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         if (
                           confirm(
@@ -471,33 +489,34 @@ Published by {{author}} on {{date}}
                           handleDeleteVersion(version);
                         }
                       }}
-                      className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                      className="rounded-app-md border border-red-400/40 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-100 transition-colors hover:bg-red-500/25"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="h-3 w-3" />
                       Delete
                     </button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Surface>
         )}
 
         {selectedVersions && (
-          <div className="mt-6 rounded-app-lg border border-app-border bg-app-bg-subtle p-6">
+          <Surface variant="glass" padding="md" className="mt-6 shadow-app-lift">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-app-text">Version Comparison</h3>
               <button
+                type="button"
                 onClick={() => {
                   setSelectedVersions(null);
                   setLastClickedVersion(null);
                 }}
-                className="text-app-muted hover:text-app-text"
+                className="text-app-muted transition-colors hover:text-app-text"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="bg-app-bg-subtle rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="max-h-96 overflow-y-auto rounded-app-lg border border-white/8 bg-app-bg-subtle/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="space-y-1">
                 {(() => {
                   const { diffs, hasDifferences } = getDiffLines(
@@ -548,10 +567,10 @@ Published by {{author}} on {{date}}
                 </p>
               </div>
             </div>
-          </div>
+          </Surface>
         )}
 
-        <div className="rounded-app-lg border border-app-border bg-app-surface p-6">
+        <Surface variant="glass" padding="lg" className="shadow-app-lift">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <div className="mb-6">
@@ -659,17 +678,18 @@ Published by {{author}} on {{date}}
               )}
             </div>
           </div>
-        </div>
+        </Surface>
 
         {/* Channel Bindings Section */}
-        <div className="mt-6 bg-app-surface rounded-lg border border-app-border p-6">
-          <div className="flex justify-between items-center mb-4">
+        <Surface variant="glass" padding="md" className="mt-6 shadow-app-lift">
+          <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-app-text">Channel Bindings</h3>
             <button
+              type="button"
               onClick={() => setShowAddChannelModal(true)}
-              className="flex items-center gap-2 rounded-app-md border border-app-border bg-app-elevated px-3 py-1.5 text-sm text-app-text hover:bg-app-surface-hover"
+              className="flex items-center gap-2 rounded-app-md border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm font-medium text-app-text transition-colors hover:border-app-accent/35 hover:bg-app-accent/10"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="h-4 w-4" />
               Add Channel
             </button>
           </div>
@@ -679,7 +699,7 @@ Published by {{author}} on {{date}}
             onBindingUpdated={handleBindingUpdated}
             onEditBinding={handleEditBinding}
           />
-        </div>
+        </Surface>
       </div>
 
       {/* Add Channel Modal */}

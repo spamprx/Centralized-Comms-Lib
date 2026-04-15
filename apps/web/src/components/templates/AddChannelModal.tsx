@@ -6,6 +6,7 @@ import {
   type CreateBindingRequest,
   type Binding,
 } from '../../services';
+import { formInputClass, formSelectClass, formLabelClass } from '../ui';
 
 interface AddChannelModalProps {
   templateId: string;
@@ -125,57 +126,59 @@ export default function AddChannelModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/65 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-[520px] max-h-[80vh] bg-[#1a1d2e] border border-app-border rounded-2xl flex flex-col overflow-hidden shadow-[0_24px_48px_rgba(0,0,0,0.4)]"
+        className="relative flex max-h-[80vh] w-[520px] flex-col overflow-hidden rounded-app-xl border border-white/[0.12] bg-app-bg/85 shadow-app-glow backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/70"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-app-border flex justify-between items-center">
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-transparent"
+        />
+        <div className="relative flex items-center justify-between border-b border-white/[0.08] px-6 py-5">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Plus size={18} color="#0f766e" />
-              <h2 className="text-base font-bold text-app-text m-0">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-app-md bg-gradient-to-br from-app-accent/30 to-app-accent-2/20 text-app-accent ring-1 ring-white/10">
+                <Plus size={18} />
+              </span>
+              <h2 className="m-0 text-base font-bold text-app-text">
                 {editingBinding ? 'Edit Channel' : 'Add Channel'}
               </h2>
             </div>
-            <p className="text-xs text-app-faint m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
+            <p className="m-0 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-app-faint">
               {templateName}
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="bg-app-surface border-none rounded-lg p-2 text-app-muted cursor-pointer"
+            className="cursor-pointer rounded-app-md border border-white/10 bg-white/[0.05] p-2 text-app-muted transition-colors hover:bg-white/10 hover:text-app-text"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex justify-center p-8">
-              <Loader2 size={24} color="#0f766e" className="animate-spin" />
+              <Loader2 size={24} className="animate-spin text-app-accent" />
             </div>
           ) : channels.length === 0 ? (
-            <div className="p-8 text-center text-app-faint text-[13px]">
+            <div className="p-8 text-center text-[13px] text-app-faint">
               {existingChannelIds.length > 0
                 ? 'All available channels are already bound to this template'
                 : 'No channels available'}
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Channel Selection */}
               <div>
-                <label className="block text-sm font-medium text-app-text mb-2">
-                  Select Channel
-                </label>
+                <label className={formLabelClass}>Select Channel</label>
                 <select
                   value={selectedChannelId}
                   onChange={(e) => setSelectedChannelId(e.target.value)}
-                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm outline-none focus:border-app-accent/50"
+                  className={`${formSelectClass} mt-1.5 text-sm`}
                 >
                   <option value="">Choose a channel...</option>
                   {channels.map((channel) => (
@@ -186,34 +189,30 @@ export default function AddChannelModal({
                 </select>
               </div>
 
-              {/* Channel Info */}
               {selectedChannel && (
-                <div className="p-3 bg-app-accent-muted border border-app-accent/25 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-2 h-2 bg-app-accent rounded-full"></div>
-                    <span className="text-sm font-medium text-app-accent">
+                <div className="rounded-app-lg border border-app-accent/30 bg-app-accent/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  <div className="mb-1 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-app-accent-2 shadow-[0_0_10px_rgba(45,212,191,0.5)]" />
+                    <span className="text-sm font-medium text-app-text">
                       {selectedChannel.name}
                     </span>
                     <span className="text-xs text-app-accent">({selectedChannel.key})</span>
                   </div>
-                  <p className="text-xs text-app-accent">{selectedChannel.description}</p>
+                  <p className="text-xs text-app-muted">{selectedChannel.description}</p>
                 </div>
               )}
 
-              {/* Layout Configuration */}
               <div>
-                <label className="block text-sm font-medium text-app-text mb-2">
-                  Layout Configuration (JSON)
-                </label>
+                <label className={formLabelClass}>Layout Configuration (JSON)</label>
                 <textarea
                   value={layoutConfig}
                   onChange={(e) => handleConfigChange(e.target.value)}
                   rows={8}
-                  className="w-full px-3 py-2 bg-app-surface border border-app-border rounded-lg text-app-text text-sm font-mono outline-none focus:border-app-accent/50 resize-none"
+                  className={`${formInputClass} mt-1.5 resize-none font-mono text-sm`}
                   placeholder="Enter layout configuration as JSON..."
                 />
                 {configError && (
-                  <div className="mt-2 flex items-center gap-2 text-red-400 text-xs">
+                  <div className="mt-2 flex items-center gap-2 text-xs text-red-300">
                     <AlertCircle size={12} />
                     <span>{configError}</span>
                   </div>
@@ -223,19 +222,20 @@ export default function AddChannelModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-app-border flex justify-between items-center">
+        <div className="flex items-center justify-between border-t border-white/[0.08] px-6 py-4">
           <span className="text-xs text-app-faint">
             Configure channel-specific rendering settings
           </span>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={onClose}
-              className="px-[18px] py-2.5 bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer"
+              className="cursor-pointer rounded-app-md border border-white/10 bg-white/[0.05] px-[18px] py-2.5 text-[13px] text-app-muted transition-colors hover:bg-white/10 hover:text-app-text"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={
                 !selectedChannelId ||
@@ -244,12 +244,12 @@ export default function AddChannelModal({
                 success ||
                 channels.length === 0
               }
-              className={`flex items-center gap-1.5 px-5 py-2.5 border-none rounded-lg text-white text-[13px] font-semibold ${
+              className={`flex items-center gap-1.5 rounded-app-md border-none px-5 py-2.5 text-[13px] font-semibold text-app-bg transition-[transform,opacity,filter] duration-(--duration-app) ease-app-out active:scale-[0.98] ${
                 success
-                  ? 'bg-emerald-600 cursor-not-allowed'
+                  ? 'cursor-not-allowed bg-emerald-600'
                   : !selectedChannelId || !!configError || channels.length === 0
-                    ? 'bg-app-accent/30 cursor-not-allowed opacity-50'
-                    : 'bg-app-accent cursor-pointer'
+                    ? 'cursor-not-allowed bg-app-accent/35 opacity-50'
+                    : 'cursor-pointer bg-gradient-to-r from-app-accent to-app-accent-2 shadow-[0_0_24px_-8px_rgba(147,124,248,0.5)] hover:brightness-105'
               }`}
             >
               {submitting ? (
@@ -270,9 +270,8 @@ export default function AddChannelModal({
           </div>
         </div>
 
-        {/* Error display */}
         {error && (
-          <div className="px-6 py-2.5 bg-red-400/10 border-t border-red-400/20 text-red-400 text-xs text-center">
+          <div className="border-t border-red-400/25 bg-red-500/10 px-6 py-2.5 text-center text-xs text-red-200">
             {error}
           </div>
         )}

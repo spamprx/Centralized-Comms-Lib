@@ -260,13 +260,13 @@ export default function SlashCommandMenu({ editor, onOpenCitation }: SlashComman
   return (
     <div
       data-slash-menu
-      className="slash-menu fixed z-50 min-w-[200px] max-h-[min(280px,70vh)] overflow-auto rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] py-1 text-[12px] text-[var(--editor-doc-text)]"
+      className="slash-menu fixed z-50 min-w-[220px] max-h-[min(280px,70vh)] overflow-auto rounded-[var(--editor-radius-input)] border border-white/12 py-1 text-[12px] text-[var(--editor-doc-text)]"
       style={{ top: pos.top, left: pos.left }}
       role="listbox"
       aria-label="Insert block"
     >
-      <div className="border-b border-[var(--editor-border)] px-2.5 py-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
-        Type <span className="font-mono text-[var(--editor-muted)]">/</span> in a paragraph or
+      <div className="border-b border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
+        Type <span className="font-mono text-[var(--editor-primary)]">/</span> in a paragraph or
         heading to open this menu.
       </div>
       {filtered.length === 0 ? (
@@ -278,10 +278,10 @@ export default function SlashCommandMenu({ editor, onOpenCitation }: SlashComman
             type="button"
             role="option"
             aria-selected={i === active}
-            className={`flex w-full cursor-pointer border-none px-2.5 py-1.5 text-left transition-colors ${
+            className={`flex w-full cursor-pointer border-none px-2.5 py-1.5 text-left transition-[background-color,color] duration-150 ${
               i === active
-                ? 'bg-[var(--editor-primary-muted)] text-[var(--editor-doc-text)]'
-                : 'bg-transparent text-[var(--editor-muted)] hover:bg-[var(--editor-canvas-bg)]'
+                ? 'bg-[var(--editor-primary-muted)] text-[var(--editor-doc-text)] shadow-[inset_2px_0_0_0_var(--editor-primary)]'
+                : 'bg-transparent text-[var(--editor-muted)] hover:bg-white/[0.04]'
             }`}
             onMouseEnter={() => setActive(i)}
             onMouseDown={(e) => e.preventDefault()}

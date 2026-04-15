@@ -12,6 +12,7 @@ import {
   Send,
   MessageCircle,
   History,
+  Search,
 } from 'lucide-react';
 import { contentService } from '../services/contentService';
 import ManageReviewersModal from '../components/ManageReviewersModal';
@@ -117,30 +118,68 @@ export default function MyContentLayout() {
 
   if (loading) {
     return (
-      <PageShell wide className="animate-pulse">
-        <div className="mb-8 h-10 max-w-md rounded-app-lg bg-app-surface" />
-        <div className="mb-6 flex flex-wrap gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 min-w-[160px] flex-1 rounded-app-lg bg-app-surface" />
-          ))}
+      <PageShell wide className="app-main-canvas">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+          <div className="absolute -left-24 top-16 h-64 w-64 rounded-full bg-app-accent/12 blur-[100px]" />
+          <div className="absolute right-0 top-1/3 h-56 w-56 rounded-full bg-app-accent-2/10 blur-[90px]" />
         </div>
-        <div className="mb-4 h-10 rounded-app-md bg-app-surface" />
-        <div className="min-h-[400px] rounded-app-lg bg-app-surface" />
+        <div className="space-y-8">
+          <div className="space-y-3">
+            <div className="app-skeleton-shimmer h-3 w-28 rounded-full" />
+            <div className="app-skeleton-shimmer h-10 max-w-md rounded-app-lg" />
+            <div className="app-skeleton-shimmer h-3 max-w-lg rounded-full" />
+          </div>
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+            <div className="relative w-full max-w-md shrink-0 overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/35 p-5 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/25 lg:max-w-[26rem]">
+              <div className="flex flex-col gap-3">
+                <div className="app-skeleton-shimmer h-11 w-full rounded-app-md" />
+                <div className="app-skeleton-shimmer h-11 w-full rounded-app-md" />
+                <div className="app-skeleton-shimmer h-11 w-full rounded-app-md" />
+              </div>
+            </div>
+            <div className="grid w-full max-w-md grid-cols-2 gap-3 self-center lg:w-[20.5rem] lg:max-w-none lg:shrink-0 lg:self-start">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/30 p-4 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/22"
+                >
+                  <div className="app-skeleton-shimmer mb-3 h-2 w-20 rounded-full" />
+                  <div className="app-skeleton-shimmer h-7 w-16 rounded-app-md" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="relative min-h-[22rem] overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/30 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/22">
+            <div className="app-skeleton-shimmer h-11 w-full rounded-none rounded-t-app-xl" />
+            <div className="space-y-2 p-3">
+              {[1, 2, 3, 4, 5].map((j) => (
+                <div key={j} className="app-skeleton-shimmer h-12 rounded-app-md" />
+              ))}
+            </div>
+          </div>
+        </div>
       </PageShell>
     );
   }
 
   return (
-    <PageShell wide>
+    <PageShell wide className="app-main-canvas">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        <div className="absolute -left-24 top-16 h-64 w-64 rounded-full bg-app-accent/12 blur-[100px]" />
+        <div className="absolute right-0 top-1/3 h-56 w-56 rounded-full bg-app-accent-2/10 blur-[90px]" />
+        <div className="absolute bottom-0 left-1/2 h-48 w-[min(90%,42rem)] -translate-x-1/2 rounded-full bg-app-accent-deep/18 blur-[110px]" />
+      </div>
+
       <PageHeader
         title="My content"
+        accentWord="content"
         description="Manage and track everything you own."
         actions={
           <button
             type="button"
             onClick={() => void handleCreateContent()}
             disabled={creating}
-            className={`inline-flex h-10 items-center justify-center rounded-app-lg border border-app-accent/35 bg-app-accent-muted px-4 py-2.5 text-[13px] font-semibold text-app-accent shadow-sm transition-colors hover:bg-app-accent/20 ${
+            className={`relative inline-flex h-10 items-center justify-center overflow-hidden rounded-app-lg bg-gradient-to-r from-app-accent to-app-accent-2 px-4 py-2.5 text-[13px] font-semibold text-app-bg shadow-[0_0_28px_-8px_rgba(147,124,248,0.55),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/15 transition-[transform,box-shadow,filter] duration-(--duration-app-slow) ease-(--ease-app-out) before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/20 before:to-transparent before:opacity-60 hover:shadow-[0_0_36px_-4px_rgba(45,212,191,0.35)] hover:brightness-105 active:scale-[0.98] motion-reduce:transition-shadow motion-reduce:hover:brightness-100 ${
               creating ? 'cursor-not-allowed opacity-70' : ''
             }`}
             title="Create a new draft"
@@ -150,54 +189,81 @@ export default function MyContentLayout() {
         }
       />
 
-      <div className="animate-fade-in space-y-6">
-        {/* Filters + compact stats row */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="relative min-w-[260px] flex-1">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search your content..."
-                className={`${formInputClass} py-2.5 text-[13px]`}
-              />
+      <div className="animate-fade-in space-y-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+          <Surface
+            variant="glass"
+            padding="md"
+            className="w-full max-w-md min-w-0 overflow-hidden shadow-app-lift transition-shadow duration-(--duration-app-slow) ease-app-out hover:shadow-app-soft lg:max-w-[26rem]"
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -right-16 top-0 h-36 w-36 rounded-full bg-app-accent/12 blur-3xl"
+            />
+            <div className="relative z-1 flex flex-col gap-3">
+              <div className="relative w-full">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 z-1 -translate-y-1/2 text-app-accent/70"
+                  aria-hidden
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search your content..."
+                  className={`${formInputClass} box-border w-full py-2.5 pl-10 pr-3 text-[13px]`}
+                />
+              </div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className={`${formSelectClass} box-border w-full py-2.5 text-[13px]`}
+                aria-label="Filter by status"
+              >
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="in_review">In Review</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`${formSelectClass} box-border w-full py-2.5 text-[13px]`}
+                aria-label="Sort by"
+              >
+                <option value="lastModified">Last Modified</option>
+                <option value="createdAt">Date Created</option>
+                <option value="views">Most Views</option>
+                <option value="title">Title A-Z</option>
+              </select>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className={`${formSelectClass} w-auto min-w-[10rem] py-2.5 text-[13px]`}
-              aria-label="Filter by status"
-            >
-              <option value="all">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="in_review">In Review</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className={`${formSelectClass} w-auto min-w-[11rem] py-2.5 text-[13px]`}
-              aria-label="Sort by"
-            >
-              <option value="lastModified">Last Modified</option>
-              <option value="createdAt">Date Created</option>
-              <option value="views">Most Views</option>
-              <option value="title">Title A-Z</option>
-            </select>
-          </div>
+          </Surface>
 
-          <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+          <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-3 [grid-auto-rows:1fr] lg:mx-0 lg:w-[20.5rem] lg:max-w-none lg:shrink-0 lg:self-start">
             {stats.map((stat) => (
               <Surface
                 key={stat.label}
+                variant="glass"
                 padding="sm"
-                className="min-w-[150px] flex-1 lg:flex-none lg:min-w-[170px]"
+                className="group/stat relative flex h-full min-h-[5.25rem] min-w-0 overflow-hidden shadow-app-lift transition-[transform,box-shadow,border-color] duration-(--duration-app-slow) ease-(--ease-app-out) hover:-translate-y-0.5 hover:border-white/14 hover:shadow-app-glow motion-reduce:transform-none"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-app-faint">
+                <div
+                  aria-hidden
+                  className="absolute inset-x-0 top-0 h-px opacity-90"
+                  style={{
+                    background: `linear-gradient(90deg, transparent, ${stat.color}, transparent)`,
+                  }}
+                />
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover/stat:opacity-40"
+                  style={{ background: stat.color }}
+                />
+                <div className="relative z-1 flex h-full min-h-0 w-full items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-app-faint">
                       {stat.label}
                     </div>
                     <div className="text-[16px] font-bold tracking-tight text-app-text">
@@ -205,8 +271,8 @@ export default function MyContentLayout() {
                     </div>
                   </div>
                   <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-app-md"
-                    style={{ background: `${stat.color}22`, color: stat.color }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md ring-1 ring-white/10 transition-transform duration-(--duration-app-slow) ease-(--ease-app-out) group-hover/stat:scale-105"
+                    style={{ background: `${stat.color}28`, color: stat.color }}
                   >
                     <svg
                       width="13"
@@ -215,6 +281,7 @@ export default function MyContentLayout() {
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
+                      aria-hidden
                     >
                       {stat.icon === 'content' ? (
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -242,28 +309,35 @@ export default function MyContentLayout() {
           </div>
         </div>
 
-        {/* Content Table */}
-        <Surface padding="none" className="overflow-hidden">
+        <Surface
+          variant="glass"
+          padding="none"
+          className="overflow-hidden shadow-app-lift transition-shadow duration-(--duration-app-slow) ease-app-out hover:shadow-app-soft"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-transparent"
+          />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-left">
               <thead>
-                <tr className="border-b border-app-border bg-app-bg/40">
-                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                <tr className="border-b border-white/[0.08] bg-app-bg/35 backdrop-blur-md">
+                  <th className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                     Title
                   </th>
-                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                  <th className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                     Type
                   </th>
-                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                  <th className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                  <th className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                     Views
                   </th>
-                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                  <th className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                     Last Modified
                   </th>
-                  <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                  <th className="px-4 py-3.5 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                     Actions
                   </th>
                 </tr>
@@ -274,24 +348,24 @@ export default function MyContentLayout() {
                   return (
                     <tr
                       key={item.id}
-                      className="border-b border-app-border/60 transition-colors hover:bg-app-surface/40"
+                      className="group/row border-b border-white/[0.05] transition-[background-color,box-shadow] duration-(--duration-app) ease-(--ease-app-material) hover:bg-white/[0.04]"
                     >
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex h-9 w-9 items-center justify-center rounded-app-md"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-app-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-white/5 backdrop-blur-sm transition-transform duration-(--duration-app-slow) ease-(--ease-app-out) group-hover/row:scale-[1.03]"
                             style={{
-                              background: `${typeColors[item.type]}22`,
+                              background: `${typeColors[item.type]}26`,
                               color: typeColors[item.type],
                             }}
                           >
                             <TypeIcon size={18} />
                           </div>
                           <div className="min-w-0">
-                            <div className="truncate text-[13px] font-medium text-app-text">
+                            <div className="truncate text-[13px] font-semibold text-app-text">
                               {item.title}
                             </div>
-                            <div className="text-[11px] text-app-faint">
+                            <div className="text-[11px] text-app-muted">
                               {item.collaborators} collaborators
                             </div>
                           </div>
@@ -299,7 +373,7 @@ export default function MyContentLayout() {
                       </td>
                       <td className="p-4">
                         <span
-                          className="rounded-full px-2 py-0.5 text-[11px] capitalize"
+                          className="inline-flex rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] font-medium capitalize shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm"
                           style={{
                             background: `${typeColors[item.type]}22`,
                             color: typeColors[item.type],
@@ -313,11 +387,11 @@ export default function MyContentLayout() {
                           <button
                             type="button"
                             onClick={() => setReviewModalItem({ id: item.id, title: item.title })}
-                            className="cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase transition-opacity hover:opacity-90"
+                            className="cursor-pointer rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-white/10 transition-[transform,opacity] duration-(--duration-app) ease-app-out hover:opacity-95 active:scale-[0.98]"
                             style={{
-                              background: `${statusColors[item.status]}22`,
+                              background: `${statusColors[item.status]}28`,
                               color: statusColors[item.status],
-                              border: `1px solid ${statusColors[item.status]}44`,
+                              border: `1px solid ${statusColors[item.status]}55`,
                             }}
                             title="Click to manage reviewers"
                           >
@@ -325,7 +399,7 @@ export default function MyContentLayout() {
                           </button>
                         ) : (
                           <span
-                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
+                            className="inline-flex rounded-full border border-white/8 px-2.5 py-0.5 text-[11px] font-semibold uppercase ring-1 ring-white/5"
                             style={{
                               background: `${statusColors[item.status]}22`,
                               color: statusColors[item.status],
@@ -335,10 +409,10 @@ export default function MyContentLayout() {
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-[13px] text-app-muted">
+                      <td className="p-4 text-[13px] tabular-nums text-app-muted">
                         {item.views.toLocaleString()}
                       </td>
-                      <td className="p-4 text-[13px] text-app-faint">
+                      <td className="p-4 text-[13px] tabular-nums text-app-faint">
                         {new Date(item.lastModified).toLocaleDateString()}
                       </td>
                       <td className="p-4 text-right">
@@ -348,14 +422,14 @@ export default function MyContentLayout() {
                               type="button"
                               onClick={() => handleSubmitForReview(item.id)}
                               disabled={submittingId === item.id}
-                              className={`flex items-center gap-1 rounded-app-md border border-amber-400/30 bg-amber-400/15 px-2.5 py-1 text-[11px] font-semibold text-amber-400 transition-all duration-200 ${
+                              className={`flex items-center gap-1 rounded-app-md border border-amber-400/35 bg-amber-400/18 px-2.5 py-1 text-[11px] font-semibold text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-[transform,background-color,opacity] duration-(--duration-app) ease-(--ease-app-material) hover:bg-amber-400/26 active:scale-[0.98] ${
                                 submittingId === item.id
                                   ? 'cursor-not-allowed opacity-60'
-                                  : 'cursor-pointer hover:bg-amber-400/20'
+                                  : 'cursor-pointer'
                               }`}
                               title="Submit for Review"
                             >
-                              <Send size={12} />
+                              <Send size={12} aria-hidden />
                               {submittingId === item.id ? 'Submitting...' : 'Review'}
                             </button>
                           )}
@@ -365,43 +439,43 @@ export default function MyContentLayout() {
                               onClick={() =>
                                 setFeedbackModalItem({ id: item.id, title: item.title })
                               }
-                              className="flex cursor-pointer items-center gap-1 rounded-app-md border border-app-accent/35 bg-app-accent-muted px-2.5 py-1 text-[11px] font-semibold text-app-accent transition-colors hover:bg-app-accent/25"
+                              className="flex cursor-pointer items-center gap-1 rounded-app-md border border-app-accent/40 bg-app-accent-muted px-2.5 py-1 text-[11px] font-semibold text-app-accent shadow-[0_0_20px_-10px_rgba(147,124,248,0.45)] transition-[transform,background-color,box-shadow] duration-(--duration-app) ease-(--ease-app-material) hover:bg-app-accent/20 hover:shadow-[0_0_24px_-8px_rgba(147,124,248,0.5)] active:scale-[0.98]"
                               title="View Review Feedback"
                             >
-                              <MessageCircle size={12} />
+                              <MessageCircle size={12} aria-hidden />
                               Feedback
                             </button>
                           )}
                           <Link
                             to={`/history/${item.id}`}
-                            className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                            className="rounded-app-md border border-transparent p-1.5 text-app-muted transition-[color,background-color,border-color,transform] duration-(--duration-app) ease-app-out hover:border-white/10 hover:bg-white/6 hover:text-app-text active:scale-95"
                             title="Version history for this item"
                           >
-                            <History size={14} />
+                            <History size={14} aria-hidden />
                           </Link>
                           <button
                             type="button"
                             onClick={() => navigate(`/editor/${item.id}`)}
-                            className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                            className="rounded-app-md border border-transparent p-1.5 text-app-muted transition-[color,background-color,border-color,transform] duration-(--duration-app) ease-app-out hover:border-white/10 hover:bg-white/6 hover:text-app-text active:scale-95"
                             title="Edit"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 size={14} aria-hidden />
                           </button>
                           <button
                             type="button"
                             onClick={() => navigate(`/preview/${item.id}`)}
-                            className="rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-app-surface-hover hover:text-app-text"
+                            className="rounded-app-md border border-transparent p-1.5 text-app-muted transition-[color,background-color,border-color,transform] duration-(--duration-app) ease-app-out hover:border-white/10 hover:bg-white/6 hover:text-app-text active:scale-95"
                             title="View"
                           >
-                            <Eye size={14} />
+                            <Eye size={14} aria-hidden />
                           </button>
                           <button
                             type="button"
                             onClick={() => void handleDelete(item.id, item.title)}
-                            className="rounded-app-md p-1.5 text-red-400 transition-colors hover:bg-red-500/10"
+                            className="rounded-app-md border border-transparent p-1.5 text-red-400/90 transition-[color,background-color,border-color,transform] duration-(--duration-app) ease-app-out hover:border-red-400/25 hover:bg-red-500/12 active:scale-95"
                             title="Delete"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={14} aria-hidden />
                           </button>
                         </div>
                       </td>
@@ -412,13 +486,12 @@ export default function MyContentLayout() {
             </table>
           </div>
           {contentItems.length === 0 && (
-            <div className="p-12 text-center text-sm text-app-faint">
-              No content found matching your filters.
+            <div className="border-t border-dashed border-white/12 bg-app-bg/25 px-6 py-14 text-center backdrop-blur-sm">
+              <p className="text-sm text-app-muted">No content found matching your filters.</p>
             </div>
           )}
         </Surface>
 
-        {/* Manage Reviewers Modal */}
         {reviewModalItem && (
           <ManageReviewersModal
             contentId={reviewModalItem.id}
@@ -428,7 +501,6 @@ export default function MyContentLayout() {
           />
         )}
 
-        {/* Review Feedback Modal */}
         {feedbackModalItem && (
           <ReviewFeedbackModal
             contentId={feedbackModalItem.id}

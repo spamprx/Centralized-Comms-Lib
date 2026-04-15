@@ -163,15 +163,12 @@ export default function UsersTable({
 
   if (loading)
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2 p-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="h-[52px] rounded-xl animate-pulse"
-            style={{
-              opacity: 1 - i * 0.12,
-              background: 'rgba(255,255,255,0.035)',
-            }}
+            className="app-skeleton-shimmer h-[52px] rounded-app-lg border border-white/[0.06]"
+            style={{ opacity: 1 - i * 0.1 }}
           />
         ))}
       </div>
@@ -179,24 +176,32 @@ export default function UsersTable({
 
   if (!users.length)
     return (
-      <div className="flex items-center justify-center p-[60px] text-app-faint text-sm">
-        No users found matching your criteria.
+      <div className="flex flex-col items-center justify-center gap-2 p-16 text-center">
+        <div className="rounded-app-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-8 py-10 backdrop-blur-sm">
+          <p className="m-0 text-sm font-medium text-app-muted">
+            No users found matching your criteria.
+          </p>
+          <p className="mt-1 text-xs text-app-faint">Try adjusting search or filters.</p>
+        </div>
       </div>
     );
 
   return (
     <div className="flex flex-col">
       {selected.size > 0 && (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 admin-glass rounded-xl mb-3 text-[13px] text-app-accent admin-row-enter">
-          <span className="font-medium">{selected.size} selected</span>
+        <div className="admin-glass relative mb-3 flex items-center gap-3 overflow-hidden rounded-app-xl px-4 py-3 text-[13px] text-app-accent admin-row-enter shadow-[0_0_24px_-10px_rgba(147,124,248,0.35)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-app-accent/40 via-app-accent-2/30 to-transparent" />
+          <span className="font-semibold tabular-nums">{selected.size} selected</span>
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-400/10 border border-red-400/20 rounded-lg text-red-400 text-xs cursor-pointer admin-btn-lift"
+            type="button"
+            className="admin-btn-lift flex cursor-pointer items-center gap-1.5 rounded-app-md border border-red-400/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/15"
             onClick={handleBulkDelete}
           >
-            <Trash2 size={13} /> Deactivate
+            <Trash2 size={13} strokeWidth={2} /> Deactivate
           </button>
           <button
-            className="bg-transparent border-none text-app-faint text-xs cursor-pointer ml-1 hover:text-app-text"
+            type="button"
+            className="ml-auto cursor-pointer rounded-app-md border border-transparent bg-transparent px-2 py-1 text-xs font-medium text-app-faint transition-colors hover:bg-white/[0.06] hover:text-app-text"
             onClick={() => setSelected(new Set())}
           >
             Cancel
@@ -204,12 +209,12 @@ export default function UsersTable({
         </div>
       )}
 
-      <div className="rounded-xl admin-glass" style={{ border: 'none' }}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[720px]">
+      <div className="overflow-hidden rounded-app-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent shadow-app-lift backdrop-blur-xl">
+        <div className="overflow-x-auto [scrollbar-width:thin]">
+          <table className="w-full min-w-[720px] border-collapse">
             <thead>
-              <tr>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold tracking-wide uppercase text-app-faint bg-transparent border-b border-white/[0.04] whitespace-nowrap w-11">
+              <tr className="bg-app-bg/40">
+                <th className="w-11 whitespace-nowrap border-b border-white/[0.08] bg-transparent px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-app-faint">
                   <input
                     type="checkbox"
                     checked={selected.size === users.length && users.length > 0}
@@ -220,7 +225,7 @@ export default function UsersTable({
                 {['User', 'Role', 'Status', 'Groups', 'Last Active', ''].map((h, i) => (
                   <th
                     key={i}
-                    className={`px-4 py-3 text-left text-[11px] font-semibold tracking-wide uppercase text-app-faint bg-transparent border-b border-white/[0.04] whitespace-nowrap ${
+                    className={`whitespace-nowrap border-b border-white/[0.08] bg-transparent px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-app-faint ${
                       i === 5 ? 'w-[50px]' : ''
                     }`}
                   >
@@ -239,8 +244,8 @@ export default function UsersTable({
                 return (
                   <tr
                     key={user.id}
-                    className={`admin-row-enter group transition-colors duration-100 ${
-                      isSelected ? 'bg-app-accent-muted' : ''
+                    className={`admin-row-enter group transition-[background-color] duration-200 ${
+                      isSelected ? 'bg-app-accent-muted/80' : ''
                     }`}
                     style={
                       {
@@ -248,7 +253,7 @@ export default function UsersTable({
                       } as React.CSSProperties
                     }
                   >
-                    <td className="px-4 py-3 align-middle w-11 border-b border-white/[0.03]">
+                    <td className="w-11 border-b border-white/[0.05] px-4 py-3 align-middle">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -257,15 +262,14 @@ export default function UsersTable({
                       />
                     </td>
 
-                    <td className="px-4 py-3 align-middle border-b border-white/[0.03] relative group-hover:bg-app-elevated/30">
-                      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-app-accent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <td className="relative border-b border-white/[0.05] px-4 py-3 align-middle group-hover:bg-white/[0.02]">
+                      <div className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-gradient-to-b from-app-accent to-app-accent-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white shadow-[0_4px_16px_-4px_rgba(0,0,0,0.4)] ring-2 ring-white/10"
                           style={{
                             background: `linear-gradient(135deg, hsl(${hue}, 60%, 45%), hsl(${hue + 40}, 50%, 55%))`,
-                            color: '#fff',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.35)',
                           }}
                         >
                           {user.avatar ? (
@@ -285,9 +289,9 @@ export default function UsersTable({
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 align-middle border-b border-white/[0.03] group-hover:bg-app-elevated/30">
+                    <td className="border-b border-white/[0.05] px-4 py-3 align-middle group-hover:bg-white/[0.02]">
                       <span
-                        className="inline-block px-2.5 py-[3px] rounded-full text-[11px] font-medium capitalize whitespace-nowrap"
+                        className="inline-block whitespace-nowrap rounded-full px-2.5 py-[3px] text-[11px] font-semibold capitalize"
                         style={{
                           color: badge.textColor,
                           border: `1px solid ${badge.borderColor}`,
@@ -299,7 +303,7 @@ export default function UsersTable({
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 align-middle border-b border-white/[0.03] group-hover:bg-app-elevated/30">
+                    <td className="border-b border-white/[0.05] px-4 py-3 align-middle group-hover:bg-white/[0.02]">
                       <div className="flex items-center gap-2">
                         <span className={STATUS_DOT_CLASS[user.status]} />
                         <span className="text-[12px] text-app-muted">
@@ -308,26 +312,26 @@ export default function UsersTable({
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 align-middle border-b border-white/[0.03] group-hover:bg-app-elevated/30">
+                    <td className="border-b border-white/[0.05] px-4 py-3 align-middle group-hover:bg-white/[0.02]">
                       <div className="flex flex-wrap gap-1">
                         {user.groups.slice(0, 2).map((g) => (
                           <span
                             key={g}
-                            className="px-2 py-0.5 bg-white/[0.04] rounded-md text-[11px] text-app-muted whitespace-nowrap"
+                            className="whitespace-nowrap rounded-app-md border border-white/[0.06] bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-app-muted"
                           >
                             {groupLookup?.[g] ?? g}
                           </span>
                         ))}
                         {user.groups.length > 2 && (
-                          <span className="px-2 py-0.5 bg-white/[0.04] rounded-md text-[11px] text-app-faint whitespace-nowrap">
+                          <span className="whitespace-nowrap rounded-app-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] text-app-faint">
                             +{user.groups.length - 2}
                           </span>
                         )}
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 align-middle border-b border-white/[0.03] group-hover:bg-app-elevated/30">
-                      <span className="text-[12px] text-app-faint whitespace-nowrap">
+                    <td className="border-b border-white/[0.05] px-4 py-3 align-middle group-hover:bg-white/[0.02]">
+                      <span className="whitespace-nowrap text-[12px] text-app-faint">
                         {formatRelative(user.lastActive)}
                       </span>
                       <div className="admin-recency-bar" style={{ width: 60 }}>
@@ -335,13 +339,13 @@ export default function UsersTable({
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 align-middle border-b border-white/[0.03] w-[50px] group-hover:bg-app-elevated/30">
+                    <td className="w-[50px] border-b border-white/[0.05] px-4 py-3 align-middle group-hover:bg-white/[0.02]">
                       <button
                         type="button"
                         data-admin-user-menu-btn
                         aria-expanded={menu?.userId === user.id}
                         aria-haspopup="menu"
-                        className="flex items-center justify-center w-[30px] h-[30px] bg-transparent border-none rounded-lg text-app-faint cursor-pointer transition-all duration-150 hover:bg-app-surface-hover hover:text-app-muted"
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-app-md border border-transparent bg-transparent text-app-faint transition-[border-color,background-color,color] duration-150 hover:border-white/[0.1] hover:bg-white/[0.06] hover:text-app-muted"
                         onClick={(e) => openMenuFor(e, user.id)}
                       >
                         <MoreHorizontal size={15} />
@@ -361,7 +365,7 @@ export default function UsersTable({
           <div
             ref={menuPanelRef}
             role="menu"
-            className="fixed z-[1150] admin-glass rounded-xl p-1.5 shadow-app-soft admin-modal-enter"
+            className="admin-modal-enter admin-modal-panel fixed z-[1150] rounded-app-xl p-1.5 shadow-app-soft"
             style={{
               top: menu.top,
               left: menu.left,
@@ -372,7 +376,7 @@ export default function UsersTable({
               <button
                 type="button"
                 role="menuitem"
-                className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-none rounded-lg text-app-muted text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-app-surface-hover"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-app-md border border-transparent bg-transparent px-3 py-2 text-left text-[13px] text-app-muted transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.06]"
                 onClick={() => {
                   onEdit(menuUser);
                   setMenu(null);
@@ -385,7 +389,7 @@ export default function UsersTable({
               <button
                 type="button"
                 role="menuitem"
-                className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-none rounded-lg text-app-muted text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-app-surface-hover"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-app-md border border-transparent bg-transparent px-3 py-2 text-left text-[13px] text-app-muted transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.06]"
                 onClick={() => {
                   void onResetPassword(menuUser.id);
                   setMenu(null);
@@ -398,7 +402,7 @@ export default function UsersTable({
               <button
                 type="button"
                 role="menuitem"
-                className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-none rounded-lg text-red-400 text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-red-400/10"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-app-md border border-transparent bg-transparent px-3 py-2 text-left text-[13px] text-red-400 transition-colors duration-150 hover:border-red-400/25 hover:bg-red-500/10"
                 onClick={() => {
                   void onDelete(menuUser.id);
                   setMenu(null);
@@ -411,7 +415,7 @@ export default function UsersTable({
               <button
                 type="button"
                 role="menuitem"
-                className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-none rounded-lg text-app-muted text-[13px] cursor-pointer text-left transition-colors duration-100 hover:bg-app-surface-hover"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-app-md border border-transparent bg-transparent px-3 py-2 text-left text-[13px] text-app-muted transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.06]"
                 onClick={() => {
                   void onStatusChange(menuUser.id, 'active');
                   setMenu(null);

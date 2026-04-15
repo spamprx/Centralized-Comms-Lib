@@ -7,7 +7,7 @@ function tagLabelForSlug(slug: string, catalog: Tag[]): string {
 }
 
 const chipBase =
-  'inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-2xl text-[11px] font-medium max-w-full';
+  'inline-flex max-w-full items-center gap-1.5 rounded-full py-1 pl-3 pr-1 text-[11px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md transition-[transform,box-shadow,border-color] duration-(--duration-app-slow) ease-(--ease-app-material) hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:transform-none';
 
 export type LibraryFilterChipsProps = {
   filters: LibraryUrlFilters;
@@ -48,7 +48,8 @@ export function LibraryFilterChips({
     chips.push({
       key: 'q',
       label: `Search: "${searchDisplay.trim()}"`,
-      className: 'bg-app-accent-muted text-app-accent border border-app-accent/25',
+      className:
+        'border border-app-accent/35 bg-gradient-to-br from-app-accent/25 to-app-accent-muted text-app-accent ring-1 ring-app-accent/20',
       onRemove: onRemoveSearch,
     });
   }
@@ -58,7 +59,8 @@ export function LibraryFilterChips({
       chips.push({
         key: `tag:${slug}`,
         label: `Tag: ${tagLabelForSlug(slug, tagCatalog)}`,
-        className: 'bg-fuchsia-500/12 text-fuchsia-300 border border-fuchsia-500/22',
+        className:
+          'border border-fuchsia-400/25 bg-fuchsia-500/15 text-fuchsia-100 ring-1 ring-fuchsia-500/15',
         onRemove: () => onRemoveTag(slug),
       });
     }
@@ -68,7 +70,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'author',
       label: `Author: ${filters.author}`,
-      className: 'bg-sky-500/12 text-sky-300 border border-sky-500/22',
+      className: 'border border-sky-400/25 bg-sky-500/15 text-sky-100 ring-1 ring-sky-400/15',
       onRemove: onRemoveAuthor,
     });
   }
@@ -77,7 +79,8 @@ export function LibraryFilterChips({
     chips.push({
       key: 'channel',
       label: `Channel: ${filters.channel}`,
-      className: 'bg-teal-500/12 text-teal-300 border border-teal-500/22',
+      className:
+        'border border-app-accent-2/30 bg-app-accent-2/12 text-teal-100 ring-1 ring-app-accent-2/20',
       onRemove: onRemoveChannel,
     });
   }
@@ -86,7 +89,8 @@ export function LibraryFilterChips({
     chips.push({
       key: 'status',
       label: `Status: ${filters.status}`,
-      className: 'bg-amber-500/12 text-amber-300 border border-amber-500/22',
+      className:
+        'border border-amber-400/25 bg-amber-500/14 text-amber-100 ring-1 ring-amber-400/15',
       onRemove: onRemoveStatus,
     });
   }
@@ -95,7 +99,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'type',
       label: `Type: ${filters.type}`,
-      className: 'bg-cyan-500/12 text-emerald-800 border border-emerald-600/22',
+      className: 'border border-cyan-400/25 bg-cyan-500/14 text-cyan-100 ring-1 ring-cyan-400/15',
       onRemove: onRemoveType,
     });
   }
@@ -104,7 +108,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'from',
       label: `From: ${filters.dateFrom}`,
-      className: 'bg-app-elevated text-app-muted border border-app-border',
+      className: 'border border-white/10 bg-app-bg/50 text-app-muted ring-1 ring-white/8',
       onRemove: onRemoveDateFrom,
     });
   }
@@ -113,7 +117,7 @@ export function LibraryFilterChips({
     chips.push({
       key: 'to',
       label: `To: ${filters.dateTo}`,
-      className: 'bg-app-elevated text-app-muted border border-app-border',
+      className: 'border border-white/10 bg-app-bg/50 text-app-muted ring-1 ring-white/8',
       onRemove: onRemoveDateTo,
     });
   }
@@ -121,14 +125,14 @@ export function LibraryFilterChips({
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mt-3">
+    <div className="flex flex-wrap items-center gap-2">
       {chips.map((c) => (
         <span key={c.key} className={`${chipBase} ${c.className}`}>
-          <span className="truncate max-w-[220px]">{c.label}</span>
+          <span className="max-w-[220px] truncate">{c.label}</span>
           <button
             type="button"
             onClick={c.onRemove}
-            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-black/20 border-none cursor-pointer text-inherit hover:bg-black/35"
+            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-black/25 text-[13px] leading-none text-inherit transition-[background-color,transform,border-color] duration-(--duration-app) ease-app-out hover:border-white/18 hover:bg-white/12 active:scale-95"
             aria-label={`Remove ${c.label}`}
           >
             ×
@@ -138,7 +142,7 @@ export function LibraryFilterChips({
       <button
         type="button"
         onClick={onClearAll}
-        className="text-[11px] text-app-faint hover:text-app-muted bg-transparent border-none cursor-pointer underline-offset-2 hover:underline ml-1"
+        className="ml-1 cursor-pointer border-none bg-transparent text-[11px] text-app-faint underline-offset-4 transition-[color,transform] duration-(--duration-app) ease-app-out hover:text-app-accent hover:underline active:scale-[0.98]"
       >
         Clear all
       </button>

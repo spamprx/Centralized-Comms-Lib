@@ -17,6 +17,8 @@ import {
   flattenRegions,
   parseAndValidateLayoutConfig,
   regenerateLayoutIds,
+  validateLayoutStructure,
+  type StructuralRestrictions,
 } from "../../shared/validation/layoutConfig";
 import { workspaceService } from "../workspace/workspace.service";
 
@@ -339,7 +341,10 @@ export const templateService = {
         src.activeLayout != null
           ? regenerateLayoutIds(deepCloneJson(src.activeLayout))
           : null;
-      const i18n = deepCloneJson(src.i18n) as Record<string, Record<string, string>>;
+      const i18n = deepCloneJson(src.i18n) as Record<
+        string,
+        Record<string, string>
+      >;
 
       const created = await repos.template.create({
         workspaceId,
@@ -449,6 +454,57 @@ export const templateService = {
         }
       }
 
+      // Structural restrictions: validate layout shape against each bound channel
+      for (const b of withBindings.bindings) {
+        const ch = await repos.channel.getById(b.channelId);
+        if (!ch) continue;
+        const raw = ch.compatibility?.restrictions as
+          | Record<string, unknown>
+          | undefined;
+        if (!raw) continue;
+        const structural: StructuralRestrictions = {
+          maxRows: typeof raw.maxRows === "number" ? raw.maxRows : undefined,
+          maxColumnsPerRow:
+            typeof raw.maxColumnsPerRow === "number"
+              ? raw.maxColumnsPerRow
+              : undefined,
+          maxRichTextRegions:
+            typeof raw.maxRichTextRegions === "number"
+              ? raw.maxRichTextRegions
+              : undefined,
+          maxMediaRegions:
+            typeof raw.maxMediaRegions === "number"
+              ? raw.maxMediaRegions
+              : undefined,
+          maxFieldRegions:
+            typeof raw.maxFieldRegions === "number"
+              ? raw.maxFieldRegions
+              : undefined,
+          maxTotalRegions:
+            typeof raw.maxTotalRegions === "number"
+              ? raw.maxTotalRegions
+              : undefined,
+          allowedRegionSequences: Array.isArray(raw.allowedRegionSequences)
+            ? (raw.allowedRegionSequences as string[][])
+            : undefined,
+          disallowInlineImagesInRichText:
+            raw.disallowInlineImagesInRichText === true,
+          contentModel:
+            raw.contentModel === "whatsapp" ||
+            raw.contentModel === "sms" ||
+            raw.contentModel === "push"
+              ? (raw.contentModel as "whatsapp" | "sms" | "push")
+              : undefined,
+        };
+        const violations = validateLayoutStructure(parsed, structural);
+        if (violations.length > 0) {
+          return {
+            invalid: true,
+            message: `Channel "${ch.name}" structural rules violated: ${violations.join(" ")}`,
+          } as const;
+        }
+      }
+
       const template = await repos.template.update(id, { draftLayout: parsed });
       await repos.audit.append({
         action: "UPDATE",
@@ -493,7 +549,10 @@ export const templateService = {
         return { ok: true, translated: res.text, detectedSource } as const;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        return { invalid: true, message: `Translation failed: ${msg}` } as const;
+        return {
+          invalid: true,
+          message: `Translation failed: ${msg}`,
+        } as const;
       }
     }
 
@@ -505,7 +564,8 @@ export const templateService = {
         break;
       }
       let splitAt = remaining.lastIndexOf("\n", MAX_CHUNK);
-      if (splitAt < MAX_CHUNK * 0.3) splitAt = remaining.lastIndexOf(" ", MAX_CHUNK);
+      if (splitAt < MAX_CHUNK * 0.3)
+        splitAt = remaining.lastIndexOf(" ", MAX_CHUNK);
       if (splitAt < MAX_CHUNK * 0.3) splitAt = MAX_CHUNK;
       chunks.push(remaining.slice(0, splitAt));
       remaining = remaining.slice(splitAt);
@@ -519,10 +579,17 @@ export const templateService = {
         translated.push(res.text);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        return { invalid: true, message: `Translation failed: ${msg}` } as const;
+        return {
+          invalid: true,
+          message: `Translation failed: ${msg}`,
+        } as const;
       }
     }
-    return { ok: true, translated: translated.join(""), detectedSource } as const;
+    return {
+      ok: true,
+      translated: translated.join(""),
+      detectedSource,
+    } as const;
   },
 
   async activate(

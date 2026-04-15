@@ -41,7 +41,7 @@ import {
   type UpdateTemplateInput,
 } from '../../services/templateCrudService';
 import { PageHeader } from '../ui/PageHeader';
-import { PageShell } from '../ui/PageShell';
+import { PageShell, Surface, formInputClass, formLabelClass, formSelectClass } from '../ui';
 import TemplateLayoutEditor from './TemplateLayoutEditor';
 
 const TEMPLATES_LIST_SEARCH_KEY = 'templates:listSearch';
@@ -905,8 +905,12 @@ export default function TemplatesPage() {
     <>
       {hasTemplateSelected ? (
         /* Full-height editor — same shell rhythm as content editor */
-        <div className="relative flex h-screen flex-col overflow-hidden bg-app-bg">
-          <header className="relative z-40 shrink-0 border-b border-app-border bg-app-bg-subtle px-4 py-3 sm:px-6">
+        <div className="relative flex h-screen flex-col overflow-hidden bg-app-bg app-main-canvas">
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+            <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-app-accent/10 blur-[100px]" />
+            <div className="absolute right-0 top-24 h-64 w-64 rounded-full bg-app-accent-2/8 blur-[90px]" />
+          </div>
+          <header className="relative z-40 shrink-0 border-b border-white/[0.08] bg-app-bg/70 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:px-6">
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                 <nav
@@ -1082,7 +1086,7 @@ export default function TemplatesPage() {
 
           {/* Mobile / tablet: switch metadata vs layout (mirrors content editor split) */}
           <div
-            className="relative z-10 flex shrink-0 gap-1 border-b border-app-border bg-app-bg-subtle px-2 py-2 xl:hidden"
+            className="relative z-10 flex shrink-0 gap-1 border-b border-white/[0.08] bg-app-bg/60 px-2 py-2 backdrop-blur-md xl:hidden"
             role="tablist"
             aria-label="Editor workspace"
           >
@@ -1121,13 +1125,13 @@ export default function TemplatesPage() {
           </div>
 
           {/* Main workspace — sidebar fixed left, editor fills remainder */}
-          <div className="relative z-10 flex min-h-0 flex-1 flex-row overflow-hidden">
+          <div className="relative z-10 flex min-h-0 flex-1 flex-row overflow-hidden bg-app-bg/25">
             {/* Left: template details, channel bindings, translations */}
             <aside
               id="template-meta-panel"
               role="tabpanel"
               aria-labelledby="tab-workspace-template"
-              className={`order-1 flex w-full shrink-0 flex-col overflow-hidden border-r border-app-border bg-app-bg-subtle md:w-[17.5rem] lg:w-[19rem] ${
+              className={`order-1 flex w-full shrink-0 flex-col overflow-hidden border-r border-white/[0.08] bg-app-bg/55 shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl supports-backdrop-filter:bg-app-bg/40 md:w-[17.5rem] lg:w-[19rem] ${
                 mobileWorkspace === 'template' ? 'flex' : 'hidden'
               } xl:flex`}
             >
@@ -1556,7 +1560,7 @@ export default function TemplatesPage() {
                   <p className="max-w-xs text-sm text-red-200">{detailError}</p>
                 </div>
               ) : detail ? (
-                <div className="flex-1 overflow-y-auto bg-app-bg px-4 py-5 sm:px-6">
+                <div className="flex-1 overflow-y-auto bg-gradient-to-b from-transparent via-app-bg/40 to-app-bg px-4 py-5 sm:px-6">
                   <TemplateLayoutEditor
                     templateId={detail.id}
                     draftLayout={detail.draftLayout}
@@ -1597,13 +1601,17 @@ export default function TemplatesPage() {
         </div>
       ) : (
         /* List view */
-        <PageShell wide className="min-h-screen text-app-text">
+        <PageShell wide className="app-main-canvas min-h-screen text-app-text">
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+            <div className="absolute -left-16 top-20 h-56 w-56 rounded-full bg-app-accent/10 blur-[90px]" />
+            <div className="absolute right-0 top-40 h-48 w-48 rounded-full bg-app-accent-2/10 blur-[80px]" />
+          </div>
           <PageHeader
             title="Templates"
             accentWord="Templates"
             description="Search, filter, then open a template to edit its layout."
           />
-          <div className="mb-5 space-y-2">
+          <div className="animate-fade-in mb-5 space-y-2">
             {cloneBanner && (
               <div className="rounded-app-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
                 Cloned from &quot;{cloneBanner}&quot;.
@@ -1618,19 +1626,24 @@ export default function TemplatesPage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="min-w-0">
-              <div className="mb-5 rounded-app-lg border border-app-border bg-app-surface/50 p-4 sm:p-5">
-                <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+              <Surface
+                variant="glass"
+                padding="md"
+                className="relative mb-5 overflow-hidden shadow-app-lift transition-shadow duration-(--duration-app-slow) ease-app-out hover:shadow-app-soft"
+              >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-16 top-0 h-36 w-36 rounded-full bg-app-accent/12 blur-3xl"
+                />
+                <div className="relative z-1 flex flex-wrap items-end gap-x-4 gap-y-3">
                   <div className="min-w-[min(100%,220px)] flex-1">
-                    <label
-                      htmlFor="templates-search"
-                      className="mb-1.5 block text-xs font-medium text-app-muted"
-                    >
+                    <label htmlFor="templates-search" className={formLabelClass}>
                       Search
                     </label>
                     <div className="relative">
                       <Search
                         size={14}
-                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-faint"
+                        className="pointer-events-none absolute left-3 top-1/2 z-1 -translate-y-1/2 text-app-accent/70"
                         aria-hidden
                       />
                       <input
@@ -1646,15 +1659,12 @@ export default function TemplatesPage() {
                         placeholder="Name, slug, description…"
                         title="Search templates"
                         autoComplete="off"
-                        className="w-full rounded-app-md border border-app-border bg-app-bg-subtle py-2.5 pl-9 pr-3 text-sm outline-none focus:border-app-accent/45 focus:ring-1 focus:ring-app-accent/25"
+                        className={`${formInputClass} py-2.5 pl-9 pr-3 text-sm`}
                       />
                     </div>
                   </div>
                   <div className="w-[min(100%,8.5rem)]">
-                    <label
-                      htmlFor="templates-status"
-                      className="mb-1.5 block text-xs font-medium text-app-muted"
-                    >
+                    <label htmlFor="templates-status" className={formLabelClass}>
                       Status
                     </label>
                     <select
@@ -1668,7 +1678,7 @@ export default function TemplatesPage() {
                         })
                       }
                       title="Filter by status"
-                      className="w-full rounded-app-md border border-app-border bg-app-bg-subtle px-3 py-2.5 text-sm outline-none focus:border-app-accent/45"
+                      className={`${formSelectClass} px-3 py-2.5 text-sm`}
                     >
                       <option value="ALL">All</option>
                       <option value="DRAFT">Draft</option>
@@ -1677,10 +1687,7 @@ export default function TemplatesPage() {
                     </select>
                   </div>
                   <div className="w-[min(100%,5.5rem)]">
-                    <label
-                      htmlFor="templates-page-size"
-                      className="mb-1.5 block text-xs font-medium text-app-muted"
-                    >
+                    <label htmlFor="templates-page-size" className={formLabelClass}>
                       Per page
                     </label>
                     <select
@@ -1694,7 +1701,7 @@ export default function TemplatesPage() {
                         })
                       }
                       title="Page size"
-                      className="w-full rounded-app-md border border-app-border bg-app-bg-subtle px-3 py-2.5 text-sm outline-none focus:border-app-accent/45"
+                      className={`${formSelectClass} px-3 py-2.5 text-sm`}
                     >
                       {PAGE_SIZE_OPTIONS.map((opt) => (
                         <option key={opt} value={opt}>
@@ -1707,20 +1714,20 @@ export default function TemplatesPage() {
                     <button
                       type="button"
                       onClick={openCreateForm}
-                      className="flex w-full items-center justify-center gap-2 rounded-app-md border border-app-accent/50 bg-app-accent-muted px-4 py-2.5 text-sm font-semibold text-app-accent sm:w-auto"
+                      className="flex w-full items-center justify-center gap-2 rounded-app-md bg-gradient-to-r from-app-accent to-app-accent-2 px-4 py-2.5 text-sm font-semibold text-app-bg shadow-[0_0_24px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/15 transition-[transform,box-shadow,filter] duration-(--duration-app-slow) ease-(--ease-app-out) hover:brightness-105 active:scale-[0.98] sm:w-auto"
                     >
                       <Plus size={15} aria-hidden /> New template
                     </button>
                   </div>
                 </div>
-              </div>
+              </Surface>
 
               {loading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div
                       key={i}
-                      className="overflow-hidden rounded-2xl border border-app-border/70 bg-app-surface/50"
+                      className="overflow-hidden rounded-2xl border border-white/[0.08] bg-app-bg/40 shadow-app-lift backdrop-blur-md supports-backdrop-filter:bg-app-bg/30"
                     >
                       <div className="flex items-center gap-5 px-6 py-4 pl-6">
                         <div
@@ -1744,12 +1751,12 @@ export default function TemplatesPage() {
                   ))}
                 </div>
               ) : error ? (
-                <div className="rounded-2xl border border-red-400/30 bg-red-500/5 p-8 text-center">
+                <div className="rounded-2xl border border-red-400/35 bg-red-500/10 p-8 text-center shadow-app-lift backdrop-blur-md">
                   <p className="text-sm text-red-200">{error}</p>
                 </div>
               ) : items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-app-border/80 bg-app-surface/20 py-20 text-center">
-                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-app-border/80 bg-app-elevated ring-1 ring-app-border/40">
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/15 bg-app-bg/35 py-20 text-center shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/28">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/12 bg-gradient-to-br from-app-accent/20 to-app-accent-2/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ring-1 ring-white/10">
                     <FileText className="h-7 w-7 text-app-faint" />
                   </div>
                   <h3 className="mb-2 text-[15px] font-semibold tracking-tight text-app-text">
@@ -1774,7 +1781,7 @@ export default function TemplatesPage() {
                       onClick={() =>
                         navigate(`/templates/${t.id}`, { state: { listSearch: location.search } })
                       }
-                      className="group relative flex cursor-pointer overflow-hidden rounded-2xl border border-app-border bg-app-surface/50 hover:border-app-accent/35 hover:bg-app-surface-hover"
+                      className="group relative flex cursor-pointer overflow-hidden rounded-2xl border border-white/[0.09] bg-app-bg/45 shadow-app-lift backdrop-blur-md transition-[transform,border-color,box-shadow] duration-(--duration-app-slow) ease-(--ease-app-out) supports-backdrop-filter:bg-app-bg/32 hover:-translate-y-px hover:border-app-accent/40 hover:shadow-app-glow motion-reduce:transform-none"
                     >
                       {/* Status accent left strip */}
                       <div
@@ -1922,11 +1929,11 @@ export default function TemplatesPage() {
                           })
                         }
                         disabled={currentPage <= 1}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-app-border text-app-muted hover:bg-app-surface-hover disabled:opacity-40"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-app-bg/40 text-app-muted backdrop-blur-sm transition-colors hover:border-app-accent/35 hover:bg-white/6 hover:text-app-accent disabled:opacity-40"
                       >
                         <ChevronLeft size={14} />
                       </button>
-                      <div className="rounded-xl border border-app-border bg-app-surface px-4 py-1.5 text-[11px] tabular-nums text-app-muted">
+                      <div className="rounded-xl border border-white/10 bg-app-bg/50 px-4 py-1.5 text-[11px] tabular-nums text-app-muted backdrop-blur-sm">
                         {currentPage} / {pageCount}
                       </div>
                       <button
@@ -1939,7 +1946,7 @@ export default function TemplatesPage() {
                           })
                         }
                         disabled={currentPage >= pageCount}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-app-border text-app-muted hover:bg-app-surface-hover disabled:opacity-40"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-app-bg/40 text-app-muted backdrop-blur-sm transition-colors hover:border-app-accent/35 hover:bg-white/6 hover:text-app-accent disabled:opacity-40"
                       >
                         <ChevronRight size={14} />
                       </button>
@@ -1952,9 +1959,9 @@ export default function TemplatesPage() {
             <div className="hidden lg:block">
               <div className="sticky top-6 space-y-4">
                 {/* Quick-start card */}
-                <div className="overflow-hidden rounded-app-xl border border-app-border bg-app-surface/50">
-                  <div className="flex h-20 items-center justify-center border-b border-app-border bg-app-bg-subtle">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-app-lg border border-app-border bg-app-bg">
+                <div className="overflow-hidden rounded-app-xl border border-white/[0.1] bg-app-bg/45 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/32">
+                  <div className="flex h-20 items-center justify-center border-b border-white/[0.08] bg-app-bg/50">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-app-lg border border-white/10 bg-gradient-to-br from-app-accent/25 to-app-accent-2/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                       <LayoutTemplate className="h-6 w-6 text-app-accent" strokeWidth={1.5} />
                     </div>
                   </div>
@@ -1992,9 +1999,9 @@ export default function TemplatesPage() {
                 ).map(({ icon: Icon, label, desc }) => (
                   <div
                     key={label}
-                    className="flex gap-3 rounded-app-lg border border-app-border bg-app-surface/30 p-4"
+                    className="flex gap-3 rounded-app-lg border border-white/[0.08] bg-app-bg/35 p-4 shadow-app-soft backdrop-blur-md transition-[border-color,transform] duration-(--duration-app) ease-app-out hover:border-white/14 hover:-translate-y-0.5 motion-reduce:transform-none"
                   >
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-app-border/60 bg-app-bg/60">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-white/10 bg-white/[0.05]">
                       <Icon className="h-4 w-4 text-app-accent/80" strokeWidth={1.75} />
                     </div>
                     <div>

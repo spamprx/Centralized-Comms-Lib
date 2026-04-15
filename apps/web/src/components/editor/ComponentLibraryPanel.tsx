@@ -145,7 +145,7 @@ export default function ComponentLibraryPanel({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search components…"
-          className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] py-2 pl-8 pr-8 text-[12px] text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)] focus:border-[var(--editor-primary)]"
+          className="box-border w-full rounded-[var(--editor-radius-input)] border border-white/10 bg-white/[0.04] py-2 pl-8 pr-8 text-[12px] text-[var(--editor-doc-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none placeholder:text-[var(--editor-faint)] focus:border-[var(--editor-primary)]/50 focus:ring-2 focus:ring-[var(--editor-primary)]/15"
           aria-label="Search components"
         />
         {query ? (
@@ -162,7 +162,7 @@ export default function ComponentLibraryPanel({
       </div>
 
       {loadError ? (
-        <p className="m-0 rounded-[var(--editor-radius-input)] border-[0.5px] border-amber-500/35 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-900 dark:text-amber-100/90">
+        <p className="m-0 rounded-[var(--editor-radius-input)] border border-amber-400/30 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-100/95">
           API: {loadError}. Showing offline catalog.
         </p>
       ) : null}
@@ -171,15 +171,15 @@ export default function ComponentLibraryPanel({
         <p className="m-0 text-[11px] text-[var(--editor-faint)]">Loading components…</p>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)]">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-[var(--editor-radius-input)] border border-white/10 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         {!loading && items.length === 0 ? (
           <div className="p-3 text-[12px] text-[var(--editor-faint)]">
             {query.trim() ? 'No components match your search.' : 'No components in the library.'}
           </div>
         ) : (
-          <ul className="m-0 list-none divide-y divide-[var(--editor-border)] p-0">
+          <ul className="m-0 list-none divide-y divide-white/[0.06] p-0">
             {items.map((comp) => (
-              <li key={comp.id} className="p-2.5">
+              <li key={comp.id} className="p-2.5 transition-colors hover:bg-white/[0.03]">
                 <div className="min-w-0">
                   <div className="truncate text-[12px] font-semibold text-[var(--editor-doc-text)]">
                     {comp.name}
@@ -198,7 +198,7 @@ export default function ComponentLibraryPanel({
                     type="button"
                     disabled={!editor}
                     onClick={() => insertFromLibrary(editor, 'linked', comp)}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-primary)] bg-transparent px-2 py-1.5 text-[11px] font-medium text-[var(--editor-primary)] transition-colors hover:bg-[var(--editor-primary-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border border-[var(--editor-primary)]/45 bg-[var(--editor-primary-muted)] px-2 py-1.5 text-[11px] font-semibold text-[var(--editor-primary)] transition-colors hover:bg-[var(--editor-primary-muted)] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
                     title="Insert live link to this component version (body refreshes from the library on save)"
                   >
                     <Link2 size={12} strokeWidth={2.25} />
@@ -208,7 +208,7 @@ export default function ComponentLibraryPanel({
                     type="button"
                     disabled={!editor}
                     onClick={() => insertFromLibrary(editor, 'detached', comp)}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-transparent bg-[var(--editor-primary)] px-2 py-1.5 text-[11px] font-medium text-[var(--editor-primary-fg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border border-white/12 bg-gradient-to-r from-app-accent to-app-accent-2 px-2 py-1.5 text-[11px] font-semibold text-app-bg shadow-[0_0_16px_-6px_rgba(147,124,248,0.45)] transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
                     title="Insert a frozen copy of this version (edits here do not change the library)"
                   >
                     <Copy size={12} strokeWidth={2.25} />

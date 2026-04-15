@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { GitCompare, RotateCcw, Clock, FileText, ChevronDown, Users } from 'lucide-react';
+import {
+  GitCompare,
+  GitCommitVertical,
+  RotateCcw,
+  Clock,
+  FileText,
+  ChevronDown,
+  Users,
+} from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PageShell } from '../components/ui/PageShell';
 import { Surface } from '../components/ui/Surface';
@@ -373,7 +381,7 @@ export default function VersionHistoryLayout() {
 
   if (!contentId) {
     return (
-      <PageShell wide className="flex min-h-0 flex-1 flex-col pb-10">
+      <PageShell wide className="version-history-layout-root flex min-h-0 flex-1 flex-col pb-10">
         <PageHeader
           title="Version history"
           accentWord="history"
@@ -384,7 +392,7 @@ export default function VersionHistoryLayout() {
   }
 
   return (
-    <PageShell wide className="flex min-h-0 flex-1 flex-col pb-10">
+    <PageShell wide className="version-history-layout-root flex min-h-0 flex-1 flex-col pb-10">
       <PageHeader
         title={contentTitle ? `Version history — ${contentTitle}` : 'Version history'}
         accentWord="history"
@@ -395,7 +403,7 @@ export default function VersionHistoryLayout() {
         <Surface
           variant="muted"
           padding="md"
-          className="mb-4 border border-sky-500/25 bg-sky-500/10 text-sm text-sky-100"
+          className="mb-5 border border-sky-400/20 bg-sky-500/[0.08] text-sm text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md"
         >
           {demoNotice}
         </Surface>
@@ -405,7 +413,7 @@ export default function VersionHistoryLayout() {
         <Surface
           variant="muted"
           padding="md"
-          className="mb-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200"
+          className="mb-5 border border-red-400/25 bg-red-500/[0.08] text-sm text-red-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md"
         >
           {loadError}
         </Surface>
@@ -415,12 +423,12 @@ export default function VersionHistoryLayout() {
         <Surface
           variant="muted"
           padding="md"
-          className="mb-4 flex items-start gap-3 border border-amber-400/25 bg-amber-500/10 text-sm text-amber-100"
+          className="mb-5 flex items-start gap-3 border border-amber-400/25 bg-amber-500/[0.1] text-sm text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md"
         >
-          <Users className="mt-0.5 shrink-0 opacity-90" size={18} />
+          <Users className="mt-0.5 shrink-0 text-amber-200/90" size={18} strokeWidth={1.75} />
           <div>
-            <p className="m-0 font-semibold">Co-author session active</p>
-            <p className="mt-1 mb-0 text-xs text-amber-100/85">
+            <p className="m-0 font-semibold tracking-tight">Co-author session active</p>
+            <p className="mb-0 mt-1 text-xs text-amber-100/90">
               Restoring a snapshot is disabled until the live collaboration session ends
               (F-AUT-004).
             </p>
@@ -432,34 +440,52 @@ export default function VersionHistoryLayout() {
         <Surface
           variant="muted"
           padding="md"
-          className="mb-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200"
+          className="mb-5 border border-red-400/25 bg-red-500/[0.08] text-sm text-red-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md"
         >
           {restoreError}
         </Surface>
       )}
 
-      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(260px,320px)_1fr]">
+      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(300px,380px)_1fr] lg:gap-10">
         <Surface
           variant="glass"
           padding="none"
-          className="flex max-h-[min(70vh,640px)] flex-col overflow-hidden lg:max-h-none"
+          className="relative flex max-h-[min(74vh,720px)] flex-col overflow-hidden rounded-app-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent shadow-app-lift ring-1 ring-white/[0.04] backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/30 lg:max-h-none"
         >
-          <div className="border-b border-app-border/80 px-5 py-4">
-            <h2 className="m-0 text-sm font-semibold text-app-text">Timeline</h2>
-            <p className="mt-1 m-0 text-[11px] text-app-faint">
-              {apiHydrating
-                ? 'Connecting to API…'
-                : loading
-                  ? 'Loading…'
-                  : `${sortedVersions.length} loaded${hasMore ? ' · more available' : ''}`}
-            </p>
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/50 to-app-accent-2/35"
+            aria-hidden
+          />
+          <div className="flex items-start gap-3 border-b border-white/[0.08] px-5 py-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-app-lg border border-app-accent/30 bg-app-accent/10 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <GitCommitVertical size={20} strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-app-accent/90">
+                Timeline
+              </p>
+              <h2 className="mt-1 m-0 text-base font-semibold tracking-tight text-app-text">
+                Revisions
+              </h2>
+              <p className="mt-1 m-0 text-[11px] leading-snug text-app-muted">
+                {apiHydrating
+                  ? 'Connecting to API…'
+                  : loading
+                    ? 'Loading…'
+                    : `${sortedVersions.length} loaded${hasMore ? ' · more available' : ''}`}
+              </p>
+            </div>
           </div>
-          <div className="relative flex-1 overflow-y-auto p-3">
+          <div className="version-history-timeline-scroll relative min-h-0 flex-1 overflow-y-auto scroll-smooth px-3 pb-2 pt-3 [mask-image:linear-gradient(to_bottom,transparent,black_10px,black_calc(100%-8px),transparent)]">
             <div
-              className="pointer-events-none absolute bottom-4 left-[1.35rem] top-4 w-px bg-gradient-to-b from-app-accent/45 via-app-border to-transparent"
+              className="pointer-events-none absolute bottom-8 left-[1.125rem] top-6 w-[2px] rounded-full bg-gradient-to-b from-app-accent/70 via-app-accent-2/35 to-white/5 shadow-[0_0_24px_rgba(147,124,248,0.35)]"
               aria-hidden
             />
-            <div className="relative flex flex-col gap-2">
+            <div
+              className="pointer-events-none absolute bottom-8 left-[1.125rem] top-6 w-5 -translate-x-1/2 bg-gradient-to-b from-app-accent/25 via-app-accent/5 to-transparent blur-md"
+              aria-hidden
+            />
+            <div className="relative flex flex-col gap-3 pl-0.5">
               {sortedVersions.map((version) => {
                 const active = selected?.id === version.id;
                 const isHeadRow = headVersion?.id === version.id;
@@ -471,28 +497,32 @@ export default function VersionHistoryLayout() {
                       setSelectedId(version.id);
                       if (!showDiff) setCompareId(null);
                     }}
-                    className={`relative rounded-app-lg border p-3.5 pl-10 text-left transition-all duration-200 ${
+                    className={`version-timeline-card group relative rounded-app-xl border py-3.5 pl-11 pr-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out motion-reduce:transition-none ${
                       active
-                        ? 'border-app-accent/40 bg-app-accent-muted shadow-app-soft'
-                        : 'border-app-border/60 bg-app-bg/35 hover:border-app-border-strong hover:bg-app-elevated'
+                        ? 'version-timeline-card--active border-app-accent/50 bg-gradient-to-br from-app-accent/[0.14] to-white/[0.03] shadow-[inset_4px_0_0_0_rgba(147,124,248,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-app-accent/25'
+                        : 'border-white/[0.06] bg-white/[0.025] hover:-translate-y-px hover:border-white/12 hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_0_rgba(255,255,255,0.08)]'
                     }`}
                   >
                     <span
-                      className={`absolute left-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border-2 ${
+                      className={`absolute left-[1.125rem] top-1/2 z-[1] flex h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 transition-shadow duration-200 ${
                         active
-                          ? 'border-app-accent bg-app-accent shadow-[0_0_12px_rgba(147,124,248,0.45)]'
-                          : 'border-app-border-strong bg-app-bg-subtle'
+                          ? 'border-app-accent bg-gradient-to-br from-white to-app-accent-muted shadow-[0_0_0_5px_rgba(147,124,248,0.22),0_0_22px_rgba(147,124,248,0.5)]'
+                          : 'border-white/30 bg-app-bg/90 group-hover:border-app-accent/45 group-hover:shadow-[0_0_14px_rgba(147,124,248,0.28)]'
                       }`}
                       aria-hidden
-                    />
+                    >
+                      {active ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-app-accent" aria-hidden />
+                      ) : null}
+                    </span>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
                       <span
-                        className={`text-xs font-bold ${active ? 'text-app-accent' : 'text-app-text'}`}
+                        className={`font-mono text-xs font-bold tabular-nums ${active ? 'text-app-accent' : 'text-app-text'}`}
                       >
                         v{version.versionNumber}
                       </span>
                       {isHeadRow && (
-                        <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-300">
+                        <span className="rounded-app-md border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-200">
                           Current
                         </span>
                       )}
@@ -503,19 +533,21 @@ export default function VersionHistoryLayout() {
                     <p className="mb-1.5 line-clamp-2 text-[11px] leading-snug text-app-faint">
                       {version.title}
                     </p>
-                    <div className="flex items-center gap-2 text-[10px] text-app-faint">
-                      <Clock size={10} className="shrink-0 opacity-80" />
+                    <div className="flex items-center gap-2 text-[10px] tabular-nums text-app-faint">
+                      <Clock size={11} className="shrink-0 opacity-80" strokeWidth={2} />
                       {new Date(version.createdAt).toLocaleString()}
                     </div>
-                    <div className="mt-1 text-[10px] text-app-faint">
+                    <div className="mt-1 text-[10px] text-app-muted">
                       {actorLabel(version.authorId, primaryAuthorId, primaryAuthorName, coAuthors)}
                     </div>
 
                     {showDiff && selected && selected.id !== version.id && (
                       <label
                         onClick={(e) => e.stopPropagation()}
-                        className={`absolute right-3 top-3 flex cursor-pointer items-center gap-1 text-[10px] ${
-                          compareId === version.id ? 'text-app-accent' : 'text-app-faint'
+                        className={`absolute right-2.5 top-2.5 flex cursor-pointer items-center gap-1.5 rounded-app-md border border-white/[0.06] bg-app-bg/50 px-2 py-1 text-[10px] font-medium backdrop-blur-sm ${
+                          compareId === version.id
+                            ? 'border-app-accent/40 text-app-accent'
+                            : 'text-app-faint hover:border-white/12 hover:text-app-muted'
                         }`}
                       >
                         <input
@@ -533,14 +565,14 @@ export default function VersionHistoryLayout() {
               })}
             </div>
             {hasMore && (
-              <div className="p-3 pt-1">
+              <div className="p-3 pt-2">
                 <button
                   type="button"
                   disabled={loadingMore || loading}
                   onClick={() => void loadPage(false)}
-                  className="flex w-full items-center justify-center gap-1 rounded-app-md border border-app-border/70 bg-app-bg/40 py-2 text-[11px] font-medium text-app-muted hover:border-app-accent/30 hover:text-app-text disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-app-lg border border-white/10 bg-white/[0.03] py-2.5 text-[11px] font-medium text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-app-accent/30 hover:bg-white/[0.06] hover:text-app-text disabled:opacity-50"
                 >
-                  <ChevronDown size={14} />
+                  <ChevronDown size={14} strokeWidth={2} />
                   {loadingMore ? 'Loading…' : 'Load older versions'}
                 </button>
               </div>
@@ -548,18 +580,22 @@ export default function VersionHistoryLayout() {
           </div>
         </Surface>
 
-        <div className="flex min-h-0 min-w-0 flex-col gap-4">
+        <div className="flex min-h-0 min-w-0 flex-col gap-6">
           <Surface
             variant="default"
             padding="md"
-            className="flex flex-wrap items-center justify-between gap-4"
+            className="relative flex flex-wrap items-center justify-between gap-4 rounded-app-xl border border-white/[0.09] bg-app-surface/75 shadow-[0_12px_48px_-16px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl supports-backdrop-filter:bg-app-surface/60"
           >
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+              aria-hidden
+            />
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-app-lg bg-app-accent-muted text-app-accent">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-app-lg border border-app-accent/25 bg-app-accent/10 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                 <FileText size={20} strokeWidth={1.75} />
               </div>
               <div className="min-w-0">
-                <h2 className="m-0 text-sm font-semibold text-app-text">
+                <h2 className="m-0 text-sm font-semibold tracking-tight text-app-text">
                   {selected ? (
                     <>
                       v{selected.versionNumber} — {changeTypeLabel(selected.changeType)}
@@ -568,7 +604,7 @@ export default function VersionHistoryLayout() {
                     'Select a version'
                   )}
                 </h2>
-                <p className="mt-0.5 m-0 text-[11px] text-app-faint">
+                <p className="mt-0.5 m-0 text-[11px] text-app-muted">
                   {selected
                     ? `${new Date(selected.createdAt).toLocaleString()} · ${actorLabel(
                         selected.authorId,
@@ -584,13 +620,13 @@ export default function VersionHistoryLayout() {
               <button
                 type="button"
                 onClick={toggleCompare}
-                className={`flex items-center gap-1.5 rounded-app-md px-3.5 py-2 text-xs transition-colors ${
+                className={`flex items-center gap-1.5 rounded-app-lg border px-3.5 py-2 text-xs font-medium transition-all duration-200 ${
                   showDiff
-                    ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
-                    : 'border border-app-border/80 bg-app-bg/40 text-app-muted hover:border-app-accent/25 hover:text-app-text'
+                    ? 'border-app-accent/40 bg-app-accent/12 text-app-accent shadow-[0_0_20px_-8px_rgba(147,124,248,0.45)]'
+                    : 'border-white/10 bg-white/[0.04] text-app-muted hover:border-app-accent/25 hover:bg-white/[0.07] hover:text-app-text'
                 }`}
               >
-                <GitCompare size={14} /> {showDiff ? 'Hide diff' : 'Compare'}
+                <GitCompare size={14} strokeWidth={2} /> {showDiff ? 'Hide diff' : 'Compare'}
               </button>
               {selected && headVersion && selected.id !== headVersion.id && (
                 <button
@@ -603,10 +639,11 @@ export default function VersionHistoryLayout() {
                         ? 'Cannot restore while a co-author session is active'
                         : 'Creates a new head revision from this snapshot'
                   }
-                  className="flex items-center gap-1.5 rounded-app-md border border-emerald-400/35 bg-emerald-500/10 px-3.5 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded-app-lg border border-emerald-400/35 bg-emerald-500/[0.1] px-3.5 py-2 text-xs font-semibold text-emerald-100 shadow-[0_0_18px_-10px_rgba(16,185,129,0.35)] transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() => void onRestore()}
                 >
-                  <RotateCcw size={14} /> {restoreBusy ? 'Restoring…' : 'Restore as new version'}
+                  <RotateCcw size={14} strokeWidth={2} />{' '}
+                  {restoreBusy ? 'Restoring…' : 'Restore as new version'}
                 </button>
               )}
             </div>
@@ -615,12 +652,12 @@ export default function VersionHistoryLayout() {
           <Surface
             variant="muted"
             padding="md"
-            className="min-h-[280px] flex-1 overflow-auto lg:min-h-0"
+            className="min-h-[280px] flex-1 overflow-auto rounded-app-xl border border-white/[0.07] bg-gradient-to-b from-app-bg/50 to-app-bg/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md lg:min-h-0"
           >
             {!selected ? (
               <p className="m-0 text-sm text-app-muted">No version selected.</p>
             ) : showDiff ? (
-              <div>
+              <div className="version-history-canvas rounded-app-xl border border-white/[0.06] bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 {!compareTo ? (
                   <p className="m-0 text-sm text-app-muted">
                     Pick a baseline version from the timeline (radio on another row) to compare
@@ -630,38 +667,37 @@ export default function VersionHistoryLayout() {
                   <p className="m-0 text-sm text-app-muted">Computing diff…</p>
                 ) : (
                   <>
-                    <h3 className="mb-3 text-sm font-semibold text-app-text">
+                    <h3 className="mb-1 text-sm font-semibold tracking-tight text-app-text">
                       Changes from v{compareTo.versionNumber} → v{selected.versionNumber}
                     </h3>
+                    <p className="mb-4 mt-0 text-[11px] text-app-faint">
+                      Word-level diff — additions and removals highlighted below.
+                    </p>
                     <div className="mb-4 flex flex-wrap gap-3">
-                      <div className="min-w-[120px] flex-1 rounded-app-md bg-emerald-500/10 px-3 py-2">
-                        <span className="text-[10px] uppercase tracking-wide text-emerald-200/90">
+                      <div className="min-w-[120px] flex-1 rounded-app-lg border border-emerald-400/25 bg-emerald-500/[0.1] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200/95">
                           Inserted
                         </span>
-                        <p className="m-0 mt-0.5 text-xs text-emerald-100">
+                        <p className="m-0 mt-1 text-xs tabular-nums text-emerald-100">
                           {diffStats.added} characters
                         </p>
                       </div>
-                      <div className="min-w-[120px] flex-1 rounded-app-md bg-red-500/10 px-3 py-2">
-                        <span className="text-[10px] uppercase tracking-wide text-red-200/90">
+                      <div className="min-w-[120px] flex-1 rounded-app-lg border border-red-400/25 bg-red-500/[0.1] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-red-200/95">
                           Removed
                         </span>
-                        <p className="m-0 mt-0.5 text-xs text-red-100">
+                        <p className="m-0 mt-1 text-xs tabular-nums text-red-100">
                           {diffStats.removed} characters
                         </p>
                       </div>
                     </div>
-                    <div
-                      className="rounded-app-lg bg-app-bg/50 p-4 text-[13px] leading-relaxed text-app-muted"
-                      style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                    >
+                    <div className="rounded-app-xl border border-white/[0.09] bg-[#080a0f]/90 p-4 font-mono text-[13px] leading-relaxed text-app-muted shadow-[inset_0_3px_32px_rgba(0,0,0,0.45)] whitespace-pre-wrap break-words ring-1 ring-inset ring-white/[0.04]">
                       {diffParts.map((part, i) => {
                         if (part.type === 'insert') {
                           return (
                             <mark
                               key={i}
-                              className="bg-emerald-500/25 text-emerald-100"
-                              style={{ padding: '0 2px', borderRadius: 2 }}
+                              className="rounded px-0.5 text-emerald-100 [box-decoration-break:clone] bg-emerald-500/35"
                             >
                               {part.text}
                             </mark>
@@ -669,7 +705,10 @@ export default function VersionHistoryLayout() {
                         }
                         if (part.type === 'delete') {
                           return (
-                            <del key={i} className="bg-red-500/20 text-red-100/95">
+                            <del
+                              key={i}
+                              className="rounded bg-red-500/30 px-0.5 text-red-100/95 [box-decoration-break:clone]"
+                            >
                               {part.text}
                             </del>
                           );
@@ -700,16 +739,18 @@ export default function VersionHistoryLayout() {
                     'type' in (fallbackDoc as Record<string, unknown>);
                   if (fallbackIsDoc && prevWithBody) {
                     return (
-                      <div className="space-y-3">
-                        <p className="m-0 text-[12px] text-app-faint">
-                          No body was captured for this lifecycle-only snapshot. Showing body from v
-                          {prevWithBody.versionNumber}.
-                        </p>
-                        <div className="tiptap-content">
-                          <TipTapReadonly
-                            doc={fallbackDoc as any}
-                            className="ProseMirror text-[13px] leading-relaxed text-app-muted outline-none"
-                          />
+                      <div className="version-history-canvas rounded-app-xl border border-white/[0.06] bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <div className="version-history-body space-y-3">
+                          <p className="m-0 text-[12px] text-app-faint">
+                            No body was captured for this lifecycle-only snapshot. Showing body from
+                            v{prevWithBody.versionNumber}.
+                          </p>
+                          <div className="tiptap-content">
+                            <TipTapReadonly
+                              doc={fallbackDoc as any}
+                              className="ProseMirror version-history-prose text-[13px] leading-relaxed text-app-muted outline-none"
+                            />
+                          </div>
                         </div>
                       </div>
                     );
@@ -721,11 +762,13 @@ export default function VersionHistoryLayout() {
                   );
                 }
                 return (
-                  <div className="tiptap-content">
-                    <TipTapReadonly
-                      doc={doc as any}
-                      className="ProseMirror text-[13px] leading-relaxed text-app-muted outline-none"
-                    />
+                  <div className="version-history-canvas rounded-app-xl border border-white/[0.06] bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="version-history-body tiptap-content">
+                      <TipTapReadonly
+                        doc={doc as any}
+                        className="ProseMirror version-history-prose text-[13px] leading-relaxed text-app-muted outline-none"
+                      />
+                    </div>
                   </div>
                 );
               })()

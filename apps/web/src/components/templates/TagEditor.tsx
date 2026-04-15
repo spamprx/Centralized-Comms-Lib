@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { tagService, type Tag, type TemplateTag } from '../../services';
+import { formInputClass } from '../ui';
 
 interface TagEditorProps {
   templateId: string;
@@ -158,15 +159,17 @@ export default function TagEditor({
   if (!isEditing) {
     return (
       <div className="mb-6">
-        <label className="block text-sm font-medium text-app-muted mb-2">Tags</label>
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.1em] text-app-faint">
+          Tags
+        </label>
         <div className="flex flex-wrap gap-2">
           {tags.length === 0 ? (
-            <span className="text-app-faint text-sm">No tags</span>
+            <span className="text-sm text-app-faint">No tags</span>
           ) : (
             tags.map((tag) => (
               <span
                 key={tag.id}
-                className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                className="inline-flex items-center rounded-full border border-app-accent/25 bg-app-accent/12 px-3 py-1 text-sm font-medium text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               >
                 {tag.name}
               </span>
@@ -179,39 +182,40 @@ export default function TagEditor({
 
   return (
     <div className="mb-6">
-      <label className="block text-sm font-medium text-app-muted mb-2">Tags</label>
+      <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.1em] text-app-faint">
+        Tags
+      </label>
 
       {error && (
-        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+        <div className="mb-2 rounded-app-lg border border-red-400/35 bg-red-500/10 p-2 text-sm text-red-200 backdrop-blur-sm">
           {error}
         </div>
       )}
 
-      {/* Existing Tags */}
-      <div className="flex flex-wrap gap-2 mb-3">
+      <div className="mb-3 flex flex-wrap gap-2">
         {tags.length === 0 ? (
-          <span className="text-app-faint text-sm">No tags</span>
+          <span className="text-sm text-app-faint">No tags</span>
         ) : (
           tags.map((tag, index) => (
             <span
               key={tag.id || `tag-${index}`}
-              className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+              className="inline-flex items-center rounded-full border border-app-accent/30 bg-app-accent/15 px-3 py-1 text-sm font-medium text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
             >
               {tag.name}
               <button
+                type="button"
                 onClick={() => handleRemoveTag(tag.id)}
                 disabled={loading}
-                className="ml-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                className="ml-1.5 rounded-full p-0.5 text-app-accent transition-colors hover:bg-white/10 hover:text-app-text disabled:opacity-50"
                 title="Remove tag"
               >
-                <X className="w-3 h-3" />
+                <X className="h-3 w-3" />
               </button>
             </span>
           ))
         )}
       </div>
 
-      {/* Add New Tag */}
       <div className="relative">
         <div className="flex gap-2">
           <input
@@ -228,32 +232,33 @@ export default function TagEditor({
             }}
             placeholder="Type to search tags or add new..."
             disabled={loading}
-            className="flex-1 rounded-lg border border-app-border bg-app-bg/40 px-3 py-2 text-app-text outline-none focus:ring-2 focus:ring-app-accent"
+            className={`${formInputClass} flex-1 text-sm`}
           />
           <button
+            type="button"
             onClick={handleAddTag}
             disabled={loading || !newTagName.trim()}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            className="inline-flex shrink-0 items-center gap-1 rounded-app-md bg-gradient-to-r from-app-accent to-app-accent-2 px-3 py-2 text-sm font-semibold text-app-bg shadow-[0_0_20px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/15 transition-[transform,opacity] duration-(--duration-app) ease-app-out hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-4 w-4" />
             Add
           </button>
         </div>
 
-        {/* Suggestions Dropdown */}
         {showSuggestions && (
-          <div className="absolute z-10 w-full mt-1 bg-app-surface border border-app-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-app-lg border border-white/[0.1] bg-app-bg/90 py-1 shadow-app-lift backdrop-blur-xl">
             {filteredSuggestions.length > 0 ? (
               filteredSuggestions.slice(0, 10).map((tag) => (
                 <button
                   key={tag.id}
+                  type="button"
                   onClick={() => {
                     setNewTagName(tag.name);
                     setShowSuggestions(false);
                   }}
-                  className="w-full px-3 py-2 text-left hover:bg-app-elevated flex items-center justify-between"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
                 >
-                  <span className="text-sm">{tag.name}</span>
+                  <span>{tag.name}</span>
                   <span className="text-xs text-app-faint">{tag.slug}</span>
                 </button>
               ))

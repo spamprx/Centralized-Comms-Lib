@@ -89,7 +89,9 @@ export const channelService = {
       compatibility?: Record<string, unknown>;
     },
   ): Promise<
-    { ok: true; channel: { id: string; name: string; key: string } } | { notFound: true } | { conflict: true }
+    | { ok: true; channel: { id: string; name: string; key: string } }
+    | { notFound: true }
+    | { conflict: true }
   > {
     if (!ctx.isAdmin) {
       throw new Error("Only admins can update channels");
@@ -105,7 +107,8 @@ export const channelService = {
         throw new Error("name must be at most 200 characters");
       }
 
-      const nextKey = input.key !== undefined ? slugifyKey(input.key) : undefined;
+      const nextKey =
+        input.key !== undefined ? slugifyKey(input.key) : undefined;
       if (input.key !== undefined && !nextKey) {
         throw new Error("Could not derive a valid channel key");
       }
@@ -117,9 +120,15 @@ export const channelService = {
       const channel = await repos.channel.update(id, {
         ...(nextName !== undefined && { name: nextName }),
         ...(nextKey !== undefined && { key: nextKey }),
-        ...(input.description !== undefined && { description: input.description }),
-        ...(input.priority !== undefined && { priority: Number(input.priority) || 0 }),
-        ...(input.compatibility !== undefined && { compatibility: input.compatibility }),
+        ...(input.description !== undefined && {
+          description: input.description,
+        }),
+        ...(input.priority !== undefined && {
+          priority: Number(input.priority) || 0,
+        }),
+        ...(input.compatibility !== undefined && {
+          compatibility: input.compatibility,
+        }),
       });
 
       await repos.audit.append({
@@ -137,14 +146,19 @@ export const channelService = {
         userAgent: ctx.userAgent,
       });
 
-      return { ok: true, channel: { id: channel.id, name: channel.name, key: channel.key } } as const;
+      return {
+        ok: true,
+        channel: { id: channel.id, name: channel.name, key: channel.key },
+      } as const;
     });
   },
 
   async remove(
     ctx: AuditContext,
     id: string,
-  ): Promise<{ ok: true } | { notFound: true } | { conflict: true; message: string }> {
+  ): Promise<
+    { ok: true } | { notFound: true } | { conflict: true; message: string }
+  > {
     if (!ctx.isAdmin) {
       throw new Error("Only admins can delete channels");
     }

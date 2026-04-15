@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { StatCard as StatCardModel } from '../../data/mockDashboardData';
 import { Surface } from '../ui';
@@ -21,30 +22,42 @@ export function StatCard({ stat }: { stat: StatCardModel }) {
 
   return (
     <Surface
+      variant="glass"
       padding="sm"
-      className="group/card relative min-w-[200px] flex-1 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-app-glow"
+      className="group/card relative min-w-[200px] flex-1 overflow-hidden rounded-app-xl shadow-app-lift transition-[transform,box-shadow,border-color] duration-[var(--duration-app-slow)] ease-[var(--ease-app-out)] hover:-translate-y-1 hover:border-white/15 hover:shadow-app-glow motion-reduce:transform-none motion-reduce:transition-shadow"
     >
       <div
-        className="absolute inset-x-0 top-0 h-px opacity-90"
+        className="absolute inset-x-0 top-0 z-[1] h-px opacity-95"
         style={{
           background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
         }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover/card:opacity-40"
+        className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover/card:opacity-50"
         style={{ background: accent }}
       />
-      <div className="relative mb-3 flex items-center justify-between">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-8 left-1/2 h-20 w-[120%] -translate-x-1/2 rounded-full bg-gradient-to-t from-black/35 to-transparent opacity-70"
+      />
+      <div className="relative z-[1] mb-3 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-app-faint">
           {stat.label}
         </span>
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-app-md ring-1 ring-white/10 transition-transform duration-300 group-hover/card:scale-105"
-          style={{
-            background: `${accent}28`,
-            color: accent,
-          }}
+          className="flex h-10 w-10 items-center justify-center rounded-app-md ring-1 ring-white/12 transition-[transform,box-shadow] duration-[var(--duration-app-slow)] ease-[var(--ease-app-out)] group-hover/card:scale-105 group-hover/card:shadow-[0_0_20px_-4px_var(--tw-shadow-color)]"
+          style={
+            {
+              background: `${accent}30`,
+              color: accent,
+              '--tw-shadow-color': accent,
+            } as CSSProperties
+          }
         >
           <svg
             width="16"
@@ -73,11 +86,15 @@ export function StatCard({ stat }: { stat: StatCardModel }) {
           </svg>
         </div>
       </div>
-      <div className="relative mb-1 text-2xl font-bold tracking-tight text-app-text md:text-[1.65rem]">
+      <div className="relative z-[1] mb-1 bg-gradient-to-br from-app-text to-app-muted bg-clip-text text-2xl font-bold tracking-tight text-transparent md:text-[1.65rem]">
         {stat.value}
       </div>
-      <div className={`relative flex items-center gap-1.5 text-xs ${trendColor}`}>
-        <TrendIcon size={12} aria-hidden className="shrink-0" />
+      <div className={`relative z-[1] flex items-center gap-1.5 text-xs ${trendColor}`}>
+        <TrendIcon
+          size={12}
+          aria-hidden
+          className="shrink-0 transition-transform duration-300 group-hover/card:scale-110"
+        />
         <span>
           {stat.change > 0 ? '+' : ''}
           {stat.change.toFixed(1)}% from last month
@@ -91,7 +108,13 @@ export function StatCardsRow({ statCards }: { statCards: StatCardModel[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {statCards.map((stat, i) => (
-        <StatCard key={i} stat={stat} />
+        <div
+          key={i}
+          className="animate-fade-in motion-reduce:animate-none"
+          style={{ animationDelay: `${i * 70}ms` }}
+        >
+          <StatCard stat={stat} />
+        </div>
       ))}
     </div>
   );

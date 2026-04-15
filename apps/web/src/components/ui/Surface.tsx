@@ -4,12 +4,13 @@ type SurfaceVariant = 'default' | 'muted' | 'inset' | 'glass';
 
 const variantClass: Record<SurfaceVariant, string> = {
   default:
-    'border-app-border/90 bg-app-surface/75 shadow-app-soft backdrop-blur-md supports-[backdrop-filter]:bg-app-surface/55',
-  muted: 'border-app-border/70 bg-app-bg-subtle/85 shadow-none backdrop-blur-sm',
+    'border border-white/[0.08] bg-app-surface/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] shadow-app-soft backdrop-blur-lg supports-[backdrop-filter]:bg-app-surface/58',
+  muted:
+    'border border-white/[0.05] bg-app-bg-subtle/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] shadow-none backdrop-blur-md',
   inset:
-    'border-app-border/50 bg-app-bg/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm',
+    'border border-white/[0.06] bg-app-bg/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md',
   glass:
-    'border-app-border/80 bg-app-bg/40 shadow-app-lift backdrop-blur-xl supports-[backdrop-filter]:bg-app-bg/30',
+    'border border-white/10 bg-app-bg/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] shadow-app-lift backdrop-blur-2xl supports-[backdrop-filter]:bg-app-bg/32',
 };
 
 export interface SurfaceProps extends HTMLAttributes<HTMLDivElement> {
@@ -34,7 +35,7 @@ export function Surface({
 }: SurfaceProps) {
   return (
     <div
-      className={`rounded-app-xl border transition-[box-shadow,border-color,transform] duration-300 ${variantClass[variant]} ${paddingClass[padding]} ${className}`}
+      className={`relative rounded-app-xl transition-[box-shadow,border-color,transform,background-color] duration-[var(--duration-app-slow)] ease-[var(--ease-app-out)] motion-reduce:transition-shadow motion-reduce:duration-200 ${variantClass[variant]} ${paddingClass[padding]} ${className}`}
       {...rest}
     >
       {children}

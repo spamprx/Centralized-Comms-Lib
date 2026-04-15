@@ -36,16 +36,21 @@ export default function SystemSettingsTab() {
   const current = settings ? { ...settings[activeSection], ...localChanges } : null;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-app-text mb-1">System Settings</h2>
-          <p className="text-[13px] text-app-faint m-0">Configure application-wide preferences</p>
+          <h2 className="mb-1 text-lg font-semibold tracking-tight text-app-text">
+            System Settings
+          </h2>
+          <p className="m-0 text-[13px] text-app-muted">Configure application-wide preferences</p>
         </div>
         <button
-          className={`flex items-center gap-1.5 px-3.5 py-2 admin-glass-button rounded-xl text-[13px] font-medium transition-all duration-200 ${
-            saved ? 'text-emerald-400 !border-emerald-400/30 !bg-emerald-400/10' : 'text-app-accent'
-          } disabled:opacity-40 disabled:cursor-not-allowed`}
+          type="button"
+          className={`admin-glass-button inline-flex items-center gap-2 rounded-app-lg px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
+            saved
+              ? '!border-emerald-400/35 !bg-emerald-500/15 text-emerald-300'
+              : 'border-app-accent/25 bg-app-accent-muted/35 text-app-accent'
+          } disabled:cursor-not-allowed disabled:opacity-40`}
           onClick={handleSave}
           disabled={saving || !isDirty}
         >
@@ -60,13 +65,15 @@ export default function SystemSettingsTab() {
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
           <span className="text-[13px] text-amber-300/90 flex-1">You have unsaved changes</span>
           <button
-            className="flex items-center gap-1 px-2.5 py-1 bg-transparent border border-amber-400/20 rounded-lg text-amber-400 text-[12px] cursor-pointer hover:bg-amber-400/10"
+            type="button"
+            className="flex cursor-pointer items-center gap-1 rounded-app-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[12px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
             onClick={handleDiscard}
           >
             <RotateCcw size={11} /> Discard
           </button>
           <button
-            className="flex items-center gap-1 px-2.5 py-1 bg-app-accent-muted border border-app-accent/30 rounded-lg text-app-accent text-[12px] cursor-pointer hover:bg-app-accent/20"
+            type="button"
+            className="flex cursor-pointer items-center gap-1 rounded-app-md border border-app-accent/35 bg-app-accent-muted px-2.5 py-1.5 text-[12px] font-semibold text-app-accent transition-colors hover:bg-app-accent/20"
             onClick={handleSave}
             disabled={saving}
           >
@@ -75,18 +82,19 @@ export default function SystemSettingsTab() {
         </div>
       )}
 
-      <div className="flex gap-5 items-start">
+      <div className="flex flex-col items-start gap-5 md:flex-row">
         {/* Vertical icon tab rail */}
-        <nav className="flex flex-col gap-1 shrink-0">
+        <nav className="admin-glass flex shrink-0 flex-row gap-1 rounded-app-xl p-1.5 ring-1 ring-white/[0.05] md:flex-col">
           {SECTIONS.map(({ id, label, icon: Icon }) => {
             const isActive = activeSection === id;
             return (
               <button
                 key={id}
-                className={`relative flex items-center justify-center w-11 h-11 border-none rounded-xl cursor-pointer transition-all duration-200 group/tab ${
+                type="button"
+                className={`group/tab relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-app-md border border-transparent transition-all duration-200 ${
                   isActive
-                    ? 'bg-app-accent-muted text-app-accent'
-                    : 'bg-transparent text-app-faint hover:bg-app-surface-hover hover:text-app-muted'
+                    ? 'border-app-accent/25 bg-app-accent-muted text-app-accent shadow-[0_0_20px_-8px_rgba(147,124,248,0.45)]'
+                    : 'border-transparent bg-transparent text-app-faint hover:border-white/[0.08] hover:bg-white/[0.05] hover:text-app-muted'
                 }`}
                 onClick={() => {
                   setActiveSection(id);
@@ -112,12 +120,10 @@ export default function SystemSettingsTab() {
         </nav>
 
         {/* Content */}
-        <div
-          className="flex-1 p-5 admin-glass rounded-xl"
-          style={{ background: 'rgba(15, 20, 32, 0.5)' }}
-        >
+        <div className="admin-glass relative min-w-0 flex-1 overflow-hidden rounded-app-xl p-5 ring-1 ring-white/[0.05] sm:p-6 md:flex-1">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
           {/* Section label */}
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-app-faint mb-4">
+          <div className="relative mb-5 text-[10px] font-bold uppercase tracking-[0.14em] text-app-faint">
             {SECTIONS.find((s) => s.id === activeSection)?.label}
           </div>
 
@@ -126,8 +132,7 @@ export default function SystemSettingsTab() {
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-[56px] rounded-xl animate-pulse"
-                  style={{ background: 'rgba(255,255,255,0.03)' }}
+                  className="app-skeleton-shimmer h-14 rounded-app-lg border border-white/[0.06]"
                 />
               ))}
             </div>
@@ -196,7 +201,7 @@ function ToggleField({
 // ─── Shared input classes ─────────────────────────────────────────────
 
 const inputClass =
-  'w-full px-3 py-3 bg-app-surface border border-app-border rounded-xl text-app-text text-[13px] outline-none transition-all duration-200 focus:border-app-accent/40 focus:shadow-[0_0_0_3px_rgba(147,124,248,0.06)] placeholder-transparent';
+  'w-full rounded-app-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 placeholder-transparent focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/12';
 const inputSmClass = `${inputClass} w-[140px]`;
 
 // ─── Section Components ───────────────────────────────────────────────

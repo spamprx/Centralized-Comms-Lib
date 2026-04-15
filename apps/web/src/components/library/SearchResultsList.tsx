@@ -49,14 +49,22 @@ export function SearchResultsList({
   const toIdx = total === 0 ? 0 : Math.min(page * pageSize, total);
 
   return (
-    <div className="mt-4 rounded-app-lg border border-app-border bg-app-surface overflow-hidden">
-      <div className="px-4 py-3 border-b border-app-border flex items-center justify-between gap-3">
+    <div className="relative mt-2 overflow-hidden rounded-app-xl border border-white/10 bg-app-bg/35 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/28">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 top-0 h-48 w-48 rounded-full bg-app-accent/12 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-transparent"
+      />
+      <div className="relative z-1 flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3.5">
         <div className="min-w-0">
-          <div className="text-[12px] font-semibold text-app-text truncate">
+          <div className="truncate text-[12px] font-semibold tracking-tight text-app-text">
             Results for “{q.trim()}”
           </div>
           {!compact && (
-            <div className="text-[11px] text-app-faint mt-0.5 space-x-1">
+            <div className="mt-1 space-x-1 text-[11px] text-app-faint">
               <span>Ranked by relevance{unavailable ? ' (search index unavailable)' : ''}.</span>
               {!error && !unavailable && !loading && total > 0 && (
                 <span className="text-app-muted">
@@ -68,28 +76,34 @@ export function SearchResultsList({
         </div>
         {loading && (
           <Loader2
-            size={16}
-            className="animate-spin text-app-faint shrink-0"
+            size={18}
+            className="shrink-0 animate-spin text-app-accent"
             aria-label="Loading results"
           />
         )}
       </div>
 
-      {error && <div className="px-4 py-3 text-[12px] text-red-400/90">{error}</div>}
+      {error && (
+        <div className="relative z-1 border-b border-white/[0.05] px-4 py-3.5 text-[12px] text-red-400/95">
+          {error}
+        </div>
+      )}
 
       {!error && unavailable && (
-        <div className="px-4 py-3 text-[12px] text-app-muted">
+        <div className="relative z-1 border-b border-white/[0.05] px-4 py-3.5 text-[12px] text-app-muted">
           Search index is unavailable right now. Showing basic filtered items below.
         </div>
       )}
 
       {!error && !loading && !unavailable && hits.length === 0 && (
-        <div className="px-4 py-8 text-center">
-          <SearchX size={18} className="text-app-faint inline-block mb-2" aria-hidden />
-          <div className="text-[13px] font-medium text-app-text">
+        <div className="relative z-1 px-4 py-10 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-app-bg/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm">
+            <SearchX size={20} className="text-app-accent/80" aria-hidden />
+          </div>
+          <div className="text-[13px] font-semibold text-app-text">
             No matches in the search index
           </div>
-          <p className="mt-1.5 text-[12px] text-app-muted max-w-sm mx-auto leading-relaxed">
+          <p className="mx-auto mt-2 max-w-sm text-[12px] leading-relaxed text-app-muted">
             Nothing ranked for this query. Try different keywords or clear the search box and use
             filters on the full library below.
           </p>
@@ -97,7 +111,7 @@ export function SearchResultsList({
             <button
               type="button"
               onClick={onClearSearch}
-              className="mt-4 text-[12px] font-semibold text-app-accent bg-transparent border-none cursor-pointer hover:underline underline-offset-2"
+              className="mt-5 cursor-pointer rounded-full border border-app-accent/35 bg-app-accent/15 px-4 py-2 text-[12px] font-semibold text-app-accent shadow-[0_0_24px_-10px_rgba(147,124,248,0.5)] transition-[transform,background-color,border-color,box-shadow] duration-(--duration-app-slow) ease-(--ease-app-material) hover:border-app-accent/50 hover:bg-app-accent/22 active:scale-[0.98]"
             >
               Clear search
             </button>
@@ -107,19 +121,19 @@ export function SearchResultsList({
 
       {!error && hits.length > 0 && (
         <>
-          <ul className="list-none m-0 p-0 divide-y divide-app-border">
+          <ul className="relative z-1 m-0 list-none space-y-2 p-3">
             {hits.map((h, idx) => {
               const titlePlain = plainTitleFromHit(h);
               const titleHtml = titleHtmlFromHit(h);
               const snippetHtml = snippetHtmlFromHit(h);
               const relPct = relevancePercentForHit(hits, idx);
               return (
-                <li key={`${h.contentId}:${idx}`} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
+                <li key={`${h.contentId}:${idx}`}>
+                  <div className="group/hit flex items-start justify-between gap-3 rounded-app-lg border border-white/[0.07] bg-app-bg/25 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm transition-[border-color,transform,box-shadow] duration-(--duration-app-slow) ease-(--ease-app-material) hover:-translate-y-px hover:border-white/12 hover:bg-white/[0.04] hover:shadow-[0_16px_48px_-24px_rgba(0,0,0,0.55)] motion-reduce:transition-colors motion-reduce:hover:transform-none">
                     <div className="min-w-0 flex-1">
                       <Link
                         to={`/library/${h.contentId}`}
-                        className="text-[13px] font-semibold text-app-accent hover:text-app-accent line-clamp-2"
+                        className="line-clamp-2 text-[13px] font-semibold text-app-accent transition-[color,gap] duration-(--duration-app) ease-app-out hover:text-app-accent-hover"
                         title={titlePlain}
                       >
                         {titleHtml ? (
@@ -132,34 +146,32 @@ export function SearchResultsList({
                         )}
                         <ArrowUpRight
                           size={14}
-                          className="inline-block ml-1 opacity-70 shrink-0 align-middle"
+                          className="ml-1 inline-block shrink-0 align-middle opacity-60 transition-transform duration-(--duration-app) ease-app-out group-hover/hit:translate-x-0.5 group-hover/hit:-translate-y-0.5 group-hover/hit:opacity-100"
                           aria-hidden
                         />
                       </Link>
                       {snippetHtml ? (
                         <div
-                          className={`text-[12px] text-app-muted mt-1.5 leading-relaxed line-clamp-3 ${snippetMarkClass}`}
+                          className={`mt-2 line-clamp-3 text-[12px] leading-relaxed text-app-muted ${snippetMarkClass}`}
                           dangerouslySetInnerHTML={{ __html: snippetHtml }}
                         />
                       ) : (
-                        <div className="text-[12px] text-app-faint mt-1.5">
-                          No snippet available.
-                        </div>
+                        <div className="mt-2 text-[12px] text-app-faint">No snippet available.</div>
                       )}
                     </div>
-                    <div className="shrink-0 text-right w-[4.5rem]">
-                      <div className="text-[10px] text-app-faint uppercase tracking-wide">
+                    <div className="w-[4.75rem] shrink-0 text-right">
+                      <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-app-faint">
                         Relevance
                       </div>
-                      <div className="text-[12px] font-semibold text-app-text tabular-nums">
+                      <div className="text-[12px] font-semibold tabular-nums text-app-text">
                         {relPct}%
                       </div>
                       <div
-                        className="mt-1 h-1 rounded-full bg-app-border/80 overflow-hidden"
+                        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/5"
                         title={`Blended score on this page: ${typeof h.score === 'number' ? h.score.toFixed(4) : '—'}`}
                       >
                         <div
-                          className="h-full rounded-full bg-app-accent/80 transition-[width] duration-300"
+                          className="h-full rounded-full bg-gradient-to-r from-app-accent via-app-accent-2 to-app-accent transition-[width] duration-500 ease-out"
                           style={{ width: `${relPct}%` }}
                         />
                       </div>
@@ -170,7 +182,10 @@ export function SearchResultsList({
             })}
           </ul>
           {showPager && (
-            <nav className="border-t border-app-border" aria-label="Search results pages">
+            <nav
+              className="border-t border-white/[0.06] bg-app-bg/20 backdrop-blur-md"
+              aria-label="Search results pages"
+            >
               <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
             </nav>
           )}

@@ -13,16 +13,6 @@ import {
   Zap,
 } from 'lucide-react';
 
-const BG = '#0d0f18';
-const SURFACE = '#13151f';
-const BORDER = 'rgba(255,255,255,0.07)';
-const PURPLE = '#7C6FF7';
-const AMBER = '#EF9F27';
-const TEAL = '#1D9E75';
-const USER_BUBBLE = '#1e1b3a';
-const MUTED = '#8b90a4';
-const MUTED_GREEN = 'rgba(74, 184, 120, 0.85)';
-
 type ChatMessage = {
   id: string;
   type: 'ai' | 'user';
@@ -63,6 +53,8 @@ const recentSessionsSeed = [
   { id: 'e', title: 'Brand voice workshop', at: '2026-04-08T11:45:00.000Z' },
 ];
 
+const ease = 'duration-[var(--duration-app-slow)] ease-[var(--ease-app-out)]';
+
 function formatSessionTime(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -77,6 +69,11 @@ function formatSessionTime(iso: string) {
 function formatMessageTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
+
+const glassPanel =
+  'border border-white/[0.08] bg-gradient-to-b from-white/[0.08] to-white/[0.02] shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/40';
+const iconBtn =
+  'flex size-8 shrink-0 items-center justify-center rounded-app-md border border-white/[0.08] text-app-muted transition-[border-color,background-color,color,transform] motion-reduce:transition-none hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-app-text active:scale-[0.97] motion-reduce:active:transform-none';
 
 export default function AITutorPage() {
   const [messages, setMessages] = useState(initialMessages);
@@ -151,37 +148,37 @@ export default function AITutorPage() {
   const streakPct = Math.min(100, (streakDays / streakGoal) * 100);
 
   return (
-    <div
-      className="flex h-screen min-h-0 w-full font-[ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif] font-normal antialiased"
-      style={{ backgroundColor: BG, color: '#eceef4' }}
-    >
+    <div className="relative isolate flex h-screen min-h-0 w-full overflow-hidden bg-app-bg font-sans font-normal text-app-text antialiased app-main-canvas">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -left-24 top-20 h-96 w-96 rounded-full bg-app-accent/12 blur-[110px]" />
+        <div className="absolute right-0 top-1/4 h-80 w-80 rounded-full bg-app-accent-2/10 blur-[100px]" />
+      </div>
+
       {/* Left sidebar (sessions + nav) */}
       <aside
-        className={`flex shrink-0 flex-col overflow-hidden border-r py-4 transition-[width] duration-200 ease-out ${
+        className={`relative z-[1] flex shrink-0 flex-col overflow-hidden border-r border-white/[0.07] bg-app-bg/55 py-4 shadow-[1px_0_0_rgba(255,255,255,0.03)_inset] backdrop-blur-2xl transition-[width] duration-300 ease-[var(--ease-app-out)] motion-reduce:transition-none ${
           sessionsSidebarOpen ? 'w-[220px]' : 'w-11'
         }`}
-        style={{ borderColor: BORDER, backgroundColor: BG }}
       >
         {sessionsSidebarOpen ? (
           <>
             <div className="flex items-start justify-between gap-2 px-3 pb-5 pl-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: PURPLE }}
+                  className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-app-lg bg-gradient-to-br from-app-accent to-app-accent-deep shadow-app-glow ring-1 ring-white/10"
                   aria-hidden
                 >
-                  <GraduationCap size={18} className="text-white" strokeWidth={2} />
+                  <span className="absolute inset-0 bg-gradient-to-t from-transparent to-white/20" />
+                  <GraduationCap size={18} className="relative text-white" strokeWidth={2} />
                 </div>
-                <span className="truncate text-[15px] font-medium tracking-tight text-white">
+                <span className="truncate text-[15px] font-semibold tracking-tight text-app-text">
                   LearnAI
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setSessionsSidebarOpen(false)}
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.07)] transition-colors hover:border-[rgba(255,255,255,0.14)]"
-                style={{ color: MUTED }}
+                className={iconBtn}
                 aria-label="Collapse sessions sidebar"
                 title="Collapse sidebar"
               >
@@ -193,41 +190,30 @@ export default function AITutorPage() {
               <button
                 type="button"
                 onClick={newSession}
-                className="h-9 w-full rounded-lg text-[13px] font-medium text-white transition-colors"
-                style={{ backgroundColor: PURPLE }}
+                className={`h-9 w-full rounded-app-lg text-[13px] font-semibold text-white shadow-app-soft transition-[filter,transform,box-shadow] motion-reduce:transition-none ${ease} bg-gradient-to-br from-app-accent to-app-accent-deep hover:brightness-110 active:scale-[0.99] motion-reduce:active:transform-none`}
               >
                 New session
               </button>
             </div>
 
-            {/* <nav className="mt-5 flex items-center gap-4 px-4 text-[13px]" aria-label="App">
-              <span className="font-medium text-white">Assistant</span>
-              <button type="button" className="font-medium transition-colors hover:text-white" style={{ color: MUTED }}>
-                Library
-              </button>
-            </nav> */}
-
-            <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin]">
-              <p
-                className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide"
-                style={{ color: MUTED }}
-              >
+            <div className="chat-premium-scroll mt-5 min-h-0 flex-1 overflow-y-auto px-3">
+              <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">
                 Recent sessions
               </p>
-              <ul className="m-0 list-none p-0">
+              <ul className="m-0 list-none space-y-1 p-0">
                 {sessions.map((s) => (
                   <li key={s.id}>
                     <button
                       type="button"
                       onClick={() => setActiveSessionId(s.id)}
-                      className="w-full border-b py-3 text-left transition-colors hover:text-white"
-                      style={{
-                        borderColor: BORDER,
-                        color: activeSessionId === s.id ? '#fff' : MUTED,
-                      }}
+                      className={`w-full rounded-app-md border px-2.5 py-2.5 text-left transition-[border-color,background-color,box-shadow] motion-reduce:transition-none ${ease} ${
+                        activeSessionId === s.id
+                          ? 'border-app-accent/35 bg-app-accent-muted/40 shadow-[0_0_24px_-10px_rgba(147,124,248,0.5)]'
+                          : 'border-transparent bg-transparent hover:border-white/[0.08] hover:bg-white/[0.04]'
+                      }`}
                     >
-                      <span className="block text-[13px] font-medium text-white">{s.title}</span>
-                      <span className="mt-0.5 block text-[11px]" style={{ color: MUTED }}>
+                      <span className="block text-[13px] font-medium text-app-text">{s.title}</span>
+                      <span className="mt-0.5 block text-[11px] text-app-muted">
                         {formatSessionTime(s.at)}
                       </span>
                     </button>
@@ -236,26 +222,17 @@ export default function AITutorPage() {
               </ul>
             </div>
 
-            <div
-              className="mt-auto flex items-center gap-2 border-t px-3 pt-3"
-              style={{ borderColor: BORDER }}
-            >
+            <div className="mt-auto flex items-center gap-2 border-t border-white/[0.07] px-3 pt-3">
               <div
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-medium text-white"
-                style={{ backgroundColor: SURFACE, border: `1px solid ${BORDER}` }}
+                className={`flex size-8 shrink-0 items-center justify-center rounded-app-md text-[11px] font-semibold text-app-text ${glassPanel}`}
                 aria-hidden
               >
                 AC
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-white">Alex Chen</p>
+                <p className="truncate text-[13px] font-medium text-app-text">Alex Chen</p>
               </div>
-              <button
-                type="button"
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors"
-                style={{ border: `1px solid ${BORDER}`, color: MUTED }}
-                aria-label="Settings"
-              >
+              <button type="button" className={iconBtn} aria-label="Settings">
                 <Settings size={16} strokeWidth={2} />
               </button>
             </div>
@@ -265,34 +242,34 @@ export default function AITutorPage() {
             <button
               type="button"
               onClick={() => setSessionsSidebarOpen(true)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.07)] transition-colors hover:border-[rgba(255,255,255,0.14)]"
-              style={{ color: MUTED }}
+              className={iconBtn}
               aria-label="Open sessions sidebar"
               title="Open sidebar"
             >
               <ChevronRight size={18} strokeWidth={2} aria-hidden />
             </button>
             <div
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-              style={{ backgroundColor: PURPLE }}
+              className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-app-lg bg-gradient-to-br from-app-accent to-app-accent-deep shadow-app-glow ring-1 ring-white/10"
               aria-hidden
             >
-              <GraduationCap size={16} className="text-white" strokeWidth={2} />
+              <GraduationCap size={16} className="relative text-white" strokeWidth={2} />
             </div>
           </div>
         )}
       </aside>
 
       {/* Center chat */}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ backgroundColor: BG }}>
-        <header
-          className="flex h-12 shrink-0 items-center justify-between border-b px-5"
-          style={{ borderColor: BORDER, backgroundColor: BG }}
-        >
+      <main className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-white/[0.08] bg-app-bg/45 px-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/25">
           <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
-            <h1 className="m-0 text-base font-medium text-white">AI learning assistant</h1>
-            <div className="flex items-center gap-1.5 text-[12px]" style={{ color: MUTED_GREEN }}>
-              <span className="size-1.5 shrink-0 rounded-full bg-[#4ab878]" aria-hidden />
+            <h1 className="m-0 text-base font-semibold tracking-tight text-app-text">
+              AI learning assistant
+            </h1>
+            <div className="flex items-center gap-1.5 text-[12px] font-medium text-emerald-300/95">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/35 opacity-75 motion-reduce:animate-none" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]" />
+              </span>
               <span>Ready to help you learn</span>
             </div>
           </div>
@@ -300,49 +277,40 @@ export default function AITutorPage() {
             <button
               type="button"
               onClick={clearSession}
-              className="h-8 rounded-lg border border-[rgba(255,255,255,0.07)] bg-transparent px-3 text-[13px] font-medium transition-colors hover:border-[rgba(255,255,255,0.14)]"
-              style={{ color: MUTED }}
+              className={`h-8 rounded-app-md border border-white/[0.1] bg-white/[0.03] px-3 text-[13px] font-medium text-app-muted shadow-sm backdrop-blur-md transition-[border-color,background-color,color] motion-reduce:transition-none ${ease} hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-app-text`}
             >
               Clear session
             </button>
             <span
-              className="rounded-full px-2.5 py-1 text-[11px] font-medium"
-              style={{
-                backgroundColor: SURFACE,
-                border: `1px solid ${BORDER}`,
-                color: MUTED,
-              }}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium text-app-muted ${glassPanel}`}
             >
               GPT-4o
             </span>
           </div>
         </header>
 
-        <div
-          className="min-h-0 flex-1 overflow-y-auto px-5 py-5 [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-0.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(255,255,255,0.12)]"
-          style={{
-            scrollbarGutter: 'stable',
-          }}
-        >
+        <div className="chat-premium-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5 [scrollbar-gutter:stable]">
           <div className="mx-auto flex max-w-[720px] flex-col gap-5">
             {messages.map((message) =>
               message.type === 'ai' ? (
-                <div key={message.id} className="flex gap-3 justify-start">
+                <div key={message.id} className="flex justify-start gap-3">
                   <div
-                    className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded"
-                    style={{ backgroundColor: PURPLE }}
+                    className="relative mt-1 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-app-lg bg-gradient-to-br from-app-accent to-app-accent-deep shadow-app-glow ring-1 ring-white/10"
                     aria-hidden
                   >
-                    <Sparkles size={12} className="text-white" strokeWidth={2} />
+                    <Sparkles size={14} className="relative text-white" strokeWidth={2} />
                   </div>
                   <div className="min-w-0 max-w-[600px]">
                     <div
-                      className="rounded-xl border px-4 py-3 text-[13px] leading-[1.7] text-white"
-                      style={{ borderColor: BORDER, backgroundColor: SURFACE }}
+                      className={`relative overflow-hidden rounded-2xl rounded-tl-md px-4 py-3.5 text-[13px] leading-[1.7] text-app-text shadow-app-lift transition-[border-color,box-shadow] motion-reduce:transition-none ${ease} border border-white/[0.1] bg-gradient-to-br from-white/[0.1] to-white/[0.02] backdrop-blur-xl supports-backdrop-filter:bg-app-bg/35 hover:border-white/[0.14]`}
                     >
-                      <p className="m-0 whitespace-pre-wrap">{message.content}</p>
+                      <div
+                        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                        aria-hidden
+                      />
+                      <p className="relative m-0 whitespace-pre-wrap">{message.content}</p>
                     </div>
-                    <p className="mt-1.5 text-left text-[11px]" style={{ color: MUTED }}>
+                    <p className="mt-1.5 text-left text-[11px] font-medium tabular-nums text-app-faint">
                       {formatMessageTime(message.timestamp)}
                     </p>
                   </div>
@@ -351,12 +319,15 @@ export default function AITutorPage() {
                 <div key={message.id} className="flex justify-end">
                   <div className="flex min-w-0 max-w-[500px] flex-col items-end">
                     <div
-                      className="rounded-xl border px-4 py-3 text-[13px] leading-[1.7] text-white"
-                      style={{ borderColor: BORDER, backgroundColor: USER_BUBBLE }}
+                      className={`relative overflow-hidden rounded-2xl rounded-br-md border border-app-accent/28 bg-gradient-to-br from-app-accent/35 via-app-accent/18 to-app-accent-deep/28 px-4 py-3.5 text-[13px] leading-[1.7] text-app-text shadow-app-lift transition-[border-color,box-shadow,transform] motion-reduce:transition-none ${ease} hover:border-app-accent/45 hover:shadow-[0_14px_44px_-16px_rgba(147,124,248,0.38)]`}
                     >
-                      <p className="m-0 whitespace-pre-wrap">{message.content}</p>
+                      <div
+                        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/50 to-transparent"
+                        aria-hidden
+                      />
+                      <p className="relative m-0 whitespace-pre-wrap">{message.content}</p>
                     </div>
-                    <p className="mt-1.5 text-right text-[11px]" style={{ color: MUTED }}>
+                    <p className="mt-1.5 text-right text-[11px] font-medium tabular-nums text-app-faint">
                       {formatMessageTime(message.timestamp)}
                     </p>
                   </div>
@@ -366,20 +337,18 @@ export default function AITutorPage() {
             {isTyping && (
               <div className="flex gap-3">
                 <div
-                  className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded"
-                  style={{ backgroundColor: PURPLE }}
+                  className="relative mt-1 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-app-lg bg-gradient-to-br from-app-accent to-app-accent-deep shadow-app-glow ring-1 ring-white/10"
                   aria-hidden
                 >
-                  <Sparkles size={12} className="text-white" strokeWidth={2} />
+                  <Sparkles size={14} className="relative text-white" strokeWidth={2} />
                 </div>
                 <div
-                  className="rounded-xl border px-4 py-3"
-                  style={{ borderColor: BORDER, backgroundColor: SURFACE }}
+                  className={`flex items-center gap-3 rounded-2xl rounded-tl-md border border-white/[0.1] px-4 py-3.5 shadow-app-lift backdrop-blur-xl ${glassPanel}`}
                 >
-                  <div className="flex gap-1">
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: PURPLE }} />
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: PURPLE }} />
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: PURPLE }} />
+                  <div className="flex items-center gap-1.5 py-0.5">
+                    <span className="ai-tutor-typing-dot size-2 rounded-full bg-app-accent shadow-[0_0_10px_rgba(147,124,248,0.55)]" />
+                    <span className="ai-tutor-typing-dot size-2 rounded-full bg-app-accent shadow-[0_0_10px_rgba(147,124,248,0.55)]" />
+                    <span className="ai-tutor-typing-dot size-2 rounded-full bg-app-accent shadow-[0_0_10px_rgba(147,124,248,0.55)]" />
                   </div>
                 </div>
               </div>
@@ -387,14 +356,8 @@ export default function AITutorPage() {
           </div>
         </div>
 
-        <div
-          className="shrink-0 border-t px-5 py-3"
-          style={{ borderColor: BORDER, backgroundColor: BG }}
-        >
-          <p
-            className="mb-2 text-[11px] font-medium uppercase tracking-wide"
-            style={{ color: MUTED }}
-          >
+        <div className="shrink-0 border-t border-white/[0.07] bg-gradient-to-t from-app-bg/85 to-transparent px-5 py-3 backdrop-blur-xl">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">
             Quick actions
           </p>
           <div className="flex flex-wrap gap-2">
@@ -403,27 +366,18 @@ export default function AITutorPage() {
                 key={action.label}
                 type="button"
                 onClick={() => handleQuickAction(action.prompt)}
-                className="flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.1)] bg-transparent px-3 py-2 text-[13px] font-medium text-[#eceef4] transition-colors hover:border-[#7C6FF7] hover:bg-[rgba(124,111,247,0.15)]"
+                className={`flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-[13px] font-medium text-app-text shadow-sm backdrop-blur-md transition-[border-color,background-color,box-shadow,transform] motion-reduce:transition-none ${ease} hover:border-app-accent/35 hover:bg-app-accent-muted/30 hover:shadow-[0_0_24px_-10px_rgba(147,124,248,0.35)] active:scale-[0.98] motion-reduce:active:transform-none`}
               >
-                <action.icon
-                  size={14}
-                  className="shrink-0"
-                  strokeWidth={2}
-                  style={{ color: MUTED }}
-                />
+                <action.icon size={14} className="shrink-0 text-app-muted" strokeWidth={2} />
                 {action.label}
               </button>
             ))}
           </div>
         </div>
 
-        <div
-          className="shrink-0 border-t px-5 pb-4 pt-3"
-          style={{ borderColor: BORDER, backgroundColor: BG }}
-        >
+        <div className="shrink-0 border-t border-white/[0.08] bg-app-bg/50 px-5 pb-5 pt-4 backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/30">
           <div
-            className="mx-auto flex h-11 max-w-[720px] items-center gap-2 rounded-full border pl-4 pr-1"
-            style={{ borderColor: BORDER, backgroundColor: SURFACE }}
+            className={`mx-auto flex max-w-[720px] items-center gap-2 rounded-app-xl border border-white/[0.1] bg-gradient-to-b from-white/[0.08] to-white/[0.02] p-1.5 pl-4 shadow-app-lift backdrop-blur-xl transition-[box-shadow,border-color] motion-reduce:transition-none ${ease} focus-within:border-app-accent/38 focus-within:shadow-[0_0_0_1px_rgba(147,124,248,0.2),0_18px_56px_-24px_rgba(147,124,248,0.28)]`}
           >
             <input
               type="text"
@@ -436,24 +390,19 @@ export default function AITutorPage() {
                 }
               }}
               placeholder="Ask anything about your learning materials..."
-              className="h-11 min-w-0 flex-1 border-none bg-transparent text-[13px] text-white outline-none placeholder:font-normal"
-              style={{ color: '#eceef4' }}
+              className="h-11 min-w-0 flex-1 border-none bg-transparent text-[13px] text-app-text outline-none placeholder:text-app-faint"
             />
             <button
               type="button"
               onClick={() => void handleSend()}
               disabled={!inputValue.trim()}
-              className="flex size-9 shrink-0 items-center justify-center gap-0 rounded-full text-[13px] font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ backgroundColor: PURPLE }}
+              className={`flex size-10 shrink-0 items-center justify-center rounded-app-lg border border-app-accent/25 bg-gradient-to-br from-app-accent to-app-accent-deep text-white shadow-app-glow transition-[opacity,transform,filter] motion-reduce:transition-none ${ease} hover:brightness-110 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:active:transform-none`}
               aria-label="Send"
             >
-              <Send size={16} strokeWidth={2} className="text-white" />
+              <Send size={16} strokeWidth={2.25} className="translate-x-px text-white" />
             </button>
           </div>
-          <p
-            className="mx-auto mt-2 max-w-[720px] text-center text-[11px] font-normal"
-            style={{ color: MUTED }}
-          >
+          <p className="mx-auto mt-2.5 max-w-[720px] text-center text-[11px] font-medium text-app-muted">
             {topicsMastered} / {topicsTotal} topics mastered · {streakDays} day streak ·{' '}
             {questionsCount} questions
           </p>
@@ -461,20 +410,18 @@ export default function AITutorPage() {
       </main>
 
       {/* Right panel */}
-      <aside
-        className="flex w-[280px] shrink-0 flex-col border-l py-4"
-        style={{ borderColor: BORDER, backgroundColor: BG }}
-      >
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin]">
+      <aside className="relative z-[1] flex w-[280px] shrink-0 flex-col border-l border-white/[0.07] bg-app-bg/50 py-4 shadow-[-1px_0_0_rgba(255,255,255,0.03)_inset] backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/35">
+        <div className="chat-premium-scroll min-h-0 flex-1 overflow-y-auto px-4">
           <div className="mb-1 flex items-center gap-2">
             <div
-              className="flex size-7 shrink-0 items-center justify-center rounded-lg"
-              style={{ backgroundColor: AMBER }}
+              className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-app-lg bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_8px_28px_-8px_rgba(251,191,36,0.45)] ring-1 ring-white/15"
               aria-hidden
             >
-              <Zap size={16} className="text-[#0d0f18]" strokeWidth={2.5} />
+              <Zap size={16} className="relative text-app-bg" strokeWidth={2.5} />
             </div>
-            <h2 className="m-0 text-base font-medium text-white">Suggested topics</h2>
+            <h2 className="m-0 text-base font-semibold tracking-tight text-app-text">
+              Suggested topics
+            </h2>
           </div>
 
           <ul className="mt-4 m-0 list-none space-y-2 p-0">
@@ -483,25 +430,19 @@ export default function AITutorPage() {
                 <button
                   type="button"
                   onClick={() => handleQuickAction(`Tell me about ${topic.name}`)}
-                  className="flex w-full items-start gap-2 rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#13151f] p-3 text-left transition-colors hover:border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.04)]"
+                  className={`group flex w-full items-start gap-2 rounded-app-lg border border-white/[0.08] p-3 text-left shadow-sm transition-[border-color,background-color,box-shadow,transform] motion-reduce:transition-none ${ease} bg-gradient-to-br from-white/[0.07] to-white/[0.02] backdrop-blur-md hover:border-white/[0.14] hover:shadow-app-lift active:scale-[0.99] motion-reduce:active:transform-none`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="m-0 text-[13px] font-medium text-white">{topic.name}</p>
-                    <span
-                      className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.06)',
-                        border: `1px solid ${BORDER}`,
-                        color: MUTED,
-                      }}
-                    >
+                    <p className="m-0 text-[13px] font-medium text-app-text transition-colors group-hover:text-app-text">
+                      {topic.name}
+                    </p>
+                    <span className="mt-1.5 inline-block rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-0.5 text-[10px] font-medium text-app-muted backdrop-blur-sm">
                       {topic.category}
                     </span>
                   </div>
                   <ChevronRight
                     size={16}
-                    className="mt-0.5 shrink-0"
-                    style={{ color: MUTED }}
+                    className="mt-0.5 shrink-0 text-app-faint transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-hover:text-app-muted motion-reduce:transition-none"
                     aria-hidden
                   />
                 </button>
@@ -509,49 +450,48 @@ export default function AITutorPage() {
             ))}
           </ul>
 
-          <div className="my-5 h-px w-full" style={{ backgroundColor: BORDER }} role="separator" />
+          <div
+            className="my-5 h-px w-full bg-gradient-to-r from-transparent via-white/[0.12] to-transparent"
+            role="separator"
+          />
 
-          <h2 className="m-0 text-base font-medium text-white">Your progress</h2>
+          <h2 className="m-0 text-base font-semibold tracking-tight text-app-text">
+            Your progress
+          </h2>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-5">
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[13px]">
-                <span style={{ color: MUTED }}>Topics mastered</span>
-                <span className="font-medium text-white">
+                <span className="text-app-muted">Topics mastered</span>
+                <span className="font-semibold tabular-nums text-app-text">
                   {topicsMastered} of {topicsTotal}
                 </span>
               </div>
-              <div
-                className="h-[3px] w-full overflow-hidden rounded-full"
-                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
-              >
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.05]">
                 <div
-                  className="h-full rounded-full"
-                  style={{ width: `${topicsPct}%`, backgroundColor: TEAL }}
+                  className="h-full rounded-full bg-gradient-to-r from-app-accent-2 to-cyan-300 shadow-[0_0_16px_rgba(45,212,191,0.35)] transition-[width] duration-700 ease-out motion-reduce:transition-none"
+                  style={{ width: `${topicsPct}%` }}
                 />
               </div>
             </div>
 
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[13px]">
-                <span style={{ color: MUTED }}>Learning streak</span>
-                <span className="font-medium text-white">{streakDays} days</span>
+                <span className="text-app-muted">Learning streak</span>
+                <span className="font-semibold tabular-nums text-app-text">{streakDays} days</span>
               </div>
-              <div
-                className="h-[3px] w-full overflow-hidden rounded-full"
-                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
-              >
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.05]">
                 <div
-                  className="h-full rounded-full"
-                  style={{ width: `${streakPct}%`, backgroundColor: AMBER }}
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 shadow-[0_0_16px_rgba(251,191,36,0.3)] transition-[width] duration-700 ease-out motion-reduce:transition-none"
+                  style={{ width: `${streakPct}%` }}
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between text-[13px]">
-                <span style={{ color: MUTED }}>Questions asked</span>
-                <span className="font-medium text-white">{questionsCount}</span>
+                <span className="text-app-muted">Questions asked</span>
+                <span className="font-semibold tabular-nums text-app-text">{questionsCount}</span>
               </div>
             </div>
           </div>
@@ -560,8 +500,7 @@ export default function AITutorPage() {
         <div className="shrink-0 px-4 pt-3">
           <button
             type="button"
-            className="h-[34px] w-full rounded-lg border border-[rgba(255,255,255,0.07)] bg-transparent text-[13px] font-medium transition-colors hover:border-[rgba(255,255,255,0.14)]"
-            style={{ color: MUTED }}
+            className={`h-9 w-full rounded-app-md border border-white/[0.1] bg-white/[0.03] text-[13px] font-medium text-app-muted shadow-sm backdrop-blur-md transition-[border-color,background-color,color] motion-reduce:transition-none ${ease} hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-app-text`}
           >
             View full report
           </button>

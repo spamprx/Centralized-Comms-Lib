@@ -12,7 +12,7 @@ interface GroupModalProps {
 }
 
 const inputClass =
-  'w-full px-3 py-3 bg-app-surface border border-app-border rounded-xl text-app-text text-[13px] outline-none transition-all duration-200 focus:border-app-accent/40 focus:shadow-[0_0_0_3px_rgba(147,124,248,0.06)] resize-y placeholder-transparent';
+  'w-full resize-y rounded-app-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 placeholder-transparent focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/12';
 
 export default function GroupModal({ group, users, roles, onClose, onSave }: GroupModalProps) {
   const [formData, setFormData] = useState({
@@ -72,15 +72,14 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
 
   return (
     <div
-      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 backdrop-blur-sm admin-modal-backdrop"
+      className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="admin-glass rounded-2xl w-full max-w-[520px] max-h-[90vh] overflow-y-auto shadow-app-soft admin-modal-enter"
-        style={{ background: 'rgba(15, 20, 32, 0.92)' }}
+        className="admin-modal-enter admin-modal-panel max-h-[90vh] w-full max-w-[520px] overflow-y-auto rounded-app-xl shadow-app-soft"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-5">
           <h2 className="m-0 text-lg font-semibold text-app-text">
             {group ? 'Edit Group' : 'Create Group'}
           </h2>
@@ -125,7 +124,7 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
 
           <div className="mb-5">
             <label className="block text-[13px] font-medium text-app-muted mb-2">Members</label>
-            <div className="flex flex-col gap-0.5 p-2 admin-glass rounded-xl max-h-[180px] overflow-y-auto">
+            <div className="admin-glass max-h-[180px] overflow-y-auto rounded-app-lg p-2 ring-1 ring-white/[0.05]">
               {users.length === 0 ? (
                 <span className="text-xs text-app-faint px-2 py-2">No users available</span>
               ) : (
@@ -152,7 +151,7 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
 
           <div className="mb-5">
             <label className="block text-[13px] font-medium text-app-muted mb-2">Group Roles</label>
-            <div className="flex flex-col gap-0.5 p-2 admin-glass rounded-xl max-h-[180px] overflow-y-auto">
+            <div className="admin-glass max-h-[180px] overflow-y-auto rounded-app-lg p-2 ring-1 ring-white/[0.05]">
               {roles.length === 0 ? (
                 <span className="text-xs text-app-faint px-2 py-2">No roles available</span>
               ) : (
@@ -174,17 +173,17 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
             </div>
           </div>
 
-          <div className="flex gap-2.5 justify-end mt-6 pt-5 border-t border-white/[0.06]">
+          <div className="mt-6 flex justify-end gap-3 border-t border-white/[0.08] pt-5">
             <button
               type="button"
-              className="px-5 py-2.5 admin-glass-button rounded-xl text-app-muted text-[13px]"
+              className="admin-glass-button rounded-app-lg px-5 py-2.5 text-[13px] font-semibold text-app-muted"
               onClick={onClose}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-app-accent-muted border border-app-accent/30 rounded-xl text-app-accent text-[13px] font-medium cursor-pointer admin-btn-lift transition-all duration-150 hover:bg-app-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="admin-btn-lift cursor-pointer rounded-app-lg border border-app-accent/35 bg-gradient-to-br from-app-accent-muted to-app-accent-muted/50 px-5 py-2.5 text-[13px] font-semibold text-app-accent shadow-[0_0_24px_-8px_rgba(147,124,248,0.4)] transition-all duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={loading}
             >
               {loading ? 'Saving...' : group ? 'Update Group' : 'Create Group'}

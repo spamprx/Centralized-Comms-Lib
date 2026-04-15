@@ -69,28 +69,34 @@ export default function SearchAndFilterBar({
   const ROLES = ['all', 'super_admin', 'admin', 'moderator', 'editor', 'viewer'] as const;
 
   const selectClass =
-    'px-2.5 py-[7px] bg-app-surface border border-app-border rounded-lg text-app-muted text-[13px] cursor-pointer outline-none';
+    'rounded-app-md border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none backdrop-blur-md transition-[border-color,box-shadow] duration-200 hover:border-white/[0.14] focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/15 cursor-pointer';
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2.5 flex-wrap">
+    <div className="admin-glass relative flex flex-col gap-4 overflow-hidden rounded-app-xl p-4 sm:p-5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      <div className="relative flex flex-wrap items-center gap-2.5">
         {/* Command palette search */}
-        <div className="relative flex items-center flex-1 min-w-[220px] max-w-[400px]">
-          <Search size={15} className="absolute left-3 text-app-faint pointer-events-none" />
+        <div className="relative flex min-w-[220px] max-w-[400px] flex-1 items-center">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3.5 text-app-faint"
+            strokeWidth={2}
+          />
           <input
             ref={searchRef}
             type="text"
             placeholder="Search users…"
             value={filters.search ?? ''}
             onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
-            className="w-full py-2.5 pr-10 pl-[34px] bg-app-surface border border-app-border rounded-xl text-app-text text-[13px] outline-none transition-all duration-200 focus:border-app-accent/40 focus:shadow-[0_0_0_3px_rgba(147,124,248,0.08)] placeholder:text-app-faint"
+            className="w-full rounded-app-lg border border-white/[0.1] bg-app-bg/40 py-2.5 pl-10 pr-10 text-[13px] text-app-text shadow-inner outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 placeholder:text-app-faint focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/12"
           />
           {filters.search ? (
             <button
-              className="absolute right-3 bg-transparent border-none text-app-faint cursor-pointer flex p-1 hover:text-app-text"
+              type="button"
+              className="absolute right-2.5 flex rounded-app-md p-1.5 text-app-faint transition-colors hover:bg-white/[0.06] hover:text-app-text"
               onClick={() => onFilterChange({ ...filters, search: '' })}
             >
-              <X size={13} />
+              <X size={14} strokeWidth={2} />
             </button>
           ) : null}
         </div>
@@ -131,14 +137,14 @@ export default function SearchAndFilterBar({
         )}
 
         {totalResults !== undefined && (
-          <span className="ml-auto text-xs text-app-faint">
+          <span className="ml-auto rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold tabular-nums text-app-muted backdrop-blur-sm">
             {loading ? '…' : `${totalResults} result${totalResults !== 1 ? 's' : ''}`}
           </span>
         )}
       </div>
 
       {/* Segmented status filter chips */}
-      <div className="flex items-center gap-3">
+      <div className="relative flex flex-wrap items-center gap-3">
         <div ref={containerRef} className="admin-pill-toggle">
           {/* Sliding indicator */}
           <div
@@ -166,10 +172,10 @@ export default function SearchAndFilterBar({
         {/* Role pills */}
         <button
           type="button"
-          className={`text-[12px] px-2.5 py-1 rounded-lg border transition-colors duration-150 ${
+          className={`rounded-app-md border px-3 py-1.5 text-[12px] font-medium transition-[border-color,background-color,color,box-shadow] duration-200 ${
             showRoleFilters
-              ? 'bg-app-accent-muted border-app-accent/30 text-app-accent'
-              : 'bg-transparent border-app-border text-app-faint hover:text-app-muted hover:border-white/15'
+              ? 'border-app-accent/35 bg-app-accent-muted text-app-accent shadow-[0_0_20px_-8px_rgba(147,124,248,0.4)]'
+              : 'border-white/[0.1] bg-transparent text-app-faint hover:border-white/[0.14] hover:bg-white/[0.04] hover:text-app-muted'
           }`}
           onClick={() => setShowRoleFilters((v) => !v)}
         >
@@ -183,10 +189,11 @@ export default function SearchAndFilterBar({
           {ROLES.map((role) => (
             <button
               key={role}
-              className={`px-2.5 py-1 rounded-[20px] border text-xs cursor-pointer capitalize transition-all duration-150 admin-btn-lift ${
+              type="button"
+              className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-[border-color,background-color,color,transform] duration-200 admin-btn-lift motion-reduce:transition-none ${
                 filters.role === role || (!filters.role && role === 'all')
-                  ? 'bg-app-accent-muted border-app-accent/35 text-app-accent'
-                  : 'bg-app-surface border-app-border text-app-muted hover:border-white/20 hover:text-app-muted'
+                  ? 'border-app-accent/40 bg-gradient-to-b from-app-accent-muted to-app-accent-muted/40 text-app-accent shadow-[0_0_16px_-6px_rgba(147,124,248,0.45)]'
+                  : 'border-white/[0.08] bg-white/[0.03] text-app-muted hover:border-white/[0.14] hover:bg-white/[0.06]'
               }`}
               onClick={() => onFilterChange({ ...filters, role })}
             >

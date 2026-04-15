@@ -93,23 +93,32 @@ export default function MonitoringTab() {
     });
   }, [logs, query, severity]);
 
-  if (error) return <div className="text-red-400 p-6">⚠ {error}</div>;
+  if (error)
+    return (
+      <div className="admin-glass relative overflow-hidden rounded-app-xl p-8 text-center text-sm font-medium text-red-300">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-400/35 to-transparent" />
+        {error}
+      </div>
+    );
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-app-border bg-app-bg-subtle p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
+      <div className="admin-glass relative overflow-hidden rounded-app-xl p-5 sm:p-6 ring-1 ring-white/[0.04]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+        <div className="relative flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-medium text-app-text mb-1">Monitoring</h2>
-            <p className="text-[13px] text-app-faint m-0">
+            <h2 className="mb-1 text-lg font-semibold tracking-tight text-app-text">Monitoring</h2>
+            <p className="m-0 text-[13px] text-app-muted">
               System health, metrics, and detailed audit activity
             </p>
           </div>
           <button
-            className="flex items-center gap-1.5 px-3 py-[7px] rounded-xl border border-app-border bg-app-surface text-app-muted text-[13px] transition-colors hover:border-app-border-strong hover:text-app-text disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            className="admin-glass-button inline-flex items-center gap-2 rounded-app-lg px-3.5 py-2 text-[13px] font-semibold text-app-muted disabled:cursor-not-allowed disabled:opacity-45"
             onClick={refetch}
             disabled={loading}
           >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+            <RefreshCw size={14} strokeWidth={2} className={loading ? 'animate-spin' : ''} />{' '}
+            Refresh
           </button>
         </div>
       </div>
@@ -120,28 +129,30 @@ export default function MonitoringTab() {
           ? Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-[110px] rounded-xl animate-pulse"
-                style={{ background: 'rgba(255,255,255,0.03)' }}
+                className="app-skeleton-shimmer h-[110px] rounded-app-xl border border-white/[0.06]"
               />
             ))
           : metrics.map((m, idx) => <MetricCard key={m.label} metric={m} index={idx} />)}
       </div>
 
       {/* Activity Log Stream */}
-      <div className="rounded-xl border border-app-border bg-app-bg-subtle p-4 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-medium text-app-muted m-0">Recent activity</h3>
-          <div className="flex items-center gap-2">
+      <div className="admin-glass relative overflow-hidden rounded-app-xl p-5 sm:p-6 ring-1 ring-white/[0.04]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+        <div className="relative mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="m-0 text-sm font-semibold tracking-tight text-app-text">
+            Recent activity
+          </h3>
+          <div className="flex flex-wrap items-center gap-2">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Filter logs..."
-              className="h-8 w-44 rounded-lg border border-app-border bg-app-bg px-2.5 text-[12px] text-app-text outline-none transition-colors focus:border-app-accent"
+              className="h-9 w-44 rounded-app-lg border border-white/[0.1] bg-white/[0.04] px-3 text-[12px] text-app-text shadow-inner outline-none backdrop-blur-sm transition-[border-color,box-shadow] focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/12"
             />
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value as 'all' | ActivityLog['severity'])}
-              className="h-8 rounded-lg border border-app-border bg-app-bg px-2.5 text-[12px] text-app-muted outline-none transition-colors focus:border-app-accent"
+              className="h-9 rounded-app-lg border border-white/[0.1] bg-white/[0.04] px-3 text-[12px] text-app-muted shadow-inner outline-none backdrop-blur-sm transition-[border-color] focus:border-app-accent/45"
             >
               <option value="all">All severities</option>
               <option value="success">Success</option>
@@ -152,7 +163,7 @@ export default function MonitoringTab() {
           </div>
         </div>
 
-        <div className="flex max-h-[560px] flex-col gap-2 overflow-y-auto pr-1">
+        <div className="chat-premium-scroll relative flex max-h-[560px] flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1">
           {filteredLogs.map((log, idx) => (
             <LogRow key={log.id} log={log} index={idx} />
           ))}
@@ -214,7 +225,7 @@ function MetricCard({ metric, index }: { metric: SystemMetric; index: number }) 
         } as React.CSSProperties
       }
     >
-      <div className="p-4 rounded-[15px] bg-app-bg-subtle flex flex-col gap-2 min-w-0 h-full">
+      <div className="flex h-full min-w-0 flex-col gap-2 rounded-[15px] bg-gradient-to-b from-white/[0.05] to-transparent p-4 backdrop-blur-sm">
         <div className="flex items-start justify-between">
           <span className="text-[11px] font-semibold tracking-wide uppercase text-app-faint whitespace-nowrap">
             {metric.label}
@@ -284,10 +295,10 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
 
   return (
     <div
-      className="admin-row-enter rounded-lg border border-app-border bg-app-bg/35"
+      className="admin-row-enter rounded-app-lg border border-white/[0.08] bg-app-bg/55 shadow-sm transition-[border-color,box-shadow] hover:border-white/[0.12] hover:bg-app-bg/70 hover:shadow-app-soft"
       style={{ '--row-index': index } as React.CSSProperties}
     >
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+      <div className="flex min-h-[44px] flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4">
         <span
           className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-mono"
           style={{
@@ -314,7 +325,8 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
           {new Date(log.timestamp).toLocaleString()}
         </span>
         <button
-          className="inline-flex h-6 items-center gap-1 rounded-md border border-app-border px-2 text-[11px] text-app-muted transition-colors hover:border-app-border-strong hover:text-app-text"
+          type="button"
+          className="inline-flex h-7 items-center gap-1 rounded-app-md border border-white/[0.1] bg-white/[0.04] px-2.5 text-[11px] font-medium text-app-muted transition-[border-color,background-color,color] hover:border-white/[0.16] hover:bg-white/[0.07] hover:text-app-text"
           onClick={() => setExpanded((v) => !v)}
         >
           details {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -322,8 +334,8 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
       </div>
 
       {expanded ? (
-        <div className="grid gap-2 border-t border-app-border px-3 py-2.5 md:grid-cols-2">
-          <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2">
+        <div className="grid gap-2 border-t border-white/[0.08] bg-app-bg/20 px-3 py-3 md:grid-cols-2 sm:px-4">
+          <div className="rounded-app-md border border-white/[0.08] bg-app-bg/70 p-3">
             <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">
               Actor / Network
             </div>
@@ -335,27 +347,27 @@ function LogRow({ log, index }: { log: ActivityLog; index: number }) {
               UA: {log.userAgent || '—'}
             </div>
           </div>
-          <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2">
+          <div className="rounded-app-md border border-white/[0.08] bg-app-bg/70 p-3">
             <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">Status</div>
             <div className="text-[12px] text-app-text">
               {isSuccess ? 'Completed successfully' : 'Failed'}
             </div>
             <div className="text-[11px] text-app-faint">Event ID: {log.id}</div>
           </div>
-          <div className="rounded-md border border-app-border/70 bg-app-bg/60 p-2 md:col-span-2">
+          <div className="rounded-app-md border border-white/[0.08] bg-app-bg/70 p-3 md:col-span-2">
             <div className="mb-1 text-[10px] uppercase tracking-wide text-app-faint">
               Change payload
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               <div>
                 <div className="mb-1 text-[11px] text-app-muted">Previous</div>
-                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">
+                <pre className="max-h-28 overflow-auto rounded-app-md border border-white/[0.06] bg-app-bg/80 p-2 text-[10px] text-app-faint">
                   {compactJson(log.oldValue)}
                 </pre>
               </div>
               <div>
                 <div className="mb-1 text-[11px] text-app-muted">Current</div>
-                <pre className="max-h-28 overflow-auto rounded bg-app-bg p-2 text-[10px] text-app-faint">
+                <pre className="max-h-28 overflow-auto rounded-app-md border border-white/[0.06] bg-app-bg/80 p-2 text-[10px] text-app-faint">
                   {compactJson(log.newValue)}
                 </pre>
               </div>

@@ -77,105 +77,123 @@ export default function PreviewLayout() {
   );
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-app-bg">
-      <header className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
+    <div className="preview-reading-root relative flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-app-text">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute left-1/2 top-0 h-[42vh] w-[min(100%,720px)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_50%_0%,rgba(147,124,248,0.07),transparent_62%)]" />
+        <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-app-accent-2/6 blur-[80px]" />
+      </div>
+
+      <header className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] bg-app-bg/75 px-4 py-2.5 backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/55 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-app-elevated hover:text-app-text"
+            className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-white/[0.06] hover:text-app-text"
             aria-label="Back"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={20} strokeWidth={2} />
           </button>
-          <h1 className="m-0 shrink-0 text-sm font-semibold text-app-text sm:text-base">Preview</h1>
-          <span className="hidden h-4 w-px shrink-0 bg-app-border sm:block" aria-hidden />
-          <span className="min-w-0 truncate text-[13px] text-app-muted">{title}</span>
+          <div className="flex min-w-0 flex-col gap-0.5 leading-none">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">
+              Preview
+            </span>
+            <span className="min-w-0 truncate font-serif text-[15px] font-medium tracking-tight text-app-text sm:text-base">
+              {title}
+            </span>
+          </div>
         </div>
 
-        <div className="flex rounded-app-lg border border-app-border/80 bg-app-bg/40 p-1">
+        <div className="flex rounded-app-lg border border-white/10 bg-white/[0.03] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md">
           {channels.map((channel) => (
             <button
               key={channel.id}
               type="button"
               onClick={() => setActiveChannel(channel.id)}
-              className={`flex items-center gap-1.5 rounded-app-md px-3 py-2 text-xs transition-colors ${
+              className={`flex items-center gap-1.5 rounded-app-md px-2.5 py-1.5 text-[11px] font-medium transition-[background-color,color,box-shadow] sm:px-3 sm:py-2 sm:text-xs ${
                 activeChannel === channel.id
-                  ? 'bg-app-accent-muted text-app-accent shadow-[0_0_0_1px_rgba(147,124,248,0.2)]'
-                  : 'text-app-faint hover:bg-app-elevated hover:text-app-muted'
+                  ? 'bg-white/[0.1] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                  : 'text-app-faint hover:bg-white/[0.05] hover:text-app-muted'
               }`}
             >
-              <channel.icon size={14} className="shrink-0 opacity-90" />
+              <channel.icon size={14} className="shrink-0 opacity-90" strokeWidth={2} />
               <span className="hidden sm:inline">{channel.name}</span>
             </button>
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-app-md border border-app-border/80 bg-app-bg/40 px-3 py-2 text-xs text-app-muted transition-colors hover:border-app-accent/25 hover:text-app-text"
+            className="flex items-center gap-1.5 rounded-app-md border border-transparent px-2.5 py-1.5 text-[11px] font-medium text-app-muted transition-colors hover:bg-white/[0.05] hover:text-app-text sm:px-3 sm:py-2 sm:text-xs"
           >
-            <Download size={14} /> Export
+            <Download size={14} strokeWidth={2} /> Export
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-app-md border-none bg-gradient-to-br from-app-accent to-app-accent-2 px-3.5 py-2 text-xs font-semibold text-white shadow-app-glow"
+            className="flex items-center gap-1.5 rounded-app-md border border-white/12 bg-gradient-to-r from-app-accent to-app-accent-2 px-3 py-1.5 text-[11px] font-semibold text-app-bg shadow-[0_0_20px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 transition-[filter] hover:brightness-105 sm:px-3.5 sm:py-2 sm:text-xs"
           >
-            <Share2 size={14} /> Share
+            <Share2 size={14} strokeWidth={2} /> Share
           </button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,rgba(147,124,248,0.06),transparent_50%)] p-6 md:p-10">
-          <div className="mx-auto flex max-w-[1100px] justify-center">
-            <div
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <div className="preview-reading-scroll min-h-0 flex-1 overflow-y-auto scroll-smooth px-4 py-8 sm:px-8 sm:py-10 md:px-12 md:py-12">
+          <div className="mx-auto flex max-w-[min(100%,52rem)] justify-center">
+            <article
               style={{ width: getPreviewWidth() }}
-              className={`max-w-full overflow-hidden border border-app-border/60 bg-app-surface/90 shadow-app-lift backdrop-blur-sm ${
+              className={`preview-reading-article max-w-full overflow-hidden border border-white/[0.08] bg-[rgba(10,12,18,0.65)] shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_40px_100px_-48px_rgba(0,0,0,0.65)] backdrop-blur-xl supports-backdrop-filter:bg-[rgba(10,12,18,0.5)] ${
                 activeChannel === 'web'
                   ? 'rounded-app-xl'
-                  : 'rounded-[2rem] ring-2 ring-app-border-strong'
+                  : 'rounded-[2rem] ring-1 ring-white/[0.1]'
               }`}
             >
-              <div className="bg-gradient-to-br from-app-accent to-app-accent-2 px-6 py-6 text-white sm:px-8 sm:py-8">
-                <h1 className="mb-2 text-2xl font-bold">{title}</h1>
-                <p className="m-0 text-[13px] text-white/85">Last updated: March 11, 2026</p>
-              </div>
+              <header className="border-b border-white/[0.06] px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-12">
+                <h1 className="m-0 max-w-[34ch] font-serif text-[1.65rem] font-semibold leading-[1.2] tracking-[-0.02em] text-app-text sm:text-[1.85rem]">
+                  {title}
+                </h1>
+                <p className="mt-4 mb-0 max-w-prose text-[13px] leading-relaxed text-app-muted">
+                  Last updated: March 11, 2026
+                </p>
+              </header>
 
-              <div className="p-6 sm:p-8">
+              <div className="px-6 py-10 sm:px-10 sm:py-12">
                 {loadError ? (
-                  <p className="m-0 text-sm text-red-300">{loadError}</p>
+                  <p className="m-0 text-sm leading-relaxed text-red-400">{loadError}</p>
                 ) : loading ? (
-                  <p className="m-0 text-sm text-app-faint">Loading preview…</p>
+                  <p className="m-0 text-[15px] leading-relaxed text-app-faint">Loading preview…</p>
                 ) : hasTipTapDoc ? (
                   <div className="tiptap-content">
                     <TipTapReadonly
                       doc={bodyDoc as any}
-                      className="ProseMirror text-app-muted leading-relaxed outline-none"
+                      className="ProseMirror preview-reading-prose text-[1.0625rem] leading-[1.75] text-app-text/90 outline-none antialiased"
                     />
                   </div>
                 ) : (
-                  <p className="m-0 text-sm text-app-faint">No saved body found for this item.</p>
+                  <p className="m-0 text-[15px] leading-relaxed text-app-faint">
+                    No saved body found for this item.
+                  </p>
                 )}
               </div>
 
-              <div className="border-t border-app-border/80 bg-app-surface/50 px-6 py-4 sm:px-8">
-                <p className="m-0 text-xs text-app-faint">© 2026 CommsLib. All rights reserved.</p>
-              </div>
-            </div>
+              <footer className="border-t border-white/[0.06] px-6 py-5 sm:px-10">
+                <p className="m-0 text-[11px] font-medium tracking-wide text-app-faint">
+                  © 2026 CommsLib. All rights reserved.
+                </p>
+              </footer>
+            </article>
           </div>
         </div>
 
         <Surface
           variant="glass"
           padding="md"
-          className="max-h-[40vh] w-full shrink-0 overflow-y-auto border-t border-app-border/80 lg:max-h-none lg:w-[280px] lg:border-l lg:border-t-0"
+          className="max-h-[36vh] w-full shrink-0 overflow-y-auto border-t border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:max-h-none lg:w-[260px] lg:border-l lg:border-t-0"
         >
-          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-app-faint">
+          <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-app-faint">
             Conditional sections
           </h3>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {[
               { name: 'Introduction', enabled: true },
               { name: 'Getting Started', enabled: true },
@@ -185,13 +203,13 @@ export default function PreviewLayout() {
             ].map((section) => (
               <label
                 key={section.name}
-                className="flex cursor-pointer items-center justify-between rounded-app-md border border-app-border/60 bg-app-bg/35 px-3 py-2.5 transition-colors hover:border-app-accent/25"
+                className="flex cursor-pointer items-center justify-between rounded-app-md border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 transition-colors hover:border-white/14 hover:bg-white/[0.05]"
               >
-                <span className="text-xs text-app-muted">{section.name}</span>
+                <span className="text-[12px] text-app-muted">{section.name}</span>
                 <input
                   type="checkbox"
                   defaultChecked={section.enabled}
-                  className="accent-app-accent"
+                  className="size-3.5 rounded border-white/20 accent-app-accent"
                 />
               </label>
             ))}

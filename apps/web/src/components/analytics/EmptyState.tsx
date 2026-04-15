@@ -15,9 +15,9 @@ const icons = {
 };
 
 const sizes = {
-  small: 'h-[100px]',
-  medium: 'h-[150px]',
-  large: 'h-[200px]',
+  small: 'min-h-[100px]',
+  medium: 'min-h-[150px]',
+  large: 'min-h-[200px]',
 };
 
 export function EmptyState({
@@ -30,12 +30,18 @@ export function EmptyState({
   const heightClass = sizes[size];
 
   return (
-    <div className="p-4 bg-white/[0.03] border border-white/[0.07] rounded-[10px]">
-      <div className={`flex flex-col items-center justify-center ${heightClass} gap-3`}>
-        <Icon size={24} className="text-[#555870]" />
-        <div className="text-center">
-          <p className="text-sm font-medium text-[#8b8fa8] mb-1">{title}</p>
-          <p className="text-xs text-[#555870]">{description}</p>
+    <div className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/35 to-transparent"
+        aria-hidden
+      />
+      <div className={`flex flex-col items-center justify-center gap-3 py-2 ${heightClass}`}>
+        <div className="flex h-12 w-12 items-center justify-center rounded-app-lg border border-app-accent/25 bg-app-accent/10 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <Icon size={22} strokeWidth={1.75} />
+        </div>
+        <div className="max-w-xs text-center">
+          <p className="mb-1 text-sm font-semibold tracking-tight text-app-text">{title}</p>
+          <p className="text-xs leading-relaxed text-app-muted">{description}</p>
         </div>
       </div>
     </div>

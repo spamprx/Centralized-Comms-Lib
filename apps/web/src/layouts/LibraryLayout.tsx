@@ -97,23 +97,63 @@ export default function LibraryLayout() {
 
   if (loading) {
     return (
-      <PageShell wide className="animate-pulse">
-        <div className="mb-8 h-10 max-w-lg rounded-app-lg bg-app-surface" />
-        <div className="mb-6 flex flex-wrap gap-3">
-          <div className="h-10 flex-1 rounded-app-md bg-app-surface" />
-          <div className="h-10 w-40 rounded-app-md bg-app-surface" />
+      <PageShell wide className="app-main-canvas">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+          <div className="absolute -left-24 top-20 h-64 w-64 rounded-full bg-app-accent/12 blur-[100px]" />
+          <div className="absolute right-0 top-40 h-56 w-56 rounded-full bg-app-accent-2/10 blur-[90px]" />
         </div>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-[280px] rounded-app-lg bg-app-surface" />
-          ))}
+        <div className="space-y-8">
+          <div className="space-y-3">
+            <div className="app-skeleton-shimmer h-3 w-32 rounded-full" />
+            <div className="app-skeleton-shimmer h-10 max-w-lg rounded-app-lg" />
+            <div className="app-skeleton-shimmer h-3 max-w-xl rounded-full" />
+          </div>
+          <div className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/35 p-5 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/25">
+            <div className="flex flex-wrap gap-3">
+              <div className="app-skeleton-shimmer h-11 min-w-[220px] flex-1 rounded-app-md" />
+              <div className="app-skeleton-shimmer h-11 w-36 rounded-app-md" />
+              <div className="app-skeleton-shimmer h-11 w-32 rounded-app-md" />
+              <div className="app-skeleton-shimmer h-11 w-28 rounded-app-md" />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="app-skeleton-shimmer h-8 w-20 rounded-full" />
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/30 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/22"
+              >
+                <div className="app-skeleton-shimmer h-[148px] w-full" />
+                <div className="space-y-3 p-4">
+                  <div className="app-skeleton-shimmer h-3 w-16 rounded-full" />
+                  <div className="app-skeleton-shimmer h-4 w-full rounded-app-sm" />
+                  <div className="app-skeleton-shimmer h-4 w-[85%] rounded-app-sm" />
+                  <div className="flex gap-2 pt-2">
+                    <div className="app-skeleton-shimmer h-5 w-14 rounded-md" />
+                    <div className="app-skeleton-shimmer h-5 w-14 rounded-md" />
+                  </div>
+                  <div className="app-skeleton-shimmer mt-2 h-10 w-full rounded-app-md" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </PageShell>
     );
   }
 
   return (
-    <PageShell wide>
+    <PageShell wide className="app-main-canvas">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        <div className="absolute -left-24 top-20 h-64 w-64 rounded-full bg-app-accent/12 blur-[100px]" />
+        <div className="absolute right-0 top-40 h-56 w-56 rounded-full bg-app-accent-2/10 blur-[90px]" />
+        <div className="absolute bottom-0 left-1/3 h-40 w-96 max-w-[80%] rounded-full bg-app-accent-deep/15 blur-[100px]" />
+      </div>
+
       <PageHeader
         title="Content library"
         accentWord="library"
@@ -121,7 +161,7 @@ export default function LibraryLayout() {
         hint="Filters update the URL so you can copy and share the current view."
       />
 
-      <div className="animate-fade-in space-y-6">
+      <div className="animate-fade-in space-y-8">
         <LibraryFilterInvalidBanner issues={filterIssues} onRemoveInvalid={removeInvalidFilters} />
 
         <LibraryFilterBar

@@ -1,5 +1,9 @@
 import { ReviewLayout } from '../../layouts';
 
 export default function ReviewPage() {
-  return <ReviewLayout />;
+  return (
+    <div className="review-page-root isolate flex min-h-screen w-full flex-col bg-app-bg">
+      <ReviewLayout />
+    </div>
+  );
 }

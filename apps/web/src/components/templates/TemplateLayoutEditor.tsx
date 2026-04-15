@@ -1009,6 +1009,8 @@ type SortableLayoutRowProps = {
   onEditorFocusRegion: (regionId: string) => void;
   onEditorBlurRegion: (regionId: string, relatedTarget: EventTarget | null) => void;
   onRichTextEditorRegister: (regionId: string, editor: Editor | null) => void;
+  addColumnDisabled?: boolean;
+  addToCellDisabled?: (rowId: string, cellId: string) => boolean;
 };
 
 function SortableLayoutRow({
@@ -1023,6 +1025,8 @@ function SortableLayoutRow({
   onEditorFocusRegion,
   onEditorBlurRegion,
   onRichTextEditorRegister,
+  addColumnDisabled,
+  addToCellDisabled,
 }: SortableLayoutRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.id,
@@ -1072,8 +1076,13 @@ function SortableLayoutRow({
         <button
           type="button"
           onClick={() => onRequestAddColumn(row.id)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-app-accent/35 bg-app-accent-muted/40 px-2.5 py-1 text-[10px] font-medium text-app-accent hover:bg-app-accent-muted"
-          title="Add a new column block in this row"
+          disabled={addColumnDisabled}
+          className="inline-flex items-center gap-1.5 rounded-md border border-app-accent/35 bg-app-accent-muted/40 px-2.5 py-1 text-[10px] font-medium text-app-accent hover:bg-app-accent-muted disabled:opacity-40"
+          title={
+            addColumnDisabled
+              ? 'Column limit reached for this channel'
+              : 'Add a new column block in this row'
+          }
         >
           <Columns2 size={12} aria-hidden />+ Column
         </button>
@@ -1100,7 +1109,8 @@ function SortableLayoutRow({
               <button
                 type="button"
                 onClick={() => onRequestAddToCell(row.id, cell.id)}
-                className="flex w-full items-center justify-center gap-1 rounded-app-md border border-dashed border-white/[0.1] bg-black/15 py-1.5 text-[10px] font-medium text-app-faint hover:border-app-accent/35 hover:bg-app-accent-muted/20 hover:text-app-accent"
+                disabled={addToCellDisabled?.(row.id, cell.id)}
+                className="flex w-full items-center justify-center gap-1 rounded-app-md border border-dashed border-white/[0.1] bg-black/15 py-1.5 text-[10px] font-medium text-app-faint hover:border-app-accent/35 hover:bg-app-accent-muted/20 hover:text-app-accent disabled:opacity-30 disabled:pointer-events-none"
               >
                 <Plus size={11} aria-hidden />+ Block
               </button>
@@ -1396,23 +1406,6 @@ export default function TemplateLayoutEditor({
   const allowRichText = allows('richText') || allows('paragraph');
   const allowMedia = allows('media') || allows('image');
   const allowField = allows('field');
-  const richTextToolkit = useMemo<RichTextToolkitFlags>(
-    () => ({
-      heading1: allows('heading1'),
-      heading2: allows('heading2'),
-      bold: allows('bold'),
-      italic: allows('italic'),
-      underline: allows('underline') && underlineRestrictionOk,
-      bulletList: allows('bullet_list'),
-      orderedList: allows('ordered_list'),
-      link: allows('link'),
-      insertImage: allows('image'),
-      fieldToken: allows('field'),
-      mediaToken: allows('media'),
-    }),
-    [allows, underlineRestrictionOk],
-  );
-
   const richTextEditorsRef = useRef<Map<string, Editor>>(new Map());
   const [focusedRichRegionId, setFocusedRichRegionId] = useState<string | null>(null);
   const [editorRegistryEpoch, setEditorRegistryEpoch] = useState(0);
@@ -1464,6 +1457,23 @@ export default function TemplateLayoutEditor({
     if (!focusedRichRegionId) return null;
     return richTextEditorsRef.current.get(focusedRichRegionId) ?? null;
   }, [focusedRichRegionId, editorRegistryEpoch]);
+
+  const richTextToolkit = useMemo<RichTextToolkitFlags>(
+    () => ({
+      heading1: allows('heading1'),
+      heading2: allows('heading2'),
+      bold: allows('bold'),
+      italic: allows('italic'),
+      underline: allows('underline') && underlineRestrictionOk,
+      bulletList: allows('bullet_list'),
+      orderedList: allows('ordered_list'),
+      link: allows('link'),
+      insertImage: allows('image'),
+      fieldToken: allows('field'),
+      mediaToken: allows('media'),
+    }),
+    [allows, underlineRestrictionOk],
+  );
 
   /** JSON snapshot last synced with the server (load or successful save). */
   const lastSyncedLayoutJsonRef = useRef('');
@@ -1599,14 +1609,180 @@ export default function TemplateLayoutEditor({
   const hasMaxCharacters = Number.isFinite(maxCharacters) && maxCharacters > 0;
   const exceedsCharacterLimit = hasMaxCharacters ? richTextCharCount > maxCharacters : false;
 
+  // --- Structural restrictions ---
+  const restrictions = channelCompatibility?.restrictions;
+  const structMaxRows = restrictions?.maxRows;
+  const structMaxColsPerRow = restrictions?.maxColumnsPerRow;
+  const structMaxRichText = restrictions?.maxRichTextRegions;
+  const structMaxMedia = restrictions?.maxMediaRegions;
+  const structMaxField = restrictions?.maxFieldRegions;
+  const structMaxTotal = restrictions?.maxTotalRegions;
+  const structAllowedSeqs = restrictions?.allowedRegionSequences;
+
+  const regionCounts = useMemo(() => {
+    let richText = 0;
+    let media = 0;
+    let field = 0;
+    let total = 0;
+    rows.forEach((row) => {
+      row.cells.forEach((cell) => {
+        cell.regions.forEach((region) => {
+          total++;
+          if (region.type === REGION_TYPES.richText) richText++;
+          else if (region.type === REGION_TYPES.media) media++;
+          else if (region.type === REGION_TYPES.field) field++;
+        });
+      });
+    });
+    return { richText, media, field, total };
+  }, [rows]);
+
+  const structuralViolations = useMemo(() => {
+    const msgs: string[] = [];
+    const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+    if (fin(structMaxRows) && rows.length > structMaxRows) {
+      msgs.push(`Max ${structMaxRows} row(s) allowed; layout has ${rows.length}.`);
+    }
+    if (fin(structMaxColsPerRow)) {
+      for (const row of rows) {
+        if (row.cells.length > structMaxColsPerRow) {
+          msgs.push(`Max ${structMaxColsPerRow} column(s) per row allowed.`);
+          break;
+        }
+      }
+    }
+    if (fin(structMaxRichText) && regionCounts.richText > structMaxRichText) {
+      msgs.push(
+        `Max ${structMaxRichText} text block(s) allowed; layout has ${regionCounts.richText}.`,
+      );
+    }
+    if (fin(structMaxMedia) && regionCounts.media > structMaxMedia) {
+      msgs.push(`Max ${structMaxMedia} media block(s) allowed; layout has ${regionCounts.media}.`);
+    }
+    if (fin(structMaxField) && regionCounts.field > structMaxField) {
+      msgs.push(`Max ${structMaxField} field block(s) allowed; layout has ${regionCounts.field}.`);
+    }
+    if (fin(structMaxTotal) && regionCounts.total > structMaxTotal) {
+      msgs.push(`Max ${structMaxTotal} total block(s) allowed; layout has ${regionCounts.total}.`);
+    }
+
+    if (Array.isArray(structAllowedSeqs) && structAllowedSeqs.length > 0) {
+      for (const row of rows) {
+        for (const cell of row.cells) {
+          const seq = cell.regions.map((r) => r.type);
+          const ok = structAllowedSeqs.some(
+            (allowed: string[]) =>
+              allowed.length === seq.length &&
+              allowed.every((t: string, i: number) => t === seq[i]),
+          );
+          if (!ok && seq.length > 0) {
+            const seqStr = seq.join(' → ');
+            const allowedStr = structAllowedSeqs.map((s) => s.join('+')).join(', ');
+            msgs.push(
+              `Block sequence [${seqStr}] is not allowed for this channel (valid: ${allowedStr}).`,
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    return msgs;
+  }, [
+    rows,
+    structMaxRows,
+    structMaxColsPerRow,
+    structMaxRichText,
+    structMaxMedia,
+    structMaxField,
+    structMaxTotal,
+    structAllowedSeqs,
+    regionCounts,
+  ]);
+
+  const hasStructuralViolation = structuralViolations.length > 0;
+
+  /** Whether adding a new row is possible given structural limits. */
+  const canAddRow = useMemo(() => {
+    const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+    if (fin(structMaxRows) && rows.length >= structMaxRows) return false;
+    return true;
+  }, [structMaxRows, rows.length]);
+
+  /** Whether a specific block type can still be added (global count caps). */
+  const canAddBlockType = useCallback(
+    (type: string): boolean => {
+      const fin = (v: unknown): v is number =>
+        typeof v === 'number' && Number.isFinite(v) && v >= 0;
+      if (fin(structMaxTotal) && regionCounts.total >= structMaxTotal) return false;
+      if (
+        type === REGION_TYPES.richText &&
+        fin(structMaxRichText) &&
+        regionCounts.richText >= structMaxRichText
+      )
+        return false;
+      if (
+        type === REGION_TYPES.media &&
+        fin(structMaxMedia) &&
+        regionCounts.media >= structMaxMedia
+      )
+        return false;
+      if (
+        type === REGION_TYPES.field &&
+        fin(structMaxField) &&
+        regionCounts.field >= structMaxField
+      )
+        return false;
+      return true;
+    },
+    [structMaxTotal, structMaxRichText, structMaxMedia, structMaxField, regionCounts],
+  );
+
+  /** Whether adding a column to a row is allowed. */
+  const canAddColumnToRow = useCallback(
+    (rowId: string): boolean => {
+      const fin = (v: unknown): v is number =>
+        typeof v === 'number' && Number.isFinite(v) && v >= 0;
+      if (!fin(structMaxColsPerRow)) return true;
+      const row = rows.find((r) => r.id === rowId);
+      if (!row) return true;
+      return row.cells.length < structMaxColsPerRow;
+    },
+    [structMaxColsPerRow, rows],
+  );
+
+  /** Whether adding a block of a given type into a specific cell would produce a valid region sequence. */
+  const canAddToCellSeq = useCallback(
+    (rowId: string, cellId: string, regionType: string): boolean => {
+      if (!Array.isArray(structAllowedSeqs) || structAllowedSeqs.length === 0) return true;
+      const row = rows.find((r) => r.id === rowId);
+      if (!row) return true;
+      const cell = row.cells.find((c) => c.id === cellId);
+      if (!cell) return true;
+      const candidateSeq = [...cell.regions.map((r) => r.type), regionType];
+      return structAllowedSeqs.some(
+        (allowed: string[]) =>
+          allowed.length === candidateSeq.length &&
+          allowed.every((t: string, i: number) => t === candidateSeq[i]),
+      );
+    },
+    [structAllowedSeqs, rows],
+  );
+
   const canSaveDraft = useMemo(
-    () => dirty && !exceedsCharacterLimit,
-    [dirty, exceedsCharacterLimit],
+    () => dirty && !exceedsCharacterLimit && !hasStructuralViolation,
+    [dirty, exceedsCharacterLimit, hasStructuralViolation],
   );
 
   const canActivate = useMemo(
-    () => !dirty && bindingCount >= 1 && regionCount >= 1 && !exceedsCharacterLimit,
-    [dirty, bindingCount, regionCount, exceedsCharacterLimit],
+    () =>
+      !dirty &&
+      bindingCount >= 1 &&
+      regionCount >= 1 &&
+      !exceedsCharacterLimit &&
+      !hasStructuralViolation,
+    [dirty, bindingCount, regionCount, exceedsCharacterLimit, hasStructuralViolation],
   );
 
   useEffect(() => {
@@ -1915,17 +2091,18 @@ export default function TemplateLayoutEditor({
   );
 
   function onPaletteAdd() {
-    if (allowRichText) {
+    if (!canAddRow) return;
+    if (allowRichText && canAddBlockType(REGION_TYPES.richText)) {
       addRichTextRegion();
       return;
     }
-    if (allowMedia) {
+    if (allowMedia && canAddBlockType(REGION_TYPES.media)) {
       setAppendToRowId(null);
       setAppendToCell(null);
       setBlockModal({ flow: 'add', kind: 'media' });
       return;
     }
-    if (allowField) {
+    if (allowField && canAddBlockType(REGION_TYPES.field)) {
       setAppendToRowId(null);
       setAppendToCell(null);
       setBlockModal({ flow: 'add', kind: 'field' });
@@ -1933,30 +2110,72 @@ export default function TemplateLayoutEditor({
   }
 
   function onRequestAddColumn(rowId: string) {
+    if (!canAddColumnToRow(rowId)) return;
     if (!allowRichText && !allowMedia && !allowField) return;
-    if (allowRichText) {
+    if (allowRichText && canAddBlockType(REGION_TYPES.richText)) {
       addRichTextRegion({ rowId });
       return;
     }
     setAppendToRowId(rowId);
     setAppendToCell(null);
-    setBlockModal({ flow: 'add', kind: allowMedia ? 'media' : 'field' });
+    if (allowMedia && canAddBlockType(REGION_TYPES.media)) {
+      setBlockModal({ flow: 'add', kind: 'media' });
+    } else if (allowField && canAddBlockType(REGION_TYPES.field)) {
+      setBlockModal({ flow: 'add', kind: 'field' });
+    }
   }
 
   function onRequestAddToCell(rowId: string, cellId: string) {
     if (!allowRichText && !allowMedia && !allowField) return;
-    if (allowRichText) {
+    if (
+      allowRichText &&
+      canAddBlockType(REGION_TYPES.richText) &&
+      canAddToCellSeq(rowId, cellId, REGION_TYPES.richText)
+    ) {
       addRichTextRegion({ rowId, cellId });
       return;
     }
-    setAppendToRowId(null);
-    setAppendToCell({ rowId, cellId });
-    setBlockModal({ flow: 'add', kind: allowMedia ? 'media' : 'field' });
+    if (
+      allowMedia &&
+      canAddBlockType(REGION_TYPES.media) &&
+      canAddToCellSeq(rowId, cellId, REGION_TYPES.media)
+    ) {
+      setAppendToRowId(null);
+      setAppendToCell({ rowId, cellId });
+      setBlockModal({ flow: 'add', kind: 'media' });
+      return;
+    }
+    if (
+      allowField &&
+      canAddBlockType(REGION_TYPES.field) &&
+      canAddToCellSeq(rowId, cellId, REGION_TYPES.field)
+    ) {
+      setAppendToRowId(null);
+      setAppendToCell({ rowId, cellId });
+      setBlockModal({ flow: 'add', kind: 'field' });
+      return;
+    }
   }
 
   const onEqualizeColumns = useCallback((rowId: string) => {
     setRows((prev) => equalizeRowColumns(prev, rowId));
   }, []);
+
+  /** Returns true if no block type can legally be added to the given cell. */
+  const isCellAddDisabled = useCallback(
+    (rowId: string, cellId: string): boolean => {
+      const types = [REGION_TYPES.richText, REGION_TYPES.media, REGION_TYPES.field] as const;
+      for (const t of types) {
+        const fieldAllowed =
+          (t === REGION_TYPES.richText && allowRichText) ||
+          (t === REGION_TYPES.media && allowMedia) ||
+          (t === REGION_TYPES.field && allowField);
+        if (fieldAllowed && canAddBlockType(t) && canAddToCellSeq(rowId, cellId, t)) return false;
+      }
+      return true;
+    },
+    [allowRichText, allowMedia, allowField, canAddBlockType, canAddToCellSeq],
+  );
 
   const handleSaveDraft = useCallback(async () => {
     if (exceedsCharacterLimit) {
@@ -1965,6 +2184,10 @@ export default function TemplateLayoutEditor({
           ? `This channel allows at most ${maxCharacters} characters in rich text. Shorten content before saving.`
           : 'Content exceeds the channel character limit. Shorten content before saving.',
       );
+      return;
+    }
+    if (hasStructuralViolation) {
+      setSaveError(structuralViolations.join(' '));
       return;
     }
     setSaving(true);
@@ -1991,6 +2214,8 @@ export default function TemplateLayoutEditor({
     exceedsCharacterLimit,
     hasMaxCharacters,
     maxCharacters,
+    hasStructuralViolation,
+    structuralViolations,
   ]);
 
   const handleActivate = useCallback(async () => {
@@ -2022,7 +2247,7 @@ export default function TemplateLayoutEditor({
   return (
     <div className={compact ? 'space-y-6' : 'space-y-8'}>
       {!compact && (
-        <header className="border-b border-app-border/40 pb-4">
+        <header className="border-b border-white/[0.08] pb-4">
           <h3 className="m-0 text-base font-semibold tracking-tight text-app-text">Layout</h3>
         </header>
       )}
@@ -2038,16 +2263,16 @@ export default function TemplateLayoutEditor({
         </div>
       )}
 
-      <div className="flex min-h-[680px] flex-1 flex-col overflow-hidden rounded-[12px] border border-white/[0.07] bg-[#0d0f18]">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.07] px-3">
+      <div className="flex min-h-[680px] flex-1 flex-col overflow-hidden rounded-app-xl border border-white/[0.1] bg-[#0a0c12]/95 shadow-app-lift ring-1 ring-white/[0.05] [background-image:radial-gradient(rgba(147,124,248,0.06)_1px,transparent_1px),radial-gradient(rgba(45,212,191,0.04)_1px,transparent_1px)] [background-size:22px_22px,22px_22px] [background-position:0_0,11px_11px] backdrop-blur-sm">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.08] bg-app-bg/40 px-3 backdrop-blur-md">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 items-center rounded-full border border-white/[0.09] bg-white/[0.05] p-0.5">
+            <div className="flex h-8 items-center rounded-full border border-white/[0.12] bg-black/25 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
               <button
                 type="button"
                 onClick={() => setWorkspaceTab('editor')}
-                className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-150 ease-in ${
+                className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-(--duration-app-slow) ease-(--ease-app-out) ${
                   workspaceTab === 'editor'
-                    ? 'bg-[#7C6FF7] text-white'
+                    ? 'bg-gradient-to-r from-app-accent to-app-accent-2 text-app-bg shadow-[0_0_20px_-6px_rgba(147,124,248,0.55)]'
                     : 'bg-transparent text-app-muted hover:text-app-text'
                 }`}
               >
@@ -2056,9 +2281,9 @@ export default function TemplateLayoutEditor({
               <button
                 type="button"
                 onClick={() => setWorkspaceTab('preview')}
-                className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-150 ease-in ${
+                className={`h-7 rounded-full px-4 text-[13px] font-medium transition-all duration-(--duration-app-slow) ease-(--ease-app-out) ${
                   workspaceTab === 'preview'
-                    ? 'bg-[#7C6FF7] text-white'
+                    ? 'bg-gradient-to-r from-app-accent to-app-accent-2 text-app-bg shadow-[0_0_20px_-6px_rgba(147,124,248,0.55)]'
                     : 'bg-transparent text-app-muted hover:text-app-text'
                 }`}
               >
@@ -2086,13 +2311,13 @@ export default function TemplateLayoutEditor({
           <div className="flex items-center gap-3">
             {workspaceTab === 'preview' ? (
               <>
-                <div className="flex h-8 items-center rounded-full border border-white/[0.09] bg-white/[0.05] p-0.5">
+                <div className="flex h-8 items-center rounded-full border border-white/[0.12] bg-black/25 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                   <button
                     type="button"
                     onClick={() => setPreviewBp('desktop')}
-                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-150 ease-in ${
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-(--duration-app-slow) ease-(--ease-app-out) ${
                       previewBp === 'desktop'
-                        ? 'bg-white text-[#0d0f18]'
+                        ? 'bg-white text-[#0a0c12] shadow-[0_0_16px_-4px_rgba(255,255,255,0.25)]'
                         : 'bg-transparent text-app-muted hover:text-app-text'
                     }`}
                   >
@@ -2101,9 +2326,9 @@ export default function TemplateLayoutEditor({
                   <button
                     type="button"
                     onClick={() => setPreviewBp('mobile')}
-                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-150 ease-in ${
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-all duration-(--duration-app-slow) ease-(--ease-app-out) ${
                       previewBp === 'mobile'
-                        ? 'bg-white text-[#0d0f18]'
+                        ? 'bg-white text-[#0a0c12] shadow-[0_0_16px_-4px_rgba(255,255,255,0.25)]'
                         : 'bg-transparent text-app-muted hover:text-app-text'
                     }`}
                   >
@@ -2116,8 +2341,16 @@ export default function TemplateLayoutEditor({
             <button
               type="button"
               onClick={onPaletteAdd}
-              disabled={!allowRichText && !allowMedia && !allowField}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-white/[0.12] bg-transparent px-3 text-[13px] font-medium text-app-muted transition-all duration-150 ease-in hover:border-white/[0.14] hover:text-app-text"
+              disabled={
+                (!allowRichText && !allowMedia && !allowField) ||
+                !canAddRow ||
+                !(
+                  (allowRichText && canAddBlockType(REGION_TYPES.richText)) ||
+                  (allowMedia && canAddBlockType(REGION_TYPES.media)) ||
+                  (allowField && canAddBlockType(REGION_TYPES.field))
+                )
+              }
+              className="inline-flex h-8 items-center gap-1.5 rounded-app-md border border-white/[0.14] bg-white/[0.04] px-3 text-[13px] font-medium text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all duration-(--duration-app-slow) ease-(--ease-app-out) hover:border-app-accent/35 hover:bg-app-accent/10 hover:text-app-text disabled:opacity-40"
             >
               <Plus size={14} /> Add block
             </button>
@@ -2143,13 +2376,21 @@ export default function TemplateLayoutEditor({
               {exceedsCharacterLimit ? ' (reduce content for this channel)' : ''}
             </div>
           ) : null}
+          {hasStructuralViolation ? (
+            <div className="border-b border-red-400/30 bg-red-500/10 px-4 py-2 text-[11px] text-red-200">
+              {structuralViolations.map((msg, i) => (
+                <div key={i}>{msg}</div>
+              ))}
+            </div>
+          ) : null}
 
           {workspaceTab === 'editor' ? (
             <div className="min-w-0 flex flex-col gap-0">
-              <div className="border-b border-white/[0.07] px-4 py-2 text-[12px] text-app-faint">
-                Drag rows, resize gutters, use <span className="text-app-muted">+ Column</span>, and
-                stack blocks with dashed +. Click inside a rich text editor to move the caret — the
-                toolbar directly under the Editor / Preview tabs applies formatting to that block.
+              <div className="border-b border-white/[0.07] bg-black/20 px-4 py-2.5 text-[11px] leading-relaxed text-app-faint backdrop-blur-sm">
+                Drag rows, resize gutters, use{' '}
+                <span className="text-app-accent-2/90">+ Column</span>, and stack blocks with dashed
+                +. Click inside a rich text editor to move the caret — the toolbar directly under
+                the Editor / Preview tabs applies formatting to that block.
               </div>
               <DndContext
                 sensors={sensors}
@@ -2163,7 +2404,7 @@ export default function TemplateLayoutEditor({
                 >
                   <div className="space-y-4 px-4 pb-4">
                     {rows.length === 0 ? (
-                      <div className="rounded-app-lg border border-dashed border-app-accent/25 bg-app-accent-muted/10 px-4 py-10 text-center">
+                      <div className="rounded-app-xl border border-dashed border-app-accent/35 bg-gradient-to-b from-app-accent/8 to-transparent px-4 py-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                         <p className="m-0 text-[13px] text-app-faint">
                           Empty — add a block from the bar above.
                         </p>
@@ -2183,6 +2424,8 @@ export default function TemplateLayoutEditor({
                           onEditorFocusRegion={handleEditorFocusRegion}
                           onEditorBlurRegion={handleEditorBlurRegion}
                           onRichTextEditorRegister={registerRichTextEditor}
+                          addColumnDisabled={!canAddColumnToRow(row.id)}
+                          addToCellDisabled={isCellAddDisabled}
                         />
                       ))
                     )}
@@ -2198,9 +2441,11 @@ export default function TemplateLayoutEditor({
                     title={
                       exceedsCharacterLimit
                         ? 'Reduce rich text length to satisfy this channel’s limit before saving'
-                        : dirty
-                          ? 'Save draft layout to the server'
-                          : 'No unsaved changes'
+                        : hasStructuralViolation
+                          ? 'Fix layout structure violations before saving'
+                          : dirty
+                            ? 'Save draft layout to the server'
+                            : 'No unsaved changes'
                     }
                     onClick={handleSaveDraft}
                     className="inline-flex items-center justify-center gap-2 rounded-app-md border border-app-accent/45 bg-app-accent-muted px-4 py-2.5 text-sm font-medium hover:bg-app-accent/20 disabled:opacity-50"
@@ -2221,7 +2466,9 @@ export default function TemplateLayoutEditor({
                             ? 'Add at least one section before activating'
                             : exceedsCharacterLimit
                               ? 'Reduce content length to satisfy channel character limit'
-                              : 'Promote draft layout to active'
+                              : hasStructuralViolation
+                                ? 'Fix layout structure violations before activating'
+                                : 'Promote draft layout to active'
                     }
                     className="inline-flex items-center justify-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/12 px-4 py-2.5 text-sm font-medium text-emerald-100 hover:bg-emerald-500/18 disabled:opacity-40"
                   >

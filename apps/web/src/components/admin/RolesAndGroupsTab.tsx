@@ -186,19 +186,20 @@ export default function RolesAndGroupsTab() {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-[120px] rounded-xl animate-pulse"
-            style={{ background: 'rgba(255,255,255,0.03)' }}
+            className="app-skeleton-shimmer h-[120px] rounded-app-xl border border-white/[0.06]"
           />
         ))}
       </div>
     );
   if (error)
     return (
-      <div className="p-12 text-center text-red-400 text-sm">
-        <p>⚠ {error}</p>
+      <div className="admin-glass relative mx-auto max-w-md overflow-hidden rounded-app-xl p-12 text-center">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-400/35 to-transparent" />
+        <p className="m-0 text-sm font-medium text-red-300">{error}</p>
         <button
+          type="button"
           onClick={refetch}
-          className="mt-3 px-4 py-1.5 admin-glass-button rounded-lg text-app-text"
+          className="admin-glass-button mt-4 rounded-app-lg px-5 py-2.5 text-[13px] font-semibold text-app-text"
         >
           Retry
         </button>
@@ -206,22 +207,24 @@ export default function RolesAndGroupsTab() {
     );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {twoStepDialog}
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-app-text mb-1">Roles &amp; Groups</h2>
-          <p className="text-[13px] text-app-faint m-0">
+          <h2 className="mb-1 text-lg font-semibold tracking-tight text-app-text">
+            Roles &amp; Groups
+          </h2>
+          <p className="m-0 text-[13px] text-app-muted">
             Control access levels and team organization
           </p>
         </div>
         <button
           type="button"
-          className="flex items-center gap-1.5 px-3.5 py-2 admin-glass-button rounded-xl text-app-accent text-[13px] font-medium"
+          className="admin-glass-button inline-flex items-center gap-2 self-start rounded-app-lg border border-app-accent/25 bg-app-accent-muted/40 px-4 py-2.5 text-[13px] font-semibold text-app-accent shadow-[0_0_24px_-10px_rgba(147,124,248,0.4)] sm:self-auto"
           onClick={() => (view === 'roles' ? openNewRole() : openNewGroup())}
         >
-          <Plus size={14} /> New {view === 'roles' ? 'role' : 'group'}
+          <Plus size={15} strokeWidth={2} /> New {view === 'roles' ? 'role' : 'group'}
         </button>
       </div>
 
@@ -303,15 +306,14 @@ export default function RolesAndGroupsTab() {
 
       {showDeleteRoleConfirm && (
         <div
-          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 backdrop-blur-sm admin-modal-backdrop"
+          className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
           onClick={() => {
             setShowDeleteRoleConfirm(null);
             setRoleActionError(null);
           }}
         >
           <div
-            className="admin-glass admin-modal-enter w-full max-w-[400px] rounded-2xl p-6 shadow-app-soft"
-            style={{ background: 'rgba(15, 20, 32, 0.9)' }}
+            className="admin-modal-enter admin-modal-panel w-full max-w-[400px] rounded-app-xl p-6 shadow-app-soft"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="m-0 mb-3 text-base font-semibold text-app-text">Delete role</h3>
@@ -377,8 +379,8 @@ function RoleCard({
 
   return (
     <div
-      className="admin-glass admin-card-hover group relative flex flex-col gap-3 rounded-xl p-4 admin-row-enter"
-      style={{ '--row-index': index, borderTop: `2px solid ${topColor}` } as React.CSSProperties}
+      className="admin-glass admin-card-hover group relative flex flex-col gap-3 overflow-hidden rounded-app-xl p-4 shadow-app-lift admin-row-enter ring-1 ring-white/[0.04]"
+      style={{ '--row-index': index, borderTop: `3px solid ${topColor}` } as React.CSSProperties}
     >
       <div className="flex items-center gap-2.5">
         <div
@@ -480,8 +482,8 @@ function GroupCard({
 
   return (
     <div
-      className="admin-glass admin-card-hover group relative flex flex-col gap-3 rounded-xl p-4 admin-row-enter"
-      style={{ '--row-index': index, borderTop: '2px solid #38bdf8' } as React.CSSProperties}
+      className="admin-glass admin-card-hover group relative flex flex-col gap-3 overflow-hidden rounded-app-xl p-4 shadow-app-lift admin-row-enter ring-1 ring-white/[0.04]"
+      style={{ '--row-index': index, borderTop: '3px solid #38bdf8' } as React.CSSProperties}
     >
       <div className="flex items-center gap-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-400/10 text-sky-400">

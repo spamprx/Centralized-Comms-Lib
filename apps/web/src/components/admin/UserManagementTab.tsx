@@ -155,11 +155,13 @@ export default function UserManagementTab() {
 
   if (error)
     return (
-      <div className="flex flex-col items-center gap-3 p-12 text-red-400 text-sm">
-        <p>⚠ {error}</p>
+      <div className="admin-glass relative flex flex-col items-center gap-4 overflow-hidden rounded-app-xl p-12 text-center">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-400/30 to-transparent" />
+        <p className="m-0 max-w-md text-sm font-medium text-red-300">{error}</p>
         <button
+          type="button"
           onClick={refetch}
-          className="px-4 py-1.5 admin-glass-button rounded-lg text-app-text"
+          className="admin-glass-button rounded-app-lg px-5 py-2.5 text-[13px] font-semibold text-app-text"
         >
           Retry
         </button>
@@ -167,15 +169,15 @@ export default function UserManagementTab() {
     );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="relative flex flex-col gap-6">
       {twoStepDialog}
 
       {rowActionError && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-[13px] text-red-300">
-          <span>{rowActionError}</span>
+        <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-app-xl border border-red-400/25 bg-gradient-to-r from-red-500/12 to-red-500/5 px-4 py-3 text-[13px] text-red-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md">
+          <span className="font-medium">{rowActionError}</span>
           <button
             type="button"
-            className="shrink-0 rounded-lg border-none bg-white/5 px-2 py-1 text-[12px] text-app-muted hover:bg-white/10"
+            className="shrink-0 rounded-app-md border border-white/[0.1] bg-white/[0.06] px-3 py-1.5 text-[12px] font-semibold text-app-muted transition-colors hover:bg-white/[0.1] hover:text-app-text"
             onClick={() => setRowActionError(null)}
           >
             Dismiss
@@ -183,16 +185,17 @@ export default function UserManagementTab() {
         </div>
       )}
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-app-text mb-1">Users</h2>
-          <p className="text-[13px] text-app-faint m-0">Manage accounts, roles, and permissions</p>
+          <h2 className="mb-1 text-lg font-semibold tracking-tight text-app-text">Users</h2>
+          <p className="m-0 text-[13px] text-app-muted">Manage accounts, roles, and permissions</p>
         </div>
         <button
-          className="flex items-center gap-1.5 px-3.5 py-2 admin-glass-button rounded-xl text-app-accent text-[13px] font-medium"
+          type="button"
+          className="admin-glass-button inline-flex items-center justify-center gap-2 self-start rounded-app-lg border border-app-accent/25 bg-app-accent-muted/40 px-4 py-2.5 text-[13px] font-semibold text-app-accent shadow-[0_0_24px_-10px_rgba(147,124,248,0.45)] sm:self-auto"
           onClick={() => setShowInviteModal(true)}
         >
-          <Plus size={14} /> Invite user
+          <Plus size={15} strokeWidth={2} /> Invite user
         </button>
       </div>
 
@@ -216,19 +219,21 @@ export default function UserManagementTab() {
       />
 
       {pagination.total > pagination.limit && (
-        <div className="flex items-center justify-center gap-4 pt-2">
+        <div className="admin-glass flex items-center justify-center gap-4 overflow-hidden rounded-app-xl px-4 py-3">
           <button
-            className="px-4 py-2 admin-glass-button rounded-lg text-app-muted text-[13px] disabled:opacity-30 disabled:cursor-not-allowed"
+            type="button"
+            className="admin-glass-button rounded-app-md px-4 py-2 text-[13px] font-medium text-app-muted disabled:cursor-not-allowed disabled:opacity-35"
             disabled={pagination.page === 1}
             onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
           >
             ← Prev
           </button>
-          <span className="text-[13px] text-app-faint">
+          <span className="text-[13px] font-semibold tabular-nums text-app-muted">
             Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}
           </span>
           <button
-            className="px-4 py-2 admin-glass-button rounded-lg text-app-muted text-[13px] disabled:opacity-30 disabled:cursor-not-allowed"
+            type="button"
+            className="admin-glass-button rounded-app-md px-4 py-2 text-[13px] font-medium text-app-muted disabled:cursor-not-allowed disabled:opacity-35"
             disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
             onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
           >
@@ -257,7 +262,7 @@ export default function UserManagementTab() {
       )}
 
       {showPasswordResetToast && (
-        <div className="fixed bottom-6 right-6 admin-glass rounded-xl px-5 py-3 text-emerald-400 text-[13px] shadow-app-soft admin-modal-enter max-w-sm">
+        <div className="admin-modal-enter admin-modal-panel fixed bottom-6 right-6 z-[1300] max-w-sm rounded-app-xl px-5 py-3.5 text-[13px] font-medium text-emerald-300 shadow-app-glow">
           <span>{passwordResetMessage}</span>
         </div>
       )}

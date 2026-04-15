@@ -151,95 +151,80 @@ export default function SimilarContentWidget({
 
   return (
     <div
-      className={`overflow-hidden rounded-[var(--editor-radius-input,0.5rem)] border-[0.5px] border-[var(--editor-border,rgba(0,0,0,0.12))] bg-[var(--editor-card-bg,transparent)] ${className}`}
+      className={`similar-content-widget overflow-hidden rounded-app-xl border border-white/10 bg-app-bg/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] shadow-app-soft backdrop-blur-xl supports-backdrop-filter:bg-app-bg/40 ${className}`}
     >
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className={`flex w-full cursor-pointer items-center justify-between gap-2 border-none px-3 py-2 text-left transition-colors ${
-          neutral
-            ? 'bg-transparent hover:bg-[var(--editor-canvas-bg)]'
-            : 'bg-transparent hover:bg-app-surface'
+        className={`flex w-full cursor-pointer items-center justify-between gap-2 border-none px-3.5 py-2.5 text-left transition-[background-color] duration-200 ${
+          neutral ? 'bg-transparent hover:bg-white/[0.04]' : 'bg-transparent hover:bg-white/[0.04]'
         }`}
       >
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2.5">
           {neutral ? (
-            <FileText size={14} className="shrink-0 text-[var(--editor-muted)]" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-white/10 bg-white/[0.04] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <FileText size={15} strokeWidth={2} className="shrink-0" />
+            </span>
           ) : (
-            <FileWarning size={14} className="shrink-0 text-amber-400/90" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app-md border border-amber-400/25 bg-amber-500/10 text-amber-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <FileWarning size={15} strokeWidth={2} className="shrink-0" />
+            </span>
           )}
-          <span
-            className={`truncate text-[12px] font-medium ${neutral ? 'text-[var(--editor-muted)]' : 'text-app-muted'}`}
-          >
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-tight text-app-text">
             Similar content
             {count > 0 && (
               <span
-                className={`ml-1 ${neutral ? 'text-[var(--editor-primary)]' : 'text-app-accent/90'}`}
+                className={`ml-1.5 tabular-nums ${neutral ? 'text-app-accent' : 'text-amber-200/90'}`}
               >
                 · {count}
               </span>
             )}
           </span>
-          {loading && (
-            <Loader2
-              size={12}
-              className={`shrink-0 animate-spin ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'}`}
-            />
-          )}
+          {loading && <Loader2 size={14} className="shrink-0 animate-spin text-app-accent/80" />}
         </span>
         <ChevronDown
-          size={14}
-          className={`shrink-0 transition-transform ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'} ${expanded ? 'rotate-180' : ''}`}
+          size={16}
+          strokeWidth={2}
+          className={`shrink-0 text-app-faint transition-transform duration-200 ease-out ${expanded ? 'rotate-180' : ''}`}
         />
       </button>
 
       {expanded && (
-        <div
-          className={`border-t px-3 pb-3 pt-0 ${neutral ? 'border-[var(--editor-border)]' : 'border-app-border'}`}
-        >
+        <div className="border-t border-white/[0.08] bg-white/[0.02] px-3 pb-3.5 pt-1">
           {!shouldQuery && (
-            <p
-              className={`m-0 mt-2 text-[11px] ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'}`}
-            >
+            <p className="m-0 mt-2 text-[11px] leading-relaxed text-app-muted">
               Type at least 3 characters in the title or body — we will suggest possible duplicates.
             </p>
           )}
           {shouldQuery && subtitle && count > 0 && (
-            <p
-              className={`m-0 mb-2 text-[10px] ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'}`}
-            >
+            <p className="m-0 mb-2 mt-1 text-[10px] font-medium uppercase tracking-wider text-app-faint">
               {subtitle}
             </p>
           )}
-          {error && <p className="m-0 mt-1 text-[11px] text-red-500/90">{error}</p>}
+          {error && <p className="m-0 mt-1 text-[11px] text-red-400">{error}</p>}
           {shouldQuery && !loading && count === 0 && !error && (
-            <p
-              className={`m-0 mt-1 text-[11px] ${neutral ? 'text-[var(--editor-faint)]' : 'text-app-faint'}`}
-            >
-              No close matches found.
-            </p>
+            <p className="m-0 mt-1 text-[11px] text-app-muted">No close matches found.</p>
           )}
-          <ul className={`m-0 list-none space-y-1.5 overflow-y-auto p-0 ${listMaxHeightClassName}`}>
+          <ul
+            className={`m-0 list-none space-y-1 overflow-y-auto p-0 pt-1 ${listMaxHeightClassName}`}
+          >
             {hits.map((h) => (
-              <li key={h.contentId} className="flex items-start justify-between gap-2 text-[12px]">
+              <li
+                key={h.contentId}
+                className="flex items-start justify-between gap-2 rounded-app-md border border-transparent px-2 py-2 text-[12px] transition-[border-color,background-color] duration-150 hover:border-white/10 hover:bg-white/[0.04]"
+              >
                 <Link
                   to={`/library/${h.contentId}`}
-                  className={`min-w-0 flex-1 truncate no-underline hover:underline ${
+                  className={`min-w-0 flex-1 truncate font-medium no-underline transition-colors ${
                     neutral
-                      ? 'text-[var(--editor-primary)]'
+                      ? 'text-app-accent hover:text-app-accent-hover'
                       : 'text-app-accent/95 hover:text-app-accent'
                   }`}
                   title={h.title}
                 >
                   {h.title}
                 </Link>
-                <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] tabular-nums ${
-                    neutral
-                      ? 'bg-[var(--editor-canvas-bg)] text-[var(--editor-faint)]'
-                      : 'rounded bg-app-surface text-app-faint'
-                  }`}
-                >
+                <span className="shrink-0 rounded-app-md border border-white/10 bg-app-bg/60 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   {h.similarityScore}%
                 </span>
               </li>

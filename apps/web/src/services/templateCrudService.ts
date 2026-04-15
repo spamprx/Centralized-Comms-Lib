@@ -77,6 +77,25 @@ export type ChannelRecord = {
       maxCharacters?: number;
       supportsMedia?: boolean;
       supportsUnderline?: boolean;
+      maxRows?: number;
+      maxColumnsPerRow?: number;
+      maxRichTextRegions?: number;
+      maxMediaRegions?: number;
+      maxFieldRegions?: number;
+      maxTotalRegions?: number;
+      allowedRegionSequences?: string[][];
+      /**
+       * When true, richText must not embed media: no TipTap `image` nodes and no `<mediaKey>`
+       * placeholders from "Add media token". Use a layout media block (+ optional caption richText).
+       */
+      disallowInlineImagesInRichText?: boolean;
+      /**
+       * Selects the per-channel content-model validator run on save draft.
+       * "whatsapp" — validates inline image / media-token placement rules.
+       * "sms"       — disallows rich formatting, inline images, and media tokens.
+       * "push"      — disallows inline images and media tokens inside richText.
+       */
+      contentModel?: 'whatsapp' | 'sms' | 'push';
       [key: string]: unknown;
     };
     [key: string]: unknown;

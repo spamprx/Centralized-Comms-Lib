@@ -332,7 +332,7 @@ export default function ReviewLayout() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4">
+      <div className="review-layout-root relative isolate flex min-h-[70vh] flex-1 flex-col items-center justify-center gap-4 bg-app-bg px-4">
         <Surface
           variant="glass"
           padding="lg"
@@ -347,7 +347,7 @@ export default function ReviewLayout() {
 
   if (reviewItems.length === 0) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4">
+      <div className="review-layout-root relative isolate flex min-h-[70vh] flex-1 flex-col items-center justify-center gap-4 bg-app-bg px-4">
         <Surface
           variant="glass"
           padding="lg"
@@ -366,9 +366,19 @@ export default function ReviewLayout() {
   const isAlreadyDecided = selectedItem?.status === 'COMPLETED';
 
   return (
-    <div className="flex h-screen flex-col bg-app-bg">
+    <div className="review-layout-root relative isolate flex min-h-0 flex-1 flex-col overflow-hidden bg-app-bg">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -left-24 top-0 h-80 w-80 rounded-full bg-app-accent/14 blur-3xl" />
+        <div className="absolute -right-16 top-1/3 h-72 w-72 rounded-full bg-app-accent-2/12 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-500/8 blur-3xl" />
+      </div>
+
       {/* Topbar */}
-      <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-app-border/80 bg-app-surface/70 px-4 py-3 shadow-app-soft backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:items-center sm:px-6">
+      <div className="relative z-10 flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.08] bg-app-bg/55 px-4 py-3 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.45)] backdrop-blur-2xl supports-[backdrop-filter]:bg-app-bg/40 sm:items-center sm:px-6">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/45 to-app-accent-2/30"
+          aria-hidden
+        />
         <div className="min-w-0 flex-1">
           <h1 className="mb-1 truncate text-base font-semibold text-app-text">
             {selectedItem?.title || 'Select a review'}
@@ -381,7 +391,7 @@ export default function ReviewLayout() {
           {selectedItem && (
             <Link
               to={`/history/${selectedItem.contentId}`}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-app-md border border-app-border/70 bg-app-bg/40 px-2.5 py-1 text-[11px] font-medium text-app-muted transition-colors hover:border-app-accent/35 hover:text-app-accent"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-app-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-colors hover:border-app-accent/35 hover:bg-white/[0.06] hover:text-app-accent"
             >
               <History size={12} />
               Version history (this document)
@@ -389,18 +399,18 @@ export default function ReviewLayout() {
           )}
         </div>
         {isAlreadyDecided && (
-          <span className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
-            <Check size={14} /> Decision submitted
+          <span className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-emerald-400/40 bg-emerald-500/[0.12] px-3 py-1.5 text-xs font-semibold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.35)]">
+            <Check size={14} strokeWidth={2} /> Decision submitted
           </span>
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 sm:p-3 lg:flex-row">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 sm:p-3 lg:flex-row">
         {/* Review Items Sidebar */}
         <Surface
           variant="glass"
           padding="sm"
-          className="max-h-[40vh] w-full shrink-0 overflow-y-auto lg:max-h-none lg:w-[300px]"
+          className="max-h-[40vh] w-full shrink-0 overflow-y-auto ring-1 ring-white/[0.06] lg:max-h-none lg:w-[300px]"
         >
           <h3 className="mx-1 mb-3 mt-1 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
             Inbox ({reviewItems.length})
@@ -416,8 +426,8 @@ export default function ReviewLayout() {
                   onClick={() => handleSelectItem(item)}
                   className={`rounded-app-lg border p-3.5 text-left transition-all duration-150 ${
                     isActive
-                      ? 'border-app-accent/35 bg-app-accent-muted shadow-[0_0_0_1px_rgba(147,124,248,0.12)]'
-                      : 'border-transparent bg-app-bg/25 hover:border-app-border/80 hover:bg-app-elevated'
+                      ? 'border-app-accent/40 bg-app-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(147,124,248,0.15)]'
+                      : 'border-white/[0.06] bg-white/[0.02] hover:border-white/12 hover:bg-white/[0.05]'
                   } ${isPending ? 'opacity-100' : 'opacity-65'}`}
                 >
                   <div
@@ -445,19 +455,25 @@ export default function ReviewLayout() {
         </Surface>
 
         {/* Content View Panel */}
-        <div className="min-w-0 flex-1 overflow-y-auto p-2 sm:p-3 lg:p-1">
+        <div className="min-w-0 flex-1 overflow-y-auto p-2 sm:p-3 lg:p-2">
           {loadingContent ? (
             <div className="flex justify-center p-16">
               <Loader2 size={24} className="animate-spin text-app-accent" />
             </div>
           ) : (
-            <Surface variant="default" padding="lg" className="mx-auto max-w-[800px]">
+            <Surface
+              variant="default"
+              padding="lg"
+              className="mx-auto max-w-[800px] border border-white/[0.07] bg-app-surface/80 shadow-app-lift ring-1 ring-white/[0.04] backdrop-blur-sm"
+            >
               {/* Content header */}
               <div className="mb-6">
-                <h2 className="text-[22px] font-bold text-app-text mb-2">{selectedItem?.title}</h2>
-                <div className="flex gap-4 flex-wrap items-center">
+                <h2 className="mb-2 text-[22px] font-bold tracking-tight text-app-text">
+                  {selectedItem?.title}
+                </h2>
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-white text-xs font-semibold">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-app-accent to-app-accent-2 text-xs font-semibold text-app-bg shadow-inner">
                       {(selectedItem?.author || 'U')[0].toUpperCase()}
                     </div>
                     <div>
@@ -478,7 +494,7 @@ export default function ReviewLayout() {
                 </div>
               </div>
 
-              <div className="h-px bg-app-elevated mb-6" />
+              <div className="mb-6 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
 
               {/* Content body */}
               {selectedItem?.contentBody &&
@@ -488,7 +504,7 @@ export default function ReviewLayout() {
                 <div className="tiptap-content">
                   <TipTapReadonly
                     doc={selectedItem.contentBody as any}
-                    className="ProseMirror text-[15px] leading-relaxed text-app-muted outline-none"
+                    className="ProseMirror review-body-prose text-[15px] leading-relaxed text-app-muted outline-none"
                   />
                 </div>
               ) : (
@@ -504,24 +520,31 @@ export default function ReviewLayout() {
         <Surface
           variant="glass"
           padding="none"
-          className="flex max-h-[min(52vh,520px)] w-full shrink-0 flex-col overflow-y-auto lg:max-h-none lg:w-[380px]"
+          className="flex max-h-[min(52vh,520px)] w-full shrink-0 flex-col overflow-y-auto ring-1 ring-white/[0.06] lg:max-h-none lg:w-[380px]"
         >
           {/* Review Decision */}
-          <div className="p-5 border-b border-app-border/80">
-            <h3 className="text-xs font-semibold text-app-faint uppercase mb-3">Review Decision</h3>
+          <div className="border-b border-white/[0.08] p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-faint">
+              Review Decision
+            </h3>
 
             {isAlreadyDecided || decisionSuccess ? (
               <div
-                className={`p-4 rounded-app-lg text-center ${
+                className={`rounded-app-lg border p-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${
                   selectedItem?.verdict === 'DENIED'
-                    ? 'bg-red-500/10 border border-red-500/20'
-                    : 'bg-emerald-500/10 border border-emerald-500/20'
+                    ? 'border-red-400/25 bg-red-500/[0.08]'
+                    : 'border-emerald-400/25 bg-emerald-500/[0.08]'
                 }`}
               >
                 {selectedItem?.verdict === 'DENIED' ? (
-                  <XCircle size={24} color="#f87171" className="mb-2 mx-auto" />
+                  <XCircle size={24} color="#f87171" className="mx-auto mb-2" strokeWidth={1.75} />
                 ) : (
-                  <CheckCircle size={24} color="#10b981" className="mb-2 mx-auto" />
+                  <CheckCircle
+                    size={24}
+                    color="#10b981"
+                    className="mx-auto mb-2"
+                    strokeWidth={1.75}
+                  />
                 )}
                 <p
                   className={`mb-1 text-[13px] font-semibold ${
@@ -566,10 +589,11 @@ export default function ReviewLayout() {
                 {/* Comment from reviewer */}
                 {selectedItem?.savedComment && (
                   <div
-                    className="mt-2.5 px-3.5 py-2.5 bg-app-surface rounded-lg text-left"
-                    style={{
-                      borderLeft: `3px solid ${selectedItem?.verdict === 'DENIED' ? '#f87171' : '#10b981'}`,
-                    }}
+                    className={`mt-2.5 rounded-app-md border border-white/[0.06] bg-white/[0.03] px-3.5 py-2.5 text-left ${
+                      selectedItem?.verdict === 'DENIED'
+                        ? 'border-l-[3px] border-l-red-400'
+                        : 'border-l-[3px] border-l-emerald-500'
+                    }`}
                   >
                     <span className="text-[10px] text-app-faint uppercase font-semibold">
                       Your Comment
@@ -582,32 +606,34 @@ export default function ReviewLayout() {
               </div>
             ) : (
               <>
-                <div className="flex gap-2 mb-3">
+                <div className="mb-3 flex gap-2">
                   <button
+                    type="button"
                     onClick={() => {
                       if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'APPROVED');
                       setDecisionError(null);
                     }}
-                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all duration-200 ${
                       decision === 'APPROVED'
-                        ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
-                        : 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300/90'
+                        ? 'border-emerald-400/55 bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-400/20'
+                        : 'border-emerald-500/20 bg-emerald-500/[0.07] text-emerald-200/90 hover:border-emerald-400/35 hover:bg-emerald-500/12'
                     }`}
                   >
-                    <CheckCircle size={16} /> Approve
+                    <CheckCircle size={16} strokeWidth={2} /> Approve
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       if (currentAssignmentId) setDraftDecision(currentAssignmentId, 'DENIED');
                       setDecisionError(null);
                     }}
-                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-app-lg border-2 px-4 py-2.5 text-[13px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all duration-200 ${
                       decision === 'DENIED'
-                        ? 'border-red-400/70 bg-red-500/20 text-red-200'
-                        : 'border-red-500/25 bg-red-500/[0.08] text-red-300/90'
+                        ? 'border-red-400/60 bg-red-500/20 text-red-100 ring-1 ring-red-400/20'
+                        : 'border-red-500/20 bg-red-500/[0.07] text-red-200/90 hover:border-red-400/35 hover:bg-red-500/12'
                     }`}
                   >
-                    <XCircle size={16} /> Deny
+                    <XCircle size={16} strokeWidth={2} /> Deny
                   </button>
                 </div>
 
@@ -629,8 +655,8 @@ export default function ReviewLayout() {
                           : 'What needs to be changed...'
                       }
                       rows={3}
-                      className={`w-full p-2.5 bg-app-surface rounded-lg text-app-text text-xs resize-none box-border outline-none ${
-                        decisionError ? 'border border-red-400/50' : 'border border-app-border'
+                      className={`box-border w-full resize-none rounded-app-md border bg-white/[0.03] p-2.5 text-xs text-app-text outline-none ring-0 transition-shadow placeholder:text-app-faint focus:border-app-accent/35 focus:ring-2 focus:ring-app-accent/15 ${
+                        decisionError ? 'border-red-400/45' : 'border-white/10'
                       }`}
                     />
                   </div>
@@ -644,14 +670,15 @@ export default function ReviewLayout() {
 
                 {decision && (
                   <button
+                    type="button"
                     onClick={handleSubmitDecision}
                     disabled={submittingDecision}
-                    className={`flex w-full items-center justify-center gap-1.5 rounded-app-lg border-none px-4 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 ${
+                    className={`flex w-full items-center justify-center gap-1.5 rounded-app-lg border border-white/10 px-4 py-2.5 text-[13px] font-semibold text-app-bg shadow-[0_0_24px_-10px_rgba(147,124,248,0.4)] ring-1 ring-white/10 transition-[filter,opacity] duration-200 ${
                       submittingDecision
-                        ? 'cursor-not-allowed bg-app-accent/35'
+                        ? 'cursor-not-allowed bg-app-accent/35 opacity-80'
                         : decision === 'APPROVED'
-                          ? 'cursor-pointer bg-gradient-to-br from-emerald-500 to-app-accent-2'
-                          : 'cursor-pointer bg-gradient-to-br from-red-500 to-orange-500'
+                          ? 'cursor-pointer bg-gradient-to-r from-emerald-500 to-app-accent-2 hover:brightness-105'
+                          : 'cursor-pointer bg-gradient-to-r from-red-500 to-orange-500 hover:brightness-105'
                     }`}
                   >
                     {submittingDecision ? (
@@ -670,10 +697,12 @@ export default function ReviewLayout() {
           </div>
 
           {/* AI Screening Panel */}
-          <div className="border-b border-app-border/80 p-5">
-            <h3 className="mb-3 text-xs font-semibold uppercase text-app-faint">AI screening</h3>
+          <div className="border-b border-white/[0.08] p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-faint">
+              AI screening
+            </h3>
             <div className="mb-3">
-              <div className="flex justify-between items-center mb-2">
+              <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs text-app-muted">Quality Score</span>
                 <span
                   className={`text-lg font-bold ${screeningData.score > 80 ? 'text-emerald-500' : 'text-amber-400'}`}
@@ -681,19 +710,23 @@ export default function ReviewLayout() {
                   {screeningData.score}/100
                 </span>
               </div>
-              <div className="h-1.5 bg-white/10 rounded-sm overflow-hidden">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08] ring-1 ring-inset ring-white/[0.04]">
                 <div
-                  className="h-full rounded-sm"
-                  style={{
-                    width: `${screeningData.score}%`,
-                    background: `linear-gradient(90deg, ${screeningData.score > 80 ? '#10b981' : '#fbbf24'}, ${screeningData.score > 80 ? '#34d399' : '#f59e0b'})`,
-                  }}
+                  className={`h-full rounded-full ${
+                    screeningData.score > 80
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                      : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                  }`}
+                  style={{ width: `${screeningData.score}%` }}
                 />
               </div>
             </div>
             <div className="flex flex-col gap-2">
               {screeningData.issues.map((issue, i) => (
-                <div key={i} className="flex gap-2 items-start">
+                <div
+                  key={i}
+                  className="flex items-start gap-2 rounded-app-md border border-white/[0.05] bg-white/[0.02] px-2.5 py-2"
+                >
                   {issue.type === 'warning' && (
                     <AlertCircle size={14} color="#fbbf24" className="mt-0.5" />
                   )}
@@ -711,29 +744,33 @@ export default function ReviewLayout() {
 
           {/* Comments Thread */}
           <div className="flex flex-1 flex-col p-5">
-            <h3 className="mb-3 text-xs font-semibold uppercase text-app-faint">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-app-faint">
               Comments ({comments.length})
             </h3>
-            <div className="flex flex-col gap-3 mb-4">
+            <div className="mb-4 flex flex-col gap-2.5">
               {comments.map((comment) => (
                 <div
                   key={comment.id}
-                  className={`p-3 bg-app-surface rounded-lg ${comment.resolved ? 'opacity-50' : ''}`}
+                  className={`rounded-app-lg border border-white/[0.07] bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${
+                    comment.resolved ? 'opacity-50' : ''
+                  }`}
                 >
-                  <div className="flex justify-between mb-1.5">
+                  <div className="mb-1.5 flex justify-between gap-2">
                     <span className="text-xs font-semibold text-app-text">{comment.author}</span>
-                    <span className="text-[10px] text-app-faint">{comment.time}</span>
+                    <span className="shrink-0 text-[10px] tabular-nums text-app-faint">
+                      {comment.time}
+                    </span>
                   </div>
-                  <p className="text-xs text-app-muted mb-1.5">{comment.text}</p>
+                  <p className="mb-1.5 text-xs leading-relaxed text-app-muted">{comment.text}</p>
                   {comment.resolved && (
-                    <span className="text-[10px] text-emerald-500 flex items-center gap-1">
-                      <CheckCircle size={10} /> Resolved
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                      <CheckCircle size={10} strokeWidth={2} /> Resolved
                     </span>
                   )}
                 </div>
               ))}
               {comments.length === 0 && (
-                <div className="p-4 text-center text-app-faint text-xs">
+                <div className="rounded-app-lg border border-dashed border-white/10 bg-white/[0.02] p-5 text-center text-xs text-app-faint">
                   No comments yet. Add a comment to discuss this content.
                 </div>
               )}
@@ -747,15 +784,16 @@ export default function ReviewLayout() {
                 }}
                 placeholder="Add a comment or feedback..."
                 rows={3}
-                className="w-full p-3 bg-app-surface border border-app-border rounded-lg text-app-text text-xs resize-none mb-2 box-border"
+                className="mb-2 box-border w-full resize-none rounded-app-md border border-white/10 bg-white/[0.03] p-3 text-xs text-app-text outline-none ring-0 transition-shadow placeholder:text-app-faint focus:border-app-accent/35 focus:ring-2 focus:ring-app-accent/15"
               />
               <button
+                type="button"
                 onClick={handleAddComment}
                 disabled={!commentText.trim()}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-app-md border-none px-4 py-2.5 text-xs font-semibold ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-app-md border px-4 py-2.5 text-xs font-semibold transition-[filter,opacity] ${
                   commentText.trim()
-                    ? 'cursor-pointer bg-gradient-to-br from-app-accent to-app-accent-2 text-white shadow-app-soft'
-                    : 'cursor-not-allowed bg-app-elevated text-app-faint'
+                    ? 'cursor-pointer border-white/12 bg-gradient-to-r from-app-accent to-app-accent-2 text-app-bg shadow-[0_0_22px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 hover:brightness-105'
+                    : 'cursor-not-allowed border-transparent bg-app-elevated text-app-faint'
                 }`}
               >
                 <MessageSquare size={14} /> Post Comment

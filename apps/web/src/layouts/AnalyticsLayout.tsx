@@ -5,11 +5,7 @@ import { AnalyticsDashboard } from '../components/analytics/AnalyticsDashboard';
 import { buildAnalyticsCsv, downloadCsv } from '../lib/analyticsCsv';
 import type { DateRange } from '../lib/dateUtils';
 import { formatDateRange } from '../lib/dateUtils';
-
-const BG = '#0d0f18';
-const MUTED = 'rgba(255,255,255,0.45)';
-const RED = '#E24B4A';
-const PURPLE = '#7C6FF7';
+import { Surface } from '../components/ui/Surface';
 
 export default function AnalyticsLayout() {
   const [dateRange, setDateRange] = useState<string | DateRange>('30d');
@@ -63,37 +59,32 @@ export default function AnalyticsLayout() {
 
   if (error) {
     return (
-      <div
-        className="flex min-h-screen items-center justify-center px-6 py-10 font-sans text-white"
-        style={{ backgroundColor: BG, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
-      >
-        <div
-          className="max-w-md rounded-xl border p-6 text-center transition-colors duration-150"
-          style={{ borderColor: 'rgba(226,75,74,0.35)', backgroundColor: 'rgba(226,75,74,0.08)' }}
+      <div className="app-main-canvas flex min-h-screen items-center justify-center px-6 py-10 font-sans">
+        <Surface
+          variant="glass"
+          padding="lg"
+          className="max-w-md border border-red-400/25 bg-red-500/[0.08] text-center shadow-app-lift backdrop-blur-xl"
         >
-          <p className="m-0 text-[14px] font-medium" style={{ color: RED }}>
+          <p className="m-0 text-[14px] font-semibold tracking-tight text-red-200">
             Something went wrong
           </p>
-          <p className="mt-2 text-[13px] font-normal leading-relaxed" style={{ color: MUTED }}>
-            {error}
-          </p>
-        </div>
+          <p className="mt-3 m-0 text-[13px] leading-relaxed text-app-muted">{error}</p>
+        </Surface>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div
-        className="flex min-h-screen items-center justify-center gap-3 font-sans text-[13px] font-medium transition-colors duration-150"
-        style={{
-          backgroundColor: BG,
-          color: MUTED,
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-        }}
-      >
-        <Loader2 className="size-5 animate-spin" style={{ color: PURPLE }} aria-hidden />
-        Loading analytics…
+      <div className="app-main-canvas flex min-h-screen flex-col items-center justify-center gap-4 px-6 py-10 font-sans">
+        <Surface
+          variant="glass"
+          padding="lg"
+          className="flex items-center gap-3 border border-white/10 shadow-app-lift backdrop-blur-xl"
+        >
+          <Loader2 className="size-6 animate-spin text-app-accent" strokeWidth={2} aria-hidden />
+          <span className="text-[13px] font-medium text-app-muted">Loading analytics…</span>
+        </Surface>
       </div>
     );
   }

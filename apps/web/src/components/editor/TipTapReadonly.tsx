@@ -59,5 +59,9 @@ export default function TipTapReadonly({
     };
   }, [editor, onSelectionChange]);
 
-  return <EditorContent editor={editor} />;
+  return (
+    <div className="tiptap-readonly-root min-w-0 rounded-app-md border border-white/[0.06] bg-white/[0.02] px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <EditorContent editor={editor} />
+    </div>
+  );
 }

@@ -13,7 +13,7 @@ const RESOURCES = ['users', 'roles', 'content', 'reports', 'settings', 'analytic
 const ACTIONS = ['create', 'read', 'update', 'delete', 'manage'] as const;
 
 const inputClass =
-  'w-full px-3 py-3 bg-app-surface border border-app-border rounded-xl text-app-text text-[13px] outline-none transition-all duration-200 focus:border-app-accent/40 focus:shadow-[0_0_0_3px_rgba(147,124,248,0.06)] resize-y placeholder-transparent';
+  'w-full resize-y rounded-app-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 placeholder-transparent focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/12';
 
 const emptyForm = { name: '', description: '', permissions: [] as Permission[] };
 
@@ -75,15 +75,14 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 backdrop-blur-sm admin-modal-backdrop"
+      className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="admin-glass admin-modal-enter max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-2xl shadow-app-soft"
-        style={{ background: 'rgba(15, 20, 32, 0.92)' }}
+        className="admin-modal-enter admin-modal-panel max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-app-xl shadow-app-soft"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-5">
+        <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-5">
           <h2 className="m-0 text-lg font-semibold text-app-text">
             {role ? 'Edit Role' : 'Create Role'}
           </h2>
@@ -137,8 +136,8 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
 
           <div className="mb-5">
             <label className="mb-2 block text-[13px] font-medium text-app-muted">Permissions</label>
-            <div className="admin-glass overflow-hidden rounded-xl">
-              <div className="grid grid-cols-[120px_repeat(5,1fr)] gap-px border-b border-white/[0.04] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+            <div className="admin-glass overflow-hidden rounded-app-lg ring-1 ring-white/[0.06]">
+              <div className="grid grid-cols-[120px_repeat(5,1fr)] gap-px border-b border-white/[0.08] bg-app-bg/30 px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-app-faint">
                 <span>Resource</span>
                 {ACTIONS.map((action) => (
                   <span key={action} className="flex items-center justify-center text-center">
@@ -149,8 +148,8 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
               {RESOURCES.map((resource, i) => (
                 <div
                   key={resource}
-                  className={`grid grid-cols-[120px_repeat(5,1fr)] items-center gap-px px-3 py-2.5 transition-colors duration-100 hover:bg-app-surface-hover ${
-                    i < RESOURCES.length - 1 ? 'border-b border-white/[0.03]' : ''
+                  className={`grid grid-cols-[120px_repeat(5,1fr)] items-center gap-px px-3 py-2.5 transition-colors duration-150 hover:bg-white/[0.04] ${
+                    i < RESOURCES.length - 1 ? 'border-b border-white/[0.05]' : ''
                   }`}
                 >
                   <span className="text-xs font-medium capitalize text-app-muted">{resource}</span>
@@ -169,17 +168,17 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-2.5 border-t border-white/[0.06] pt-5">
+          <div className="mt-6 flex justify-end gap-3 border-t border-white/[0.08] pt-5">
             <button
               type="button"
-              className="rounded-xl px-5 py-2.5 text-[13px] text-app-muted admin-glass-button"
+              className="admin-glass-button rounded-app-lg px-5 py-2.5 text-[13px] font-semibold text-app-muted"
               onClick={onClose}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="cursor-pointer rounded-xl border border-app-accent/30 bg-app-accent-muted px-5 py-2.5 text-[13px] font-medium text-app-accent transition-all duration-150 admin-btn-lift hover:bg-app-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="admin-btn-lift cursor-pointer rounded-app-lg border border-app-accent/35 bg-gradient-to-br from-app-accent-muted to-app-accent-muted/50 px-5 py-2.5 text-[13px] font-semibold text-app-accent shadow-[0_0_24px_-8px_rgba(147,124,248,0.4)] transition-all duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={loading}
             >
               {loading ? 'Saving...' : role ? 'Update Role' : 'Create Role'}

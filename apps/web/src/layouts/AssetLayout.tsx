@@ -166,7 +166,13 @@ export default function AssetLayout() {
   const selectionCount = selectedIds.size;
 
   return (
-    <PageShell wide>
+    <PageShell wide className="app-main-canvas relative">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        <div className="absolute -left-24 top-20 h-64 w-64 rounded-full bg-app-accent/12 blur-[100px]" />
+        <div className="absolute right-0 top-40 h-56 w-56 rounded-full bg-app-accent-2/10 blur-[90px]" />
+        <div className="absolute bottom-0 left-1/3 h-40 w-96 max-w-[80%] rounded-full bg-app-accent-deep/15 blur-[100px]" />
+      </div>
+
       <input
         ref={fileInputRef}
         type="file"
@@ -189,28 +195,37 @@ export default function AssetLayout() {
         hint="Browse assets with the same workflow as content library."
       />
 
-      <div className="animate-fade-in space-y-6">
-        <Surface className="space-y-4">
+      <div className="animate-fade-in space-y-8">
+        <Surface
+          variant="glass"
+          padding="lg"
+          className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/35 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/25"
+        >
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-app-accent-2/25"
+            aria-hidden
+          />
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[220px] flex-1">
               <Search
                 size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-muted"
+                strokeWidth={2}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-accent/70"
               />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search assets..."
-                className="h-10 w-full rounded-app-md border border-app-border bg-app-bg/50 pl-9 pr-3 text-[13px] text-app-text outline-none transition-colors focus:border-app-accent"
+                className="h-10 w-full rounded-app-md border border-white/10 bg-white/[0.04] pl-9 pr-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-[border-color,box-shadow] placeholder:text-app-faint focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <select
                   value={sortKey}
                   onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
-                  className="h-10 appearance-none rounded-app-md border border-app-border bg-app-bg/40 pl-3 pr-8 text-[13px] text-app-muted outline-none transition-colors hover:border-app-border-strong focus:border-app-accent"
+                  className="h-10 cursor-pointer appearance-none rounded-app-md border border-white/10 bg-white/[0.04] pl-3 pr-8 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-colors hover:border-white/16 focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
                 >
                   <option value="date">Date added</option>
                   <option value="name">Name</option>
@@ -218,44 +233,45 @@ export default function AssetLayout() {
                 </select>
                 <ChevronDown
                   size={16}
+                  strokeWidth={2}
                   className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-app-faint"
                 />
               </div>
-              <div className="inline-flex rounded-app-md border border-app-border p-0.5">
+              <div className="inline-flex rounded-app-lg border border-white/10 bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`flex size-9 items-center justify-center rounded-app-sm transition-colors ${
+                  className={`flex size-9 items-center justify-center rounded-app-md transition-all duration-200 ${
                     viewMode === 'grid'
-                      ? 'bg-app-surface text-app-text'
-                      : 'text-app-muted hover:bg-app-surface hover:text-app-text'
+                      ? 'bg-app-accent/15 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-app-accent/25'
+                      : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
                   }`}
                 >
-                  <Grid3x3 size={16} />
+                  <Grid3x3 size={16} strokeWidth={2} />
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={`flex size-9 items-center justify-center rounded-app-sm transition-colors ${
+                  className={`flex size-9 items-center justify-center rounded-app-md transition-all duration-200 ${
                     viewMode === 'list'
-                      ? 'bg-app-surface text-app-text'
-                      : 'text-app-muted hover:bg-app-surface hover:text-app-text'
+                      ? 'bg-app-accent/15 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-app-accent/25'
+                      : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
                   }`}
                 >
-                  <List size={16} />
+                  <List size={16} strokeWidth={2} />
                 </button>
               </div>
               <Button
                 type="button"
                 variant="primary"
                 onClick={handleUploadClick}
-                leftIcon={<Upload size={16} />}
+                leftIcon={<Upload size={16} strokeWidth={2} />}
               >
                 Upload files
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-5">
             <div className="flex flex-wrap items-center gap-2">
               {filterChips.map(({ key, label, icon: Icon }) => {
                 const active = filterType === key;
@@ -264,57 +280,69 @@ export default function AssetLayout() {
                     key={key}
                     type="button"
                     onClick={() => setFilterType(key)}
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors ${
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-all duration-200 ${
                       active
-                        ? 'border-app-accent bg-app-accent-muted text-app-accent-hover'
-                        : 'border-app-border text-app-muted hover:border-app-border-strong hover:bg-app-surface hover:text-app-text'
+                        ? 'border-app-accent/45 bg-app-accent/12 text-app-accent shadow-[0_0_20px_-10px_rgba(147,124,248,0.45)] ring-1 ring-app-accent/20'
+                        : 'border-white/[0.08] bg-white/[0.03] text-app-muted hover:border-white/14 hover:bg-white/[0.06] hover:text-app-text'
                     }`}
                   >
-                    <Icon size={15} />
+                    <Icon size={15} strokeWidth={2} />
                     {label}
                   </button>
                 );
               })}
             </div>
-            <div className="text-[12px] text-app-muted">
+            <div className="text-[12px] font-medium tabular-nums text-app-muted">
               {filteredAssets.length} assets · {storageLabel}
             </div>
           </div>
         </Surface>
 
         {isUploading && (
-          <div className="rounded-app-md border border-app-accent/40 bg-app-accent-muted px-4 py-2 text-[13px] text-app-accent-hover">
+          <div className="rounded-app-xl border border-app-accent/35 bg-app-accent/10 px-4 py-3 text-[13px] text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
             Upload complete. Assets were added to your library.
           </div>
         )}
 
-        <Surface>
+        <Surface
+          variant="glass"
+          padding="lg"
+          className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/30 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/22"
+        >
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent"
+            aria-hidden
+          />
           {allAssets.length === 0 && (
-            <div className="mb-4 rounded-app-md border border-app-border bg-app-bg/40 px-4 py-3 text-[13px] text-app-muted">
-              Drag files here or use <span className="text-app-text">Upload files</span> to add to
-              your library.
+            <div className="mb-5 rounded-app-lg border border-dashed border-white/12 bg-white/[0.02] px-4 py-3 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              Drag files here or use <span className="font-medium text-app-text">Upload files</span>{' '}
+              to add to your library.
             </div>
           )}
 
           {allAssets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Upload size={42} className="text-app-faint" />
-              <p className="mt-5 text-base text-app-text">No assets yet</p>
-              <p className="mt-1 text-[13px] text-app-muted">
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-app-xl border border-app-accent/30 bg-app-accent/10 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <Upload size={36} strokeWidth={1.5} />
+              </div>
+              <p className="mt-6 text-lg font-semibold tracking-tight text-app-text">
+                No assets yet
+              </p>
+              <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-app-muted">
                 Upload your first file to get started.
               </p>
               <Button
                 type="button"
                 variant="primary"
-                className="mt-5"
+                className="mt-6"
                 onClick={handleUploadClick}
-                leftIcon={<Upload size={16} />}
+                leftIcon={<Upload size={16} strokeWidth={2} />}
               >
                 Upload files
               </Button>
             </div>
           ) : filteredAssets.length === 0 ? (
-            <div className="py-16 text-center text-[13px] text-app-muted">
+            <div className="rounded-app-lg border border-dashed border-white/10 bg-white/[0.02] py-16 text-center text-[13px] text-app-muted">
               No assets match your search or filters.
             </div>
           ) : viewMode === 'grid' ? (
@@ -333,7 +361,7 @@ export default function AssetLayout() {
               ))}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {filteredAssets.map((asset) => (
                 <AssetListRow
                   key={asset.id}
@@ -348,23 +376,24 @@ export default function AssetLayout() {
         </Surface>
 
         <div
-          className={`sticky bottom-0 z-20 rounded-app-md border bg-app-bg-subtle px-4 py-3 transition-all ${
+          className={`sticky bottom-0 z-20 mb-2 rounded-app-xl border border-app-accent/45 bg-app-bg/80 px-4 py-3.5 shadow-[0_-12px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 ease-out supports-backdrop-filter:bg-app-bg/65 md:px-5 ${
             selectionCount > 0
               ? 'translate-y-0 opacity-100'
               : 'pointer-events-none translate-y-4 opacity-0'
           }`}
-          style={{ borderColor: 'rgba(124, 111, 247, 0.45)' }}
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[13px] text-app-text">{selectionCount} items selected</span>
-            <div className="flex items-center gap-2">
+            <span className="text-[13px] font-medium tabular-nums text-app-text">
+              {selectionCount} items selected
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="secondary">
                 Download selected
               </Button>
               <button
                 type="button"
                 onClick={() => deleteAssets(selectedIds)}
-                className="h-9 rounded-app-md border border-red-400/40 bg-red-500/10 px-3 text-[13px] text-red-300 transition-colors hover:bg-red-500/20"
+                className="h-9 rounded-app-lg border border-red-400/35 bg-red-500/[0.12] px-3.5 text-[13px] font-medium text-red-200 shadow-[0_0_18px_-10px_rgba(248,113,113,0.35)] transition-colors hover:bg-red-500/20"
               >
                 Delete selected
               </button>
@@ -392,56 +421,68 @@ function AssetCard({
 
   return (
     <div
-      className={`group overflow-hidden rounded-app-xl border bg-app-surface/55 shadow-app-soft transition-all duration-200 ${
+      className={`group relative overflow-hidden rounded-app-xl border shadow-app-lift transition-all duration-200 ease-out motion-reduce:transition-none ${
         selected
-          ? 'border-app-accent/70'
-          : 'border-app-border/90 hover:-translate-y-0.5 hover:border-app-accent/35'
+          ? 'border-app-accent/50 bg-gradient-to-br from-app-accent/[0.12] to-white/[0.04] ring-1 ring-app-accent/25'
+          : 'border-white/[0.08] bg-app-bg/40 backdrop-blur-sm hover:-translate-y-0.5 hover:border-app-accent/30 hover:shadow-[0_20px_50px_-20px_rgba(0,0,0,0.55)] motion-reduce:hover:translate-y-0'
       }`}
     >
-      <div className="relative aspect-4/3 bg-app-bg-subtle">
-        <span className="absolute left-2 top-2 z-10 rounded bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent opacity-80"
+        aria-hidden
+      />
+      <div className="relative aspect-4/3 overflow-hidden bg-gradient-to-br from-white/[0.06] via-app-bg-subtle to-app-bg">
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_100%,rgba(147,124,248,0.12),transparent)] opacity-40"
+          aria-hidden
+        />
+        <span className="absolute left-2.5 top-2.5 z-10 rounded-app-md border border-white/10 bg-app-bg/70 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
           {asset.extLabel}
         </span>
-        <label className="absolute right-2 top-2 z-10 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <label className="absolute right-2.5 top-2.5 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <input
             type="checkbox"
             checked={selected}
             onChange={onToggleSelect}
-            className="size-4 cursor-pointer rounded accent-[#7C6FF7]"
+            className="size-4 cursor-pointer rounded border-white/20 bg-app-bg/80 accent-app-accent shadow-sm"
             onClick={(e) => e.stopPropagation()}
           />
         </label>
-        <div className="flex h-full w-full items-center justify-center">
-          <Icon size={32} className={colorClass} />
+        <div className="relative flex h-full w-full items-center justify-center">
+          <div className="rounded-app-xl border border-white/[0.07] bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <Icon size={34} strokeWidth={1.5} className={colorClass} />
+          </div>
         </div>
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-black/55 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-gradient-to-t from-app-bg via-app-bg/88 to-transparent opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
           <button
             type="button"
-            className="flex size-8 items-center justify-center rounded-full bg-white/15 text-white transition-colors duration-150 hover:bg-white/25"
+            className="pointer-events-auto flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:border-white/25 hover:bg-white/20"
             aria-label="Preview"
           >
-            <Eye size={16} />
+            <Eye size={16} strokeWidth={2} />
           </button>
           <button
             type="button"
-            className="flex size-8 items-center justify-center rounded-full bg-white/15 text-white transition-colors duration-150 hover:bg-white/25"
+            className="pointer-events-auto flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:border-white/25 hover:bg-white/20"
             aria-label="Download"
           >
-            <Download size={16} />
+            <Download size={16} strokeWidth={2} />
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="flex size-8 items-center justify-center rounded-full bg-white/15 text-white transition-colors duration-150 hover:bg-white/25"
+            className="pointer-events-auto flex size-9 items-center justify-center rounded-full border border-red-400/30 bg-red-500/20 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-red-500/35"
             aria-label="Delete"
           >
-            <Trash2 size={16} />
+            <Trash2 size={16} strokeWidth={2} />
           </button>
         </div>
       </div>
-      <div className="border-t border-app-border/70 px-4 py-3">
-        <p className="m-0 truncate text-[13px] text-app-text">{asset.name}</p>
-        <p className="m-0 mt-1 truncate text-[11px] text-app-muted">
+      <div className="border-t border-white/[0.07] bg-white/[0.02] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <p className="m-0 truncate text-[13px] font-medium tracking-tight text-app-text">
+          {asset.name}
+        </p>
+        <p className="m-0 mt-1 truncate text-[11px] tabular-nums text-app-muted">
           {asset.size} · {asset.uploadedAt}
         </p>
       </div>
@@ -464,41 +505,43 @@ function AssetListRow({
   const colorClass = TYPE_COLOR[asset.type];
   return (
     <div
-      className={`flex items-center gap-3 rounded-app-md border px-3 py-2 transition-colors ${
+      className={`group flex items-center gap-3 rounded-app-xl border px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 ${
         selected
-          ? 'border-app-accent bg-app-accent-muted/30'
-          : 'border-app-border bg-app-bg-subtle hover:border-app-border-strong'
+          ? 'border-app-accent/45 bg-app-accent/10 ring-1 ring-app-accent/20'
+          : 'border-white/[0.08] bg-white/[0.03] hover:border-white/14 hover:bg-white/[0.05]'
       }`}
     >
       <input
         type="checkbox"
         checked={selected}
         onChange={onToggleSelect}
-        className="size-4 shrink-0 rounded accent-[#7C6FF7]"
+        className="size-4 shrink-0 rounded border-white/15 bg-app-bg/80 accent-app-accent"
       />
-      <div className="flex size-12 shrink-0 items-center justify-center rounded-app-sm bg-app-bg">
-        <Icon size={28} className={colorClass} />
+      <div className="flex size-12 shrink-0 items-center justify-center rounded-app-lg border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+        <Icon size={26} strokeWidth={1.75} className={colorClass} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="m-0 truncate text-xs text-app-text">{asset.name}</p>
-        <p className="m-0 truncate text-[11px] text-app-muted">
+        <p className="m-0 truncate text-[13px] font-medium tracking-tight text-app-text">
+          {asset.name}
+        </p>
+        <p className="m-0 truncate text-[11px] tabular-nums text-app-muted">
           {asset.size} · {asset.uploadedAt}
         </p>
       </div>
       <button
         type="button"
-        className="shrink-0 p-2 text-app-muted hover:text-app-text"
+        className="shrink-0 rounded-app-md p-2 text-app-muted transition-colors hover:bg-white/[0.06] hover:text-app-accent"
         aria-label="Download"
       >
-        <Download size={16} />
+        <Download size={16} strokeWidth={2} />
       </button>
       <button
         type="button"
-        className="shrink-0 p-2 text-red-400 hover:text-red-300"
+        className="shrink-0 rounded-app-md p-2 text-red-400/90 transition-colors hover:bg-red-500/15 hover:text-red-300"
         aria-label="Delete"
         onClick={onDelete}
       >
-        <Trash2 size={16} />
+        <Trash2 size={16} strokeWidth={2} />
       </button>
     </div>
   );

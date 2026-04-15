@@ -474,27 +474,34 @@ export default function ReadingLayout() {
   const readTimeLabel = useMemo(() => (hasTipTapDoc ? 'Read' : '—'), [hasTipTapDoc]);
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-app-bg">
-      <div className="relative h-[3px] shrink-0 bg-app-elevated">
+    <div className="reading-layout-root relative flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-app-text">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute left-1/2 top-0 h-[38vh] w-[min(100%,680px)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_50%_0%,rgba(147,124,248,0.06),transparent_60%)]" />
+        <div className="absolute bottom-0 right-0 h-56 w-56 rounded-full bg-app-accent-2/8 blur-[88px]" />
+      </div>
+
+      <div className="relative z-20 h-[2px] shrink-0 bg-white/[0.06]">
         <div
-          className="absolute left-0 top-0 h-full bg-gradient-to-r from-app-accent to-app-accent-2 transition-[width] duration-100"
+          className="h-full rounded-full bg-gradient-to-r from-app-accent via-app-accent-hover to-app-accent-2 shadow-[0_0_12px_rgba(147,124,248,0.35)] transition-[width] duration-150 ease-out"
           style={{ width: `${scrollProgress}%` }}
         />
       </div>
 
-      <header className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-app-border/80 bg-app-surface/70 px-4 py-3 backdrop-blur-xl supports-[backdrop-filter]:bg-app-surface/50 sm:px-6">
+      <header className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] bg-app-bg/70 px-4 py-2.5 backdrop-blur-2xl supports-backdrop-filter:bg-app-bg/50 sm:px-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => navigate('/library')}
-            className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-app-elevated hover:text-app-text"
+            className="rounded-app-md p-2 text-app-faint transition-colors hover:bg-white/[0.06] hover:text-app-text"
             aria-label="Back to library"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={20} strokeWidth={2} />
           </button>
-          <span className="text-[13px] text-app-muted">Back to library</span>
+          <span className="text-[12px] font-medium tracking-wide text-app-muted">
+            Back to library
+          </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => {
@@ -516,34 +523,38 @@ export default function ReadingLayout() {
               })();
             }}
             disabled={bookmarkBusy || !contentId}
-            className={`flex items-center gap-1.5 rounded-app-md px-3 py-2 text-xs transition-colors ${
+            className={`flex items-center gap-1.5 rounded-app-md border px-3 py-2 text-[11px] font-semibold transition-colors sm:text-xs ${
               bookmarked
-                ? 'border border-app-accent/35 bg-app-accent-muted text-app-accent'
-                : 'border border-app-border/80 bg-app-bg/40 text-app-muted hover:border-app-accent/20'
+                ? 'border-app-accent/40 bg-app-accent/12 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+                : 'border-white/10 bg-white/[0.04] text-app-muted hover:border-app-accent/25 hover:text-app-text'
             }`}
           >
-            <Bookmark size={16} className={bookmarked ? 'fill-app-accent text-app-accent' : ''} />
+            <Bookmark
+              size={16}
+              strokeWidth={2}
+              className={bookmarked ? 'fill-app-accent text-app-accent' : ''}
+            />
             {bookmarkBusy ? 'Saving…' : bookmarked ? 'Saved' : 'Save'}
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-app-md border border-app-border/80 bg-app-bg/40 px-3 py-2 text-xs text-app-muted hover:border-app-accent/25 hover:text-app-text"
+            className="flex items-center gap-1.5 rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-medium text-app-muted transition-colors hover:border-white/16 hover:text-app-text sm:text-xs"
           >
-            <Share2 size={16} /> Share
+            <Share2 size={16} strokeWidth={2} /> Share
           </button>
-          <div className="flex items-center gap-1 rounded-app-md border border-app-border/60 px-2 py-1">
+          <div className="flex items-center gap-0.5 rounded-app-md border border-white/10 bg-white/[0.03] px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <button
               type="button"
               onClick={() => setFontSize(Math.max(12, fontSize - 2))}
-              className="cursor-pointer border-none bg-transparent p-1 text-xs text-app-faint hover:text-app-text"
+              className="cursor-pointer rounded-app-sm border-none bg-transparent px-2 py-1 text-[11px] font-medium text-app-faint transition-colors hover:bg-white/[0.06] hover:text-app-text"
             >
               A−
             </button>
-            <Type size={16} className="text-app-muted" aria-hidden />
+            <Type size={15} className="text-app-muted opacity-80" aria-hidden strokeWidth={2} />
             <button
               type="button"
               onClick={() => setFontSize(Math.min(24, fontSize + 2))}
-              className="cursor-pointer border-none bg-transparent p-1 text-sm text-app-faint hover:text-app-text"
+              className="cursor-pointer rounded-app-sm border-none bg-transparent px-2 py-1 text-[12px] font-medium text-app-faint transition-colors hover:bg-white/[0.06] hover:text-app-text"
             >
               A+
             </button>
@@ -551,81 +562,97 @@ export default function ReadingLayout() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <main
-          className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10"
+          className="reading-main-scroll min-h-0 flex-1 scroll-smooth overflow-y-auto px-4 py-8 sm:px-8 sm:py-10 md:px-12 md:py-12"
           onScroll={handleScroll}
         >
-          <Surface variant="default" padding="lg" className="mx-auto max-w-3xl">
-            <header className="mb-8">
-              <h1 className="mb-4 text-[28px] font-extrabold leading-tight tracking-tight text-app-text sm:text-[32px]">
-                {title}
-              </h1>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-app-accent to-app-accent-deep text-sm font-bold text-white">
-                    {(authorName || title || 'U')
-                      .split(' ')
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((n) => n[0])
-                      .join('')
-                      .toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-medium text-app-text">{authorName}</div>
-                    <div className="text-[11px] text-app-faint">
-                      {loading ? 'Loading…' : loadError ? 'Error' : 'Loaded'} · {readTimeLabel}
+          <Surface
+            variant="glass"
+            padding="none"
+            className="mx-auto max-w-[min(100%,42rem)] overflow-hidden border border-white/[0.09] shadow-app-lift"
+          >
+            <div className="border-b border-white/[0.06] px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-12">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-faint">
+                {contentTypeLabel(currentType)}
+              </p>
+              <header className="mb-0">
+                <h1 className="mb-6 font-serif text-[clamp(1.65rem,4vw,2.25rem)] font-semibold leading-[1.15] tracking-[-0.03em] text-app-text">
+                  {title}
+                </h1>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-app-accent/90 to-app-accent-deep text-sm font-bold text-white shadow-[0_0_20px_-6px_rgba(147,124,248,0.5)]">
+                      {(authorName || title || 'U')
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-medium tracking-tight text-app-text">
+                        {authorName}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-app-muted">
+                        {loading ? 'Loading…' : loadError ? 'Error' : 'Loaded'} · {readTimeLabel}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </header>
-
-            <div className="leading-relaxed text-app-muted" style={{ fontSize }}>
-              {loadError ? (
-                <p className="m-0 text-sm text-red-300">{loadError}</p>
-              ) : hasTipTapDoc ? (
-                <div className="tiptap-content" style={{ fontSize }}>
-                  <TipTapReadonly
-                    doc={bodyDoc as any}
-                    className="ProseMirror text-app-muted leading-relaxed outline-none"
-                    onSelectionChange={setSelection}
-                  />
-                </div>
-              ) : (
-                <p className="m-0 text-sm text-app-faint">
-                  {loading ? 'Loading content…' : 'No published body found for this item.'}
-                </p>
-              )}
+              </header>
             </div>
 
-            <div className="mt-8 border-t border-app-border/80 pt-6">
+            <div className="border-b border-white/[0.06] px-6 py-10 sm:px-10 sm:py-12">
+              <div className="leading-[1.75] text-app-muted/95" style={{ fontSize }}>
+                {loadError ? (
+                  <p className="m-0 text-sm leading-relaxed text-red-400">{loadError}</p>
+                ) : hasTipTapDoc ? (
+                  <div className="tiptap-content" style={{ fontSize }}>
+                    <TipTapReadonly
+                      doc={bodyDoc as any}
+                      className="ProseMirror reading-body-prose leading-[1.75] outline-none antialiased"
+                      onSelectionChange={setSelection}
+                    />
+                  </div>
+                ) : (
+                  <p className="m-0 text-[15px] leading-relaxed text-app-faint">
+                    {loading ? 'Loading content…' : 'No published body found for this item.'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="border-b border-white/[0.06] px-6 py-5 sm:px-10">
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-app-accent-muted px-3 py-1 text-xs text-app-accent">
+                <span className="rounded-full border border-app-accent/25 bg-app-accent/10 px-3 py-1 text-[11px] font-medium text-app-accent">
                   {contentId ? `ID ${contentId.slice(0, 8)}…` : '—'}
                 </span>
               </div>
             </div>
 
-            <div className="mt-8 flex justify-between rounded-app-xl border border-app-border/70 bg-app-bg/40 px-5 py-5">
-              <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col justify-between gap-4 px-6 py-6 sm:flex-row sm:items-center sm:px-10">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 rounded-full border-none bg-app-accent-muted px-4 py-2 text-[13px] text-app-accent"
+                  className="flex items-center gap-2 rounded-app-md border border-app-accent/35 bg-app-accent/10 px-4 py-2.5 text-[13px] font-semibold text-app-accent transition-colors hover:bg-app-accent/16"
                   onClick={() => void toggleLike()}
                   title={engagementLoading ? 'Loading…' : likedByMe ? 'Unlike' : 'Like'}
                 >
                   <ThumbsUp
                     size={16}
+                    strokeWidth={2}
                     className={likedByMe ? 'fill-app-accent text-app-accent' : ''}
-                  />{' '}
+                  />
                   Helpful
-                  <span className="ml-1 text-[11px] text-app-faint">({likesCount})</span>
+                  <span className="ml-0.5 text-[11px] font-normal tabular-nums text-app-faint">
+                    ({likesCount})
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 rounded-full border border-app-border/80 bg-app-bg/50 px-4 py-2 text-[13px] text-app-muted"
+                  className="flex items-center gap-2 rounded-app-md border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-app-muted transition-colors hover:border-white/16 hover:bg-white/[0.06] hover:text-app-text"
                   onClick={() => {
                     const next = !commentsOpen;
                     setCommentsOpen(next);
@@ -633,23 +660,29 @@ export default function ReadingLayout() {
                   }}
                   title={commentsOpen ? 'Hide comments' : 'Show comments'}
                 >
-                  <MessageSquare size={16} /> Comments
-                  <span className="ml-1 text-[11px] text-app-faint">({commentsCount})</span>
+                  <MessageSquare size={16} strokeWidth={2} /> Comments
+                  <span className="ml-0.5 text-[11px] font-normal tabular-nums text-app-faint">
+                    ({commentsCount})
+                  </span>
                 </button>
               </div>
-              <div className="flex items-center gap-2 text-xs text-app-faint">
-                <span className="rounded-full bg-app-bg/40 px-3 py-1">Views: {viewsCount}</span>
+              <div className="flex items-center text-[11px] font-medium tabular-nums text-app-faint">
+                <span className="rounded-app-md border border-white/8 bg-white/[0.03] px-3 py-1.5">
+                  Views: {viewsCount}
+                </span>
               </div>
             </div>
 
             {commentsOpen ? (
-              <div className="mt-5 rounded-app-xl border border-app-border/70 bg-app-bg/30 p-5">
-                <h3 className="mb-3 text-sm font-semibold text-app-text">Comments</h3>
+              <div className="border-t border-white/[0.06] bg-white/[0.02] px-6 py-8 sm:px-10">
+                <h3 className="mb-4 font-serif text-lg font-semibold tracking-tight text-app-text">
+                  Comments
+                </h3>
 
-                <div className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3">
+                <div className="rounded-app-xl border border-white/10 bg-app-bg/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <label
                     htmlFor="reading-new-comment"
-                    className="block text-[10px] font-semibold uppercase tracking-wide text-app-faint"
+                    className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint"
                   >
                     Add a comment
                   </label>
@@ -658,41 +691,43 @@ export default function ReadingLayout() {
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Write your comment…"
-                    className="mt-2 w-full rounded-app-md border border-app-border bg-app-bg/40 px-3 py-2 text-xs text-app-text outline-none"
+                    className="mt-2 w-full rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[13px] leading-relaxed text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
                     rows={3}
                   />
                   {commentError ? (
-                    <p className="mt-2 mb-0 text-[11px] text-red-300">{commentError}</p>
+                    <p className="mt-2 mb-0 text-[11px] text-red-400">{commentError}</p>
                   ) : null}
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
                       onClick={() => void submitComment()}
                       disabled={commentSaving}
-                      className="rounded-app-md border border-app-accent/35 bg-app-accent-muted px-4 py-2 text-xs font-medium text-app-accent transition-colors hover:bg-app-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-app-md border border-white/12 bg-gradient-to-r from-app-accent to-app-accent-2 px-4 py-2 text-xs font-semibold text-app-bg shadow-[0_0_18px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {commentSaving ? 'Posting…' : 'Post comment'}
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3">
+                <div className="mt-5 flex flex-col gap-2.5">
                   {commentsLoading ? (
-                    <div className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3 text-xs text-app-faint">
+                    <div className="rounded-app-lg border border-white/10 bg-white/[0.03] p-4 text-[13px] text-app-faint">
                       Loading comments…
                     </div>
                   ) : comments.length === 0 ? (
-                    <div className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3 text-xs text-app-faint">
+                    <div className="rounded-app-lg border border-white/10 bg-white/[0.03] p-4 text-[13px] text-app-muted">
                       No comments yet.
                     </div>
                   ) : (
                     comments.map((c) => (
                       <div
                         key={c.id}
-                        className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3"
+                        className="rounded-app-lg border border-white/[0.08] bg-white/[0.03] p-4 transition-colors hover:border-white/12"
                       >
-                        <p className="mb-2 text-xs text-app-muted">{c.body}</p>
-                        <div className="text-[10px] text-app-faint">
+                        <p className="mb-2 text-[13px] leading-relaxed text-app-text/90">
+                          {c.body}
+                        </p>
+                        <div className="text-[11px] text-app-faint">
                           {(c.author?.displayName || c.author?.email || '—') as string} ·{' '}
                           {new Date(c.createdAt).toLocaleString()}
                         </div>
@@ -703,15 +738,17 @@ export default function ReadingLayout() {
               </div>
             ) : null}
 
-            <div className="mt-12">
-              <h2 className="mb-5 text-lg font-bold text-app-text">Related content</h2>
-              <div className="flex flex-col gap-3">
+            <div className="border-t border-white/[0.06] px-6 pb-10 pt-10 sm:px-10 sm:pb-12">
+              <h2 className="mb-6 font-serif text-xl font-semibold tracking-tight text-app-text">
+                Related content
+              </h2>
+              <div className="flex flex-col gap-2.5">
                 {relatedLoading ? (
-                  <div className="rounded-app-lg border border-app-border/80 bg-app-bg/30 p-4 text-sm text-app-faint">
+                  <div className="rounded-app-xl border border-white/10 bg-white/[0.03] p-5 text-[13px] text-app-faint">
                     Loading related content…
                   </div>
                 ) : related.length === 0 ? (
-                  <div className="rounded-app-lg border border-app-border/80 bg-app-bg/30 p-4 text-sm text-app-faint">
+                  <div className="rounded-app-xl border border-white/10 bg-white/[0.03] p-5 text-[13px] text-app-muted">
                     No related content found.
                   </div>
                 ) : (
@@ -720,18 +757,22 @@ export default function ReadingLayout() {
                       key={item.id}
                       type="button"
                       onClick={() => navigate(`/library/${item.id}`)}
-                      className="cursor-pointer rounded-app-lg border border-app-border/80 bg-app-bg/30 p-4 text-left transition-all duration-200 hover:border-app-accent/30 hover:bg-app-accent-muted/50"
+                      className="group cursor-pointer rounded-app-xl border border-white/[0.08] bg-white/[0.03] p-5 text-left transition-[border-color,background-color,transform] duration-200 ease-out hover:border-app-accent/30 hover:bg-app-accent/8 active:scale-[0.99]"
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <h3 className="mb-1 truncate text-sm font-semibold text-app-text">
+                          <h3 className="mb-1.5 truncate font-medium leading-snug tracking-tight text-app-text group-hover:text-app-accent">
                             {item.title}
                           </h3>
-                          <span className="text-xs text-app-faint">
+                          <span className="text-[12px] text-app-muted">
                             {item.type} · {item.readTime} · {item.authorName}
                           </span>
                         </div>
-                        <ChevronRight size={20} className="shrink-0 text-app-faint" />
+                        <ChevronRight
+                          size={20}
+                          strokeWidth={2}
+                          className="shrink-0 text-app-faint transition-transform group-hover:translate-x-0.5 group-hover:text-app-accent"
+                        />
                       </div>
                     </button>
                   ))
@@ -744,15 +785,15 @@ export default function ReadingLayout() {
         <Surface
           variant="glass"
           padding="md"
-          className="max-h-[42vh] w-full shrink-0 overflow-y-auto border-t border-app-border/80 lg:max-h-none lg:w-[280px] lg:border-l lg:border-t-0"
+          className="max-h-[40vh] w-full shrink-0 overflow-y-auto scroll-smooth border-t border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:max-h-none lg:w-[272px] lg:border-l lg:border-t-0"
         >
-          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-app-faint">
+          <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-app-faint">
             Annotations
           </h3>
-          <div className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3">
+          <div className="rounded-app-xl border border-white/10 bg-white/[0.03] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <label
               htmlFor="reading-new-annotation"
-              className="block text-[10px] font-semibold uppercase tracking-wide text-app-faint"
+              className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint"
             >
               New annotation
             </label>
@@ -763,18 +804,18 @@ export default function ReadingLayout() {
               placeholder={
                 canAttachSelection ? 'Add a note for the selected text…' : 'Add a general note…'
               }
-              className="mt-2 w-full rounded-app-md border border-app-border bg-app-bg/40 px-3 py-2 text-xs text-app-text outline-none"
+              className="mt-2 w-full rounded-app-md border border-white/10 bg-app-bg/50 px-3 py-2.5 text-[12px] leading-relaxed text-app-text outline-none focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
               rows={3}
             />
             {annotationError ? (
-              <p className="mt-2 mb-0 text-[11px] text-red-300">{annotationError}</p>
+              <p className="mt-2 mb-0 text-[11px] text-red-400">{annotationError}</p>
             ) : null}
             <div className="mt-3 flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => void submitAnnotation({ attachToSelection: true })}
                 disabled={annotationSaving || !canAttachSelection}
-                className="w-full rounded-app-md border border-app-accent/35 bg-app-accent-muted px-4 py-2 text-xs font-medium text-app-accent transition-colors hover:bg-app-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-app-md border border-app-accent/40 bg-app-accent/12 px-4 py-2.5 text-[12px] font-semibold text-app-accent transition-colors hover:bg-app-accent/18 disabled:cursor-not-allowed disabled:opacity-50"
                 title={
                   canAttachSelection
                     ? 'Attach to selected text'
@@ -787,38 +828,38 @@ export default function ReadingLayout() {
                 type="button"
                 onClick={() => void submitAnnotation({ attachToSelection: false })}
                 disabled={annotationSaving}
-                className="w-full rounded-app-md border border-app-border/70 bg-app-bg/40 px-4 py-2 text-xs font-medium text-app-muted transition-colors hover:border-app-accent/25 hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-app-md border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[12px] font-medium text-app-muted transition-colors hover:border-white/16 hover:bg-white/[0.06] hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Add general annotation
               </button>
             </div>
           </div>
 
-          <h4 className="mt-5 mb-2 text-[10px] font-semibold uppercase tracking-wide text-app-faint">
+          <h4 className="mb-2 mt-6 text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">
             Recent
           </h4>
           {annotationsLoading ? (
-            <div className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3 text-xs text-app-faint">
+            <div className="rounded-app-lg border border-white/10 bg-white/[0.03] p-3 text-[12px] text-app-faint">
               Loading annotations…
             </div>
           ) : annotations.length === 0 ? (
-            <div className="rounded-app-lg border border-app-border/60 bg-app-bg/35 p-3 text-xs text-app-faint">
+            <div className="rounded-app-lg border border-white/10 bg-white/[0.03] p-3 text-[12px] text-app-muted">
               No annotations yet.
             </div>
           ) : (
-            <div className="mt-2 flex flex-col gap-3">
+            <div className="mt-2 flex flex-col gap-2.5">
               {annotations.map((note) => (
                 <div
                   key={note.id}
-                  className="rounded-app-lg border border-app-border/60 border-l-[3px] border-l-app-accent bg-app-bg/35 p-3"
+                  className="rounded-app-lg border border-white/[0.08] border-l-[3px] border-l-app-accent bg-white/[0.03] p-3.5"
                 >
                   {note.selectionText ? (
-                    <p className="mb-2 text-[11px] text-app-faint">
+                    <p className="mb-2 text-[11px] leading-relaxed text-app-muted">
                       “{note.selectionText.slice(0, 140)}
                       {note.selectionText.length > 140 ? '…' : ''}”
                     </p>
                   ) : null}
-                  <p className="mb-2 text-xs text-app-muted">{note.body}</p>
+                  <p className="mb-2 text-[12px] leading-relaxed text-app-text/90">{note.body}</p>
                   <div className="text-[10px] text-app-faint">
                     {note.authorName} · {new Date(note.createdAt).toLocaleString()}
                   </div>
