@@ -382,6 +382,7 @@ async function seedChannels() {
           "ordered_list",
           "link",
           "citation",
+          "image",
           "richText",
           "media",
           "field",

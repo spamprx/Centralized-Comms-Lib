@@ -865,6 +865,7 @@ export default function TemplatesPage() {
         channelName: ch?.name ?? 'Channel',
         channelKey: ch?.key ?? 'channel',
         layoutConfig: parsed,
+        compatibility: ch?.compatibility,
       };
     });
   }, [channels, detail?.bindings]);

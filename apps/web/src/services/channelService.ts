@@ -1,6 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_URL;
 import { getAuthToken } from './tokenStore';
 
+export type ChannelCompatibility = {
+  fieldTypes?: string[];
+  restrictions?: Record<string, unknown>;
+};
+
 export interface Channel {
   id: string;
   name: string;
@@ -8,6 +13,8 @@ export interface Channel {
   description: string;
   createdAt: string;
   updatedAt: string;
+  /** Present when channels are loaded from the API (drives layout editor toolbar). */
+  compatibility?: ChannelCompatibility;
 }
 
 export interface Binding {

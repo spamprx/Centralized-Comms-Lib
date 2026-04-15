@@ -1335,6 +1335,14 @@ type TemplateLayoutEditorProps = {
     channelName: string;
     channelKey: string;
     layoutConfig?: Record<string, unknown> | null;
+    /** When set (e.g. from API channel record), toolbar matches this binding in preview. */
+    compatibility?: {
+      fieldTypes?: string[];
+      restrictions?: {
+        maxCharacters?: number;
+        [key: string]: unknown;
+      };
+    } | null;
   }>;
   channelCompatibility?: {
     fieldTypes?: string[];
@@ -1392,9 +1400,19 @@ export default function TemplateLayoutEditor({
   const [previewFieldJson, setPreviewFieldJson] = useState<string>('{}');
   /** Full-width editor vs full-width preview — avoids splitting horizontal space */
   const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'preview'>('editor');
+  const selectedPreviewChannel = useMemo(
+    () =>
+      previewChannels.find((c) => c.bindingId === previewBindingId) ?? previewChannels[0] ?? null,
+    [previewChannels, previewBindingId],
+  );
+  const effectiveChannelCompatibility = useMemo(
+    () => selectedPreviewChannel?.compatibility ?? channelCompatibility ?? null,
+    [selectedPreviewChannel, channelCompatibility],
+  );
   const supportedFieldTypes = useMemo(
-    () => new Set((channelCompatibility?.fieldTypes ?? []).map((v) => String(v).toLowerCase())),
-    [channelCompatibility?.fieldTypes],
+    () =>
+      new Set((effectiveChannelCompatibility?.fieldTypes ?? []).map((v) => String(v).toLowerCase())),
+    [effectiveChannelCompatibility?.fieldTypes],
   );
   const hasFieldTypeRestrictions = supportedFieldTypes.size > 0;
   const allows = useCallback(
@@ -1402,7 +1420,8 @@ export default function TemplateLayoutEditor({
     [hasFieldTypeRestrictions, supportedFieldTypes],
   );
   /** Legacy `restrictions.supportsUnderline`; matrix `underline` in fieldTypes is the source of truth when saving. */
-  const underlineRestrictionOk = channelCompatibility?.restrictions?.supportsUnderline !== false;
+  const underlineRestrictionOk =
+    effectiveChannelCompatibility?.restrictions?.supportsUnderline !== false;
   const allowRichText = allows('richText') || allows('paragraph');
   const allowMedia = allows('media') || allows('image');
   const allowField = allows('field');
@@ -1458,6 +1477,12 @@ export default function TemplateLayoutEditor({
     return richTextEditorsRef.current.get(focusedRichRegionId) ?? null;
   }, [focusedRichRegionId, editorRegistryEpoch]);
 
+  const whatsAppBindingToolkit = useMemo(() => {
+    const key = selectedPreviewChannel?.channelKey?.toLowerCase() ?? '';
+    const model = effectiveChannelCompatibility?.restrictions?.contentModel;
+    return key === 'whatsapp' || model === 'whatsapp';
+  }, [selectedPreviewChannel?.channelKey, effectiveChannelCompatibility?.restrictions?.contentModel]);
+
   const richTextToolkit = useMemo<RichTextToolkitFlags>(
     () => ({
       heading1: allows('heading1'),
@@ -1468,11 +1493,12 @@ export default function TemplateLayoutEditor({
       bulletList: allows('bullet_list'),
       orderedList: allows('ordered_list'),
       link: allows('link'),
-      insertImage: allows('image'),
+      /** WhatsApp supports images in-channel; allow toolbar when `image` or legacy `media`-only matrix. */
+      insertImage: allows('image') || (whatsAppBindingToolkit && allows('media')),
       fieldToken: allows('field'),
       mediaToken: allows('media'),
     }),
-    [allows, underlineRestrictionOk],
+    [allows, underlineRestrictionOk, whatsAppBindingToolkit],
   );
 
   /** JSON snapshot last synced with the server (load or successful save). */
@@ -1605,12 +1631,12 @@ export default function TemplateLayoutEditor({
     });
     return total;
   }, [rows]);
-  const maxCharacters = Number(channelCompatibility?.restrictions?.maxCharacters);
+  const maxCharacters = Number(effectiveChannelCompatibility?.restrictions?.maxCharacters);
   const hasMaxCharacters = Number.isFinite(maxCharacters) && maxCharacters > 0;
   const exceedsCharacterLimit = hasMaxCharacters ? richTextCharCount > maxCharacters : false;
 
   // --- Structural restrictions ---
-  const restrictions = channelCompatibility?.restrictions;
+  const restrictions = effectiveChannelCompatibility?.restrictions;
   const structMaxRows = restrictions?.maxRows;
   const structMaxColsPerRow = restrictions?.maxColumnsPerRow;
   const structMaxRichText = restrictions?.maxRichTextRegions;
@@ -1788,12 +1814,6 @@ export default function TemplateLayoutEditor({
   useEffect(() => {
     onToolbarState?.({ dirty, canActivate, canSaveDraft, exceedsCharacterLimit });
   }, [dirty, canActivate, canSaveDraft, exceedsCharacterLimit, onToolbarState]);
-
-  const selectedPreviewChannel = useMemo(
-    () =>
-      previewChannels.find((c) => c.bindingId === previewBindingId) ?? previewChannels[0] ?? null,
-    [previewChannels, previewBindingId],
-  );
 
   const resolvedPreviewRows = useMemo((): LayoutRow[] => {
     const applyTokens = (node: JSONContent): JSONContent => {
