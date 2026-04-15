@@ -5,6 +5,11 @@ import { aiDraftQuotaGate } from "../../middlewares/aiDraftQuotaGate.middleware"
 import { contentService } from "../../service";
 import { getPrismaClient } from "../../repository";
 import type { AuditContext } from "../../shared/context";
+import {
+  editorPresenceStore,
+  userMayJoinEditorPresence,
+} from "../../realtime/editorPresenceStore";
+import { broadcastToContentRoom } from "../../realtime/wsServer";
 
 const router = Router();
 
@@ -103,6 +108,64 @@ router.post("/:id/co-authors", async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: message });
   }
 });
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/co-authors/by-email:
+ *   post:
+ *     summary: Request a co-author by email
+ *     description: Only the main author. Resolves email to a user and creates a pending co-author request.
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/:id/co-authors/by-email",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { email } = req.body as { email?: string };
+      if (!email || typeof email !== "string") {
+        res.status(400).json({ error: "email is required" });
+        return;
+      }
+
+      const result = await contentService.requestCoAuthorByEmail(
+        auditContext(req),
+        req.params.id,
+        email,
+      );
+
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res
+          .status(403)
+          .json({ error: "Only the main author can add co-authors" });
+        return;
+      }
+      if ("inviteeNotFound" in result && result.inviteeNotFound) {
+        res.status(404).json({ error: "No user found with that email" });
+        return;
+      }
+      if ("alreadyCoAuthor" in result && result.alreadyCoAuthor) {
+        res.status(409).json({ error: "User is already a co-author" });
+        return;
+      }
+      if ("alreadyPending" in result && result.alreadyPending) {
+        res.status(409).json({ error: "A co-author request is already pending" });
+        return;
+      }
+
+      res.status(201).json({ message: "Co-author request created" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -329,6 +392,238 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 });
 
 /**
+ * Pending co-author invitations for the signed-in user (approve via POST …/co-authors/respond).
+ */
+router.get(
+  "/co-author-invitations/pending",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const items = await contentService.listPendingCoAuthorInvitations(
+        req.user!.id,
+      );
+      res.status(200).json(items);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+/**
+ * Primary-author and accepted co-author items for the current user (My Content workspace).
+ */
+router.get("/workspace", async (req: AuthRequest, res: Response) => {
+  try {
+    const items = await contentService.listWorkspace({
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    res.status(200).json(items);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Presence is now handled via WebSockets (Phase 1: in-memory TTL sessions).
+// Keep these endpoints for backwards compatibility, but indicate the new mechanism.
+router.post("/:id/presence/heartbeat", async (_req: AuthRequest, res: Response) => {
+  res.status(410).json({ error: "Presence heartbeat moved to WebSockets (/ws)" });
+});
+router.get("/:id/presence", async (_req: AuthRequest, res: Response) => {
+  res.status(410).json({ error: "Presence listing moved to WebSockets (/ws)" });
+});
+
+/** True when another user has the editor open (recent heartbeat). Used for version-restore gating. */
+router.get(
+  "/:id/collaboration/active",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const contentId = req.params.id;
+      const exists = await getPrismaClient().content.findUnique({
+        where: { id: contentId },
+        select: { id: true },
+      });
+      if (!exists) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      const isAdmin = req.user!.role === "ADMIN";
+      const allowed = await userMayJoinEditorPresence(
+        contentId,
+        req.user!.id,
+        isAdmin,
+      );
+      if (!allowed) {
+        res.status(403).json({
+          error:
+            "Only the primary author, an accepted co-author, or an admin can view collaboration status",
+        });
+        return;
+      }
+      res
+        .status(200)
+        .json({ active: editorPresenceStore.isCollaborationActive(contentId, req.user!.id) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+/**
+ * Ask active editors to leave so the author can restore.
+ * Best-effort: broadcasts a websocket notice to the content room.
+ */
+router.post("/:id/restore-request", async (req: AuthRequest, res: Response) => {
+  try {
+    const contentId = req.params.id;
+    const prisma = getPrismaClient();
+    const content = await prisma.content.findUnique({
+      where: { id: contentId },
+      select: { id: true, authorId: true },
+    });
+    if (!content) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const isAdmin = req.user!.role === "ADMIN";
+    if (!isAdmin && content.authorId !== req.user!.id) {
+      res.status(403).json({
+        error: "Only the primary author or an admin can request a restore",
+      });
+      return;
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, email: true, displayName: true },
+    });
+    if (!user) {
+      res.status(401).json({ error: "User not found for token" });
+      return;
+    }
+    broadcastToContentRoom(contentId, {
+      type: "presence:restore_requested",
+      contentId,
+      requestedBy: {
+        userId: user.id,
+        email: user.email,
+        displayName: user.displayName,
+      },
+    });
+    res.status(202).json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * Restore a previous version as the new head revision.
+ * Blocked (409) while another editor is active in the presence session.
+ */
+router.post("/:id/versions/:versionId/restore", async (req: AuthRequest, res: Response) => {
+  try {
+    const prisma = getPrismaClient();
+    const contentId = req.params.id;
+    const versionId = req.params.versionId;
+    const baseNRaw = (req.body as { baseVersionNumber?: unknown } | undefined)?.baseVersionNumber;
+    const baseN =
+      baseNRaw === undefined || baseNRaw === null ? undefined : Number(baseNRaw);
+    if (
+      baseN !== undefined &&
+      (typeof baseN !== "number" || !Number.isInteger(baseN) || baseN < 0)
+    ) {
+      res.status(400).json({ error: "baseVersionNumber must be a non-negative integer" });
+      return;
+    }
+
+    const content = await prisma.content.findUnique({
+      where: { id: contentId },
+      select: { id: true, authorId: true, title: true, lifecycleState: true },
+    });
+    if (!content) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const isAdmin = req.user!.role === "ADMIN";
+    const isAuthor = content.authorId === req.user!.id;
+    if (!isAdmin && !isAuthor) {
+      res.status(403).json({ error: "Only the primary author or an admin can restore versions" });
+      return;
+    }
+
+    // Presence guard: block if any *other* user is in the editor session.
+    if (editorPresenceStore.isCollaborationActive(contentId, req.user!.id)) {
+      res.status(409).json({
+        error:
+          "Cannot restore while other co-authors are in the editor session. Ask them to leave, then retry.",
+      });
+      return;
+    }
+
+    if (baseN !== undefined) {
+      const latest = await prisma.contentVersion.findFirst({
+        where: { contentId },
+        orderBy: { versionNumber: "desc" },
+        select: { versionNumber: true },
+      });
+      const headNum = latest?.versionNumber ?? 0;
+      if (headNum !== baseN) {
+        res.status(409).json({
+          error:
+            "Head revision changed. Refresh history, then retry restore from the latest version.",
+          currentVersionNumber: headNum,
+        });
+        return;
+      }
+    }
+
+    const source = await prisma.contentVersion.findUnique({
+      where: { id: versionId },
+      select: { id: true, contentId: true, title: true, body: true },
+    });
+    if (!source || source.contentId !== contentId) {
+      res.status(404).json({ error: "Version not found for this content" });
+      return;
+    }
+
+    // Restore by creating a new MANUAL_SAVE version with the old body.
+    const latest = await prisma.contentVersion.findFirst({
+      where: { contentId },
+      orderBy: { versionNumber: "desc" },
+      select: { versionNumber: true },
+    });
+    const nextVersionNumber = (latest?.versionNumber ?? 0) + 1;
+    const created = await prisma.contentVersion.create({
+      data: {
+        contentId,
+        authorId: req.user!.id,
+        changeType: "MANUAL_SAVE",
+        title: String(source.title ?? content.title ?? "Untitled"),
+        body: source.body as any,
+        metadataSnapshot: { restoredFromVersionId: versionId } as any,
+        versionNumber: nextVersionNumber,
+      },
+    });
+    res.status(200).json({
+      id: created.id,
+      versionNumber: created.versionNumber,
+      title: created.title,
+      changeType: created.changeType,
+      body: created.body,
+      metadataSnapshot: created.metadataSnapshot,
+      createdAt: created.createdAt,
+      contentId: created.contentId,
+      authorId: created.authorId,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
  * @openapi
  * /api/v1/content/{id}:
  *   get:
@@ -442,13 +737,18 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
  *               body:
  *                 description: TipTap JSON document
  *                 type: object
+ *               baseVersionNumber:
+ *                 type: integer
+ *                 description: Expected latest revision number for optimistic concurrency (omit to skip check)
  *     responses:
  *       200:
  *         description: Updated content version
  *       400:
  *         description: Invalid payload
  *       403:
- *         description: Forbidden – user is not the author
+ *         description: Forbidden – not primary author, co-author, or admin
+ *       409:
+ *         description: baseVersionNumber stale — another save created a newer revision
  *       404:
  *         description: Content not found
  *       422:
@@ -458,12 +758,23 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.post("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { body, title, contentType } = req.body;
+    const { body, title, contentType, baseVersionNumber } = req.body;
     if (body !== undefined && body !== null && !isValidTipTapDocument(body)) {
       res.status(400).json({
         error:
           "body must be a valid TipTap document (type: 'doc', content: array)",
       });
+      return;
+    }
+    const baseN =
+      baseVersionNumber === undefined || baseVersionNumber === null
+        ? undefined
+        : Number(baseVersionNumber);
+    if (
+      baseN !== undefined &&
+      (typeof baseN !== "number" || !Number.isInteger(baseN) || baseN < 0)
+    ) {
+      res.status(400).json({ error: "baseVersionNumber must be a non-negative integer" });
       return;
     }
     const result = await contentService.saveBody(
@@ -473,6 +784,7 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
         body: body ?? undefined,
         title,
         contentType: contentType ?? undefined,
+        baseVersionNumber: baseN,
       },
     );
     if ("notFound" in result && result.notFound) {
@@ -480,7 +792,18 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       return;
     }
     if ("forbidden" in result && result.forbidden) {
-      res.status(403).json({ error: "You can only edit your own content" });
+      res.status(403).json({
+        error:
+          "Only the primary author, an accepted co-author, or an admin can edit this content",
+      });
+      return;
+    }
+    if ("conflict" in result && result.conflict) {
+      res.status(409).json({
+        error:
+          "A newer revision exists. Reload the document and re-apply your changes, or save from the latest version.",
+        currentVersionNumber: result.currentVersionNumber,
+      });
       return;
     }
     if ("invalidState" in result && result.invalidState) {

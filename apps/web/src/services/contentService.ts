@@ -396,41 +396,6 @@ export const contentService = {
     return false;
   },
 
-  /** Heartbeat while the editor tab is open. No-op on failure (network). */
-  postEditorPresenceHeartbeat: async (contentId: string): Promise<void> => {
-    const token = getAuthToken();
-    try {
-      const res = await fetch(`${API_BASE}/content/${contentId}/presence/heartbeat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-      });
-      if (!res.ok && res.status !== 204) {
-        await res.json().catch(() => ({}));
-      }
-    } catch {
-      /* ignore */
-    }
-  },
-
-  listEditorPresence: async (contentId: string): Promise<EditorPresenceUser[]> => {
-    const r = await fetchOptionalJson<EditorPresenceUser[]>(`/content/${contentId}/presence`);
-    if (!r.ok) return [];
-    return Array.isArray(r.data) ? r.data : [];
-  },
-
-  /** Like `listEditorPresence`, but returns the HTTP status on failure. */
-  listEditorPresenceStatus: async (
-    contentId: string,
-  ): Promise<{ ok: true; items: EditorPresenceUser[] } | { ok: false; status: number }> => {
-    const r = await fetchOptionalJson<EditorPresenceUser[]>(`/content/${contentId}/presence`);
-    if (!r.ok) return { ok: false, status: r.status };
-    return { ok: true, items: Array.isArray(r.data) ? r.data : [] };
-  },
-
   /**
    * Server-computed word diff between two version snapshots. Returns null when the endpoint is unavailable.
    */

@@ -212,6 +212,17 @@ export class PrismaContentRepository implements ContentRepository {
     return row ? toVersion(row) : null;
   }
 
+  async isAcceptedCoAuthor(
+    contentId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const row = await this.db.contentCoAuthor.findUnique({
+      where: { contentId_userId: { contentId, userId } },
+      select: { status: true },
+    });
+    return row?.status === "ACCEPTED";
+  }
+
   async getVersionWithBodyAtOrBefore(
     contentId: string,
     maxVersionNumber: number,

@@ -206,6 +206,137 @@ export const contentService = {
     }));
   },
 
+  /**
+   * Content the user owns (primary author) plus items where they are an accepted co-author.
+   */
+  async listWorkspace(requester: {
+    id: string;
+    isAdmin?: boolean;
+  }): Promise<
+    Array<
+      Content & {
+        author: { id: string; displayName: string; email: string } | null;
+        viewsCount: number;
+        likesCount: number;
+        workspaceRole: "author" | "co_author";
+        acceptedCoAuthorCount: number;
+      }
+    >
+  > {
+    const prisma = getPrismaClient();
+    type AuthorRow = { id: string; displayName: string; email: string };
+    const uow = new PrismaUnitOfWork(prisma);
+    const repos = uow.repos();
+    const groups = await repos.userRole.listGroupsForUser(requester.id);
+
+    const authored = await repos.content.list({
+      authorId: requester.id,
+      limit: 500,
+      offset: 0,
+    });
+
+    const coLinks = await prisma.contentCoAuthor.findMany({
+      where: { userId: requester.id, status: "ACCEPTED" },
+      select: { contentId: true },
+    });
+    const coOnlyIds = coLinks
+      .map((l) => l.contentId)
+      .filter((id) => !authored.some((c) => c.id === id));
+
+    const coRows =
+      coOnlyIds.length > 0
+        ? await prisma.content.findMany({ where: { id: { in: coOnlyIds } } })
+        : [];
+
+    const coAsContent: Content[] = coRows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      slug: row.slug,
+      lifecycleState: row.lifecycleState as LifecycleState,
+      visibility: row.visibility as Visibility,
+      contentType: row.contentType as Content["contentType"],
+      aiGenerated: row.aiGenerated,
+      authorId: row.authorId,
+      visibilityGroupId: row.visibilityGroupId,
+      templateId: row.templateId ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }));
+
+    type Entry = { content: Content; workspaceRole: "author" | "co_author" };
+    const byId = new Map<string, Entry>();
+    for (const c of authored) {
+      byId.set(c.id, { content: c, workspaceRole: "author" });
+    }
+    for (const c of coAsContent) {
+      if (!byId.has(c.id)) {
+        const visible = canViewContent(c, requester, groups, true);
+        if (visible) {
+          byId.set(c.id, { content: c, workspaceRole: "co_author" });
+        }
+      }
+    }
+
+    const merged = Array.from(byId.values()).filter(({ content: c, workspaceRole }) => {
+      if (workspaceRole === "author") return true;
+      return canViewContent(c, requester, groups, true);
+    });
+
+    const contentIds = merged.map((m) => m.content.id);
+    const authorIds = Array.from(
+      new Set(merged.map((m) => m.content.authorId).filter(Boolean)),
+    );
+    const authors = (await prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true, displayName: true, email: true },
+    })) as AuthorRow[];
+    const authorById = new Map<string, AuthorRow>(
+      authors.map((u) => [u.id, u]),
+    );
+
+    const [viewsRows, likesRows, coCountRows] = await Promise.all([
+      contentIds.length
+        ? prisma.contentView.groupBy({
+            by: ["contentId"],
+            where: { contentId: { in: contentIds } },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+      contentIds.length
+        ? prisma.contentLike.groupBy({
+            by: ["contentId"],
+            where: { contentId: { in: contentIds } },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+      contentIds.length
+        ? prisma.contentCoAuthor.groupBy({
+            by: ["contentId"],
+            where: { contentId: { in: contentIds }, status: "ACCEPTED" },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const viewsById = new Map<string, number>(
+      viewsRows.map((r) => [r.contentId, r._count._all]),
+    );
+    const likesById = new Map<string, number>(
+      likesRows.map((r) => [r.contentId, r._count._all]),
+    );
+    const coCountById = new Map<string, number>(
+      coCountRows.map((r) => [r.contentId, r._count._all]),
+    );
+
+    return merged.map(({ content: c, workspaceRole }) => ({
+      ...c,
+      author: authorById.get(c.authorId) ?? null,
+      viewsCount: viewsById.get(c.id) ?? 0,
+      likesCount: likesById.get(c.id) ?? 0,
+      workspaceRole,
+      acceptedCoAuthorCount: coCountById.get(c.id) ?? 0,
+    }));
+  },
+
   async getById(
     id: string,
     requester: { id: string; isAdmin?: boolean } | null = null,
@@ -349,6 +480,8 @@ export const contentService = {
       body?: TipTapDocument | null;
       title?: string;
       contentType?: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
+      /** When set, save fails if the latest revision number no longer matches (non-live multi-editor safety). */
+      baseVersionNumber?: number;
     },
   ): Promise<
     | { version: ContentVersion }
@@ -356,6 +489,7 @@ export const contentService = {
     | { forbidden: true }
     | { invalidState: true; state: LifecycleState }
     | { invalidFormatting: true; violations: FormattingViolation[] }
+    | { conflict: true; currentVersionNumber: number }
   > {
     const prisma = getPrismaClient();
     const existingForRules = await prisma.content.findUnique({
@@ -399,12 +533,27 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
-      if (content.authorId !== ctx.actorId) return { forbidden: true } as const;
+      const isAuthor = content.authorId === ctx.actorId;
+      const isAdmin = !!ctx.isAdmin;
+      const isCoAuthor =
+        !isAuthor && !isAdmin
+          ? await repos.content.isAcceptedCoAuthor(contentId, ctx.actorId)
+          : false;
+      if (!isAuthor && !isAdmin && !isCoAuthor) {
+        return { forbidden: true } as const;
+      }
       if (
         content.lifecycleState !== "DRAFT" &&
         content.lifecycleState !== "IN_REVIEW"
       ) {
         return { invalidState: true, state: content.lifecycleState } as const;
+      }
+      if (input.baseVersionNumber !== undefined) {
+        const latest = await repos.content.getLatestVersion(contentId);
+        const headNum = latest?.versionNumber ?? 0;
+        if (headNum !== input.baseVersionNumber) {
+          return { conflict: true, currentVersionNumber: headNum } as const;
+        }
       }
       let currentTitle = content.title;
       if (input.title && input.title.trim()) {
@@ -823,6 +972,60 @@ export const contentService = {
 
       return { created: true } as const;
     });
+  },
+
+  /**
+   * Primary author only: invite a co-author by email (resolves to user id server-side).
+   */
+  async requestCoAuthorByEmail(
+    ctx: AuditContext,
+    contentId: string,
+    email: string,
+  ): Promise<
+    | { created: true }
+    | { notFound: true }
+    | { forbidden: true }
+    | { alreadyPending: true }
+    | { alreadyCoAuthor: true }
+    | { inviteeNotFound: true }
+  > {
+    const normalized = email.trim();
+    if (!normalized) return { inviteeNotFound: true } as const;
+
+    const prisma = getPrismaClient();
+    const invitee = await prisma.user.findFirst({
+      where: { email: { equals: normalized, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (!invitee) return { inviteeNotFound: true } as const;
+
+    return contentService.requestCoAuthor(ctx, contentId, invitee.id);
+  },
+
+  async listPendingCoAuthorInvitations(userId: string): Promise<
+    Array<{
+      contentId: string;
+      title: string;
+      requestedBy: { displayName: string; email: string };
+    }>
+  > {
+    const prisma = getPrismaClient();
+    const rows = await prisma.contentCoAuthor.findMany({
+      where: { userId, status: "PENDING" },
+      include: {
+        content: { select: { id: true, title: true } },
+        requestedBy: { select: { displayName: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((r) => ({
+      contentId: r.contentId,
+      title: r.content.title,
+      requestedBy: {
+        displayName: r.requestedBy.displayName,
+        email: r.requestedBy.email,
+      },
+    }));
   },
 
   async respondToCoAuthorRequest(

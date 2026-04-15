@@ -1,9 +1,14 @@
 import "dotenv/config";
 import app from "./app";
+import http from "node:http";
+import { attachWebsocketServer } from "./realtime/wsServer";
 
 const PORT = process.env.PORT || 8000;
 
-const server = app.listen(PORT, () => {
+const server = http.createServer(app);
+attachWebsocketServer(server);
+
+server.listen(PORT, () => {
   console.log(`Server running on http://127.0.0.1:${PORT}`);
 });
 

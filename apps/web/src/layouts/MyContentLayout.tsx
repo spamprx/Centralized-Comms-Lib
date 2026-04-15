@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMyContent } from '../hooks/useMyContent';
 import {
@@ -13,11 +13,15 @@ import {
   MessageCircle,
   History,
   Search,
+  Users,
 } from 'lucide-react';
 import { contentService } from '../services/contentService';
 import ManageReviewersModal from '../components/ManageReviewersModal';
 import ReviewFeedbackModal from '../components/ReviewFeedbackModal';
+import ManageCoAuthorsModal from '../components/content/ManageCoAuthorsModal';
+import CoAuthorInvitationsModal from '../components/content/CoAuthorInvitationsModal';
 import { PageHeader, PageShell, Surface, formInputClass, formSelectClass } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 
 const typeIcons = {
   article: FileText,
@@ -41,6 +45,7 @@ const statusColors = {
 };
 
 export default function MyContentLayout() {
+  const { user } = useAuth();
   const {
     contentItems,
     stats,
@@ -60,7 +65,95 @@ export default function MyContentLayout() {
   const [feedbackModalItem, setFeedbackModalItem] = useState<{ id: string; title: string } | null>(
     null,
   );
+  const [coAuthorsModalItem, setCoAuthorsModalItem] = useState<{
+    id: string;
+    title: string;
+    canInvite: boolean;
+  } | null>(null);
+  const [coAuthorInvitesOpen, setCoAuthorInvitesOpen] = useState(false);
+  const [pendingCoAuthorInvites, setPendingCoAuthorInvites] = useState<
+    Array<{
+      contentId: string;
+      title: string;
+      requestedBy: { displayName: string; email: string };
+    }>
+  >([]);
+  const [pendingCoAuthorLoading, setPendingCoAuthorLoading] = useState(false);
+  const [inviteRespondBusy, setInviteRespondBusy] = useState<string | null>(null);
+  const [inviteToastVisible, setInviteToastVisible] = useState(false);
+  const pendingInviteInitRef = useRef(true);
+  const prevPendingLenRef = useRef(0);
   const navigate = useNavigate();
+
+  const loadPendingCoAuthorInvites = useCallback(async () => {
+    if (!user?.id) {
+      setPendingCoAuthorInvites([]);
+      return [];
+    }
+    setPendingCoAuthorLoading(true);
+    try {
+      const rows = await contentService.listPendingCoAuthorInvitations();
+      setPendingCoAuthorInvites(rows);
+      return rows;
+    } catch {
+      setPendingCoAuthorInvites([]);
+      return [];
+    } finally {
+      setPendingCoAuthorLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void loadPendingCoAuthorInvites();
+  }, [loadPendingCoAuthorInvites]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void loadPendingCoAuthorInvites();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [loadPendingCoAuthorInvites]);
+
+  useEffect(() => {
+    if (pendingCoAuthorLoading) return;
+    if (pendingInviteInitRef.current) {
+      pendingInviteInitRef.current = false;
+      prevPendingLenRef.current = pendingCoAuthorInvites.length;
+      if (pendingCoAuthorInvites.length > 0) {
+        setInviteToastVisible(true);
+        globalThis.setTimeout(() => setInviteToastVisible(false), 6500);
+      }
+      return;
+    }
+    if (pendingCoAuthorInvites.length > prevPendingLenRef.current) {
+      setInviteToastVisible(true);
+      globalThis.setTimeout(() => setInviteToastVisible(false), 6500);
+    }
+    prevPendingLenRef.current = pendingCoAuthorInvites.length;
+  }, [pendingCoAuthorInvites.length, pendingCoAuthorLoading]);
+
+  const syncAfterCoAuthorChange = useCallback(async () => {
+    await refreshContent();
+    await loadPendingCoAuthorInvites();
+  }, [refreshContent, loadPendingCoAuthorInvites]);
+
+  const handleCoAuthorInviteRespond = useCallback(
+    async (contentId: string, decision: 'APPROVE' | 'REJECT') => {
+      setInviteRespondBusy(contentId);
+      try {
+        await contentService.respondToCoAuthorRequest(contentId, decision);
+        await refreshContent();
+        const remaining = await loadPendingCoAuthorInvites();
+        if (remaining.length === 0) setCoAuthorInvitesOpen(false);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setInviteRespondBusy(null);
+      }
+    },
+    [refreshContent, loadPendingCoAuthorInvites],
+  );
 
   const sortedItems = useMemo(() => {
     const items = [...contentItems];
@@ -173,7 +266,7 @@ export default function MyContentLayout() {
       <PageHeader
         title="My content"
         accentWord="content"
-        description="Manage and track everything you own."
+        description="Manage content you own and items where you are a co-author."
         actions={
           <button
             type="button"
@@ -190,6 +283,31 @@ export default function MyContentLayout() {
       />
 
       <div className="animate-fade-in space-y-8">
+        {pendingCoAuthorInvites.length > 0 ? (
+          <Surface
+            variant="muted"
+            padding="md"
+            className="flex flex-col gap-3 border border-amber-400/35 bg-amber-500/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:flex-row sm:items-center sm:justify-between"
+            role="status"
+          >
+            <div className="min-w-0">
+              <p className="m-0 text-[13px] font-semibold text-amber-100">
+                Co-author requests ({pendingCoAuthorInvites.length})
+              </p>
+              <p className="mt-1 text-[12px] text-amber-100/80">
+                Someone invited you to co-author their content. Review and accept from here.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCoAuthorInvitesOpen(true)}
+              className="shrink-0 rounded-app-lg border border-amber-300/40 bg-amber-500/25 px-4 py-2 text-[13px] font-semibold text-amber-50 hover:bg-amber-500/35"
+            >
+              Review invitations
+            </button>
+          </Surface>
+        ) : null}
+
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <Surface
             variant="glass"
@@ -365,8 +483,22 @@ export default function MyContentLayout() {
                             <div className="truncate text-[13px] font-semibold text-app-text">
                               {item.title}
                             </div>
-                            <div className="text-[11px] text-app-muted">
-                              {item.collaborators} collaborators
+                            <div className="text-[11px] leading-snug text-app-muted">
+                              {item.workspaceRole === 'author' ? (
+                                <>
+                                  <span className="font-medium text-app-text/90">You</span> — primary
+                                  author
+                                  {item.collaborators > 0
+                                    ? ` · ${item.collaborators} co-author(s)`
+                                    : ''}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-medium text-app-text/90">You</span> —{' '}
+                                  co-author · Primary:{' '}
+                                  {item.primaryAuthor?.displayName ?? '—'}
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -383,7 +515,7 @@ export default function MyContentLayout() {
                         </span>
                       </td>
                       <td className="p-4">
-                        {item.status === 'in_review' ? (
+                        {item.status === 'in_review' && item.workspaceRole === 'author' ? (
                           <button
                             type="button"
                             onClick={() => setReviewModalItem({ id: item.id, title: item.title })}
@@ -397,6 +529,16 @@ export default function MyContentLayout() {
                           >
                             {item.status.replace('_', ' ')} ▸
                           </button>
+                        ) : item.status === 'in_review' ? (
+                          <span
+                            className="inline-flex rounded-full border border-white/8 px-2.5 py-0.5 text-[11px] font-semibold uppercase ring-1 ring-white/5"
+                            style={{
+                              background: `${statusColors[item.status]}22`,
+                              color: statusColors[item.status],
+                            }}
+                          >
+                            {item.status.replace('_', ' ')}
+                          </span>
                         ) : (
                           <span
                             className="inline-flex rounded-full border border-white/8 px-2.5 py-0.5 text-[11px] font-semibold uppercase ring-1 ring-white/5"
@@ -417,7 +559,7 @@ export default function MyContentLayout() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex flex-wrap justify-end gap-1">
-                          {item.status === 'draft' && (
+                          {item.status === 'draft' && item.workspaceRole === 'author' && (
                             <button
                               type="button"
                               onClick={() => handleSubmitForReview(item.id)}
@@ -433,6 +575,25 @@ export default function MyContentLayout() {
                               {submittingId === item.id ? 'Submitting...' : 'Review'}
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCoAuthorsModalItem({
+                                id: item.id,
+                                title: item.title,
+                                canInvite: item.workspaceRole === 'author',
+                              })
+                            }
+                            className="flex cursor-pointer items-center gap-1 rounded-app-md border border-violet-400/35 bg-violet-500/15 px-2.5 py-1 text-[11px] font-semibold text-violet-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[transform,background-color] duration-(--duration-app) ease-(--ease-app-material) hover:bg-violet-500/22 active:scale-[0.98]"
+                            title={
+                              item.workspaceRole === 'author'
+                                ? 'Manage co-authors'
+                                : 'View authors and co-authors'
+                            }
+                          >
+                            <Users size={12} aria-hidden />
+                            Co-authors
+                          </button>
                           {(item.status === 'in_review' || item.status === 'published') && (
                             <button
                               type="button"
@@ -469,14 +630,16 @@ export default function MyContentLayout() {
                           >
                             <Eye size={14} aria-hidden />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(item.id, item.title)}
-                            className="rounded-app-md border border-transparent p-1.5 text-red-400/90 transition-[color,background-color,border-color,transform] duration-(--duration-app) ease-app-out hover:border-red-400/25 hover:bg-red-500/12 active:scale-95"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} aria-hidden />
-                          </button>
+                          {item.workspaceRole === 'author' ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleDelete(item.id, item.title)}
+                              className="rounded-app-md border border-transparent p-1.5 text-red-400/90 transition-[color,background-color,border-color,transform] duration-(--duration-app) ease-app-out hover:border-red-400/25 hover:bg-red-500/12 active:scale-95"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} aria-hidden />
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -497,7 +660,7 @@ export default function MyContentLayout() {
             contentId={reviewModalItem.id}
             contentTitle={reviewModalItem.title}
             onClose={() => setReviewModalItem(null)}
-            onAssigned={() => refreshContent()}
+            onAssigned={() => void syncAfterCoAuthorChange()}
           />
         )}
 
@@ -508,6 +671,50 @@ export default function MyContentLayout() {
             onClose={() => setFeedbackModalItem(null)}
           />
         )}
+
+        {coAuthorsModalItem && user?.id ? (
+          <ManageCoAuthorsModal
+            contentId={coAuthorsModalItem.id}
+            contentTitle={coAuthorsModalItem.title}
+            currentUserId={user.id}
+            canInvite={coAuthorsModalItem.canInvite}
+            onClose={() => setCoAuthorsModalItem(null)}
+            onUpdated={() => void syncAfterCoAuthorChange()}
+          />
+        ) : null}
+
+        {coAuthorInvitesOpen ? (
+          <CoAuthorInvitationsModal
+            invitations={pendingCoAuthorInvites}
+            loading={pendingCoAuthorLoading}
+            busyContentId={inviteRespondBusy}
+            onClose={() => setCoAuthorInvitesOpen(false)}
+            onRespond={(contentId, decision) => void handleCoAuthorInviteRespond(contentId, decision)}
+          />
+        ) : null}
+
+        {inviteToastVisible && pendingCoAuthorInvites.length > 0 ? (
+          <div
+            className="fixed bottom-6 right-6 z-[8500] max-w-sm rounded-app-lg border border-amber-400/40 bg-app-bg/95 px-4 py-3 shadow-app-lift backdrop-blur-xl"
+            role="alert"
+          >
+            <p className="m-0 text-[13px] font-semibold text-app-text">Co-author invitation</p>
+            <p className="mt-1 text-[12px] text-app-muted">
+              You have {pendingCoAuthorInvites.length} pending request
+              {pendingCoAuthorInvites.length === 1 ? '' : 's'}.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setInviteToastVisible(false);
+                setCoAuthorInvitesOpen(true);
+              }}
+              className="mt-2 text-[12px] font-semibold text-app-accent hover:underline"
+            >
+              Open requests
+            </button>
+          </div>
+        ) : null}
       </div>
     </PageShell>
   );

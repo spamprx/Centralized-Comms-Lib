@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import {
   Save,
   Bold,
@@ -16,14 +16,16 @@ import {
   Puzzle,
   ChevronRight,
   LayoutTemplate,
+  Users,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
-import { contentService } from '../services/contentService';
+import { contentService, ContentSaveConflictError } from '../services/contentService';
 import { componentService } from '../services/componentService';
+import { getAuthToken } from '../services/tokenStore';
 import {
   renderCitationWithFallback,
   toCitationWork,
@@ -60,6 +62,11 @@ type CitationItem = {
   work: CitationWork;
 };
 
+function maxHeadVersion(versions: Array<{ versionNumber: number }> | undefined): number {
+  if (!versions?.length) return 0;
+  return Math.max(...versions.map((v) => v.versionNumber));
+}
+
 function userInitials(email: string, displayName?: string | null): string {
   const s = (displayName?.trim() || email || '?').trim();
   const parts = s.split(/[\s@._-]+/).filter(Boolean);
@@ -72,6 +79,7 @@ function userInitials(email: string, displayName?: string | null): string {
 export default function EditorLayout() {
   const { user } = useAuth();
   const { contentId: routeContentId } = useParams<{ contentId: string }>();
+  const navigate = useNavigate();
   const { draftTitle, setDraftTitle, draftContent, setDraftContent, clearDraft } = useEditorStore();
   const [title, setTitle] = useState(draftTitle);
   const [content, setContent] = useState(draftContent || '<p></p>');
@@ -80,6 +88,8 @@ export default function EditorLayout() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** Server head revision when last save returned 409 (another editor saved first). */
+  const [saveConflictVersion, setSaveConflictVersion] = useState<number | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState<{ title: string; content: string } | null>(
     null,
   );
@@ -107,6 +117,15 @@ export default function EditorLayout() {
     'loading',
   );
   const [wordCount, setWordCount] = useState(0);
+  /** Co-authors with a recent editor heartbeat (excluding the current user). */
+  const [editorPresenceOthers, setEditorPresenceOthers] = useState<
+    Array<{ userId: string; displayName: string; email: string; lastSeenAt: string }>
+  >([]);
+  const [presenceStatus, setPresenceStatus] = useState<
+    { kind: 'ok' } | { kind: 'error'; status: number }
+  >({ kind: 'ok' });
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [showUseTemplateDialog, setShowUseTemplateDialog] = useState(false);
   /** Passed to create draft only for new content (first save) so formatting rules bind to the template. */
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
@@ -117,6 +136,8 @@ export default function EditorLayout() {
     'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'
   >('DRAFT');
   const hydratedIdRef = useRef<string | null>(null);
+  /** Latest `content_versions.versionNumber` for optimistic save concurrency. */
+  const headVersionRef = useRef<number>(0);
 
   const persistedContentId = useMemo(
     () => contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null),
@@ -130,6 +151,104 @@ export default function EditorLayout() {
 
   const similarCheckContentId =
     contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null);
+
+  useEffect(() => {
+    if (!persistedContentId || !user?.id) {
+      setPresenceStatus({ kind: 'ok' });
+      setEditorPresenceOthers([]);
+      return;
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+      setPresenceStatus({ kind: 'error', status: 401 });
+      setEditorPresenceOthers([]);
+      return;
+    }
+
+    let closed = false;
+    let ws: WebSocket | null = null;
+    let pingId: number | null = null;
+
+    const connect = () => {
+      const api = String(import.meta.env.VITE_API_URL ?? '').trim();
+      const u = new URL(api || globalThis.location.origin);
+      u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+      u.pathname = '/ws';
+      u.searchParams.set('token', token);
+
+      ws = new WebSocket(u.toString());
+
+      ws.addEventListener('open', () => {
+        if (closed || !ws) return;
+        setPresenceStatus({ kind: 'ok' });
+        ws.send(JSON.stringify({ type: 'presence:join', contentId: persistedContentId }));
+        pingId = globalThis.setInterval(() => {
+          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          ws.send(JSON.stringify({ type: 'presence:ping', contentId: persistedContentId }));
+        }, 15_000);
+      });
+
+      ws.addEventListener('message', (e) => {
+        if (closed) return;
+        let data: unknown = null;
+        try {
+          data = JSON.parse(String(e.data));
+        } catch {
+          return;
+        }
+        if (!data || typeof data !== 'object') return;
+        const m = data as Record<string, unknown>;
+        if (m.type === 'presence:error') {
+          const status = typeof m.status === 'number' ? m.status : 500;
+          setPresenceStatus({ kind: 'error', status });
+          setEditorPresenceOthers([]);
+          return;
+        }
+        if (m.type === 'presence:update' && m.contentId === persistedContentId) {
+          const users = Array.isArray(m.users) ? (m.users as any[]) : [];
+          const normalized = users
+            .map((p) => ({
+              userId: String(p.userId ?? ''),
+              displayName: String(p.displayName ?? ''),
+              email: String(p.email ?? ''),
+              lastSeenAt: '',
+            }))
+            .filter((p) => p.userId && p.userId !== user.id);
+          setPresenceStatus({ kind: 'ok' });
+          setEditorPresenceOthers(normalized);
+        }
+        if (m.type === 'presence:restore_requested' && m.contentId === persistedContentId) {
+          const by = m.requestedBy && typeof m.requestedBy === 'object' ? (m.requestedBy as any) : null;
+          const name = by && typeof by.displayName === 'string' ? by.displayName : 'The author';
+          setRestoreNotice(`${name} requested a version restore. Please finish up and leave the editor.`);
+          setRestoreModalOpen(true);
+        }
+      });
+
+      ws.addEventListener('close', () => {
+        if (closed) return;
+        setPresenceStatus({ kind: 'error', status: 0 });
+      });
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (pingId) globalThis.clearInterval(pingId);
+      try {
+        ws?.send(JSON.stringify({ type: 'presence:leave', contentId: persistedContentId }));
+      } catch {
+        // ignore
+      }
+      try {
+        ws?.close();
+      } catch {
+        // ignore
+      }
+    };
+  }, [persistedContentId, user?.id]);
 
   useEffect(() => {
     setDraftTitle(title);
@@ -189,6 +308,7 @@ export default function EditorLayout() {
 
     let cancelled = false;
     setSaveError(null);
+    setSaveConflictVersion(null);
     setContentId(id);
 
     void (async () => {
@@ -196,6 +316,7 @@ export default function EditorLayout() {
         const details = await contentService.getById(id);
         if (cancelled) return;
 
+        headVersionRef.current = maxHeadVersion(details.versions);
         const nextTitle = details.content.title || 'Untitled';
         const nextType = details.content.contentType ?? 'ARTICLE';
         const nextLifecycle = details.content.lifecycleState ?? 'DRAFT';
@@ -246,12 +367,14 @@ export default function EditorLayout() {
     if (!id) return;
     setSaving(true);
     setSaveError(null);
+    setSaveConflictVersion(null);
     try {
       const updated = await contentService.transitionState(id, 'DRAFT');
       setLifecycleState(updated.lifecycleState ?? 'DRAFT');
       // Re-hydrate from server so title/body/type stay consistent.
       hydratedIdRef.current = null;
       const details = await contentService.getById(id);
+      headVersionRef.current = maxHeadVersion(details.versions);
       setTitle(details.content.title || 'Untitled');
       setContentType(details.content.contentType ?? 'ARTICLE');
     } catch (err) {
@@ -281,6 +404,7 @@ export default function EditorLayout() {
     }
     setSaving(true);
     setSaveError(null);
+    setSaveConflictVersion(null);
     try {
       const bodyDoc =
         editor?.getJSON() ?? ({ type: 'doc', content: [{ type: 'paragraph' }] } as const);
@@ -292,23 +416,32 @@ export default function EditorLayout() {
         });
         setContentId(result.content.id);
         setPendingTemplateId(null);
+        headVersionRef.current = result.version?.versionNumber ?? 1;
       } else {
-        await contentService.saveDraft(contentId, {
+        const saved = await contentService.saveDraft(contentId, {
           title: title.trim(),
           body: bodyDoc,
           contentType,
+          baseVersionNumber: headVersionRef.current,
         });
+        headVersionRef.current = saved.versionNumber;
       }
       const t = title.trim();
       setSavedSnapshot({ title: t, content: editor?.getHTML() ?? content });
       setLastSaved(new Date());
       clearDraft();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
+      if (err instanceof ContentSaveConflictError) {
+        headVersionRef.current = err.currentVersionNumber;
+        setSaveConflictVersion(err.currentVersionNumber);
+        setSaveError(err.message);
+      } else {
+        setSaveError(err instanceof Error ? err.message : 'Failed to save draft');
+      }
     } finally {
       setSaving(false);
     }
-  }, [title, content, contentId, clearDraft, editor, pendingTemplateId]);
+  }, [title, content, contentId, clearDraft, editor, pendingTemplateId, contentType]);
 
   const applyTemplateRecord = useCallback(
     (record: TemplateRecord) => {
@@ -688,6 +821,25 @@ export default function EditorLayout() {
         </div>
       </header>
 
+      {saveConflictVersion !== null ? (
+        <div
+          className="relative z-20 flex shrink-0 items-center justify-center gap-3 border-b border-amber-500/35 bg-amber-500/10 px-4 py-2 text-[13px] text-amber-100"
+          role="status"
+        >
+          <span>
+            Another collaborator saved first (revision {saveConflictVersion}). Reload to continue
+            from the latest version, or copy your edits elsewhere before reloading.
+          </span>
+          <button
+            type="button"
+            onClick={() => globalThis.location.reload()}
+            className="shrink-0 rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-1.5 font-semibold text-amber-50 hover:bg-amber-500/30"
+          >
+            Reload latest
+          </button>
+        </div>
+      ) : null}
+
       {mainTab === 'edit' && (
         <div className="relative z-10 flex h-9 shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] bg-[var(--editor-topbar-bg)] px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
           <div className="flex min-w-0 flex-wrap items-center gap-0.5">
@@ -781,6 +933,68 @@ export default function EditorLayout() {
       )}
 
       <div className="relative z-10 flex min-h-0 flex-1 gap-0 overflow-hidden">
+        <div className="hidden w-[190px] shrink-0 border-r border-white/[0.08] bg-[var(--editor-panel-bg)] px-3 py-3 shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl lg:block">
+          {persistedContentId && user ? (
+            <div
+              className="sticky top-3 rounded-[10px] border border-white/10 bg-[var(--editor-canvas-bg)]/40 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-muted)]">
+                <Users size={14} className="shrink-0 text-[var(--editor-primary)]" aria-hidden />
+                Activity
+              </div>
+              {presenceStatus.kind === 'error' ? (
+                <p className="mb-0 mt-1.5 text-[11px] leading-snug text-rose-200/90">
+                  Presence unavailable
+                  {presenceStatus.status ? ` (HTTP ${presenceStatus.status})` : ''}. If this keeps happening,
+                  the websocket route may not be deployed or you may not have access.
+                </p>
+              ) : editorPresenceOthers.length === 0 ? (
+                <p className="mb-0 mt-1.5 text-[11px] leading-snug text-[var(--editor-faint)]">
+                  No one else has this editor open.
+                </p>
+              ) : (
+                <ul className="mb-0 mt-2 list-none space-y-1.5 p-0">
+                  {editorPresenceOthers.map((p) => (
+                    <li
+                      key={p.userId}
+                      className="flex min-w-0 items-center gap-2 text-[11px] text-[var(--editor-doc-text)]"
+                    >
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/12 bg-gradient-to-br from-white/[0.12] to-white/[0.02] text-[10px] font-semibold text-app-accent"
+                        title={p.email}
+                      >
+                        {userInitials(p.email, p.displayName)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{p.displayName}</span>
+                      <span className="shrink-0 text-[10px] font-medium text-emerald-400/90">
+                        In editor
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {restoreNotice ? (
+                <div className="mt-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.08] p-2 text-[11px] leading-snug text-amber-50">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 flex-1">{restoreNotice}</span>
+                    <button
+                      type="button"
+                      onClick={() => setRestoreNotice(null)}
+                      className="shrink-0 text-amber-100/80 hover:text-amber-50"
+                      aria-label="Dismiss notice"
+                      title="Dismiss"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
         <div className="editor-canvas-area relative min-w-0 flex-1 overflow-auto bg-[var(--editor-canvas-bg)] px-6 py-6">
           <div
             className="editor-doc-sheet mx-auto max-w-3xl rounded-[var(--editor-radius-card)] border border-[var(--editor-card-edge)] bg-[var(--editor-card-bg)] backdrop-blur-sm"
@@ -997,6 +1211,63 @@ export default function EditorLayout() {
           )}
         </aside>
       </div>
+
+      {restoreModalOpen && restoreNotice ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            aria-hidden
+            onClick={() => setRestoreModalOpen(false)}
+          />
+          <div
+            className="relative w-full max-w-[420px] rounded-[16px] border border-white/12 bg-[var(--editor-panel-bg)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Restore requested"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200/90">
+                  Attention
+                </div>
+                <div className="mt-1 text-[15px] font-semibold text-[var(--editor-doc-text)]">
+                  Version restore requested
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestoreModalOpen(false)}
+                className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[12px] font-semibold text-[var(--editor-muted)] hover:bg-white/[0.08]"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mb-0 mt-2 text-[13px] leading-snug text-[var(--editor-muted)]">
+              {restoreNotice}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRestoreModalOpen(false)}
+                className="rounded-[10px] border border-white/12 bg-white/[0.04] px-3 py-2 text-[13px] font-semibold text-[var(--editor-doc-text)] hover:bg-white/[0.08]"
+              >
+                I’ll leave soon
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRestoreModalOpen(false);
+                  setRestoreNotice(null);
+                  navigate('/my-content');
+                }}
+                className="rounded-[10px] border border-amber-300/30 bg-amber-500/[0.16] px-3 py-2 text-[13px] font-semibold text-amber-50 hover:bg-amber-500/[0.22]"
+              >
+                Leave editor now
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <footer className="relative z-20 flex h-[28px] shrink-0 items-center justify-between gap-3 border-t border-white/[0.08] bg-[var(--editor-status-bg)] px-4 text-[10px] leading-none text-[var(--editor-faint)] backdrop-blur-md">
         <span className="min-w-0 truncate">

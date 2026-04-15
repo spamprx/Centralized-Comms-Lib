@@ -8,7 +8,10 @@ export interface MyContentItem {
   views: number;
   lastModified: string;
   createdAt: string;
+  /** Accepted co-authors only (not counting primary). */
   collaborators: number;
+  workspaceRole: 'author' | 'co_author';
+  primaryAuthor: { id: string; displayName: string; email: string } | null;
 }
 
 export interface ContentStats {
@@ -28,6 +31,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-10',
     createdAt: '2025-02-15',
     collaborators: 3,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '2',
@@ -38,6 +43,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-09',
     createdAt: '2025-03-01',
     collaborators: 2,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '3',
@@ -48,6 +55,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-08',
     createdAt: '2025-02-20',
     collaborators: 1,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '4',
@@ -58,6 +67,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-07',
     createdAt: '2025-03-05',
     collaborators: 0,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '5',
@@ -68,6 +79,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-06',
     createdAt: '2025-02-10',
     collaborators: 4,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '6',
@@ -78,6 +91,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-02-28',
     createdAt: '2025-01-15',
     collaborators: 2,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '7',
@@ -88,6 +103,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-04',
     createdAt: '2025-02-25',
     collaborators: 1,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
   {
     id: '8',
@@ -98,6 +115,8 @@ export const mockMyContent: MyContentItem[] = [
     lastModified: '2025-03-03',
     createdAt: '2025-03-01',
     collaborators: 5,
+    workspaceRole: 'author',
+    primaryAuthor: { id: 'u1', displayName: 'Demo User', email: 'demo@example.com' },
   },
 ];
 

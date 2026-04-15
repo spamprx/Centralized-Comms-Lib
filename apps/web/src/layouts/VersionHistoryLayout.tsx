@@ -14,6 +14,7 @@ import { PageShell } from '../components/ui/PageShell';
 import { Surface } from '../components/ui/Surface';
 import {
   contentService,
+  ContentSaveConflictError,
   normalizeVersionListPayload,
   type ContentVersion,
 } from '../services/contentService';
@@ -369,11 +370,19 @@ export default function VersionHistoryLayout() {
         throw new Error('Selected version has no body to restore.');
       }
 
-      // Restore by rewriting the head body (creates a new MANUAL_SAVE version server-side).
-      await contentService.saveDraft(contentId, { body: doc });
+      // Restore via dedicated endpoint (server blocks if other editors are present).
+      await contentService.restoreVersion(contentId, selected.id, {
+        baseVersionNumber: headVersion.versionNumber,
+      });
       navigate(`/editor/${contentId}`);
     } catch (e) {
-      setRestoreError(e instanceof Error ? e.message : 'Restore failed');
+      if (e instanceof ContentSaveConflictError) {
+        setRestoreError(
+          `Head revision changed (now ${e.currentVersionNumber}). Refresh this page, then try restore again.`,
+        );
+      } else {
+        setRestoreError(e instanceof Error ? e.message : 'Restore failed');
+      }
     } finally {
       setRestoreBusy(false);
     }
@@ -426,13 +435,24 @@ export default function VersionHistoryLayout() {
           className="mb-5 flex items-start gap-3 border border-amber-400/25 bg-amber-500/[0.1] text-sm text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md"
         >
           <Users className="mt-0.5 shrink-0 text-amber-200/90" size={18} strokeWidth={1.75} />
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="m-0 font-semibold tracking-tight">Co-author session active</p>
             <p className="mb-0 mt-1 text-xs text-amber-100/90">
               Restoring a snapshot is disabled until the live collaboration session ends
               (F-AUT-004).
             </p>
           </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!contentId) return;
+              await contentService.requestRestore(contentId);
+            }}
+            className="shrink-0 rounded-lg border border-amber-300/35 bg-amber-500/[0.12] px-3 py-1.5 text-xs font-semibold text-amber-50 hover:bg-amber-500/[0.18]"
+            title="Ask active editors to leave so you can restore"
+          >
+            Notify editors
+          </button>
         </Surface>
       )}
 
@@ -442,7 +462,21 @@ export default function VersionHistoryLayout() {
           padding="md"
           className="mb-5 border border-red-400/25 bg-red-500/[0.08] text-sm text-red-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md"
         >
-          {restoreError}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="min-w-0">{restoreError}</span>
+            {restoreError.toLowerCase().includes('ask them to leave') ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!contentId) return;
+                  await contentService.requestRestore(contentId);
+                }}
+                className="shrink-0 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/[0.1]"
+              >
+                Notify editors
+              </button>
+            ) : null}
+          </div>
         </Surface>
       )}
 

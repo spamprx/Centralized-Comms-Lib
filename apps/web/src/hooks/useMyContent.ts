@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { MyContentItem, ContentStats } from '../data/mockMyContentData';
-import { contentService, type LifecycleState } from '../services/contentService';
+import {
+  contentService,
+  type Content,
+  type LifecycleState,
+} from '../services/contentService';
 import { useAuth } from '../context/AuthContext';
 
 function mapLifecycleToStatus(state: LifecycleState): MyContentItem['status'] {
@@ -13,6 +17,20 @@ function mapLifecycleToStatus(state: LifecycleState): MyContentItem['status'] {
       return 'published';
     case 'ARCHIVED':
       return 'archived';
+  }
+}
+
+function mapContentType(ct: Content['contentType']): MyContentItem['type'] {
+  switch (ct) {
+    case 'ARTICLE':
+      return 'article';
+    case 'VIDEO':
+      return 'video';
+    case 'PODCAST':
+      return 'podcast';
+    case 'DOCUMENT':
+    default:
+      return 'document';
   }
 }
 
@@ -38,40 +56,45 @@ export function useMyContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
+    if (!user?.id) {
+      setContentItems([]);
+      setStats(buildStats([]));
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const contents = await contentService.list(user?.id ? { authorId: user.id } : {});
+      const contents = await contentService.listWorkspace();
 
       const mapped: MyContentItem[] = await Promise.all(
         contents.map(async (c) => {
           let status = mapLifecycleToStatus(c.lifecycleState);
 
-          // FE Workaround for backend sequential quorum bug:
-          // Even if the DB says PUBLISHED, check if there are other pending review requests.
-          // If there are OPEN requests, enforce 'in_review' status.
           if (status === 'published') {
             try {
-              // Lazy load reviewService to prevent circular dependencies if they exist
               const { reviewService } = await import('../services/reviewService');
               const requests = await reviewService.listForContent(c.id);
               if (requests.some((req) => req.status === 'OPEN')) {
                 status = 'in_review';
               }
             } catch {
-              // fallback to original status if fetch fails
+              /* keep status */
             }
           }
 
           return {
             id: c.id,
             title: c.title,
-            type: 'document',
+            type: mapContentType(c.contentType),
             status,
-            views: 0,
+            views: c.viewsCount ?? 0,
             lastModified: c.updatedAt,
             createdAt: c.createdAt,
-            collaborators: 0,
+            collaborators: c.acceptedCoAuthorCount ?? 0,
+            workspaceRole: c.workspaceRole,
+            primaryAuthor: c.author ?? null,
           };
         }),
       );
@@ -81,58 +104,11 @@ export function useMyContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    (async () => {
-      try {
-        setLoading(true);
-        const contents = await contentService.list(user?.id ? { authorId: user.id } : {});
-
-        const mapped: MyContentItem[] = await Promise.all(
-          contents.map(async (c) => {
-            let status = mapLifecycleToStatus(c.lifecycleState);
-
-            // FE Workaround for backend sequential quorum bug
-            if (status === 'published') {
-              try {
-                const { reviewService } = await import('../services/reviewService');
-                const requests = await reviewService.listForContent(c.id);
-                if (requests.some((req) => req.status === 'OPEN')) {
-                  status = 'in_review';
-                }
-              } catch {
-                // fallback
-              }
-            }
-
-            return {
-              id: c.id,
-              title: c.title,
-              type: 'document',
-              status,
-              views: 0,
-              lastModified: c.updatedAt,
-              createdAt: c.createdAt,
-              collaborators: 0,
-            };
-          }),
-        );
-
-        if (!isMounted) return;
-        setContentItems(mapped);
-        setStats(buildStats(mapped));
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
+    void fetchContent();
+  }, [fetchContent]);
 
   const filteredItems = contentItems.filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());

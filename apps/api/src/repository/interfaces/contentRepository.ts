@@ -36,6 +36,8 @@ export interface ContentRepository {
   createVersion(input: CreateContentVersionInput): Promise<ContentVersion>;
   listVersions(contentId: string): Promise<ContentVersion[]>;
   getLatestVersion(contentId: string): Promise<ContentVersion | null>;
+  /** True when `userId` has an ACCEPTED co-author row for this content. */
+  isAcceptedCoAuthor(contentId: string, userId: string): Promise<boolean>;
   /**
    * Latest version at or before `maxVersionNumber` whose `body` is non-null.
    * Used to resolve document text for snapshots when intermediate rows omit `body` (e.g. state transitions).
