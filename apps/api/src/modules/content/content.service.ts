@@ -905,6 +905,7 @@ export const contentService = {
     | { created: true }
     | { notFound: true }
     | { forbidden: true }
+    | { selfInvite: true }
     | { alreadyPending: true }
     | { alreadyCoAuthor: true }
   > {
@@ -920,9 +921,9 @@ export const contentService = {
         return { forbidden: true } as const;
       }
 
-      // Do not allow inviting self explicitly
-      if (userId === content.authorId) {
-        return { alreadyCoAuthor: true } as const;
+      // Do not allow inviting self explicitly (even via email resolution)
+      if (userId === ctx.actorId) {
+        return { selfInvite: true } as const;
       }
 
       const existing = await prisma.contentCoAuthor.findUnique({
@@ -984,6 +985,7 @@ export const contentService = {
     | { created: true }
     | { notFound: true }
     | { forbidden: true }
+    | { selfInvite: true }
     | { alreadyPending: true }
     | { alreadyCoAuthor: true }
     | { inviteeNotFound: true }

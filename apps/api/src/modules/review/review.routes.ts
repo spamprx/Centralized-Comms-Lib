@@ -242,6 +242,10 @@ router.post("/requests/:id/assign", async (req: AuthRequest, res: Response) => {
       });
       return;
     }
+    if ("selfAssign" in result && result.selfAssign) {
+      res.status(400).json({ error: "You cannot add yourself as a reviewer" });
+      return;
+    }
     res.status(201).json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -93,6 +93,10 @@ router.post("/:id/co-authors", async (req: AuthRequest, res: Response) => {
         .json({ error: "Only the main author can add co-authors" });
       return;
     }
+    if ("selfInvite" in result && result.selfInvite) {
+      res.status(400).json({ error: "You cannot add yourself as a co-author" });
+      return;
+    }
     if ("alreadyCoAuthor" in result && result.alreadyCoAuthor) {
       res.status(409).json({ error: "User is already a co-author" });
       return;
@@ -148,6 +152,12 @@ router.post(
       }
       if ("inviteeNotFound" in result && result.inviteeNotFound) {
         res.status(404).json({ error: "No user found with that email" });
+        return;
+      }
+      if ("selfInvite" in result && result.selfInvite) {
+        res
+          .status(400)
+          .json({ error: "You cannot add yourself as a co-author" });
         return;
       }
       if ("alreadyCoAuthor" in result && result.alreadyCoAuthor) {
@@ -468,14 +478,12 @@ router.get(
         });
         return;
       }
-      res
-        .status(200)
-        .json({
-          active: editorPresenceStore.isCollaborationActive(
-            contentId,
-            req.user!.id,
-          ),
-        });
+      res.status(200).json({
+        active: editorPresenceStore.isCollaborationActive(
+          contentId,
+          req.user!.id,
+        ),
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });
@@ -568,11 +576,9 @@ router.post(
       const isAdmin = req.user!.role === "ADMIN";
       const isAuthor = content.authorId === req.user!.id;
       if (!isAdmin && !isAuthor) {
-        res
-          .status(403)
-          .json({
-            error: "Only the primary author or an admin can restore versions",
-          });
+        res.status(403).json({
+          error: "Only the primary author or an admin can restore versions",
+        });
         return;
       }
 

@@ -122,6 +122,9 @@ export const reviewService = {
       if (request.requestedById !== ctx.actorId && !ctx.isAdmin) {
         return { forbidden: true } as const;
       }
+      if (reviewerId === ctx.actorId) {
+        return { selfAssign: true } as const;
+      }
       const assignment = await repos.review.assignReviewer({
         reviewRequestId: request.id,
         reviewerId,

@@ -3,6 +3,7 @@ import { X, Search, UserPlus, Loader2, Check, Users } from 'lucide-react';
 import { adminUserService } from '../services/adminService';
 import { contentService } from '../services/contentService';
 import { reviewService } from '../services/reviewService';
+import { useAuth } from '../context/AuthContext';
 
 type SimpleUser = {
   id: string;
@@ -23,6 +24,7 @@ export default function ManageReviewersModal({
   onClose,
   onAssigned,
 }: ManageReviewersModalProps) {
+  const { user } = useAuth();
   const [users, setUsers] = useState<SimpleUser[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +49,10 @@ export default function ManageReviewersModal({
   }, []);
 
   const toggleUser = (userId: string) => {
+    if (user?.id && userId === user.id) {
+      setError('You cannot add yourself as a reviewer.');
+      return;
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(userId)) next.delete(userId);
@@ -55,13 +61,19 @@ export default function ManageReviewersModal({
     });
   };
 
-  const filteredUsers = users.filter((u) => {
+  const filteredUsers = users
+    .filter((u) => !(user?.id && u.id === user.id))
+    .filter((u) => {
     const q = searchQuery.toLowerCase();
     return (u.displayName || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
   const handleAssign = async () => {
     if (selectedIds.size === 0) return;
+    if (user?.id && selectedIds.has(user.id)) {
+      setError('You cannot add yourself as a reviewer.');
+      return;
+    }
     setAssigning(true);
     setError(null);
     try {
@@ -129,6 +141,8 @@ export default function ManageReviewersModal({
             type="button"
             onClick={onClose}
             className="shrink-0 rounded-app-md border border-transparent p-2 text-app-faint transition-colors hover:border-white/10 hover:bg-white/[0.06] hover:text-app-text"
+            aria-label="Close"
+            title="Close"
           >
             <X size={18} strokeWidth={2} />
           </button>

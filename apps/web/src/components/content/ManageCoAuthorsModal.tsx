@@ -66,6 +66,16 @@ export default function ManageCoAuthorsModal({
 
   const sendInvite = async () => {
     if (!email.trim()) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (
+      primaryAuthor &&
+      primaryAuthor.id === currentUserId &&
+      primaryAuthor.email &&
+      primaryAuthor.email.toLowerCase() === normalizedEmail
+    ) {
+      setInviteMsg('You cannot add yourself as a co-author.');
+      return;
+    }
     setInviteBusy(true);
     setInviteMsg(null);
     try {
@@ -76,7 +86,8 @@ export default function ManageCoAuthorsModal({
       setCoAuthors(d.coAuthors ?? []);
       onUpdated();
     } catch (e) {
-      setInviteMsg(e instanceof Error ? e.message : 'Invite failed');
+      const msg = e instanceof Error ? e.message : 'Invite failed';
+      setInviteMsg(msg);
     } finally {
       setInviteBusy(false);
     }
