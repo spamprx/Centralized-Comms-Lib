@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { StatCard as StatCardModel } from '../../data/mockDashboardData';
 import { Surface } from '../ui';
 
@@ -11,13 +10,6 @@ const iconColors: Record<string, string> = {
 };
 
 export function StatCard({ stat }: { stat: StatCardModel }) {
-  const TrendIcon = stat.trend === 'up' ? TrendingUp : stat.trend === 'down' ? TrendingDown : Minus;
-  const trendColor =
-    stat.trend === 'up'
-      ? 'text-emerald-400'
-      : stat.trend === 'down'
-        ? 'text-red-400'
-        : 'text-app-faint';
   const accent = iconColors[stat.icon] ?? '#937cf8';
 
   return (
@@ -86,19 +78,8 @@ export function StatCard({ stat }: { stat: StatCardModel }) {
           </svg>
         </div>
       </div>
-      <div className="relative z-[1] mb-1 bg-gradient-to-br from-app-text to-app-muted bg-clip-text text-2xl font-bold tracking-tight text-transparent md:text-[1.65rem]">
+      <div className="relative z-[1] bg-gradient-to-br from-app-text to-app-muted bg-clip-text text-2xl font-bold tracking-tight text-transparent md:text-[1.65rem]">
         {stat.value}
-      </div>
-      <div className={`relative z-[1] flex items-center gap-1.5 text-xs ${trendColor}`}>
-        <TrendIcon
-          size={12}
-          aria-hidden
-          className="shrink-0 transition-transform duration-300 group-hover/card:scale-110"
-        />
-        <span>
-          {stat.change > 0 ? '+' : ''}
-          {stat.change.toFixed(1)}% from last month
-        </span>
       </div>
     </Surface>
   );

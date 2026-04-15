@@ -50,7 +50,12 @@ export function buildAnalyticsCsv(input: AnalyticsCsvInput): string {
     ...section(
       'KPIs',
       ['Label', 'Value', 'Change', 'Trend'],
-      input.kpis.map((kpi) => [kpi.label, kpi.value, kpi.change, kpi.trend]),
+      input.kpis.map((kpi) => [
+        kpi.label,
+        kpi.value,
+        kpi.change ?? '',
+        kpi.trend ?? '',
+      ]),
     ),
     ...section(
       'Views',

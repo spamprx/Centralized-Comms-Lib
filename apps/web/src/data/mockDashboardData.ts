@@ -3,16 +3,9 @@
 export interface StatCard {
   label: string;
   value: string | number;
-  change: number;
-  trend: 'up' | 'down' | 'stable';
   icon: string;
-}
-
-export interface QuickAction {
-  id: string;
-  label: string;
-  icon: string;
-  color: string;
+  change?: number;
+  trend?: 'up' | 'down' | 'stable';
 }
 
 export interface Activity {
@@ -45,19 +38,10 @@ export interface Notification {
 // ─── Mock Stat Cards ──────────────────────────────────────────────────────────
 
 export const mockStatCards: StatCard[] = [
-  { label: 'Total Content', value: '1,247', change: 12.5, trend: 'up', icon: 'content' },
-  { label: 'Pending Reviews', value: '23', change: -5.2, trend: 'down', icon: 'review' },
-  { label: 'Active Users', value: '8,234', change: 8.3, trend: 'up', icon: 'users' },
-  { label: 'Avg. Engagement', value: '68.3%', change: 3.1, trend: 'up', icon: 'engagement' },
-];
-
-// ─── Mock Quick Actions ───────────────────────────────────────────────────────
-
-export const mockQuickActions: QuickAction[] = [
-  { id: '1', label: 'Create Content', icon: 'plus', color: '#8b5cf6' },
-  { id: '2', label: 'Upload Asset', icon: 'upload', color: '#06b6d4' },
-  { id: '3', label: 'Schedule Post', icon: 'calendar', color: '#f59e0b' },
-  { id: '4', label: 'Invite User', icon: 'user', color: '#10b981' },
+  { label: 'Total Content', value: '1,247', icon: 'content' },
+  { label: 'Pending Reviews', value: '23', icon: 'review' },
+  { label: 'Active Users', value: '8,234', icon: 'users' },
+  { label: 'Avg. Engagement', value: '68.3%', icon: 'engagement' },
 ];
 
 // ─── Mock Recent Activity ─────────────────────────────────────────────────────

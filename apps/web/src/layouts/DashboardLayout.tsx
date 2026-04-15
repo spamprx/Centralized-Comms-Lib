@@ -1,7 +1,6 @@
 import { useDashboard } from '../hooks/useDashboard';
 import {
   StatCardsRow,
-  QuickActionsPanel,
   RecentActivityFeed,
   PendingItemsList,
   NotificationsSummary,
@@ -9,8 +8,7 @@ import {
 import { PageHeader, PageShell } from '../components/ui';
 
 export default function DashboardLayout() {
-  const { statCards, quickActions, recentActivity, pendingItems, notifications, loading } =
-    useDashboard();
+  const { statCards, recentActivity, pendingItems, notifications, loading } = useDashboard();
 
   if (loading) {
     return (
@@ -38,16 +36,7 @@ export default function DashboardLayout() {
               </div>
             ))}
           </div>
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="relative min-h-[18rem] overflow-hidden rounded-app-xl border border-white/[0.07] bg-app-bg/35 p-6 shadow-app-lift backdrop-blur-xl lg:col-span-2 supports-[backdrop-filter]:bg-app-bg/25">
-              <div className="app-skeleton-shimmer mb-2 h-3 w-28 rounded-full" />
-              <div className="app-skeleton-shimmer mb-6 h-4 w-48 rounded-app-md" />
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-2">
-                {[1, 2, 3, 4].map((j) => (
-                  <div key={j} className="app-skeleton-shimmer h-24 rounded-app-lg" />
-                ))}
-              </div>
-            </div>
+          <div className="grid gap-6 lg:grid-cols-1">
             <div className="relative min-h-[18rem] overflow-hidden rounded-app-xl border border-white/[0.07] bg-app-bg/35 p-6 shadow-app-lift backdrop-blur-xl supports-[backdrop-filter]:bg-app-bg/25">
               <div className="app-skeleton-shimmer mb-2 h-3 w-28 rounded-full" />
               <div className="app-skeleton-shimmer mb-6 h-4 w-44 rounded-app-md" />
@@ -104,12 +93,7 @@ export default function DashboardLayout() {
       <div className="animate-fade-in space-y-10">
         <StatCardsRow statCards={statCards} />
 
-        <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
-          <div className="min-w-0 lg:col-span-2">
-            <QuickActionsPanel actions={quickActions} />
-          </div>
-          <RecentActivityFeed activities={recentActivity} />
-        </div>
+        <RecentActivityFeed activities={recentActivity} />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <PendingItemsList items={pendingItems} />

@@ -15,6 +15,25 @@ function auditContext(req: AuthRequest): AuditContext {
 
 const router = Router();
 
+function queryParamString(q: unknown, fallback: string): string {
+  if (typeof q === "string") return q;
+  if (Array.isArray(q) && typeof q[0] === "string") return q[0];
+  return fallback;
+}
+
+/** Parses `30d`, `7`, `14d` style range query params for KPI windows. */
+function parseRangeDays(range: string): number {
+  const raw = range.trim() || "30d";
+  const dMatch = /^(\d+)\s*d$/i.exec(raw);
+  const nMatch = dMatch ?? /^(\d+)$/.exec(raw);
+  if (nMatch) {
+    const n = Number.parseInt(nMatch[1], 10);
+    return Number.isFinite(n) ? Math.max(1, Math.min(366, n)) : 30;
+  }
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(366, n) : 30;
+}
+
 function parseDateRange(
   fromQ: unknown,
   toQ: unknown,
@@ -285,46 +304,53 @@ router.get(
       const uow = new PrismaUnitOfWork(prisma);
       const repos = uow.repos();
 
-      const range = (req.query.range as string) || "30d";
-      const days = parseInt(range) || 30;
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      // Get counts from database. Views are currently mocked since there is
-      // no dedicated analytics table in the schema yet.
-      const [userCount, contentCount] = await Promise.all([
+      const [
+        userCount,
+        publishedInRange,
+        totalViews,
+        likeCount,
+        commentCount,
+      ] = await Promise.all([
         repos.userRole.listUsers().then((u: any[]) => u.length),
-        prisma.content.count({ where: { createdAt: { gte: startDate } } }),
+        prisma.content.count({
+          where: {
+            lifecycleState: "PUBLISHED",
+            createdAt: { gte: startDate },
+          },
+        }),
+        prisma.contentView.count({ where: { createdAt: { gte: startDate } } }),
+        prisma.contentLike.count({ where: { createdAt: { gte: startDate } } }),
+        prisma.contentComment.count({
+          where: { createdAt: { gte: startDate } },
+        }),
       ]);
-      const totalViews = Math.floor(5000 + Math.random() * 5000);
 
-      // Calculate engagement rate (mock calculation)
-      const engagementRate = 68.3 + (Math.random() * 5 - 2.5);
+      const interactions = likeCount + commentCount;
+      const interactionRatePct =
+        totalViews > 0
+          ? Math.round((interactions / totalViews) * 1000) / 10
+          : 0;
 
       res.status(200).json([
         {
           label: "Total Views",
           value: totalViews.toLocaleString(),
-          change: 12.5,
-          trend: "up" as const,
         },
         {
-          label: "Avg. Engagement",
-          value: `${engagementRate.toFixed(1)}%`,
-          change: 5.2,
-          trend: "up" as const,
+          label: "Interaction rate",
+          value: `${interactionRatePct}%`,
         },
         {
           label: "Active Users",
           value: userCount.toLocaleString(),
-          change: -2.1,
-          trend: "down" as const,
         },
         {
           label: "Content Published",
-          value: contentCount.toLocaleString(),
-          change: 8.7,
-          trend: "up" as const,
+          value: publishedInRange.toLocaleString(),
         },
       ]);
     } catch (err) {

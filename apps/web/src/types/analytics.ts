@@ -8,8 +8,9 @@ export interface TimeSeriesPoint {
 export interface KPI {
   label: string;
   value: string | number;
-  change: number;
-  trend: 'up' | 'down' | 'stable';
+  /** @deprecated Period-over-period delta; omitted when API does not compute trends. */
+  change?: number;
+  trend?: 'up' | 'down' | 'stable';
 }
 
 export interface EngagementData {

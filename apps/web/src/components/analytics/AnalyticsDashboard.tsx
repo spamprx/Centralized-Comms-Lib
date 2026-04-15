@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
   Download,
   FileText,
   Loader2,
@@ -139,33 +137,18 @@ function MetricCardsRow({
       {kpis.map((kpi, i) => (
         <div
           key={kpi.label}
-          className={`${SURFACE_GLASS} flex h-[92px] px-5 py-4 transition-transform duration-300 ease-out motion-reduce:transition-none hover:-translate-y-0.5 motion-reduce:hover:translate-y-0`}
+          className={`${SURFACE_GLASS} flex h-[88px] px-5 py-4 transition-transform duration-300 ease-out motion-reduce:transition-none hover:-translate-y-0.5 motion-reduce:hover:translate-y-0`}
         >
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/35 to-transparent"
             aria-hidden
           />
-          <div className="flex min-w-0 flex-1 flex-col justify-between">
+          <div className="flex min-w-0 flex-1 flex-col justify-between gap-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-app-faint">
               {kpi.label}
             </div>
             <div className="text-[28px] font-semibold leading-none tracking-tight text-app-text">
               {kpi.value}
-            </div>
-            <div className="flex items-center gap-1 text-[12px] font-medium">
-              {kpi.change > 0 ? (
-                <span className="inline-flex items-center gap-0.5 text-teal-300">
-                  <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden />+
-                  {kpi.change.toFixed(1)}%
-                </span>
-              ) : kpi.change < 0 ? (
-                <span className="inline-flex items-center gap-0.5 text-red-300">
-                  <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden />
-                  {kpi.change.toFixed(1)}%
-                </span>
-              ) : (
-                <span className="font-medium text-app-muted">{kpi.change.toFixed(1)}%</span>
-              )}
             </div>
           </div>
           <div className="flex shrink-0 items-end pb-0.5">
