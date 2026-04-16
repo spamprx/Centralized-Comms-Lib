@@ -1,13 +1,7 @@
 import type { ContentSearchFilters } from "./searchTypes";
 
 const LIFECYCLE = new Set(["DRAFT", "IN_REVIEW", "PUBLISHED", "ARCHIVED"]);
-const VISIBILITY = new Set([
-  "PUBLIC",
-  "PRIVATE",
-  "HIDDEN",
-  "ARCHIVED",
-  "PRIVATE_TO_GROUP",
-]);
+const VISIBILITY = new Set(["PUBLIC", "PRIVATE_TO_GROUP"]);
 
 function splitCsv(v: string | undefined): string[] | undefined {
   if (!v || !v.trim()) return undefined;

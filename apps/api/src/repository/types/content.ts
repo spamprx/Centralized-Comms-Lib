@@ -1,11 +1,6 @@
 export type LifecycleState = "DRAFT" | "IN_REVIEW" | "PUBLISHED" | "ARCHIVED";
 
-export type Visibility =
-  | "PUBLIC"
-  | "PRIVATE"
-  | "HIDDEN"
-  | "ARCHIVED"
-  | "PRIVATE_TO_GROUP";
+export type Visibility = "PUBLIC" | "PRIVATE_TO_GROUP";
 
 export type VersionChangeType =
   | "MANUAL_SAVE"

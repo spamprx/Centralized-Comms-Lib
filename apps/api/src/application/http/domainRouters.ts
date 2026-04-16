@@ -10,6 +10,7 @@ import searchRouter from "../../modules/search/search.routes";
 import componentRouter from "../../modules/component/component.routes";
 import citationRouter from "../../modules/citation/citation.routes";
 import profileRouter from "../../modules/profile/profile.routes";
+import groupRouter from "../../modules/group/group.routes";
 
 export const applicationDomainRouters = {
   auth: authRouter,
@@ -24,4 +25,5 @@ export const applicationDomainRouters = {
   component: componentRouter,
   citation: citationRouter,
   profile: profileRouter,
+  group: groupRouter,
 };

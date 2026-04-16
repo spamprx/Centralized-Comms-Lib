@@ -57,10 +57,6 @@ function canViewContent(
   switch (visibility) {
     case "PUBLIC":
       return true;
-    case "PRIVATE":
-    case "HIDDEN":
-    case "ARCHIVED":
-      return false;
     case "PRIVATE_TO_GROUP": {
       if (!content.visibilityGroupId) return false;
       return requesterGroups.some((g) => g.id === content.visibilityGroupId);
@@ -963,7 +959,12 @@ export const contentService = {
     contentId: string,
     visibility: Visibility,
     visibilityGroupId?: string | null,
-  ): Promise<{ content: Content } | { notFound: true } | { forbidden: true }> {
+  ): Promise<
+    | { content: Content }
+    | { notFound: true }
+    | { forbidden: true }
+    | { badRequest: true; error: string }
+  > {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     const result = await uow.withTransaction(async (repos) => {
@@ -971,13 +972,39 @@ export const contentService = {
       if (!existing) return { notFound: true } as const;
       if (existing.authorId !== ctx.actorId && !ctx.isAdmin)
         return { forbidden: true } as const;
+
+      if (visibility !== "PUBLIC" && visibility !== "PRIVATE_TO_GROUP") {
+        return {
+          badRequest: true,
+          error: "visibility must be PUBLIC or PRIVATE_TO_GROUP",
+        } as const;
+      }
+
+      if (visibility === "PRIVATE_TO_GROUP") {
+        const nextGroupId =
+          visibilityGroupId !== undefined
+            ? visibilityGroupId
+            : existing.visibilityGroupId;
+        if (!nextGroupId) {
+          return {
+            badRequest: true,
+            error:
+              "visibilityGroupId is required when visibility is PRIVATE_TO_GROUP",
+          } as const;
+        }
+      }
+
       const updated = await repos.content.updateVisibility(
         contentId,
         visibility,
       );
-      if (visibility === "PRIVATE_TO_GROUP" && visibilityGroupId) {
-        await repos.content.bindVisibilityGroup(contentId, visibilityGroupId);
-      } else if (visibility !== "PRIVATE_TO_GROUP") {
+      if (visibility === "PRIVATE_TO_GROUP") {
+        const gid =
+          visibilityGroupId !== undefined
+            ? visibilityGroupId
+            : existing.visibilityGroupId;
+        await repos.content.bindVisibilityGroup(contentId, gid ?? null);
+      } else {
         await repos.content.bindVisibilityGroup(contentId, null);
       }
       await repos.audit.append({

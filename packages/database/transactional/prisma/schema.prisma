@@ -193,9 +193,6 @@ enum LifecycleState {
 
 enum Visibility {
   PUBLIC
-  PRIVATE
-  HIDDEN
-  ARCHIVED
   PRIVATE_TO_GROUP
 }
 
@@ -423,7 +420,7 @@ model Content {
   title          String
   slug           String         @unique
   lifecycleState LifecycleState @default(DRAFT)
-  visibility     Visibility     @default(PRIVATE)
+  visibility     Visibility     @default(PUBLIC)
   contentType    ContentType    @default(ARTICLE)
   aiGenerated    Boolean        @default(false)
   createdAt      DateTime       @default(now())

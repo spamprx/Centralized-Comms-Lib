@@ -836,10 +836,10 @@ async function seedContent() {
   }[] = [
     { key: "welcomePost", title: "Welcome to the Comms Platform", slug: "welcome-to-comms-platform", lifecycleState: LifecycleState.PUBLISHED, visibility: Visibility.PUBLIC, aiGenerated: false, authorKey: "admin", visibilityGroupKey: null, templateKey: "blogPost" },
     { key: "engineeringUpdate", title: "Q1 Engineering Update", slug: "q1-engineering-update", lifecycleState: LifecycleState.PUBLISHED, visibility: Visibility.PRIVATE_TO_GROUP, aiGenerated: false, authorKey: "alice", visibilityGroupKey: "engineering", templateKey: "blogPost" },
-    { key: "hiringPolicy", title: "Updated Hiring Policy 2026", slug: "updated-hiring-policy-2026", lifecycleState: LifecycleState.IN_REVIEW, visibility: Visibility.PRIVATE, aiGenerated: false, authorKey: "alice", visibilityGroupKey: null, templateKey: "policyDoc" },
+    { key: "hiringPolicy", title: "Updated Hiring Policy 2026", slug: "updated-hiring-policy-2026", lifecycleState: LifecycleState.IN_REVIEW, visibility: Visibility.PRIVATE_TO_GROUP, aiGenerated: false, authorKey: "alice", visibilityGroupKey: "hr", templateKey: "policyDoc" },
     { key: "frontendGuide", title: "Frontend Development Guidelines", slug: "frontend-development-guidelines", lifecycleState: LifecycleState.IN_REVIEW, visibility: Visibility.PUBLIC, aiGenerated: false, authorKey: "bob", visibilityGroupKey: null, templateKey: "blogPost" },
     { key: "releaseNotes", title: "Platform v2.0 Release Notes", slug: "platform-v2-release-notes", lifecycleState: LifecycleState.ARCHIVED, visibility: Visibility.PUBLIC, aiGenerated: false, authorKey: "alice", visibilityGroupKey: null, templateKey: "announcement" },
-    { key: "draftPost", title: "AI-Assisted Content Creation Guide", slug: "ai-assisted-content-creation-guide", lifecycleState: LifecycleState.DRAFT, visibility: Visibility.HIDDEN, aiGenerated: true, authorKey: "carol", visibilityGroupKey: null, templateKey: null },
+    { key: "draftPost", title: "AI-Assisted Content Creation Guide", slug: "ai-assisted-content-creation-guide", lifecycleState: LifecycleState.DRAFT, visibility: Visibility.PRIVATE_TO_GROUP, aiGenerated: true, authorKey: "carol", visibilityGroupKey: "engineering", templateKey: null },
   ];
 
   for (const c of contents) {
@@ -1310,17 +1310,11 @@ async function seedContentAnalyticsEvents() {
   ];
 
   // contentAnalyticsEvent may not be in generated client yet; use raw insert
-  const now = Date.now();
-  const ninetyDaysMs = 90 * 86400000;
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i]!;
-    // Spread events deterministically across the last 90 days (older first).
-    const t = now - Math.floor(((events.length - 1 - i) / Math.max(1, events.length - 1)) * ninetyDaysMs);
-    const createdAt = new Date(t).toISOString();
+  for (const e of events) {
     await prisma.$executeRawUnsafe(
       `INSERT INTO content_analytics_events (id, "contentId", "eventType", metadata, "createdAt")
-       VALUES ($1, $2, $3, $4::jsonb, $5::timestamptz)`,
-      randomUUID(), e.contentId, e.eventType, JSON.stringify(e.metadata), createdAt,
+       VALUES ($1, $2, $3, $4::jsonb, NOW())`,
+      randomUUID(), e.contentId, e.eventType, JSON.stringify(e.metadata),
     );
   }
   console.log(`  ✔ ${events.length} content analytics events`);

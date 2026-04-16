@@ -18,4 +18,5 @@ export function registerProtectedRoutes(router: Router): void {
   router.use("/components", applicationDomainRouters.component);
   router.use("/citations", applicationDomainRouters.citation);
   router.use("/profile", applicationDomainRouters.profile);
+  router.use("/groups", applicationDomainRouters.group);
 }

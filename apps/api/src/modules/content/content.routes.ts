@@ -1731,6 +1731,10 @@ router.patch("/:id/visibility", async (req: AuthRequest, res: Response) => {
       visibility,
       visibilityGroupId,
     );
+    if ("badRequest" in result && result.badRequest) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
     if ("notFound" in result && result.notFound) {
       res.status(404).json({ error: "Content not found" });
       return;
