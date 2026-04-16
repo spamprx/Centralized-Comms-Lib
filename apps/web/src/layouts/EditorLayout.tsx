@@ -48,8 +48,6 @@ import UseTemplateDialog from '../components/editor/UseTemplateDialog';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
 import TranslatePlainTextModal from '../components/common/TranslatePlainTextModal';
 import {
-  emptyReferencesSectionHtml,
-  hasBibliographySection,
   upsertBibliographySection,
   type CitationMarkerMode,
 } from '../lib/citationMarkers';
@@ -71,6 +69,77 @@ type CitationItem = {
   sourceId: string;
   work: CitationWork;
 };
+
+function orderedUniqueCitationMarkersFromTipTapDoc(doc: unknown): number[] {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  const visit = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+    const marks = Array.isArray(node.marks) ? node.marks : [];
+    for (const m of marks) {
+      if (!m || typeof m !== 'object') continue;
+      if (m.type === 'citationMarker') {
+        const marker = m.attrs?.marker;
+        if (typeof marker === 'number' && Number.isFinite(marker) && !seen.has(marker)) {
+          seen.add(marker);
+          out.push(marker);
+        }
+      }
+    }
+    const content = Array.isArray(node.content) ? node.content : [];
+    for (const child of content) visit(child);
+  };
+  visit(doc as any);
+  return out;
+}
+
+function renumberCitationsInEditor(ed: any, orderedMarkers: number[]): boolean {
+  if (!ed) return false;
+  if (orderedMarkers.length === 0) return false;
+  const map = new Map<number, number>();
+  orderedMarkers.forEach((old, idx) => map.set(old, idx + 1));
+  // If already 1..N in the same order, skip.
+  const alreadySequential = orderedMarkers.every((m, idx) => m === idx + 1);
+  if (alreadySequential) return false;
+
+  const { state } = ed;
+  const { schema } = state;
+  const citationMarkType = schema.marks?.citationMarker;
+  if (!citationMarkType) return false;
+
+  let tr = state.tr;
+  let changed = false;
+
+  // Walk text nodes; if they carry citationMarker, update both the mark attrs + label text.
+  state.doc.descendants((node: any, pos: number) => {
+    if (!node || !node.isText) return true;
+    const marks = Array.isArray(node.marks) ? node.marks : [];
+    const cm = marks.find((m: any) => m?.type?.name === 'citationMarker');
+    if (!cm) return true;
+    const oldMarker = cm.attrs?.marker;
+    const newMarker = typeof oldMarker === 'number' ? map.get(oldMarker) : undefined;
+    if (typeof newMarker !== 'number') return true;
+
+    const mode = (cm.attrs?.mode as CitationMarkerMode | undefined) ?? 'chip';
+    const desiredText = citationMarkLabel(newMarker, mode);
+
+    const needsTextUpdate = node.text !== desiredText;
+    const needsAttrUpdate = oldMarker !== newMarker;
+    if (!needsTextUpdate && !needsAttrUpdate) return true;
+
+    const nextMarks = marks.map((m: any) => {
+      if (m?.type?.name !== 'citationMarker') return m;
+      return citationMarkType.create({ ...m.attrs, marker: newMarker });
+    });
+    tr = tr.replaceWith(pos, pos + node.nodeSize, schema.text(desiredText, nextMarks));
+    changed = true;
+    return true;
+  });
+
+  if (!changed) return false;
+  ed.view.dispatch(tr);
+  return true;
+}
 
 /** Inline image uploads above this size are rejected (base64 would bloat the HTML). */
 const EDITOR_INLINE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
@@ -392,6 +461,7 @@ export default function EditorLayout() {
   const [citationItems, setCitationItems] = useState<CitationItem[]>([]);
   const citationItemsRef = useRef(citationItems);
   citationItemsRef.current = citationItems;
+  const citationNormalizeInFlightRef = useRef(false);
   const [rightPanelTab, setRightPanelTab] = useState<'library' | 'properties' | 'similar' | 'refs'>(
     'library',
   );
@@ -660,7 +730,56 @@ export default function EditorLayout() {
         }),
       ],
       content,
-      onUpdate: ({ editor: ed }) => setContent(ed.getHTML()),
+      onUpdate: ({ editor: ed }) => {
+        if (citationNormalizeInFlightRef.current) return;
+        const docJson = ed.getJSON();
+        const html = ed.getHTML();
+
+        // Determine the citation sequence BEFORE any renumbering so we never reattach
+        // reference text to a different citation.
+        const orderedMarkers = orderedUniqueCitationMarkersFromTipTapDoc(docJson);
+        const used = new Set(orderedMarkers);
+        const renumberMap = new Map<number, number>();
+        orderedMarkers.forEach((m, idx) => renumberMap.set(m, idx + 1));
+        const needsRenumber = orderedMarkers.some((m, idx) => m !== idx + 1);
+
+        // Sync sidebar + References block to the actual citations present.
+        // Important: only update marker numbers; never change `text/work/sourceId`.
+        setCitationItems((prev) => {
+          if (prev.length === 0) return prev;
+          const kept = prev.filter((c) => used.has(c.marker));
+          const next = needsRenumber
+            ? kept
+                .map((c) => ({
+                  ...c,
+                  marker: renumberMap.get(c.marker) ?? c.marker,
+                }))
+                .sort((a, b) => a.marker - b.marker)
+            : kept.sort((a, b) => a.marker - b.marker);
+
+          const changedLen = next.length !== prev.length;
+          const changedMarkers = next.some((c, i) => prev[i]?.marker !== c.marker);
+          if (!changedLen && !changedMarkers) return prev;
+
+          // Update the References block to match the new sequence.
+          // (We also update `content` so dirty-check + save snapshot reflect the bibliography.)
+          setContent(upsertBibliographySection(html, next));
+          return next;
+        });
+
+        // Finally, renumber the inline markers in the document (if needed).
+        if (needsRenumber && orderedMarkers.length > 0) {
+          citationNormalizeInFlightRef.current = true;
+          try {
+            const changed = renumberCitationsInEditor(ed, orderedMarkers);
+            if (changed) return; // a new update will fire with the normalized content
+          } finally {
+            citationNormalizeInFlightRef.current = false;
+          }
+        }
+
+        setContent(html);
+      },
       onSelectionUpdate: ({ editor: ed }) => {
         const { from, to } = ed.state.selection;
         const text = from === to ? '' : ed.state.doc.textBetween(from, to, ' ').trim();
@@ -1079,13 +1198,12 @@ export default function EditorLayout() {
   const placeReferencesSectionHere = useCallback(() => {
     if (!editor) return;
     const html = editor.getHTML();
-    if (hasBibliographySection(html)) {
-      setReferenceNotice('This draft already has a References section.');
-      window.setTimeout(() => setReferenceNotice(null), 4000);
-      return;
+    const nextHtml = upsertBibliographySection(html, citationItemsRef.current);
+    if (nextHtml !== html) {
+      editor.chain().focus().setContent(nextHtml).run();
+      setContent(nextHtml);
     }
-    editor.chain().focus().insertContent(emptyReferencesSectionHtml()).run();
-    setReferenceNotice('References block inserted. Add citations from Cite.');
+    setReferenceNotice('References updated at the end of the document.');
     window.setTimeout(() => setReferenceNotice(null), 4000);
   }, [editor]);
 
@@ -1841,14 +1959,7 @@ export default function EditorLayout() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">
-                    Visibility
-                  </label>
-                  <select className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none">
-                    <option>Public</option>
-                    <option>Team only</option>
-                    <option>Private</option>
-                  </select>
+                  {/* Visibility control moved to My Content for better UX. */}
                 </div>
                 <div>
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">

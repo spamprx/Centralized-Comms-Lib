@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { contentService } from '../services/contentService';
+import { groupService, type ApiUserGroup } from '../services/groupService';
 import ManageReviewersModal from '../components/ManageReviewersModal';
 import ReviewFeedbackModal from '../components/ReviewFeedbackModal';
 import ManageCoAuthorsModal from '../components/content/ManageCoAuthorsModal';
@@ -58,6 +59,9 @@ export default function MyContentLayout() {
   } = useMyContent();
   const [sortBy, setSortBy] = useState('lastModified');
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [visibilitySavingId, setVisibilitySavingId] = useState<string | null>(null);
+  const [myGroups, setMyGroups] = useState<ApiUserGroup[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [reviewModalItem, setReviewModalItem] = useState<{ id: string; title: string } | null>(
     null,
@@ -101,6 +105,29 @@ export default function MyContentLayout() {
     } finally {
       setPendingCoAuthorLoading(false);
     }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setMyGroups([]);
+      return;
+    }
+    let cancelled = false;
+    setGroupsLoading(true);
+    void groupService
+      .listMine()
+      .then((rows) => {
+        if (!cancelled) setMyGroups(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setMyGroups([]);
+      })
+      .finally(() => {
+        if (!cancelled) setGroupsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -190,6 +217,23 @@ export default function MyContentLayout() {
       await refreshContent();
     } catch (err) {
       console.error('Failed to delete content:', err);
+    }
+  };
+
+  const handleVisibilityChange = async (
+    contentId: string,
+    next: 'PUBLIC' | 'PRIVATE_TO_GROUP',
+    visibilityGroupId?: string | null,
+  ) => {
+    if (visibilitySavingId) return;
+    setVisibilitySavingId(contentId);
+    try {
+      await contentService.updateVisibility(contentId, next, visibilityGroupId);
+      await refreshContent();
+    } catch (err) {
+      console.error('Failed to update visibility:', err);
+    } finally {
+      setVisibilitySavingId(null);
     }
   };
 
@@ -558,6 +602,62 @@ export default function MyContentLayout() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex flex-wrap justify-end gap-1">
+                          {item.workspaceRole === 'author' ? (
+                            <>
+                              <select
+                                value={item.visibility}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v === 'PUBLIC') {
+                                    void handleVisibilityChange(item.id, 'PUBLIC', null);
+                                    return;
+                                  }
+                                  // PRIVATE_TO_GROUP
+                                  const gid = item.visibilityGroupId ?? myGroups[0]?.id ?? null;
+                                  void handleVisibilityChange(item.id, 'PRIVATE_TO_GROUP', gid);
+                                }}
+                                disabled={visibilitySavingId === item.id}
+                                title="Visibility"
+                                className="h-[30px] rounded-app-md border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-colors hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-label="Visibility"
+                              >
+                                <option value="PUBLIC">Public</option>
+                                <option value="PRIVATE_TO_GROUP">Private to group</option>
+                              </select>
+                              {item.visibility === 'PRIVATE_TO_GROUP' ? (
+                                <select
+                                  value={item.visibilityGroupId ?? ''}
+                                  onChange={(e) => {
+                                    const gid = e.target.value || null;
+                                    void handleVisibilityChange(item.id, 'PRIVATE_TO_GROUP', gid);
+                                  }}
+                                  disabled={
+                                    visibilitySavingId === item.id || groupsLoading || myGroups.length === 0
+                                  }
+                                  title="Visibility group"
+                                  className="h-[30px] max-w-[200px] rounded-app-md border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-colors hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
+                                  aria-label="Visibility group"
+                                >
+                                  {myGroups.length === 0 ? (
+                                    <option value="">
+                                      {groupsLoading ? 'Loading groups…' : 'No groups'}
+                                    </option>
+                                  ) : (
+                                    <>
+                                      <option value="" disabled>
+                                        Select group…
+                                      </option>
+                                      {myGroups.map((g) => (
+                                        <option key={g.id} value={g.id}>
+                                          {g.name}
+                                        </option>
+                                      ))}
+                                    </>
+                                  )}
+                                </select>
+                              ) : null}
+                            </>
+                          ) : null}
                           {item.status === 'draft' && item.workspaceRole === 'author' && (
                             <button
                               type="button"

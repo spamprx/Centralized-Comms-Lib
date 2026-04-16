@@ -85,6 +85,8 @@ export function useMyContent() {
             title: c.title,
             type: mapContentType(c.contentType),
             status,
+            visibility: c.visibility,
+            visibilityGroupId: c.visibilityGroupId ?? null,
             views: c.viewsCount ?? 0,
             lastModified: c.updatedAt,
             createdAt: c.createdAt,

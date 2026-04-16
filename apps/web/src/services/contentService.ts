@@ -3,7 +3,7 @@ const API_BASE = resolveApiV1Base();
 import { getAuthToken } from './tokenStore';
 
 export type LifecycleState = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
-export type Visibility = 'PUBLIC' | 'PRIVATE' | 'HIDDEN' | 'ARCHIVED' | 'PRIVATE_TO_GROUP';
+export type Visibility = 'PUBLIC' | 'PRIVATE_TO_GROUP';
 
 export type ContentAuthor = {
   id: string;
@@ -265,6 +265,20 @@ export const contentService = {
     return request<Content>(`/content/${id}/STATE_TRANSITION`, {
       method: 'POST',
       body: JSON.stringify({ lifecycleState }),
+    });
+  },
+
+  updateVisibility: async (
+    id: string,
+    visibility: Visibility,
+    visibilityGroupId?: string | null,
+  ): Promise<Content> => {
+    return request<Content>(`/content/${id}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        visibility,
+        ...(visibilityGroupId !== undefined ? { visibilityGroupId } : {}),
+      }),
     });
   },
 

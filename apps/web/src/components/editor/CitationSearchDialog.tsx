@@ -18,6 +18,45 @@ function hitTitle(hit: ContentSearchHit): string {
   return 'Untitled';
 }
 
+function hitKey(hit: ContentSearchHit): string {
+  const s = hit.source ?? {};
+  const title = typeof (s as any).title === 'string' ? (s as any).title.trim() : '';
+  const name = typeof (s as any).name === 'string' ? (s as any).name.trim() : '';
+  const authorName =
+    typeof (s as any).authorDisplayName === 'string'
+      ? (s as any).authorDisplayName.trim()
+      : typeof (s as any).authorName === 'string'
+        ? (s as any).authorName.trim()
+        : '';
+  const authorsArr = Array.isArray((s as any).authors) ? (s as any).authors.map(String).join(',') : '';
+  const container = typeof (s as any).container === 'string' ? (s as any).container.trim() : '';
+  const year = (s as any).year != null ? String((s as any).year) : '';
+  return [title || name, authorName || authorsArr, year, container].map((x) => x.toLowerCase()).join('|');
+}
+
+function dedupeHits(hits: ContentSearchHit[]): ContentSearchHit[] {
+  const bestByKey = new Map<string, ContentSearchHit>();
+  for (const h of hits) {
+    const key = hitKey(h);
+    const prev = bestByKey.get(key);
+    if (!prev || (h.score ?? 0) > (prev.score ?? 0)) bestByKey.set(key, h);
+  }
+  return Array.from(bestByKey.values()).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+}
+
+function isPublishedHit(hit: ContentSearchHit): boolean {
+  const s = hit.source as any;
+  const ls = typeof s?.lifecycleState === 'string' ? s.lifecycleState : '';
+  if (ls) return ls.toUpperCase() === 'PUBLISHED';
+  const status = typeof s?.status === 'string' ? s.status : '';
+  if (status) return status.toLowerCase() === 'published';
+  const published = s?.published;
+  if (typeof published === 'boolean') return published;
+  // If the search index doesn't provide lifecycle state metadata,
+  // we conservatively hide it (only published content should be referenceable).
+  return false;
+}
+
 function metaLine(hit: ContentSearchHit): string {
   const w = toCitationWork(hit);
   const parts: string[] = [];
@@ -75,7 +114,9 @@ export default function CitationSearchDialog({
     setError(null);
     try {
       const out = await searchReferences(q);
-      setHits(out.hits);
+      const deduped = dedupeHits(out.hits);
+      const publishedOnly = deduped.filter(isPublishedHit);
+      setHits(publishedOnly);
       setTotal(out.total);
       setUnavailable(out.unavailable);
     } catch (e) {
@@ -99,6 +140,9 @@ export default function CitationSearchDialog({
     setInsertingId(hit.contentId);
     setError(null);
     try {
+      if (!isPublishedHit(hit)) {
+        throw new Error('Only published content can be referenced.');
+      }
       await onInsert(hit);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not insert citation');
@@ -326,7 +370,7 @@ export default function CitationSearchDialog({
             onClick={() => onPlaceReferencesHere()}
             className="rounded-app-md border border-white/12 bg-white/[0.04] px-3 py-2 text-[12px] font-medium text-app-text transition-colors hover:border-app-accent/30 hover:bg-app-accent/10"
           >
-            Place References block at cursor
+            Update References at end
           </button>
           <button
             type="button"

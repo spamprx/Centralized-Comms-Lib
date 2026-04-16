@@ -50,11 +50,40 @@ export function toCitationWork(hit: ContentSearchHit): CitationWork {
   const authorsRaw = s.authors;
   const authors = Array.isArray(authorsRaw)
     ? authorsRaw.map((a) => String(a)).filter(Boolean)
-    : typeof s.authorName === 'string'
-      ? [s.authorName]
+    : typeof s.authorDisplayName === 'string' && s.authorDisplayName.trim()
+      ? [s.authorDisplayName.trim()]
+      : typeof s.authorName === 'string' && s.authorName.trim()
+        ? [s.authorName.trim()]
+        : typeof s.createdByName === 'string' && s.createdByName.trim()
+          ? [s.createdByName.trim()]
       : undefined;
-  const container = typeof s.container === 'string' ? s.container : undefined;
-  const year = typeof s.year === 'number' || typeof s.year === 'string' ? s.year : undefined;
+  const container =
+    typeof s.container === 'string' && s.container.trim()
+      ? s.container.trim()
+      : typeof s.channelName === 'string' && s.channelName.trim()
+        ? `Channel: ${s.channelName.trim()}`
+        : typeof s.channelKey === 'string' && s.channelKey.trim()
+          ? `Channel: ${s.channelKey.trim()}`
+          : typeof s.workspaceName === 'string' && s.workspaceName.trim()
+            ? s.workspaceName.trim()
+            : 'Comms Platform';
+  const year =
+    typeof s.year === 'number' || typeof s.year === 'string'
+      ? s.year
+      : (() => {
+          const candidates = [
+            (s as any).publishedAt,
+            (s as any).createdAt,
+            (s as any).updatedAt,
+            (s as any).lastModified,
+          ];
+          for (const c of candidates) {
+            if (!c) continue;
+            const d = new Date(String(c));
+            if (!Number.isNaN(+d)) return d.getUTCFullYear();
+          }
+          return undefined;
+        })();
   const doi = typeof s.doi === 'string' ? s.doi : undefined;
   const url = typeof s.url === 'string' ? s.url : undefined;
   return { title, authors, container, year, doi, url };
@@ -114,7 +143,7 @@ export function formatCitationLocal(style: CitationStyle, work: CitationWork): s
   const title = work.title?.trim() || '[Title unknown]';
   const y = formatYear(work.year);
   const authors = formatAuthors(work);
-  const container = work.container?.trim() || '[Source unknown]';
+  const container = work.container?.trim() || 'Comms Platform';
   const tail = linkTail(work);
 
   switch (style) {

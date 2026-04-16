@@ -15,6 +15,7 @@ import {
   Video,
 } from 'lucide-react';
 import { Button, PageHeader, PageShell, Surface } from '../components/ui';
+import { componentService, type ComponentLibraryEntry } from '../services/componentService';
 
 type AssetType = 'image' | 'video' | 'audio' | 'document';
 
@@ -79,6 +80,7 @@ function buildMockAssets(): Asset[] {
 
 export default function AssetLayout() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mainTab, setMainTab] = useState<'assets' | 'components'>('assets');
   const [allAssets, setAllAssets] = useState<Asset[]>(() => buildMockAssets());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | AssetType>('all');
@@ -86,6 +88,11 @@ export default function AssetLayout() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
+
+  const [componentQuery, setComponentQuery] = useState('');
+  const [componentItems, setComponentItems] = useState<ComponentLibraryEntry[]>([]);
+  const [componentLoading, setComponentLoading] = useState(false);
+  const [componentError, setComponentError] = useState<string | null>(null);
 
   const filteredAssets = useMemo(() => {
     let list = allAssets.filter((a) => {
@@ -165,6 +172,21 @@ export default function AssetLayout() {
 
   const selectionCount = selectedIds.size;
 
+  const refreshComponents = useCallback(async () => {
+    setComponentLoading(true);
+    setComponentError(null);
+    try {
+      const q = componentQuery.trim();
+      const rows = q ? await componentService.search(q) : await componentService.list();
+      setComponentItems(rows);
+    } catch (e) {
+      setComponentError(e instanceof Error ? e.message : 'Failed to load components');
+      setComponentItems([]);
+    } finally {
+      setComponentLoading(false);
+    }
+  }, [componentQuery]);
+
   return (
     <PageShell wide className="app-main-canvas relative">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
@@ -196,6 +218,150 @@ export default function AssetLayout() {
       />
 
       <div className="animate-fade-in space-y-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="inline-flex rounded-app-xl border border-white/10 bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] gap-2"
+            role="tablist"
+            aria-label="Asset sections"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mainTab === 'assets'}
+              onClick={() => setMainTab('assets')}
+              className={`rounded-app-lg px-4 py-2 text-[13px] font-semibold transition-colors ${
+                mainTab === 'assets'
+                  ? 'bg-app-accent/15 text-app-accent ring-1 ring-app-accent/25'
+                  : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
+              }`}
+            >
+              Assets
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mainTab === 'components'}
+              onClick={() => {
+                setMainTab('components');
+                if (componentItems.length === 0 && !componentLoading) void refreshComponents();
+              }}
+              className={`rounded-app-lg px-4 py-2 text-[13px] font-semibold transition-colors ${
+                mainTab === 'components'
+                  ? 'bg-app-accent/15 text-app-accent ring-1 ring-app-accent/25'
+                  : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
+              }`}
+            >
+              Components
+            </button>
+          </div>
+        </div>
+
+        {mainTab === 'components' ? (
+          <Surface
+            variant="glass"
+            padding="lg"
+            className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/35 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/25"
+          >
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-app-accent-2/25"
+              aria-hidden
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[220px] flex-1">
+                <Search
+                  size={16}
+                  strokeWidth={2}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-accent/70"
+                />
+                <input
+                  type="search"
+                  value={componentQuery}
+                  onChange={(e) => setComponentQuery(e.target.value)}
+                  placeholder="Search components..."
+                  className="h-10 w-full rounded-app-md border border-white/10 bg-white/[0.04] pl-9 pr-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-[border-color,box-shadow] placeholder:text-app-faint focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void refreshComponents()}
+                disabled={componentLoading}
+              >
+                {componentLoading ? 'Loading…' : 'Refresh'}
+              </Button>
+            </div>
+
+            {componentError ? (
+              <div className="mt-4 rounded-app-lg border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-[13px] text-rose-100">
+                {componentError}
+              </div>
+            ) : null}
+
+            <div className="mt-5 overflow-hidden rounded-app-xl border border-white/[0.08] bg-white/[0.02]">
+              <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3 text-[12px] text-app-muted">
+                <span className="font-semibold uppercase tracking-wide text-app-faint">
+                  Components
+                </span>
+                <span className="tabular-nums">{componentItems.length} total</span>
+              </div>
+              {componentItems.length === 0 ? (
+                <div className="px-4 py-10 text-center text-[13px] text-app-muted">
+                  {componentLoading ? 'Loading…' : 'No components found.'}
+                </div>
+              ) : (
+                <ul className="m-0 list-none divide-y divide-white/[0.06] p-0">
+                  {componentItems.map((c) => (
+                    <li key={c.id} className="px-4 py-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-semibold text-app-text">
+                            {c.name}
+                          </div>
+                          <div className="mt-0.5 truncate font-mono text-[11px] text-app-muted">
+                            {c.key}
+                          </div>
+                          {c.description ? (
+                            <div className="mt-1 text-[12px] text-app-muted">{c.description}</div>
+                          ) : null}
+                          <div className="mt-1 text-[11px] text-app-faint">
+                            Latest version:{' '}
+                            <span className="font-semibold text-app-muted">
+                              {c.latestVersion?.version ?? '—'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(c.key);
+                            }}
+                            className="rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] font-semibold text-app-muted hover:bg-white/[0.07] hover:text-app-text"
+                            title="Copy key"
+                          >
+                            Copy key
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(c.id);
+                            }}
+                            className="rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] font-semibold text-app-muted hover:bg-white/[0.07] hover:text-app-text"
+                            title="Copy id"
+                          >
+                            Copy id
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Surface>
+        ) : null}
+
+        {mainTab === 'assets' ? (
         <Surface
           variant="glass"
           padding="lg"
@@ -297,13 +463,15 @@ export default function AssetLayout() {
             </div>
           </div>
         </Surface>
+        ) : null}
 
-        {isUploading && (
+        {mainTab === 'assets' && isUploading && (
           <div className="rounded-app-xl border border-app-accent/35 bg-app-accent/10 px-4 py-3 text-[13px] text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
             Upload complete. Assets were added to your library.
           </div>
         )}
 
+        {mainTab === 'assets' ? (
         <Surface
           variant="glass"
           padding="lg"
@@ -374,32 +542,35 @@ export default function AssetLayout() {
             </div>
           )}
         </Surface>
+        ) : null}
 
-        <div
-          className={`sticky bottom-0 z-20 mb-2 rounded-app-xl border border-app-accent/45 bg-app-bg/80 px-4 py-3.5 shadow-[0_-12px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 ease-out supports-backdrop-filter:bg-app-bg/65 md:px-5 ${
-            selectionCount > 0
-              ? 'translate-y-0 opacity-100'
-              : 'pointer-events-none translate-y-4 opacity-0'
-          }`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[13px] font-medium tabular-nums text-app-text">
-              {selectionCount} items selected
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary">
-                Download selected
-              </Button>
-              <button
-                type="button"
-                onClick={() => deleteAssets(selectedIds)}
-                className="h-9 rounded-app-lg border border-red-400/35 bg-red-500/[0.12] px-3.5 text-[13px] font-medium text-red-200 shadow-[0_0_18px_-10px_rgba(248,113,113,0.35)] transition-colors hover:bg-red-500/20"
-              >
-                Delete selected
-              </button>
+        {mainTab === 'assets' ? (
+          <div
+            className={`sticky bottom-0 z-20 mb-2 rounded-app-xl border border-app-accent/45 bg-app-bg/80 px-4 py-3.5 shadow-[0_-12px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 ease-out supports-backdrop-filter:bg-app-bg/65 md:px-5 ${
+              selectionCount > 0
+                ? 'translate-y-0 opacity-100'
+                : 'pointer-events-none translate-y-4 opacity-0'
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-[13px] font-medium tabular-nums text-app-text">
+                {selectionCount} items selected
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="secondary">
+                  Download selected
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => deleteAssets(selectedIds)}
+                  className="h-9 rounded-app-lg border border-red-400/35 bg-red-500/[0.12] px-3.5 text-[13px] font-medium text-red-200 shadow-[0_0_18px_-10px_rgba(248,113,113,0.35)] transition-colors hover:bg-red-500/20"
+                >
+                  Delete selected
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </PageShell>
   );

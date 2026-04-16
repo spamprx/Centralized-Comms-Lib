@@ -5,6 +5,8 @@ export interface MyContentItem {
   title: string;
   type: 'article' | 'video' | 'podcast' | 'document';
   status: 'draft' | 'in_review' | 'published' | 'archived';
+  visibility: 'PUBLIC' | 'PRIVATE_TO_GROUP';
+  visibilityGroupId?: string | null;
   views: number;
   lastModified: string;
   createdAt: string;
@@ -27,6 +29,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Q1 Marketing Strategy Document',
     type: 'document',
     status: 'published',
+    visibility: 'PUBLIC',
+    visibilityGroupId: null,
     views: 1240,
     lastModified: '2025-03-10',
     createdAt: '2025-02-15',
@@ -39,6 +43,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Product Launch Video Script',
     type: 'video',
     status: 'in_review',
+    visibility: 'PRIVATE_TO_GROUP',
+    visibilityGroupId: 'g-demo-1',
     views: 0,
     lastModified: '2025-03-09',
     createdAt: '2025-03-01',
@@ -51,6 +57,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Customer Success Story: Acme Corp',
     type: 'article',
     status: 'published',
+    visibility: 'PUBLIC',
+    visibilityGroupId: null,
     views: 856,
     lastModified: '2025-03-08',
     createdAt: '2025-02-20',
@@ -63,6 +71,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Employee Onboarding Guide',
     type: 'document',
     status: 'draft',
+    visibility: 'PRIVATE_TO_GROUP',
+    visibilityGroupId: 'g-demo-1',
     views: 0,
     lastModified: '2025-03-07',
     createdAt: '2025-03-05',
@@ -75,6 +85,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Tech Talk: AI in Content Creation',
     type: 'podcast',
     status: 'published',
+    visibility: 'PUBLIC',
+    visibilityGroupId: null,
     views: 2340,
     lastModified: '2025-03-06',
     createdAt: '2025-02-10',
@@ -87,6 +99,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Brand Guidelines 2025',
     type: 'document',
     status: 'archived',
+    visibility: 'PUBLIC',
+    visibilityGroupId: null,
     views: 567,
     lastModified: '2025-02-28',
     createdAt: '2025-01-15',
@@ -99,6 +113,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Social Media Best Practices',
     type: 'article',
     status: 'published',
+    visibility: 'PUBLIC',
+    visibilityGroupId: null,
     views: 1890,
     lastModified: '2025-03-04',
     createdAt: '2025-02-25',
@@ -111,6 +127,8 @@ export const mockMyContent: MyContentItem[] = [
     title: 'Quarterly Review Presentation',
     type: 'document',
     status: 'in_review',
+    visibility: 'PRIVATE_TO_GROUP',
+    visibilityGroupId: 'g-demo-2',
     views: 0,
     lastModified: '2025-03-03',
     createdAt: '2025-03-01',
