@@ -34,6 +34,28 @@ function parseRangeDays(range: string): number {
   return Number.isFinite(n) && n > 0 ? Math.min(366, n) : 30;
 }
 
+function rangeWindowFromDays(days: number): { from: Date; to: Date } {
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 86400000);
+  return { from, to };
+}
+
+function ymd(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function eachDay(from: Date, to: Date): string[] {
+  const start = new Date(from);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(0, 0, 0, 0);
+  const out: string[] = [];
+  for (let cur = start; cur <= end; cur = new Date(cur.getTime() + 86400000)) {
+    out.push(ymd(cur));
+  }
+  return out;
+}
+
 function parseDateRange(
   fromQ: unknown,
   toQ: unknown,
@@ -301,43 +323,58 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const prisma = getPrismaClient();
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
+      const window = rangeWindowFromDays(days);
+
       const uow = new PrismaUnitOfWork(prisma);
       const repos = uow.repos();
 
-      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const [userCount, publishedInRange, totalViews, likeCount, commentCount] =
+      const [userCount, publishedInRange, viewEvents, interactionEvents, distinctUsers] =
         await Promise.all([
-          repos.userRole.listUsers().then((u: any[]) => u.length),
+          repos.userRole.listUsers().then((u: unknown[]) => u.length),
           prisma.content.count({
             where: {
               lifecycleState: "PUBLISHED",
-              createdAt: { gte: startDate },
+              createdAt: { gte: window.from, lte: window.to },
             },
           }),
-          prisma.contentView.count({
-            where: { createdAt: { gte: startDate } },
+          prisma.contentAnalyticsEvent.count({
+            where: {
+              createdAt: { gte: window.from, lte: window.to },
+              eventType: "view",
+            },
           }),
-          prisma.contentLike.count({
-            where: { createdAt: { gte: startDate } },
+          prisma.contentAnalyticsEvent.count({
+            where: {
+              createdAt: { gte: window.from, lte: window.to },
+              eventType: { in: ["like", "share", "bookmark", "comment"] },
+            },
           }),
-          prisma.contentComment.count({
-            where: { createdAt: { gte: startDate } },
+          prisma.contentAnalyticsEvent.findMany({
+            where: { createdAt: { gte: window.from, lte: window.to } },
+            select: { metadata: true },
           }),
         ]);
 
-      const interactions = likeCount + commentCount;
+      const uniqueUserIds = new Set<string>();
+      for (const row of distinctUsers) {
+        const meta =
+          row.metadata && typeof row.metadata === "object"
+            ? (row.metadata as Record<string, unknown>)
+            : null;
+        const userId = meta?.userId;
+        if (typeof userId === "string" && userId) uniqueUserIds.add(userId);
+      }
+
       const interactionRatePct =
-        totalViews > 0
-          ? Math.round((interactions / totalViews) * 1000) / 10
+        viewEvents > 0
+          ? Math.round((interactionEvents / viewEvents) * 1000) / 10
           : 0;
 
       res.status(200).json([
         {
           label: "Total Views",
-          value: totalViews.toLocaleString(),
+          value: viewEvents.toLocaleString(),
         },
         {
           label: "Interaction rate",
@@ -345,7 +382,7 @@ router.get(
         },
         {
           label: "Active Users",
-          value: userCount.toLocaleString(),
+          value: uniqueUserIds.size.toLocaleString(),
         },
         {
           label: "Content Published",
@@ -386,23 +423,35 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const prisma = getPrismaClient();
-      const range = (req.query.range as string) || "30d";
-      const days = parseInt(range) || 30;
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
+      const window = rangeWindowFromDays(days);
 
-      // In production, query actual analytics data grouped by date
-      // For now, return mock data structure
-      const data: { date: string; value: number }[] = [];
-      const now = new Date();
-      for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        data.push({
-          date: d.toISOString().split("T")[0],
-          value: Math.floor(3000 + Math.random() * 2000),
-        });
+      type Row = { day: string; count: bigint | number };
+      const rows = await prisma.$queryRaw<Row[]>`
+        SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
+               COUNT(*)::bigint as count
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" = 'view'
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `;
+      const byDay = new Map<string, number>();
+      for (const r of rows) {
+        const n =
+          typeof r.count === "bigint"
+            ? Number(r.count)
+            : typeof r.count === "number"
+              ? r.count
+              : Number(r.count);
+        byDay.set(String(r.day), Number.isFinite(n) ? n : 0);
       }
-
-      res.status(200).json(data);
+      const series = eachDay(window.from, window.to).map((day) => ({
+        date: day,
+        value: byDay.get(day) ?? 0,
+      }));
+      res.status(200).json(series);
     } catch (err) {
       res
         .status(500)
@@ -436,25 +485,69 @@ router.get(
   authorize("USER", "ADMIN"),
   async (req: AuthRequest, res: Response) => {
     try {
-      const range = (req.query.range as string) || "7d";
-      const days = parseInt(range) || 7;
+      const prisma = getPrismaClient();
+      const days = parseRangeDays(queryParamString(req.query.range, "7d"));
+      const window = rangeWindowFromDays(days);
 
-      // In production, query actual engagement data
-      const data = [];
-      const now = new Date();
-      for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        data.push({
-          label: d.toISOString().slice(5, 10),
-          views: Math.floor(4000 + Math.random() * 1500),
-          likes: Math.floor(800 + Math.random() * 300),
-          shares: Math.floor(200 + Math.random() * 100),
-          comments: Math.floor(150 + Math.random() * 80),
-        });
+      type Row = { day: string; eventType: string; count: bigint | number };
+      const rows = await prisma.$queryRaw<Row[]>`
+        SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
+               "eventType" as "eventType",
+               COUNT(*)::bigint as count
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" IN ('view','like','share','comment')
+        GROUP BY 1, 2
+        ORDER BY 1 ASC
+      `;
+
+      const baseDays = eachDay(window.from, window.to);
+      const byDay = new Map<
+        string,
+        { views: number; likes: number; shares: number; comments: number }
+      >();
+      for (const d of baseDays) byDay.set(d, { views: 0, likes: 0, shares: 0, comments: 0 });
+
+      for (const r of rows) {
+        const day = String(r.day);
+        const target = byDay.get(day);
+        if (!target) continue;
+        const n =
+          typeof r.count === "bigint"
+            ? Number(r.count)
+            : typeof r.count === "number"
+              ? r.count
+              : Number(r.count);
+        const count = Number.isFinite(n) ? n : 0;
+        switch (String(r.eventType)) {
+          case "view":
+            target.views += count;
+            break;
+          case "like":
+            target.likes += count;
+            break;
+          case "share":
+            target.shares += count;
+            break;
+          case "comment":
+            target.comments += count;
+            break;
+        }
       }
 
-      res.status(200).json(data);
+      res.status(200).json(
+        baseDays.map((day) => {
+          const m = byDay.get(day)!;
+          return {
+            label: day.slice(5, 10),
+            views: m.views,
+            likes: m.likes,
+            shares: m.shares,
+            comments: m.comments,
+          };
+        }),
+      );
     } catch (err) {
       res
         .status(500)
@@ -483,15 +576,39 @@ router.get(
   authorize("USER", "ADMIN"),
   async (req: AuthRequest, res: Response) => {
     try {
-      // In production, calculate from actual reading analytics
-      res.status(200).json([
-        { range: "0-1 min", count: 1250 },
-        { range: "1-3 min", count: 3420 },
-        { range: "3-5 min", count: 2890 },
-        { range: "5-10 min", count: 1560 },
-        { range: "10-15 min", count: 780 },
-        { range: "15+ min", count: 340 },
-      ]);
+      const prisma = getPrismaClient();
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
+      const window = rangeWindowFromDays(days);
+
+      const rows = await prisma.contentAnalyticsEvent.findMany({
+        where: {
+          createdAt: { gte: window.from, lte: window.to },
+          eventType: "reading_time",
+        },
+        select: { metadata: true },
+      });
+
+      const buckets = [
+        { range: "0-1 min", min: 0, max: 60, count: 0 },
+        { range: "1-3 min", min: 60, max: 180, count: 0 },
+        { range: "3-5 min", min: 180, max: 300, count: 0 },
+        { range: "5-10 min", min: 300, max: 600, count: 0 },
+        { range: "10-15 min", min: 600, max: 900, count: 0 },
+        { range: "15+ min", min: 900, max: Number.POSITIVE_INFINITY, count: 0 },
+      ];
+
+      for (const r of rows) {
+        const meta =
+          r.metadata && typeof r.metadata === "object"
+            ? (r.metadata as Record<string, unknown>)
+            : null;
+        const seconds = Number(meta?.seconds);
+        if (!Number.isFinite(seconds) || seconds <= 0) continue;
+        const b = buckets.find((b) => seconds >= b.min && seconds < b.max);
+        if (b) b.count += 1;
+      }
+
+      res.status(200).json(buckets.map(({ range, count }) => ({ range, count })));
     } catch (err) {
       res
         .status(500)
@@ -521,15 +638,59 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const prisma = getPrismaClient();
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
+      const window = rangeWindowFromDays(days);
 
-      // In production, group content by type
-      res.status(200).json([
-        { type: "Articles", value: 45, color: "#8b5cf6" },
-        { type: "Videos", value: 25, color: "#06b6d4" },
-        { type: "Podcasts", value: 15, color: "#f59e0b" },
-        { type: "Infographics", value: 10, color: "#10b981" },
-        { type: "Documents", value: 5, color: "#6b7280" },
-      ]);
+      // Determine "pieces" based on content that actually received views in the range.
+      const viewed = await prisma.contentAnalyticsEvent.findMany({
+        where: {
+          createdAt: { gte: window.from, lte: window.to },
+          eventType: "view",
+        },
+        distinct: ["contentId"],
+        select: { contentId: true },
+      });
+      const contentIds = viewed.map((v) => v.contentId);
+      if (contentIds.length === 0) {
+        res.status(200).json([]);
+        return;
+      }
+
+      const contents = await prisma.content.findMany({
+        where: { id: { in: contentIds } },
+        select: { contentType: true },
+      });
+
+      const counts = new Map<string, number>();
+      for (const c of contents) {
+        const key = String(c.contentType ?? "ARTICLE");
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      const total = Array.from(counts.values()).reduce((a, b) => a + b, 0) || 1;
+
+      // UI currently expects percentages.
+      const toPct = (n: number) => Math.round((n / total) * 1000) / 10;
+
+      const rows = Array.from(counts.entries())
+        .map(([type, n]) => ({ type, n, pct: toPct(n) }))
+        .sort((a, b) => b.n - a.n);
+
+      res.status(200).json(
+        rows.map((r) => ({
+          type:
+            r.type === "ARTICLE"
+              ? "Articles"
+              : r.type === "VIDEO"
+                ? "Videos"
+                : r.type === "PODCAST"
+                  ? "Podcasts"
+                  : r.type === "DOCUMENT"
+                    ? "Documents"
+                    : r.type,
+          value: r.pct,
+          color: "#937cf8",
+        })),
+      );
     } catch (err) {
       res
         .status(500)
@@ -566,25 +727,101 @@ router.get(
       const prisma = getPrismaClient();
       const limit = parseInt(req.query.limit as string) || 10;
 
-      // In production, query content ordered by an analytics metric. For now,
-      // use most recent content and mock the views/engagement numbers.
-      const content = await prisma.content.findMany({
-        take: limit,
-        orderBy: { createdAt: "desc" },
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
+      const window = rangeWindowFromDays(days);
+
+      type Row = { contentId: string; views: bigint | number };
+      const viewRows = await prisma.$queryRaw<Row[]>`
+        SELECT "contentId" as "contentId",
+               COUNT(*)::bigint as views
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" = 'view'
+        GROUP BY 1
+        ORDER BY views DESC
+        LIMIT ${limit}
+      `;
+
+      const ids = viewRows.map((r) => r.contentId);
+      if (ids.length === 0) {
+        res.status(200).json([]);
+        return;
+      }
+
+      const contents = await prisma.content.findMany({
+        where: { id: { in: ids } },
         include: { author: { select: { displayName: true } } },
       });
+      const contentById = new Map(contents.map((c) => [c.id, c]));
 
-      const data = content.map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        author: c.author?.displayName ?? "Unknown",
-        views: Math.floor(500 + Math.random() * 4500),
-        engagement: Math.floor(60 + Math.random() * 35),
-        avgReadTime: `${Math.floor(3 + Math.random() * 10)}:${String(
-          Math.floor(Math.random() * 60),
-        ).padStart(2, "0")}`,
-        publishedAt: c.createdAt.toISOString(),
-      }));
+      type ReadRow = { contentId: string; avgSeconds: number | null };
+      const readRows = await prisma.$queryRaw<ReadRow[]>`
+        SELECT "contentId" as "contentId",
+               AVG( (metadata->>'seconds')::float ) as "avgSeconds"
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" = 'reading_time'
+          AND (metadata->>'seconds') IS NOT NULL
+        GROUP BY 1
+      `;
+      const avgReadById = new Map<string, number>();
+      for (const r of readRows) {
+        if (typeof r.avgSeconds === "number" && Number.isFinite(r.avgSeconds)) {
+          avgReadById.set(r.contentId, r.avgSeconds);
+        }
+      }
+
+      type InterRow = { contentId: string; interactions: bigint | number };
+      const interRows = await prisma.$queryRaw<InterRow[]>`
+        SELECT "contentId" as "contentId",
+               COUNT(*)::bigint as interactions
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" IN ('like','share','bookmark','comment')
+        GROUP BY 1
+      `;
+      const interById = new Map<string, number>();
+      for (const r of interRows) {
+        const n =
+          typeof r.interactions === "bigint"
+            ? Number(r.interactions)
+            : typeof r.interactions === "number"
+              ? r.interactions
+              : Number(r.interactions);
+        interById.set(r.contentId, Number.isFinite(n) ? n : 0);
+      }
+
+      const data = viewRows
+        .map((r) => {
+          const c = contentById.get(r.contentId);
+          if (!c) return null;
+          const views =
+            typeof r.views === "bigint"
+              ? Number(r.views)
+              : typeof r.views === "number"
+                ? r.views
+                : Number(r.views);
+          const interactions = interById.get(r.contentId) ?? 0;
+          const engagement =
+            views > 0 ? Math.round((interactions / views) * 1000) / 10 : 0;
+          const avgSeconds = avgReadById.get(r.contentId) ?? 0;
+          const mm = Math.floor(avgSeconds / 60);
+          const ss = Math.floor(avgSeconds % 60);
+          const avgReadTime = `${mm}:${String(ss).padStart(2, "0")}`;
+          return {
+            id: c.id,
+            title: c.title,
+            author: c.author?.displayName ?? "Unknown",
+            views: Number.isFinite(views) ? views : 0,
+            engagement,
+            avgReadTime,
+            publishedAt: c.createdAt.toISOString(),
+          };
+        })
+        .filter(Boolean);
 
       res.status(200).json(data);
     } catch (err) {
@@ -615,37 +852,105 @@ router.get(
   authorize("USER", "ADMIN"),
   async (req: AuthRequest, res: Response) => {
     try {
-      // In production, generate insights using AI/ML based on analytics data
-      res.status(200).json([
-        {
-          title: "Engagement Peak Identified",
-          description:
-            "Content published between 9-11 AM receives 34% more engagement. Consider scheduling posts during this window.",
-          sentiment: "positive" as const,
-          impact: "high" as const,
+      const prisma = getPrismaClient();
+      const days = parseRangeDays(queryParamString(req.query.range, "30d"));
+      const window = rangeWindowFromDays(days);
+
+      const totalViews = await prisma.contentAnalyticsEvent.count({
+        where: {
+          createdAt: { gte: window.from, lte: window.to },
+          eventType: "view",
         },
-        {
-          title: "Video Content Trending",
-          description:
-            "Video content shows 2.5x higher engagement rate compared to articles this month.",
-          sentiment: "positive" as const,
-          impact: "high" as const,
+      });
+
+      // Peak hour (by views)
+      type HourRow = { hour: number; count: bigint | number };
+      const hourRows = await prisma.$queryRaw<HourRow[]>`
+        SELECT EXTRACT(HOUR FROM "createdAt")::int as hour,
+               COUNT(*)::bigint as count
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" = 'view'
+        GROUP BY 1
+        ORDER BY count DESC
+        LIMIT 1
+      `;
+      const peakHour = hourRows[0]?.hour;
+      const peakCountRaw = hourRows[0]?.count ?? 0;
+      const peakCount =
+        typeof peakCountRaw === "bigint"
+          ? Number(peakCountRaw)
+          : typeof peakCountRaw === "number"
+            ? peakCountRaw
+            : Number(peakCountRaw);
+
+      // Weekend vs weekday views
+      type DRow = { dow: number; count: bigint | number };
+      const dowRows = await prisma.$queryRaw<DRow[]>`
+        SELECT EXTRACT(DOW FROM "createdAt")::int as dow,
+               COUNT(*)::bigint as count
+        FROM content_analytics_events
+        WHERE "createdAt" >= ${window.from}
+          AND "createdAt" <= ${window.to}
+          AND "eventType" = 'view'
+        GROUP BY 1
+      `;
+      let weekend = 0;
+      let weekday = 0;
+      for (const r of dowRows) {
+        const n =
+          typeof r.count === "bigint"
+            ? Number(r.count)
+            : typeof r.count === "number"
+              ? r.count
+              : Number(r.count);
+        const c = Number.isFinite(n) ? n : 0;
+        if (r.dow === 0 || r.dow === 6) weekend += c;
+        else weekday += c;
+      }
+      const weekendPct =
+        weekend + weekday > 0
+          ? Math.round((weekend / (weekend + weekday)) * 1000) / 10
+          : 0;
+
+      // Interaction rate overall
+      const interactions = await prisma.contentAnalyticsEvent.count({
+        where: {
+          createdAt: { gte: window.from, lte: window.to },
+          eventType: { in: ["like", "share", "bookmark", "comment"] },
         },
-        {
-          title: "Drop in Weekend Activity",
-          description:
-            "User activity drops 45% on weekends. Consider automated posting or weekend-specific content.",
+      });
+      const interactionRate =
+        totalViews > 0 ? Math.round((interactions / totalViews) * 1000) / 10 : 0;
+
+      const insights = [];
+      if (typeof peakHour === "number" && Number.isFinite(peakHour) && totalViews > 0) {
+        const pct =
+          totalViews > 0 ? Math.round((peakCount / totalViews) * 1000) / 10 : 0;
+        insights.push({
+          title: "Peak viewing hour",
+          description: `Most views happen around ${String(peakHour).padStart(2, "0")}:00. That hour accounts for ~${pct}% of views in this range.`,
+          sentiment: "positive" as const,
+          impact: pct >= 20 ? ("high" as const) : ("medium" as const),
+        });
+      }
+      insights.push({
+        title: "Interaction rate",
+        description: `You have an interaction rate of ~${interactionRate}% (likes/shares/bookmarks/comments per view) over the selected range.`,
+        sentiment: interactionRate >= 5 ? ("positive" as const) : ("neutral" as const),
+        impact: interactionRate >= 10 ? ("high" as const) : ("medium" as const),
+      });
+      if (totalViews > 0) {
+        insights.push({
+          title: "Weekend share of views",
+          description: `Weekend traffic represents ~${weekendPct}% of views in this range.`,
           sentiment: "neutral" as const,
-          impact: "medium" as const,
-        },
-        {
-          title: "Long-form Content Decline",
-          description:
-            "Articles over 1500 words show 20% lower completion rates. Consider breaking into series.",
-          sentiment: "negative" as const,
-          impact: "medium" as const,
-        },
-      ]);
+          impact: weekendPct <= 15 ? ("medium" as const) : ("low" as const),
+        });
+      }
+
+      res.status(200).json(insights.slice(0, 4));
     } catch (err) {
       res
         .status(500)

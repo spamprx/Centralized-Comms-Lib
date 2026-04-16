@@ -46,10 +46,10 @@ export function useAnalytics(dateRange: string | DateRange = '30d') {
           analyticsService.getKPIs(param),
           analyticsService.getViewsData(param),
           analyticsService.getEngagementData(param),
-          analyticsService.getReadingTimeData(),
+          analyticsService.getReadingTimeData(param),
           analyticsService.getContentTypeData(param),
-          analyticsService.getTopContent(10),
-          analyticsService.getAIInsights(),
+          analyticsService.getTopContent(10, param),
+          analyticsService.getAIInsights(param),
         ]);
 
         if (!mounted) return;

@@ -543,8 +543,9 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
       <h2 className="mb-4 text-[15px] font-semibold tracking-tight text-app-text">
         Content type breakdown
       </h2>
-      <div className="flex flex-wrap items-center justify-center gap-6 lg:flex-nowrap lg:justify-between">
-        <div className="relative flex h-[220px] w-[220px] shrink-0 items-center justify-center">
+      <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[240px_1fr]">
+        <div className="flex items-center justify-center">
+          <div className="relative flex h-[220px] w-[220px] shrink-0 items-center justify-center">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -575,8 +576,9 @@ function ContentTypeCard({ data }: { data: ContentTypeBreakdown[] }) {
               {top.name} {top.pct}%
             </div>
           </div>
+          </div>
         </div>
-        <ul className="min-w-[200px] flex-1 space-y-2">
+        <ul className="min-w-0 space-y-2">
           {pieData.map((row) => (
             <li
               key={row.name}

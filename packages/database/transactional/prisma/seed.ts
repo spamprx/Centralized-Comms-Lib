@@ -1310,11 +1310,17 @@ async function seedContentAnalyticsEvents() {
   ];
 
   // contentAnalyticsEvent may not be in generated client yet; use raw insert
-  for (const e of events) {
+  const now = Date.now();
+  const ninetyDaysMs = 90 * 86400000;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    // Spread events deterministically across the last 90 days (older first).
+    const t = now - Math.floor(((events.length - 1 - i) / Math.max(1, events.length - 1)) * ninetyDaysMs);
+    const createdAt = new Date(t).toISOString();
     await prisma.$executeRawUnsafe(
       `INSERT INTO content_analytics_events (id, "contentId", "eventType", metadata, "createdAt")
-       VALUES ($1, $2, $3, $4::jsonb, NOW())`,
-      randomUUID(), e.contentId, e.eventType, JSON.stringify(e.metadata),
+       VALUES ($1, $2, $3, $4::jsonb, $5::timestamptz)`,
+      randomUUID(), e.contentId, e.eventType, JSON.stringify(e.metadata), createdAt,
     );
   }
   console.log(`  ✔ ${events.length} content analytics events`);

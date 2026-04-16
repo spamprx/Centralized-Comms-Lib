@@ -20,6 +20,7 @@ export type ReviewAssignment = {
   reviewRequestId: string;
   reviewerId: string;
   assignedById: string;
+  decision?: { verdict: string; comment: string; createdAt: string };
   reviewRequest?: ReviewRequest & {
     content?: {
       id: string;

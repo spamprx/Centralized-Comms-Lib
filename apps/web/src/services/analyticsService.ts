@@ -65,8 +65,9 @@ export const analyticsService = {
     return request<EngagementData[]>(`/analytics/engagement${params}`);
   },
 
-  getReadingTimeData: async (): Promise<ReadingTimeBucket[]> => {
-    return request<ReadingTimeBucket[]>('/analytics/reading-time');
+  getReadingTimeData: async (dateRange?: string | DateRange): Promise<ReadingTimeBucket[]> => {
+    const params = buildDateParams(dateRange);
+    return request<ReadingTimeBucket[]>(`/analytics/reading-time${params}`);
   },
 
   getContentTypeData: async (dateRange?: string | DateRange): Promise<ContentTypeBreakdown[]> => {
@@ -74,13 +75,23 @@ export const analyticsService = {
     return request<ContentTypeBreakdown[]>(`/analytics/content-types${params}`);
   },
 
-  getTopContent: async (limit?: number): Promise<TopContentItem[]> => {
-    const params = limit ? `?limit=${limit}` : '';
+  getTopContent: async (
+    limit?: number,
+    dateRange?: string | DateRange,
+  ): Promise<TopContentItem[]> => {
+    const qs: string[] = [];
+    if (limit) qs.push(`limit=${encodeURIComponent(String(limit))}`);
+    if (dateRange) {
+      const dateParams = buildDateParams(dateRange).replace(/^\?/, '');
+      if (dateParams) qs.push(dateParams);
+    }
+    const params = qs.length ? `?${qs.join('&')}` : '';
     return request<TopContentItem[]>(`/analytics/top-content${params}`);
   },
 
-  getAIInsights: async (): Promise<AIInsight[]> => {
-    return request<AIInsight[]>('/analytics/ai-insights');
+  getAIInsights: async (dateRange?: string | DateRange): Promise<AIInsight[]> => {
+    const params = buildDateParams(dateRange);
+    return request<AIInsight[]>(`/analytics/ai-insights${params}`);
   },
 };
 

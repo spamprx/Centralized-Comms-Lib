@@ -304,7 +304,8 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       const { verdict, comment } = req.body;
-      if (!verdict || !comment) {
+      const trimmedComment = typeof comment === "string" ? comment.trim() : "";
+      if (!verdict || !trimmedComment) {
         res.status(400).json({ error: "verdict and comment are required" });
         return;
       }
@@ -319,7 +320,7 @@ router.post(
         auditContext(req),
         req.params.id,
         verdict,
-        comment,
+        trimmedComment,
       );
       if ("notFound" in result && result.notFound) {
         res.status(404).json({ error: "Review assignment not found" });

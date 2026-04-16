@@ -1407,6 +1407,12 @@ export default function TemplateLayoutEditor({
       previewChannels.find((c) => c.bindingId === previewBindingId) ?? previewChannels[0] ?? null,
     [previewChannels, previewBindingId],
   );
+  const selectedPreviewLayoutMode = useMemo(() => {
+    const raw = selectedPreviewChannel?.layoutConfig;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'responsive';
+    const layout = (raw as Record<string, unknown>).layout;
+    return typeof layout === 'string' && layout.trim() ? layout.trim().toLowerCase() : 'responsive';
+  }, [selectedPreviewChannel?.layoutConfig]);
   const effectiveChannelCompatibility = useMemo(
     () => selectedPreviewChannel?.compatibility ?? channelCompatibility ?? null,
     [selectedPreviewChannel, channelCompatibility],
@@ -2516,48 +2522,99 @@ export default function TemplateLayoutEditor({
                       <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
                       <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
                     </div>
-                    <span className="text-[12px] text-app-muted">Email preview</span>
+                    <span className="text-[12px] text-app-muted">
+                      {selectedPreviewChannel
+                        ? `${selectedPreviewChannel.channelName} preview`
+                        : 'Preview'}
+                    </span>
                     <span className="w-7" />
                   </div>
                   <div className="space-y-2 p-8">
-                    {resolvedPreviewRows.length === 0 ? (
-                      <div className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] p-4 text-[14px] text-app-muted">
-                        Add blocks to start previewing.
-                      </div>
-                    ) : (
-                      resolvedPreviewRows.map((row) => (
-                        <div
-                          key={row.id}
-                          className="grid gap-2"
-                          style={{
-                            gridTemplateColumns:
-                              previewBp === 'mobile'
-                                ? '1fr'
-                                : previewRowGridTemplateColumns(row.cells),
-                          }}
-                        >
-                          {row.cells.map((cell) => (
-                            <div key={cell.id} className="space-y-2">
-                              {cell.regions.map((region) => {
-                                const doc = ensureRichDoc(region.props);
-                                const text = extractTextFromDoc(doc);
-                                return (
-                                  <div
-                                    key={region.id}
-                                    className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[14px] leading-[1.6] text-white/85"
-                                  >
-                                    {text ? (
-                                      <InlineTemplateText text={text} />
-                                    ) : (
-                                      <span className="text-app-faint">Empty block</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
+                    {selectedPreviewLayoutMode === 'listing' ? (
+                      resolvedPreviewRows.length === 0 ? (
+                        <div className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] p-4 text-[14px] text-app-muted">
+                          Add blocks to start previewing.
                         </div>
-                      ))
+                      ) : (
+                        resolvedPreviewRows.map((row) => (
+                          <div
+                            key={row.id}
+                            className="grid gap-2"
+                            style={{
+                              gridTemplateColumns:
+                                previewBp === 'mobile'
+                                  ? '1fr'
+                                  : previewRowGridTemplateColumns(row.cells),
+                            }}
+                          >
+                            {row.cells.map((cell) => (
+                              <div key={cell.id} className="space-y-2">
+                                {cell.regions.map((region) => {
+                                  if (region.type === REGION_TYPES.richText) {
+                                    const doc = ensureRichDoc(region.props);
+                                    const text = extractTextFromDoc(doc);
+                                    return (
+                                      <div
+                                        key={region.id}
+                                        className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[14px] leading-[1.6] text-white/85"
+                                      >
+                                        {text ? (
+                                          <InlineTemplateText text={text} />
+                                        ) : (
+                                          <span className="text-app-faint">Empty block</span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  if (region.type === REGION_TYPES.media) {
+                                    const role = String(
+                                      (region.props as { role?: string })?.role ?? 'inline',
+                                    );
+                                    const caption = String(
+                                      (region.props as { caption?: string })?.caption ?? '',
+                                    ).trim();
+                                    const alt = String(
+                                      (region.props as { alt?: string })?.alt ?? '',
+                                    ).trim();
+                                    const label = caption || alt || `Media (${role})`;
+                                    return (
+                                      <div
+                                        key={region.id}
+                                        className="rounded-[8px] border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-3 text-[13px] leading-[1.6] text-app-muted"
+                                      >
+                                        <span className="text-app-faint">[Media]</span> {label}
+                                      </div>
+                                    );
+                                  }
+                                  if (region.type === REGION_TYPES.field) {
+                                    const key = String(
+                                      (region.props as { fieldKey?: string })?.fieldKey ?? 'field',
+                                    );
+                                    return (
+                                      <div
+                                        key={region.id}
+                                        className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[14px] leading-[1.6] text-white/85"
+                                      >
+                                        <InlineTemplateText text={`{{${key}}}`} />
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div
+                                      key={region.id}
+                                      className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-[13px] text-app-muted"
+                                    >
+                                      Unknown block
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      )
+                    ) : (
+                      <TemplateLayoutLivePreview rows={resolvedPreviewRows} breakpoint={previewBp} />
                     )}
                   </div>
                 </div>
@@ -2571,31 +2628,60 @@ export default function TemplateLayoutEditor({
                   <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.06em] text-app-faint">
                     Preview channel
                   </label>
-                  <div className="relative flex h-9 items-center justify-between rounded-[8px] border border-white/[0.1] bg-white/[0.05] px-3 text-[13px]">
-                    <span className="inline-flex items-center gap-2 text-app-text">
-                      <Mail size={13} className="text-app-muted" />
-                      {selectedPreviewChannel
-                        ? `${selectedPreviewChannel.channelName} (${selectedPreviewChannel.channelKey})`
-                        : 'No channel'}
-                    </span>
-                    <ChevronDown size={14} className="text-app-muted" />
-                    <select
-                      value={previewBindingId}
-                      onChange={(e) => setPreviewBindingId(e.target.value)}
-                      className="absolute inset-0 cursor-pointer opacity-0"
-                      disabled={previewChannels.length < 1}
-                    >
-                      {previewChannels.length < 1 ? (
-                        <option value="">No channel bindings</option>
-                      ) : (
-                        previewChannels.map((ch) => (
-                          <option key={ch.bindingId} value={ch.bindingId}>
-                            {ch.channelName} ({ch.channelKey})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
+                    {previewChannels.length <= 4 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {previewChannels.length < 1 ? (
+                          <div className="h-9 w-full rounded-[8px] border border-white/10 bg-white/5 px-3 text-[13px] text-app-muted flex items-center">
+                            No channel bindings
+                          </div>
+                        ) : (
+                          previewChannels.map((ch) => {
+                            const active = ch.bindingId === previewBindingId;
+                            return (
+                              <button
+                                key={ch.bindingId}
+                                type="button"
+                                onClick={() => setPreviewBindingId(ch.bindingId)}
+                                className={`h-9 rounded-[8px] border px-3 text-[12px] font-semibold transition-colors ${
+                                  active
+                                    ? 'border-app-accent/45 bg-app-accent/20 text-app-text'
+                                    : 'border-white/10 bg-white/5 text-app-muted hover:bg-white/8 hover:text-app-text'
+                                }`}
+                                title={`${ch.channelName} (${ch.channelKey})`}
+                              >
+                                {ch.channelName}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    ) : (
+                      <div className="relative flex h-9 items-center justify-between rounded-[8px] border border-white/[0.1] bg-white/[0.05] px-3 text-[13px]">
+                        <span className="inline-flex items-center gap-2 text-app-text">
+                          <Mail size={13} className="text-app-muted" />
+                          {selectedPreviewChannel
+                            ? `${selectedPreviewChannel.channelName} (${selectedPreviewChannel.channelKey})`
+                            : 'No channel'}
+                        </span>
+                        <ChevronDown size={14} className="text-app-muted" />
+                        <select
+                          value={previewBindingId}
+                          onChange={(e) => setPreviewBindingId(e.target.value)}
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                          disabled={previewChannels.length < 1}
+                        >
+                          {previewChannels.length < 1 ? (
+                            <option value="">No channel bindings</option>
+                          ) : (
+                            previewChannels.map((ch) => (
+                              <option key={ch.bindingId} value={ch.bindingId}>
+                                {ch.channelName} ({ch.channelKey})
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+                    )}
                   <div className="mt-2 inline-flex items-center gap-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[11px] text-app-muted">
                     <Eye size={11} />
                     Layout: {String(selectedPreviewChannel?.layoutConfig?.layout ?? 'responsive')}

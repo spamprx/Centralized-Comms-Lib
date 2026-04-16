@@ -1,13 +1,17 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-type Decision = { verdict: 'APPROVED' | 'DENIED'; comment: string };
+type Decision = { verdict: 'APPROVED' | 'DENIED' | 'ROLLBACK'; comment: string };
 type Comment = { text: string; time: string };
 
 interface ReviewState {
   decisions: Record<string, Decision>;
   comments: Record<string, Comment[]>;
-  addDecision: (assignmentId: string, verdict: 'APPROVED' | 'DENIED', comment: string) => void;
+  addDecision: (
+    assignmentId: string,
+    verdict: 'APPROVED' | 'DENIED' | 'ROLLBACK',
+    comment: string,
+  ) => void;
   getDecision: (assignmentId: string) => Decision | null;
   addComment: (assignmentId: string, text: string) => void;
   getComments: (assignmentId: string) => Comment[];

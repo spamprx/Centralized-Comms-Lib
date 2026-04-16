@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import type { JSONContent } from '@tiptap/core';
 import {
   CheckCircle,
   XCircle,
@@ -42,7 +43,7 @@ type ReviewItem = {
   contentVersionId: string;
   contentBody?: unknown;
   requestedBy: string;
-  verdict?: 'APPROVED' | 'DENIED';
+  verdict?: 'APPROVED' | 'DENIED' | 'ROLLBACK';
   savedComment?: string;
   reviewRequestStatus?: string;
 };
@@ -66,6 +67,10 @@ export default function ReviewLayout() {
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionSuccess, setDecisionSuccess] = useState(false);
+  const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [rollbackJustification, setRollbackJustification] = useState('');
+  const [rollbackBusy, setRollbackBusy] = useState(false);
+  const [rollbackError, setRollbackError] = useState<string | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
 
@@ -100,7 +105,7 @@ export default function ReviewLayout() {
       }
 
       // Step 2: Fetch all users up front (to look up requestedBy names)
-      let userMap: Record<string, { displayName: string; email: string }> = {};
+      const userMap: Record<string, { displayName: string; email: string }> = {};
       try {
         const usersRes = await adminUserService.getUsers();
         const rawUsers = usersRes.data as unknown as Array<{
@@ -122,6 +127,13 @@ export default function ReviewLayout() {
           const reviewReq = await reviewService.getRequestById(assignment.reviewRequestId);
           const contentId = reviewReq.contentId;
           const contentVersionId = reviewReq.contentVersionId;
+          const verdict =
+            assignment.decision?.verdict === 'APPROVED' ||
+            assignment.decision?.verdict === 'DENIED' ||
+            assignment.decision?.verdict === 'ROLLBACK'
+              ? assignment.decision?.verdict
+              : undefined;
+          const savedComment = assignment.decision?.comment ?? undefined;
 
           // Step 4: Fetch content details via getById (backend now allows reviewers)
           let title = 'Untitled';
@@ -155,6 +167,8 @@ export default function ReviewLayout() {
             contentId,
             contentVersionId,
             requestedBy: requestedByUser?.displayName || 'Unknown',
+            verdict,
+            savedComment,
           });
         } catch {
           // Skip assignments we can't fully resolve
@@ -221,20 +235,24 @@ export default function ReviewLayout() {
         setLoadingContent(false);
       }
     })();
-  }, [selectedItem?.contentId, selectedItem?.contentBody]);
+  }, [selectedItem?.contentId, selectedItem?.contentBody, selectedItem?.contentVersionId]);
 
   useEffect(() => {
     if (!selectedItem?.assignmentId) return;
     const storedComments = ctxGetComments(selectedItem.assignmentId);
-    let loadedComments: any[] = storedComments.map(
-      (c: { text: string; time: string | number | Date }, index: number) => ({
+    const loadedComments: Array<{
+      id: string;
+      author: string;
+      text: string;
+      time: string;
+      resolved: boolean;
+    }> = storedComments.map((c, index: number) => ({
         id: `ctx_${index}_${Date.now()}`,
         author: 'You',
         text: c.text,
         time: new Date(c.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         resolved: false,
-      }),
-    );
+    }));
 
     if (selectedItem.verdict && selectedItem.savedComment) {
       loadedComments.push({
@@ -323,6 +341,46 @@ export default function ReviewLayout() {
       setDecisionError(err instanceof Error ? err.message : 'Failed to submit decision');
     } finally {
       setSubmittingDecision(false);
+    }
+  };
+
+  const canRollbackApproval = Boolean(
+    selectedItem &&
+      selectedItem.status === 'COMPLETED' &&
+      selectedItem.verdict === 'APPROVED' &&
+      !loadingContent,
+  );
+
+  const handleSubmitRollback = async () => {
+    if (!selectedItem) return;
+    const justification = rollbackJustification.trim();
+    if (!justification) {
+      setRollbackError('Please provide a justification for the rollback.');
+      return;
+    }
+    setRollbackBusy(true);
+    setRollbackError(null);
+    try {
+      await reviewService.decide(selectedItem.assignmentId, 'ROLLBACK', justification);
+      setRollbackOpen(false);
+      setRollbackJustification('');
+
+      const updatedItem = {
+        ...selectedItem,
+        status: 'COMPLETED',
+        verdict: 'ROLLBACK' as const,
+        savedComment: justification,
+        reviewRequestStatus: 'OPEN',
+      };
+      setReviewItems((prev) =>
+        prev.map((item) => (item.assignmentId === selectedItem.assignmentId ? updatedItem : item)),
+      );
+      setSelectedItem(updatedItem);
+      setDecisionSuccess(false);
+    } catch (err) {
+      setRollbackError(err instanceof Error ? err.message : 'Failed to roll back approval');
+    } finally {
+      setRollbackBusy(false);
     }
   };
 
@@ -440,9 +498,25 @@ export default function ReviewLayout() {
           )}
         </div>
         {isAlreadyDecided && (
-          <span className="flex shrink-0 items-center gap-1.5 rounded-app-md border border-emerald-400/40 bg-emerald-500/[0.12] px-3 py-1.5 text-xs font-semibold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.35)]">
-            <Check size={14} strokeWidth={2} /> Decision submitted
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="flex items-center gap-1.5 rounded-app-md border border-emerald-400/40 bg-emerald-500/[0.12] px-3 py-1.5 text-xs font-semibold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.35)]">
+              <Check size={14} strokeWidth={2} /> Decision submitted
+            </span>
+            {canRollbackApproval ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setRollbackOpen(true);
+                  setRollbackError(null);
+                  setRollbackJustification('');
+                }}
+                className="rounded-app-md border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:border-amber-400/45 hover:bg-amber-500/15"
+                title="Undo approval and move content back to in-review"
+              >
+                Roll back approval
+              </button>
+            ) : null}
+          </div>
         )}
       </div>
 
@@ -561,7 +635,7 @@ export default function ReviewLayout() {
               'type' in (selectedItem.contentBody as Record<string, unknown>) ? (
                 <div className="tiptap-content">
                   <TipTapReadonly
-                    doc={selectedItem.contentBody as any}
+                    doc={selectedItem.contentBody as JSONContent}
                     className="ProseMirror review-body-prose text-[15px] leading-relaxed text-app-muted outline-none"
                     onSelectionChange={setReadingSelection}
                   />
@@ -873,6 +947,83 @@ export default function ReviewLayout() {
         sourceText={translateSource?.text ?? ''}
         cautionText="This translation runs in your browser only. It is not saved and does not change the submitted draft or your approve/deny decision. If the author should publish translated text, they must edit the content in the editor and save. Only plain text is sent — formatting and media are not preserved."
       />
+      {rollbackOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            aria-hidden
+            onClick={() => {
+              if (rollbackBusy) return;
+              setRollbackOpen(false);
+            }}
+          />
+          <div
+            className="relative w-full max-w-[520px] rounded-app-xl border border-white/12 bg-app-bg/90 p-5 shadow-app-lift backdrop-blur-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Rollback approval"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-200/90">
+                  Roll back approval
+                </div>
+                <div className="mt-1 text-[15px] font-semibold text-app-text">
+                  Justification required
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (rollbackBusy) return;
+                  setRollbackOpen(false);
+                }}
+                className="rounded-app-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[12px] font-semibold text-app-muted hover:bg-white/[0.08]"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-2 text-[13px] leading-snug text-app-muted">
+              This will undo your previous approval and move the content back to <b>In review</b>.
+              The earlier approved version will remain visible in version history.
+            </p>
+            <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+              Justification <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              value={rollbackJustification}
+              onChange={(e) => setRollbackJustification(e.target.value)}
+              rows={4}
+              disabled={rollbackBusy}
+              placeholder="Explain why you're rolling back the approval..."
+              className="mt-2 box-border w-full resize-none rounded-app-lg border border-white/10 bg-white/[0.03] p-3 text-[13px] text-app-text outline-none transition-shadow placeholder:text-app-faint focus:border-amber-400/35 focus:ring-2 focus:ring-amber-400/15 disabled:opacity-60"
+            />
+            {rollbackError ? (
+              <div className="mt-2 rounded-app-md border border-red-400/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
+                {rollbackError}
+              </div>
+            ) : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRollbackOpen(false)}
+                disabled={rollbackBusy}
+                className="rounded-app-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[13px] font-semibold text-app-text hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitRollback}
+                disabled={rollbackBusy || !rollbackJustification.trim()}
+                className="rounded-app-lg border border-amber-400/35 bg-amber-500/15 px-4 py-2 text-[13px] font-semibold text-amber-100 shadow-[0_0_22px_-10px_rgba(251,191,36,0.35)] transition-colors hover:border-amber-400/55 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {rollbackBusy ? 'Rolling back…' : 'Confirm rollback'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

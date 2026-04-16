@@ -227,13 +227,94 @@ export const reviewService = {
       if (!assignment) return { notFound: true } as const;
       if (assignment.reviewerId !== ctx.actorId && !ctx.isAdmin)
         return { forbidden: true } as const;
-      if (assignment.status === "COMPLETED")
-        return { alreadyCompleted: true } as const;
+      const trimmedComment = typeof comment === "string" ? comment.trim() : "";
+      if (!trimmedComment) throw new Error("comment is required");
+
+      // Allow undoing a previous APPROVED decision by submitting verdict=ROLLBACK.
+      // This is the "undo approval" flow; it re-opens the review and moves content back to IN_REVIEW.
+      if (assignment.status === "COMPLETED") {
+        if (verdict !== "ROLLBACK") return { alreadyCompleted: true } as const;
+        const request = await repos.review.getRequestById(
+          assignment.reviewRequestId,
+        );
+        const content = request
+          ? await repos.content.getById(request.contentId)
+          : null;
+
+        // Only allow rollback if the prior verdict was APPROVED.
+        // Some legacy rows may have COMPLETED assignments without a decision row; in that case,
+        // allow rollback only if the content is currently PUBLISHED (i.e. it was approved).
+        const prior = await prisma.reviewDecision.findUnique({
+          where: { reviewAssignmentId: assignment.id },
+          select: { verdict: true, comment: true },
+        });
+        if (prior && prior.verdict !== ("APPROVED" as any)) {
+          return { alreadyCompleted: true } as const;
+        }
+        if (!prior && content?.lifecycleState !== "PUBLISHED") {
+          return { alreadyCompleted: true } as const;
+        }
+
+        // Delete prior decision (unique constraint) then record rollback decision.
+        if (prior) {
+          await prisma.reviewDecision.delete({
+            where: { reviewAssignmentId: assignment.id },
+          });
+        }
+        // recordDecision will keep assignment status COMPLETED; that's fine (decision exists) and request status drives workflow.
+        await repos.review.recordDecision({
+          reviewAssignmentId: assignment.id,
+          verdict,
+          comment: trimmedComment,
+        });
+
+        if (request) {
+          const fromState = content?.lifecycleState ?? null;
+          await repos.content.updateLifecycleState(request.contentId, "IN_REVIEW");
+          await repos.content.createVersion({
+            contentId: request.contentId,
+            authorId: ctx.actorId,
+            changeType: "STATE_TRANSITION",
+            title: content?.title ?? "Untitled",
+            metadataSnapshot: {
+              kind: "review_rollback",
+              fromState,
+              toState: "IN_REVIEW",
+              reviewRequestId: request.id,
+              reviewAssignmentId: assignment.id,
+              justification: trimmedComment,
+            },
+          });
+          await repos.review.updateRequestStatus(request.id, "OPEN");
+          await repos.outbox.add({
+            aggregateType: "CONTENT",
+            aggregateId: request.contentId,
+            eventType: "CONTENT.ROLLBACK",
+            payload: {
+              contentId: request.contentId,
+              reviewRequestId: request.id,
+              reason: trimmedComment,
+            },
+          });
+        }
+
+        await repos.audit.append({
+          action: "REVIEW_DECISION",
+          resource: "REVIEW_ASSIGNMENT",
+          resourceId: assignment.id,
+          newValue: { verdict, comment: trimmedComment, undoApproval: true },
+          actorId: ctx.actorId,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
+
+        return { ok: true } as const;
+      }
 
       await repos.review.recordDecision({
         reviewAssignmentId: assignment.id,
         verdict,
-        comment,
+        comment: trimmedComment,
       });
 
       const request = await repos.review.getRequestById(
@@ -248,10 +329,25 @@ export const reviewService = {
         ).length;
         if (completedApprovals >= request.quorumRequired) {
           await repos.review.updateRequestStatus(request.id, "CLOSED");
+          const content = await repos.content.getById(request.contentId);
+          const fromState = content?.lifecycleState ?? null;
           await repos.content.updateLifecycleState(
             request.contentId,
             "PUBLISHED",
           );
+          await repos.content.createVersion({
+            contentId: request.contentId,
+            authorId: ctx.actorId,
+            changeType: "STATE_TRANSITION",
+            title: content?.title ?? "Untitled",
+            metadataSnapshot: {
+              kind: "review_approved",
+              fromState,
+              toState: "PUBLISHED",
+              reviewRequestId: request.id,
+              reviewAssignmentId: assignment.id,
+            },
+          });
           await repos.outbox.add({
             aggregateType: "CONTENT",
             aggregateId: request.contentId,
@@ -263,7 +359,23 @@ export const reviewService = {
           });
         }
       } else if (request && verdict === "DENIED") {
+        const content = await repos.content.getById(request.contentId);
+        const fromState = content?.lifecycleState ?? null;
         await repos.content.updateLifecycleState(request.contentId, "DRAFT");
+        await repos.content.createVersion({
+          contentId: request.contentId,
+          authorId: ctx.actorId,
+          changeType: "STATE_TRANSITION",
+          title: content?.title ?? "Untitled",
+          metadataSnapshot: {
+            kind: "review_denied",
+            fromState,
+            toState: "DRAFT",
+            reviewRequestId: request.id,
+            reviewAssignmentId: assignment.id,
+            reason: trimmedComment,
+          },
+        });
         await repos.review.updateRequestStatus(request.id, "CLOSED");
         await repos.outbox.add({
           aggregateType: "CONTENT",
@@ -272,14 +384,30 @@ export const reviewService = {
           payload: {
             contentId: request.contentId,
             reviewRequestId: request.id,
-            reason: comment,
+            reason: trimmedComment,
           },
         });
       } else if (request && verdict === "ROLLBACK") {
+        const content = await repos.content.getById(request.contentId);
+        const fromState = content?.lifecycleState ?? null;
         await repos.content.updateLifecycleState(
           request.contentId,
           "IN_REVIEW",
         );
+        await repos.content.createVersion({
+          contentId: request.contentId,
+          authorId: ctx.actorId,
+          changeType: "STATE_TRANSITION",
+          title: content?.title ?? "Untitled",
+          metadataSnapshot: {
+            kind: "review_rollback",
+            fromState,
+            toState: "IN_REVIEW",
+            reviewRequestId: request.id,
+            reviewAssignmentId: assignment.id,
+            justification: trimmedComment,
+          },
+        });
         await repos.review.updateRequestStatus(request.id, "OPEN");
         await repos.outbox.add({
           aggregateType: "CONTENT",
@@ -288,7 +416,7 @@ export const reviewService = {
           payload: {
             contentId: request.contentId,
             reviewRequestId: request.id,
-            reason: comment,
+            reason: trimmedComment,
           },
         });
       }
@@ -297,7 +425,7 @@ export const reviewService = {
         action: "REVIEW_DECISION",
         resource: "REVIEW_ASSIGNMENT",
         resourceId: assignment.id,
-        newValue: { verdict, comment },
+        newValue: { verdict, comment: trimmedComment },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
@@ -345,8 +473,31 @@ export const reviewService = {
   },
 
   async listAssignmentsForReviewer(reviewerId: string) {
-    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    return repos.review.listAssignmentsForReviewer(reviewerId);
+    const prisma = getPrismaClient();
+    const repos = new PrismaUnitOfWork(prisma).repos();
+    const assignments = await repos.review.listAssignmentsForReviewer(reviewerId);
+    if (assignments.length === 0) return assignments;
+
+    const decisions = await prisma.reviewDecision.findMany({
+      where: { reviewAssignmentId: { in: assignments.map((a) => a.id) } },
+      select: {
+        reviewAssignmentId: true,
+        verdict: true,
+        comment: true,
+        decidedAt: true,
+      },
+    });
+    const decisionByAssignmentId = new Map(
+      decisions.map((d) => [
+        d.reviewAssignmentId,
+        { verdict: String(d.verdict), comment: d.comment, createdAt: d.decidedAt },
+      ]),
+    );
+
+    return assignments.map((a) => {
+      const d = decisionByAssignmentId.get(a.id);
+      return d ? { ...a, decision: d } : a;
+    });
   },
 
   async addComment(
