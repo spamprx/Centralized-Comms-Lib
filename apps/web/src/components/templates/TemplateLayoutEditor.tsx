@@ -671,7 +671,6 @@ function SharedRichTextToolkitBar({
           <div className="relative">
             <button
               type="button"
-              disabled={!hasEditor}
               onMouseDown={toolbarControlMouseDown}
               onClick={() => {
                 setShowFieldPopover(false);
@@ -683,7 +682,12 @@ function SharedRichTextToolkitBar({
                   setTranslateCapture(null);
                   return;
                 }
-                if (!editor || !activeRegionId) return;
+                if (!editor || !activeRegionId) {
+                  setTranslateCapture(null);
+                  setTranslateError('Click a rich text block, select text, then translate.');
+                  setShowTranslatePopover(true);
+                  return;
+                }
                 const { from, to } = editor.state.selection;
                 const text = editor.state.doc.textBetween(from, to, ' ');
                 setTranslateCapture({ regionId: activeRegionId, text, from, to });
@@ -695,7 +699,7 @@ function SharedRichTextToolkitBar({
               <Languages size={12} />
               <span className="hidden sm:inline">Translate</span>
             </button>
-            {showTranslatePopover && hasEditor ? (
+            {showTranslatePopover ? (
               <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[260px] rounded-lg border border-app-border bg-app-bg shadow-lg">
                 <div className="border-b border-app-border/40 px-3 py-2">
                   <span className="text-[10px] font-medium text-app-muted">
@@ -802,7 +806,7 @@ function SharedRichTextToolkitBar({
                   <p className="text-[8px] text-app-faint">
                     {translateCapture?.text.trim()
                       ? 'Pick a language to replace the selection with its translation.'
-                      : 'Select text in the editor first, then click the Translate button.'}
+                      : 'Click a rich text block, select text, then translate.'}
                   </p>
                 </div>
               </div>
@@ -1317,7 +1321,6 @@ export type TemplateLayoutEditorHandle = {
 type TemplateLayoutEditorProps = {
   templateId: string;
   draftLayout: unknown;
-  bindingCount: number;
   onLayoutSaved: (record: TemplateRecord) => void;
   /** Hide internal header and save/activate bar so the parent can host them in a topbar */
   compact?: boolean;
@@ -1371,7 +1374,6 @@ type BlockModalState =
 export default function TemplateLayoutEditor({
   templateId,
   draftLayout,
-  bindingCount,
   onLayoutSaved,
   compact,
   saveRef,
@@ -1411,7 +1413,9 @@ export default function TemplateLayoutEditor({
   );
   const supportedFieldTypes = useMemo(
     () =>
-      new Set((effectiveChannelCompatibility?.fieldTypes ?? []).map((v) => String(v).toLowerCase())),
+      new Set(
+        (effectiveChannelCompatibility?.fieldTypes ?? []).map((v) => String(v).toLowerCase()),
+      ),
     [effectiveChannelCompatibility?.fieldTypes],
   );
   const hasFieldTypeRestrictions = supportedFieldTypes.size > 0;
@@ -1481,7 +1485,10 @@ export default function TemplateLayoutEditor({
     const key = selectedPreviewChannel?.channelKey?.toLowerCase() ?? '';
     const model = effectiveChannelCompatibility?.restrictions?.contentModel;
     return key === 'whatsapp' || model === 'whatsapp';
-  }, [selectedPreviewChannel?.channelKey, effectiveChannelCompatibility?.restrictions?.contentModel]);
+  }, [
+    selectedPreviewChannel?.channelKey,
+    effectiveChannelCompatibility?.restrictions?.contentModel,
+  ]);
 
   const richTextToolkit = useMemo<RichTextToolkitFlags>(
     () => ({
@@ -1802,13 +1809,8 @@ export default function TemplateLayoutEditor({
   );
 
   const canActivate = useMemo(
-    () =>
-      !dirty &&
-      bindingCount >= 1 &&
-      regionCount >= 1 &&
-      !exceedsCharacterLimit &&
-      !hasStructuralViolation,
-    [dirty, bindingCount, regionCount, exceedsCharacterLimit, hasStructuralViolation],
+    () => !dirty && regionCount >= 1 && !exceedsCharacterLimit && !hasStructuralViolation,
+    [dirty, regionCount, exceedsCharacterLimit, hasStructuralViolation],
   );
 
   useEffect(() => {
@@ -2480,15 +2482,13 @@ export default function TemplateLayoutEditor({
                     title={
                       dirty
                         ? 'Save draft changes before activating'
-                        : bindingCount < 1
-                          ? 'Add at least one channel binding before activating'
-                          : regionCount < 1
-                            ? 'Add at least one section before activating'
-                            : exceedsCharacterLimit
-                              ? 'Reduce content length to satisfy channel character limit'
-                              : hasStructuralViolation
-                                ? 'Fix layout structure violations before activating'
-                                : 'Promote draft layout to active'
+                        : regionCount < 1
+                          ? 'Add at least one section before activating'
+                          : exceedsCharacterLimit
+                            ? 'Reduce content length to satisfy channel character limit'
+                            : hasStructuralViolation
+                              ? 'Fix layout structure violations before activating'
+                              : 'Promote draft layout to active'
                     }
                     className="inline-flex items-center justify-center gap-2 rounded-app-md border border-emerald-400/40 bg-emerald-500/12 px-4 py-2.5 text-sm font-medium text-emerald-100 hover:bg-emerald-500/18 disabled:opacity-40"
                   >
@@ -2499,11 +2499,6 @@ export default function TemplateLayoutEditor({
                     )}
                     Activate template
                   </button>
-                  {bindingCount < 1 ? (
-                    <span className="text-xs leading-snug text-app-faint sm:max-w-56">
-                      Activation needs at least one channel binding on this template.
-                    </span>
-                  ) : null}
                 </div>
               )}
             </div>

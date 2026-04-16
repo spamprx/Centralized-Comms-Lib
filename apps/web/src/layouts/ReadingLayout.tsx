@@ -8,9 +8,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Type,
+  Languages,
 } from 'lucide-react';
 import { Surface } from '../components/ui/Surface';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
+import TranslatePlainTextModal from '../components/common/TranslatePlainTextModal';
 import { contentService, type ContentComment } from '../services/contentService';
 import { fetchSimilarByContentId } from '../services/searchService';
 import { tipTapJsonToPlainText } from '../lib/tipTapPlainText';
@@ -130,6 +132,10 @@ export default function ReadingLayout() {
     to: 0,
     text: '',
   });
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateSource, setTranslateSource] = useState<{ text: string; modeLabel: string } | null>(
+    null,
+  );
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -473,6 +479,22 @@ export default function ReadingLayout() {
 
   const readTimeLabel = useMemo(() => (hasTipTapDoc ? 'Read' : '—'), [hasTipTapDoc]);
 
+  const openReadingTranslate = () => {
+    const sel = selection.text.trim();
+    if (sel) {
+      setTranslateSource({ text: sel, modeLabel: 'Selected text in the article' });
+      setTranslateOpen(true);
+      return;
+    }
+    if (hasTipTapDoc) {
+      setTranslateSource({
+        text: tipTapJsonToPlainText(bodyDoc),
+        modeLabel: 'Full article (plain text extracted from layout)',
+      });
+      setTranslateOpen(true);
+    }
+  };
+
   return (
     <div className="reading-layout-root relative flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-app-text">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -541,6 +563,16 @@ export default function ReadingLayout() {
             className="flex items-center gap-1.5 rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-medium text-app-muted transition-colors hover:border-white/16 hover:text-app-text sm:text-xs"
           >
             <Share2 size={16} strokeWidth={2} /> Share
+          </button>
+          <button
+            type="button"
+            onClick={openReadingTranslate}
+            disabled={!hasTipTapDoc && !selection.text.trim()}
+            title="Translate selection or full article as plain text (not saved)"
+            className="flex items-center gap-1.5 rounded-app-md border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-[11px] font-semibold text-emerald-100 transition-colors hover:border-emerald-400/40 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40 sm:text-xs"
+          >
+            <Languages size={16} strokeWidth={2} />
+            <span className="hidden sm:inline">Translate</span>
           </button>
           <div className="flex items-center gap-0.5 rounded-app-md border border-white/10 bg-white/[0.03] px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <button
@@ -869,6 +901,18 @@ export default function ReadingLayout() {
           )}
         </Surface>
       </div>
+      <TranslatePlainTextModal
+        open={translateOpen}
+        onClose={() => {
+          setTranslateOpen(false);
+          setTranslateSource(null);
+        }}
+        subjectLabel={title}
+        contextHint="Library · reading view"
+        sourceModeLabel={translateSource?.modeLabel ?? ''}
+        sourceText={translateSource?.text ?? ''}
+        cautionText="This translation runs in your browser only. It is not saved to this article and does not change what other readers see. To publish translated text, edit the content in the editor and save a new version. Only plain text is sent — formatting and embedded media are not preserved."
+      />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Monitor, Smartphone, Tablet, ChevronLeft, Share2, Download } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, ChevronLeft, Share2, Download, Languages } from 'lucide-react';
 import { Surface } from '../components/ui/Surface';
 import { contentService } from '../services/contentService';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
+import TranslatePlainTextModal from '../components/common/TranslatePlainTextModal';
+import { tipTapJsonToPlainText } from '../lib/tipTapPlainText';
 
 const channels = [
   { id: 'web', name: 'Web', icon: Monitor },
@@ -19,6 +21,15 @@ export default function PreviewLayout() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState('Preview');
   const [bodyDoc, setBodyDoc] = useState<unknown>(null);
+  const [selection, setSelection] = useState<{ from: number; to: number; text: string }>({
+    from: 0,
+    to: 0,
+    text: '',
+  });
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateSource, setTranslateSource] = useState<{ text: string; modeLabel: string } | null>(
+    null,
+  );
 
   const getPreviewWidth = () => {
     switch (activeChannel) {
@@ -76,6 +87,22 @@ export default function PreviewLayout() {
     [bodyDoc],
   );
 
+  const openPreviewTranslate = () => {
+    const sel = selection.text.trim();
+    if (sel) {
+      setTranslateSource({ text: sel, modeLabel: 'Selected text in preview' });
+      setTranslateOpen(true);
+      return;
+    }
+    if (hasTipTapDoc) {
+      setTranslateSource({
+        text: tipTapJsonToPlainText(bodyDoc),
+        modeLabel: 'Full preview body (plain text extracted from layout)',
+      });
+      setTranslateOpen(true);
+    }
+  };
+
   return (
     <div className="preview-reading-root relative flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-app-text">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -124,6 +151,16 @@ export default function PreviewLayout() {
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
+            onClick={openPreviewTranslate}
+            disabled={!hasTipTapDoc && !selection.text.trim()}
+            title="Translate selection or full preview body as plain text (not saved)"
+            className="flex items-center gap-1.5 rounded-app-md border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:border-emerald-400/40 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3 sm:py-2 sm:text-xs"
+          >
+            <Languages size={14} strokeWidth={2} />
+            <span className="hidden sm:inline">Translate</span>
+          </button>
+          <button
+            type="button"
             className="flex items-center gap-1.5 rounded-app-md border border-transparent px-2.5 py-1.5 text-[11px] font-medium text-app-muted transition-colors hover:bg-white/[0.05] hover:text-app-text sm:px-3 sm:py-2 sm:text-xs"
           >
             <Download size={14} strokeWidth={2} /> Export
@@ -167,6 +204,7 @@ export default function PreviewLayout() {
                     <TipTapReadonly
                       doc={bodyDoc as any}
                       className="ProseMirror preview-reading-prose text-[1.0625rem] leading-[1.75] text-app-text/90 outline-none antialiased"
+                      onSelectionChange={setSelection}
                     />
                   </div>
                 ) : (
@@ -216,6 +254,18 @@ export default function PreviewLayout() {
           </div>
         </Surface>
       </div>
+      <TranslatePlainTextModal
+        open={translateOpen}
+        onClose={() => {
+          setTranslateOpen(false);
+          setTranslateSource(null);
+        }}
+        subjectLabel={title}
+        contextHint="Content · preview layout"
+        sourceModeLabel={translateSource?.modeLabel ?? ''}
+        sourceText={translateSource?.text ?? ''}
+        cautionText="This translation runs in your browser only. Preview mode does not save changes — copy the result if you need it elsewhere. Only plain text is translated; layout and media are not sent."
+      />
     </div>
   );
 }

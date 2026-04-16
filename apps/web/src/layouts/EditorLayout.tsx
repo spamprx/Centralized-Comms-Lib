@@ -13,16 +13,19 @@ import {
   Check,
   BookMarked,
   Link as LinkIcon,
+  Image as ImageIcon,
   Puzzle,
   ChevronRight,
   LayoutTemplate,
   Users,
+  Languages,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import { contentService, ContentSaveConflictError } from '../services/contentService';
 import { componentService } from '../services/componentService';
 import { getAuthToken } from '../services/tokenStore';
@@ -41,6 +44,7 @@ import ComponentLibraryPanel from '../components/editor/ComponentLibraryPanel';
 import SlashCommandMenu from '../components/editor/SlashCommandMenu';
 import UseTemplateDialog from '../components/editor/UseTemplateDialog';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
+import TranslatePlainTextModal from '../components/common/TranslatePlainTextModal';
 import {
   emptyReferencesSectionHtml,
   hasBibliographySection,
@@ -51,7 +55,11 @@ import { CitationMarker, citationMarkLabel } from '../tiptap/CitationMarker';
 import { ComponentReference } from '../tiptap/ComponentReference';
 import { layoutConfigToTipTapDoc, templateLayoutDocExtensions } from '../tiptap/templateLayoutDoc';
 import { parseTemplateLayout } from '../lib/templateLayout/layoutConfig';
-import type { TemplateRecord } from '../services/templateCrudService';
+import {
+  templateCrudService,
+  type ChannelRecord,
+  type TemplateRecord,
+} from '../services/templateCrudService';
 
 type CitationItem = {
   marker: number;
@@ -61,6 +69,274 @@ type CitationItem = {
   sourceId: string;
   work: CitationWork;
 };
+
+/** Inline image uploads above this size are rejected (base64 would bloat the HTML). */
+const EDITOR_INLINE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+
+type EditorToolkitFlags = {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  heading1: boolean;
+  heading2: boolean;
+  bulletList: boolean;
+  orderedList: boolean;
+  link: boolean;
+  insertImage: boolean;
+};
+
+/**
+ * Count real media items in the editor HTML:
+ * - <img …> tags (file-picker inline images)
+ * - <TOKEN> angle-bracket placeholders that resolve to media at send-time
+ *   (e.g. <avatarImage>, <heroImage>) — distinguished from standard HTML tags.
+ */
+function countMediaItems(html: string): number {
+  const htmlTags = new Set([
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'a',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'ul',
+    'ol',
+    'li',
+    'blockquote',
+    'code',
+    'pre',
+    'span',
+    'div',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'td',
+    'th',
+    'hr',
+    'img',
+    'figure',
+    'figcaption',
+    'mark',
+    'sub',
+    'sup',
+  ]);
+  let count = (html.match(/<img\b/gi) ?? []).length;
+  // TipTap encodes `<` and `>` in text nodes, so typed tokens appear as `&lt;token&gt;` in HTML.
+  const tokenRes: RegExp[] = [/<([a-zA-Z_][a-zA-Z0-9_]*)>/g, /&lt;([a-zA-Z_][a-zA-Z0-9_]*)&gt;/g];
+  for (const re of tokenRes) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) {
+      if (!htmlTags.has(m[1].toLowerCase())) count++;
+    }
+  }
+  return count;
+}
+
+function stripHtmlToText(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\u200B/g, '') // zero-width space
+    .trim();
+}
+
+function firstMediaMarkerIndex(html: string): number | null {
+  const htmlTags = new Set([
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'a',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'ul',
+    'ol',
+    'li',
+    'blockquote',
+    'code',
+    'pre',
+    'span',
+    'div',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'td',
+    'th',
+    'hr',
+    'img',
+    'figure',
+    'figcaption',
+    'mark',
+    'sub',
+    'sup',
+  ]);
+  let best: number | null = null;
+
+  const imgRe = /<img\b/gi;
+  const imgMatch = imgRe.exec(html);
+  if (imgMatch?.index != null) best = imgMatch.index;
+
+  const tokenRes: RegExp[] = [/<([a-zA-Z_][a-zA-Z0-9_]*)>/g, /&lt;([a-zA-Z_][a-zA-Z0-9_]*)&gt;/g];
+  for (const re of tokenRes) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) {
+      const name = m[1]?.toLowerCase?.() ?? '';
+      if (!name || htmlTags.has(name)) continue;
+      if (best == null || m.index < best) best = m.index;
+      break; // earliest for this regex
+    }
+  }
+
+  return best;
+}
+
+function computeToolkitForChannel(channel: ChannelRecord | null): EditorToolkitFlags {
+  const restrictions = channel?.compatibility?.restrictions ?? undefined;
+  const model = restrictions?.contentModel;
+  const underlineOk = restrictions?.supportsUnderline !== false;
+  const disallowInlineMedia = restrictions?.disallowInlineImagesInRichText === true;
+
+  // Default: full toolkit.
+  let base: EditorToolkitFlags = {
+    bold: true,
+    italic: true,
+    underline: underlineOk,
+    heading1: true,
+    heading2: true,
+    bulletList: true,
+    orderedList: true,
+    link: true,
+    insertImage: true,
+  };
+
+  if (model === 'sms') {
+    // SMS: plain text + links only, no inline images (template tokens are text, allowed).
+    base = {
+      bold: false,
+      italic: false,
+      underline: false,
+      heading1: false,
+      heading2: false,
+      bulletList: false,
+      orderedList: false,
+      link: true,
+      insertImage: false,
+    };
+  } else if (model === 'push') {
+    // Push: no inline images; rich formatting ok for body text.
+    base.underline = underlineOk;
+    base.insertImage = false;
+  } else if (model === 'whatsapp') {
+    // WhatsApp: insertImage allowed but max 1 total media (image or token).
+    base.underline = underlineOk;
+    base.insertImage = true;
+  } else {
+    base.underline = underlineOk;
+  }
+
+  if (disallowInlineMedia) base.insertImage = false;
+  return base;
+}
+
+function validateHtmlAgainstChannel(
+  html: string,
+  textLen: number,
+  channel: ChannelRecord,
+): string | null {
+  const r = channel.compatibility?.restrictions ?? undefined;
+  const model = r?.contentModel;
+
+  // Character limit (all channel models).
+  const maxChars =
+    typeof r?.maxCharacters === 'number' && Number.isFinite(r.maxCharacters)
+      ? r.maxCharacters
+      : null;
+  if (maxChars && textLen > maxChars) {
+    return `This channel allows at most ${maxChars} characters. Shorten the content before saving.`;
+  }
+
+  const hasImg = /<img\b/i.test(html) || /data:image\//i.test(html);
+
+  // Generic flag set by admin.
+  if (r?.disallowInlineImagesInRichText === true && hasImg) {
+    return 'This channel does not allow inline images inside rich text.';
+  }
+
+  if (model === 'whatsapp') {
+    // WhatsApp: max 1 media item (inline image OR media token placeholder).
+    const mediaCount = countMediaItems(html);
+    if (mediaCount > 1) {
+      return `WhatsApp messages can contain at most 1 media item. You have ${mediaCount}. Remove the extra images or media tokens.`;
+    }
+    // WhatsApp ordering: if media is present, it must come first (caption after).
+    if (mediaCount === 1) {
+      const idx = firstMediaMarkerIndex(html);
+      if (idx != null && idx > 0) {
+        const prefixText = stripHtmlToText(html.slice(0, idx));
+        if (prefixText.length > 0) {
+          return 'WhatsApp messages must be either: media only, media + caption, or text only. If media is present, it must come first (no text before media).';
+        }
+      }
+    }
+  }
+
+  if (model === 'push') {
+    // Push: no inline images in the body (use the media field in the layout instead).
+    if (hasImg)
+      return 'Push notifications do not support inline images. Use a media block in the template layout instead.';
+  }
+
+  if (model === 'sms') {
+    // SMS: plain text + links only; no rich formatting, no inline images.
+    // Template tokens like <avatarImage> are text placeholders — they are allowed.
+    const forbidden = [
+      { re: /<(strong|b)\b/i, msg: 'SMS channel does not allow bold text.' },
+      { re: /<(em|i)\b/i, msg: 'SMS channel does not allow italic text.' },
+      { re: /<u\b/i, msg: 'SMS channel does not allow underline.' },
+      { re: /<h[1-6]\b/i, msg: 'SMS channel does not allow headings.' },
+      { re: /<(ul|ol|li)\b/i, msg: 'SMS channel does not allow lists.' },
+    ];
+    for (const f of forbidden) {
+      if (f.re.test(html)) return f.msg;
+    }
+    if (hasImg) return 'SMS channel does not allow inline images. Use a URL link instead.';
+  }
+
+  if (
+    typeof r?.maxInlineImagesInRichText === 'number' &&
+    Number.isFinite(r.maxInlineImagesInRichText)
+  ) {
+    const max = r.maxInlineImagesInRichText;
+    const n = (html.match(/<img\b/gi) ?? []).length;
+    if (n > max) return `This channel allows at most ${max} inline image(s) in rich text.`;
+  }
+
+  return null;
+}
 
 function maxHeadVersion(versions: Array<{ versionNumber: number }> | undefined): number {
   if (!versions?.length) return 0;
@@ -102,6 +378,10 @@ export default function EditorLayout() {
   const [componentSaveError, setComponentSaveError] = useState<string | null>(null);
   const [componentNotice, setComponentNotice] = useState<string | null>(null);
   const [selectionText, setSelectionText] = useState('');
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateSource, setTranslateSource] = useState<{ text: string; modeLabel: string } | null>(
+    null,
+  );
   const [showCitationDialog, setShowCitationDialog] = useState(false);
   const [citationDialogMountKey, setCitationDialogMountKey] = useState(0);
   const [citationStyle, setCitationStyle] = useState<CitationStyle>('APA');
@@ -117,6 +397,7 @@ export default function EditorLayout() {
     'loading',
   );
   const [wordCount, setWordCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
   /** Co-authors with a recent editor heartbeat (excluding the current user). */
   const [editorPresenceOthers, setEditorPresenceOthers] = useState<
     Array<{ userId: string; displayName: string; email: string; lastSeenAt: string }>
@@ -127,8 +408,13 @@ export default function EditorLayout() {
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [showUseTemplateDialog, setShowUseTemplateDialog] = useState(false);
-  /** Passed to create draft only for new content (first save) so formatting rules bind to the template. */
+  /** Template id to persist on next save (both new and existing content). */
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  /** Channel id to persist on next save alongside pendingTemplateId. */
+  const [pendingChannelId, setPendingChannelId] = useState<string | null>(null);
+  const [templateChannel, setTemplateChannel] = useState<ChannelRecord | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePickMessage, setImagePickMessage] = useState<string | null>(null);
   const [contentType, setContentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>(
     'ARTICLE',
   );
@@ -219,9 +505,12 @@ export default function EditorLayout() {
           setEditorPresenceOthers(normalized);
         }
         if (m.type === 'presence:restore_requested' && m.contentId === persistedContentId) {
-          const by = m.requestedBy && typeof m.requestedBy === 'object' ? (m.requestedBy as any) : null;
+          const by =
+            m.requestedBy && typeof m.requestedBy === 'object' ? (m.requestedBy as any) : null;
           const name = by && typeof by.displayName === 'string' ? by.displayName : 'The author';
-          setRestoreNotice(`${name} requested a version restore. Please finish up and leave the editor.`);
+          setRestoreNotice(
+            `${name} requested a version restore. Please finish up and leave the editor.`,
+          );
           setRestoreModalOpen(true);
         }
       });
@@ -275,6 +564,11 @@ export default function EditorLayout() {
             target: '_blank',
           },
         }),
+        Image.configure({
+          inline: true,
+          allowBase64: true,
+          HTMLAttributes: { class: 'max-w-full rounded-lg border border-white/[0.08]' },
+        }),
         Placeholder.configure({
           placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Press / to insert a block' : ''),
         }),
@@ -296,12 +590,41 @@ export default function EditorLayout() {
     [],
   );
 
+  const openContentTranslate = useCallback(() => {
+    if (!editor) return;
+    if (mainTab === 'preview') {
+      setTranslateSource({
+        text: editor.getText(),
+        modeLabel: 'Full document (plain text) — Preview tab',
+      });
+      setTranslateOpen(true);
+      return;
+    }
+    const { from, to } = editor.state.selection;
+    const sel = editor.state.doc.textBetween(from, to, ' ').trim();
+    if (sel) {
+      setTranslateSource({ text: sel, modeLabel: 'Selected text in the editor' });
+    } else {
+      setTranslateSource({
+        text: editor.getText(),
+        modeLabel: 'Full document (plain text) — no text selected',
+      });
+    }
+    setTranslateOpen(true);
+  }, [editor, mainTab]);
+
   // When opening an existing content item (`/editor/:contentId`), hydrate the editor from the latest saved body.
   // Without this, the editor starts blank and a "Save Draft" would create a new content item, making it look
   // like history was lost after a restore.
   useEffect(() => {
     const id = routeContentId && routeContentId !== 'new' ? routeContentId : null;
-    if (!id) return;
+    if (!id) {
+      // Reset channel when starting a new (unsaved) draft.
+      setTemplateChannel(null);
+      setPendingTemplateId(null);
+      setPendingChannelId(null);
+      return;
+    }
     if (!editor) return;
     // Always hydrate when the route id changes; the editor store may contain a previous draft.
     if (hydratedIdRef.current === id) return;
@@ -341,6 +664,15 @@ export default function EditorLayout() {
         setContent(html);
         setSavedSnapshot({ title: nextTitle.trim(), content: html });
         setLastSaved(new Date());
+
+        // Channel is now stored directly on the content row (channelId FK).
+        // GET /content/:id returns it as `channel` with no extra join.
+        if (cancelled) return;
+        setTemplateChannel((details.channel as unknown as ChannelRecord) ?? null);
+
+        // Clear pending ids — channel is now persisted in DB, no need to re-send.
+        setPendingTemplateId(null);
+        setPendingChannelId(null);
         hydratedIdRef.current = id;
       } catch (e) {
         if (cancelled) return;
@@ -377,6 +709,8 @@ export default function EditorLayout() {
       headVersionRef.current = maxHeadVersion(details.versions);
       setTitle(details.content.title || 'Untitled');
       setContentType(details.content.contentType ?? 'ARTICLE');
+      // Resync channel validation state from the freshly-fetched row.
+      setTemplateChannel((details.channel as unknown as ChannelRecord) ?? null);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to convert to draft');
     } finally {
@@ -387,8 +721,9 @@ export default function EditorLayout() {
   useEffect(() => {
     if (!editor) return;
     const updateCount = () => {
-      const text = editor.getText().trim();
-      setWordCount(text ? text.split(/\s+/).filter(Boolean).length : 0);
+      const textTrim = editor.getText().trim();
+      setWordCount(textTrim ? textTrim.split(/\s+/).filter(Boolean).length : 0);
+      setCharCount(editor.getText().length);
     };
     updateCount();
     editor.on('update', updateCount);
@@ -402,6 +737,17 @@ export default function EditorLayout() {
       setSaveError('Title is required');
       return;
     }
+    if (editor && templateChannel) {
+      const msg = validateHtmlAgainstChannel(
+        editor.getHTML(),
+        editor.getText().length,
+        templateChannel,
+      );
+      if (msg) {
+        setSaveError(msg);
+        return;
+      }
+    }
     setSaving(true);
     setSaveError(null);
     setSaveConflictVersion(null);
@@ -412,10 +758,12 @@ export default function EditorLayout() {
       if (!contentId) {
         const result = await contentService.createDraft(title.trim(), bodyDoc, {
           templateId: pendingTemplateId ?? undefined,
+          channelId: pendingChannelId ?? undefined,
           contentType,
         });
         setContentId(result.content.id);
         setPendingTemplateId(null);
+        setPendingChannelId(null);
         headVersionRef.current = result.version?.versionNumber ?? 1;
       } else {
         const saved = await contentService.saveDraft(contentId, {
@@ -423,8 +771,12 @@ export default function EditorLayout() {
           body: bodyDoc,
           contentType,
           baseVersionNumber: headVersionRef.current,
+          ...(pendingTemplateId ? { templateId: pendingTemplateId } : {}),
+          ...(pendingChannelId ? { channelId: pendingChannelId } : {}),
         });
         headVersionRef.current = saved.versionNumber;
+        if (pendingTemplateId) setPendingTemplateId(null);
+        if (pendingChannelId) setPendingChannelId(null);
       }
       const t = title.trim();
       setSavedSnapshot({ title: t, content: editor?.getHTML() ?? content });
@@ -441,7 +793,17 @@ export default function EditorLayout() {
     } finally {
       setSaving(false);
     }
-  }, [title, content, contentId, clearDraft, editor, pendingTemplateId, contentType]);
+  }, [
+    title,
+    content,
+    contentId,
+    clearDraft,
+    editor,
+    pendingTemplateId,
+    pendingChannelId,
+    contentType,
+    templateChannel,
+  ]);
 
   const applyTemplateRecord = useCallback(
     (record: TemplateRecord) => {
@@ -454,25 +816,52 @@ export default function EditorLayout() {
       ) {
         return;
       }
-      const parsed =
-        parseTemplateLayout(record.activeLayout) ?? parseTemplateLayout(record.draftLayout);
-      const doc = parsed
-        ? layoutConfigToTipTapDoc(parsed)
-        : { type: 'doc', content: [{ type: 'paragraph' }] };
-      editor.chain().focus().setContent(doc).run();
-      const html = editor.getHTML();
-      setContent(html);
-      setTitle(record.name.trim() || 'Untitled');
-      const isNew = !persistedContentId;
-      setPendingTemplateId(isNew ? record.id : null);
-      setSavedSnapshot(null);
-      setMainTab('edit');
-      if (!isNew) {
-        setComponentNotice('Body replaced from template. Save draft to persist.');
-        window.setTimeout(() => setComponentNotice(null), 4000);
-      } else {
-        setComponentNotice(null);
-      }
+      void (async () => {
+        let full: TemplateRecord = record;
+        try {
+          full = await templateCrudService.getById(record.id);
+        } catch {
+          /* fall back to list row */
+        }
+
+        const parsed =
+          parseTemplateLayout(full.activeLayout) ?? parseTemplateLayout(full.draftLayout);
+        const doc = parsed
+          ? layoutConfigToTipTapDoc(parsed)
+          : { type: 'doc', content: [{ type: 'paragraph' }] };
+        editor.chain().focus().setContent(doc).run();
+        const html = editor.getHTML();
+        setContent(html);
+        setTitle(full.name.trim() || 'Untitled');
+
+        const channelId = full.bindings?.[0]?.channelId ?? '';
+        if (channelId) {
+          try {
+            const ch = await templateCrudService.getChannelById(channelId);
+            setTemplateChannel(ch);
+            setPendingChannelId(channelId);
+          } catch {
+            setTemplateChannel(null);
+            setPendingChannelId(null);
+          }
+        } else {
+          setTemplateChannel(null);
+          setPendingChannelId(null);
+        }
+
+        // Always record the template id so saveDraft can persist/update it in the DB,
+        // ensuring channel restrictions survive across page refreshes for both new and existing content.
+        const isNewContent = !persistedContentId;
+        setPendingTemplateId(full.id);
+        setSavedSnapshot(null);
+        setMainTab('edit');
+        if (!isNewContent) {
+          setComponentNotice('Body replaced from template. Save draft to persist.');
+          window.setTimeout(() => setComponentNotice(null), 4000);
+        } else {
+          setComponentNotice(null);
+        }
+      })();
     },
     [editor, persistedContentId, title],
   );
@@ -567,6 +956,13 @@ export default function EditorLayout() {
     selectedText,
   ]);
 
+  const channelMaxCharacters = useMemo(() => {
+    const r = templateChannel?.compatibility?.restrictions ?? undefined;
+    return typeof r?.maxCharacters === 'number' && Number.isFinite(r.maxCharacters)
+      ? r.maxCharacters
+      : null;
+  }, [templateChannel]);
+
   const openCitationDialog = useCallback(() => {
     setCitationDialogMountKey((k) => k + 1);
     setShowCitationDialog(true);
@@ -655,6 +1051,48 @@ export default function EditorLayout() {
     }
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
+
+  const toolkit = useMemo(() => computeToolkitForChannel(templateChannel), [templateChannel]);
+
+  const insertImageFromSrc = useCallback(
+    (src: string) => {
+      if (!editor || !src.trim()) return;
+      setImagePickMessage(null);
+      editor.chain().focus().setImage({ src: src.trim(), alt: 'Uploaded image' }).run();
+    },
+    [editor],
+  );
+
+  const onImageFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        setImagePickMessage('Please choose an image file.');
+        window.setTimeout(() => setImagePickMessage(null), 3200);
+        return;
+      }
+      if (file.size > EDITOR_INLINE_IMAGE_MAX_BYTES) {
+        setImagePickMessage(
+          `Image is too large (max ${Math.round(EDITOR_INLINE_IMAGE_MAX_BYTES / (1024 * 1024))} MB).`,
+        );
+        window.setTimeout(() => setImagePickMessage(null), 4200);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = reader.result;
+        if (typeof r === 'string') insertImageFromSrc(r);
+      };
+      reader.onerror = () => {
+        setImagePickMessage('Could not read that file.');
+        window.setTimeout(() => setImagePickMessage(null), 4200);
+      };
+      reader.readAsDataURL(file);
+    },
+    [insertImageFromSrc],
+  );
 
   const fmtBtn = (active: boolean) =>
     `flex h-8 min-w-8 items-center justify-center rounded-[var(--editor-radius-input)] px-2 text-[13px] transition-[background-color,border-color,color,box-shadow] duration-200 ${
@@ -770,6 +1208,16 @@ export default function EditorLayout() {
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={openContentTranslate}
+            disabled={!editor}
+            title="Translate selected text or the full document as plain text (not saved)"
+            className="flex items-center gap-1.5 rounded-[var(--editor-radius-input)] border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-[13px] font-semibold text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-emerald-400/40 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Languages size={16} strokeWidth={2} />
+            <span className="hidden sm:inline">Translate</span>
+          </button>
           {isPublished ? (
             <button
               type="button"
@@ -840,82 +1288,132 @@ export default function EditorLayout() {
         </div>
       ) : null}
 
+      {saveError ? (
+        <div
+          className="relative z-20 flex shrink-0 items-start justify-between gap-3 border-b border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[13px] text-rose-100"
+          role="alert"
+        >
+          <div className="min-w-0">
+            <div className="font-semibold text-rose-100">Fix before saving</div>
+            <div className="mt-0.5 break-words text-rose-100/90">{saveError}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSaveError(null)}
+            className="shrink-0 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2.5 py-1 text-[12px] font-semibold text-rose-50 hover:bg-rose-500/20"
+            aria-label="Dismiss error"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
       {mainTab === 'edit' && (
         <div className="relative z-10 flex h-9 shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] bg-[var(--editor-topbar-bg)] px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
           <div className="flex min-w-0 flex-wrap items-center gap-0.5">
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleBold().run()}
-              className={fmtBtn(!!editor?.isActive('bold'))}
-              title="Bold"
-            >
-              <Bold size={16} strokeWidth={2.25} />
-            </button>
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleItalic().run()}
-              className={fmtBtn(!!editor?.isActive('italic'))}
-              title="Italic"
-            >
-              <Italic size={16} strokeWidth={2.25} />
-            </button>
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleUnderline().run()}
-              className={fmtBtn(!!editor?.isActive('underline'))}
-              title="Underline"
-            >
-              <UnderlineIcon size={16} strokeWidth={2.25} />
-            </button>
+            {toolkit.bold ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleBold().run()}
+                className={fmtBtn(!!editor?.isActive('bold'))}
+                title="Bold"
+              >
+                <Bold size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.italic ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleItalic().run()}
+                className={fmtBtn(!!editor?.isActive('italic'))}
+                title="Italic"
+              >
+                <Italic size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.underline ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                className={fmtBtn(!!editor?.isActive('underline'))}
+                title="Underline"
+              >
+                <UnderlineIcon size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
             <span className="mx-1 h-4 w-px shrink-0 bg-[var(--editor-border)]" aria-hidden />
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-              className={fmtBtn(!!editor?.isActive('heading', { level: 1 }))}
-              title="Heading 1"
-            >
-              <Heading1 size={16} strokeWidth={2.25} />
-            </button>
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-              className={fmtBtn(!!editor?.isActive('heading', { level: 2 }))}
-              title="Heading 2"
-            >
-              <Heading2 size={16} strokeWidth={2.25} />
-            </button>
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleBulletList().run()}
-              className={fmtBtn(!!editor?.isActive('bulletList'))}
-              title="Bullet list"
-            >
-              <List size={16} strokeWidth={2.25} />
-            </button>
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-              className={fmtBtn(!!editor?.isActive('orderedList'))}
-              title="Numbered list"
-            >
-              <ListOrdered size={16} strokeWidth={2.25} />
-            </button>
-            <button
-              type="button"
-              disabled={!editor || isPublished}
-              onClick={setLink}
-              className={fmtBtn(!!editor?.isActive('link'))}
-              title="Link"
-            >
-              <LinkIcon size={16} strokeWidth={2.25} />
-            </button>
+            {toolkit.heading1 ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+                className={fmtBtn(!!editor?.isActive('heading', { level: 1 }))}
+                title="Heading 1"
+              >
+                <Heading1 size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.heading2 ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+                className={fmtBtn(!!editor?.isActive('heading', { level: 2 }))}
+                title="Heading 2"
+              >
+                <Heading2 size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.bulletList ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                className={fmtBtn(!!editor?.isActive('bulletList'))}
+                title="Bullet list"
+              >
+                <List size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.orderedList ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                className={fmtBtn(!!editor?.isActive('orderedList'))}
+                title="Numbered list"
+              >
+                <ListOrdered size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.link ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={setLink}
+                className={fmtBtn(!!editor?.isActive('link'))}
+                title="Link"
+              >
+                <LinkIcon size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.insertImage ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => {
+                  setImagePickMessage(null);
+                  imageFileInputRef.current?.click();
+                }}
+                className={fmtBtn(false)}
+                title={imagePickMessage ? `Insert image · ${imagePickMessage}` : 'Insert image'}
+              >
+                <ImageIcon size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={!editor || isPublished}
@@ -925,12 +1423,65 @@ export default function EditorLayout() {
             >
               <BookMarked size={16} strokeWidth={2.25} />
             </button>
+            <input
+              ref={imageFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onImageFileChange}
+            />
           </div>
           <span className="shrink-0 tabular-nums text-[13px] text-[var(--editor-faint)]">
             {wordCount} {wordCount === 1 ? 'word' : 'words'}
+            {channelMaxCharacters ? (
+              <span
+                className={
+                  charCount > channelMaxCharacters ? 'text-rose-300' : 'text-[var(--editor-faint)]'
+                }
+              >
+                {' '}
+                · {charCount}/{channelMaxCharacters} chars
+              </span>
+            ) : null}
           </span>
         </div>
       )}
+
+      {/* Channel-model restriction banner */}
+      {templateChannel && templateChannel.compatibility?.restrictions?.contentModel
+        ? (() => {
+            const cm = templateChannel.compatibility.restrictions.contentModel;
+            const maxCh = templateChannel.compatibility.restrictions.maxCharacters;
+            if (cm === 'sms')
+              return (
+                <div className="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2 text-[12px] text-sky-200/80">
+                  <span className="mt-0.5 shrink-0 text-sky-400">ℹ</span>
+                  <span>
+                    <strong className="font-semibold text-sky-300">SMS</strong> — plain text and
+                    links only. No rich formatting or inline images.
+                    {maxCh ? (
+                      <>
+                        {' '}
+                        Max <strong>{maxCh}</strong> characters.
+                      </>
+                    ) : null}
+                  </span>
+                </div>
+              );
+            if (cm === 'push')
+              return (
+                <div className="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-violet-400/20 bg-violet-500/[0.07] px-3 py-2 text-[12px] text-violet-200/80">
+                  <span className="mt-0.5 shrink-0 text-violet-400">ℹ</span>
+                  <span>
+                    <strong className="font-semibold text-violet-300">Push notification</strong> —
+                    this field is the <strong>body</strong> text. No inline images allowed; media
+                    must be added via a media block in the template layout.
+                  </span>
+                </div>
+              );
+            return null;
+          })()
+        : null}
 
       <div className="relative z-10 flex min-h-0 flex-1 gap-0 overflow-hidden">
         <div className="hidden w-[190px] shrink-0 border-r border-white/[0.08] bg-[var(--editor-panel-bg)] px-3 py-3 shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl lg:block">
@@ -947,8 +1498,8 @@ export default function EditorLayout() {
               {presenceStatus.kind === 'error' ? (
                 <p className="mb-0 mt-1.5 text-[11px] leading-snug text-rose-200/90">
                   Presence unavailable
-                  {presenceStatus.status ? ` (HTTP ${presenceStatus.status})` : ''}. If this keeps happening,
-                  the websocket route may not be deployed or you may not have access.
+                  {presenceStatus.status ? ` (HTTP ${presenceStatus.status})` : ''}. If this keeps
+                  happening, the websocket route may not be deployed or you may not have access.
                 </p>
               ) : editorPresenceOthers.length === 0 ? (
                 <p className="mb-0 mt-1.5 text-[11px] leading-snug text-[var(--editor-faint)]">
@@ -1392,6 +1943,18 @@ export default function EditorLayout() {
           </div>
         </div>
       )}
+      <TranslatePlainTextModal
+        open={translateOpen}
+        onClose={() => {
+          setTranslateOpen(false);
+          setTranslateSource(null);
+        }}
+        subjectLabel={title.trim() || 'Untitled'}
+        contextHint="Content editor · top bar"
+        sourceModeLabel={translateSource?.modeLabel ?? ''}
+        sourceText={translateSource?.text ?? ''}
+        cautionText="This translation runs in your browser only. It does not change your draft until you paste the text into the editor and save. Only plain text is translated — layout, images, media tokens, and citations are not preserved in the translation request."
+      />
     </div>
   );
 }
