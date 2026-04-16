@@ -199,6 +199,7 @@ export const contentService = {
     body?: unknown,
     options?: {
       templateId?: string | null;
+      channelId?: string | null;
       aiGenerated?: boolean;
       contentType?: Content['contentType'];
     },
@@ -209,6 +210,7 @@ export const contentService = {
         title,
         body,
         templateId: options?.templateId ?? undefined,
+        channelId: options?.channelId ?? undefined,
         contentType: options?.contentType ?? undefined,
         aiGenerated: options?.aiGenerated,
       }),
@@ -222,6 +224,8 @@ export const contentService = {
       body?: unknown;
       contentType?: Content['contentType'];
       baseVersionNumber?: number;
+      templateId?: string | null;
+      channelId?: string | null;
     },
   ): Promise<ContentVersion> => {
     const token = getAuthToken();
@@ -271,6 +275,16 @@ export const contentService = {
     versions: ContentVersion[];
     tags: Array<{ id: string; name: string; slug: string }>;
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
+    channel?: {
+      id: string;
+      name: string;
+      key: string;
+      description: string | null;
+      priority: number;
+      compatibility: unknown;
+      createdAt: string;
+      updatedAt: string;
+    } | null;
   }> => {
     return request(`/content/${id}`);
   },
