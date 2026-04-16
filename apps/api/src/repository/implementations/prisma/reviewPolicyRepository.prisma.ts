@@ -59,7 +59,10 @@ export class PrismaReviewPolicyRepository implements ReviewPolicyRepository {
     return toPolicy(row);
   }
 
-  async update(id: string, input: UpdateReviewPolicyInput): Promise<ReviewPolicy> {
+  async update(
+    id: string,
+    input: UpdateReviewPolicyInput,
+  ): Promise<ReviewPolicy> {
     const row = await this.db.reviewPolicy.update({
       where: { id },
       data: {
@@ -67,7 +70,9 @@ export class PrismaReviewPolicyRepository implements ReviewPolicyRepository {
           contentType: input.contentType as any,
         }),
         ...(input.channelId !== undefined && { channelId: input.channelId }),
-        ...(input.userGroupId !== undefined && { userGroupId: input.userGroupId }),
+        ...(input.userGroupId !== undefined && {
+          userGroupId: input.userGroupId,
+        }),
         ...(input.quorumRequired !== undefined && {
           quorumRequired: input.quorumRequired,
         }),
@@ -116,4 +121,3 @@ export class PrismaReviewPolicyRepository implements ReviewPolicyRepository {
     return rows.map(toPolicy);
   }
 }
-

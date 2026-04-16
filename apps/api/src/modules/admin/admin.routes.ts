@@ -900,9 +900,7 @@ router.post(
 
 // ── Review Policies (F-ADM-004) ─────────────────────────────────────────────
 
-function parseOptionalStringOrNull(
-  value: unknown,
-): string | null | undefined {
+function parseOptionalStringOrNull(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
   return typeof value === "string" ? value : undefined;
@@ -985,7 +983,9 @@ router.patch(
         };
 
       const quorum =
-        quorumRequired === undefined ? undefined : parseQuorumRequired(quorumRequired);
+        quorumRequired === undefined
+          ? undefined
+          : parseQuorumRequired(quorumRequired);
       if (quorumRequired !== undefined && quorum === null) {
         res
           .status(400)

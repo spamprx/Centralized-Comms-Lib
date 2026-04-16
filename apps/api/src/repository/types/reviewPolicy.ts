@@ -28,4 +28,3 @@ export type UpdateReviewPolicyInput = {
   quorumRequired?: number;
   isActive?: boolean;
 };
-

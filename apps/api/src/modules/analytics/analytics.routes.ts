@@ -329,32 +329,37 @@ router.get(
       const uow = new PrismaUnitOfWork(prisma);
       const repos = uow.repos();
 
-      const [userCount, publishedInRange, viewEvents, interactionEvents, distinctUsers] =
-        await Promise.all([
-          repos.userRole.listUsers().then((u: unknown[]) => u.length),
-          prisma.content.count({
-            where: {
-              lifecycleState: "PUBLISHED",
-              createdAt: { gte: window.from, lte: window.to },
-            },
-          }),
-          prisma.contentAnalyticsEvent.count({
-            where: {
-              createdAt: { gte: window.from, lte: window.to },
-              eventType: "view",
-            },
-          }),
-          prisma.contentAnalyticsEvent.count({
-            where: {
-              createdAt: { gte: window.from, lte: window.to },
-              eventType: { in: ["like", "share", "bookmark", "comment"] },
-            },
-          }),
-          prisma.contentAnalyticsEvent.findMany({
-            where: { createdAt: { gte: window.from, lte: window.to } },
-            select: { metadata: true },
-          }),
-        ]);
+      const [
+        userCount,
+        publishedInRange,
+        viewEvents,
+        interactionEvents,
+        distinctUsers,
+      ] = await Promise.all([
+        repos.userRole.listUsers().then((u: unknown[]) => u.length),
+        prisma.content.count({
+          where: {
+            lifecycleState: "PUBLISHED",
+            createdAt: { gte: window.from, lte: window.to },
+          },
+        }),
+        prisma.contentAnalyticsEvent.count({
+          where: {
+            createdAt: { gte: window.from, lte: window.to },
+            eventType: "view",
+          },
+        }),
+        prisma.contentAnalyticsEvent.count({
+          where: {
+            createdAt: { gte: window.from, lte: window.to },
+            eventType: { in: ["like", "share", "bookmark", "comment"] },
+          },
+        }),
+        prisma.contentAnalyticsEvent.findMany({
+          where: { createdAt: { gte: window.from, lte: window.to } },
+          select: { metadata: true },
+        }),
+      ]);
 
       const uniqueUserIds = new Set<string>();
       for (const row of distinctUsers) {
@@ -507,7 +512,8 @@ router.get(
         string,
         { views: number; likes: number; shares: number; comments: number }
       >();
-      for (const d of baseDays) byDay.set(d, { views: 0, likes: 0, shares: 0, comments: 0 });
+      for (const d of baseDays)
+        byDay.set(d, { views: 0, likes: 0, shares: 0, comments: 0 });
 
       for (const r of rows) {
         const day = String(r.day);
@@ -608,7 +614,9 @@ router.get(
         if (b) b.count += 1;
       }
 
-      res.status(200).json(buckets.map(({ range, count }) => ({ range, count })));
+      res
+        .status(200)
+        .json(buckets.map(({ range, count }) => ({ range, count })));
     } catch (err) {
       res
         .status(500)
@@ -922,10 +930,16 @@ router.get(
         },
       });
       const interactionRate =
-        totalViews > 0 ? Math.round((interactions / totalViews) * 1000) / 10 : 0;
+        totalViews > 0
+          ? Math.round((interactions / totalViews) * 1000) / 10
+          : 0;
 
       const insights = [];
-      if (typeof peakHour === "number" && Number.isFinite(peakHour) && totalViews > 0) {
+      if (
+        typeof peakHour === "number" &&
+        Number.isFinite(peakHour) &&
+        totalViews > 0
+      ) {
         const pct =
           totalViews > 0 ? Math.round((peakCount / totalViews) * 1000) / 10 : 0;
         insights.push({
@@ -938,7 +952,8 @@ router.get(
       insights.push({
         title: "Interaction rate",
         description: `You have an interaction rate of ~${interactionRate}% (likes/shares/bookmarks/comments per view) over the selected range.`,
-        sentiment: interactionRate >= 5 ? ("positive" as const) : ("neutral" as const),
+        sentiment:
+          interactionRate >= 5 ? ("positive" as const) : ("neutral" as const),
         impact: interactionRate >= 10 ? ("high" as const) : ("medium" as const),
       });
       if (totalViews > 0) {

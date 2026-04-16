@@ -28,9 +28,6 @@ export const reviewService = {
       ) {
         return { invalidState: true, state: content.lifecycleState } as const;
       }
-      if (content.lifecycleState === "DRAFT") {
-        await repos.content.updateLifecycleState(input.contentId, "IN_REVIEW");
-      }
       // Enforce: at most ONE active (OPEN) review per content.
       // If an OPEN request already exists, merge by upgrading it to the latest version and quorum.
       const open = await repos.review.listOpenRequestsForContent(
@@ -52,18 +49,72 @@ export const reviewService = {
         }) ?? 1;
 
       const desiredQuorum = Math.max(input.quorumRequired ?? 1, requiredQuorum);
-      let request =
-        open.length > 0
-          ? await repos.review.updateRequestVersionAndQuorum(open[0].id, {
+      // If there's already an OPEN request, upgrading its quorum ("consensus updated") should move content back to DRAFT.
+      // If this is a new request, we move content to IN_REVIEW.
+      let request = null as any;
+      if (open.length > 0) {
+        const prev = open[0];
+        const nextQuorum = Math.max(prev.quorumRequired, desiredQuorum);
+        request = await repos.review.updateRequestVersionAndQuorum(prev.id, {
+          contentVersionId: input.contentVersionId,
+          quorumRequired: nextQuorum,
+        });
+
+        if (nextQuorum !== prev.quorumRequired) {
+          const fromState = content.lifecycleState;
+          await repos.content.updateLifecycleState(input.contentId, "DRAFT");
+          await repos.content.createVersion({
+            contentId: input.contentId,
+            authorId: ctx.actorId,
+            changeType: "STATE_TRANSITION",
+            title: content.title ?? "Untitled",
+            metadataSnapshot: {
+              kind: "review_consensus_updated",
+              fromState,
+              toState: "DRAFT",
+              reviewRequestId: prev.id,
+              oldQuorum: prev.quorumRequired,
+              newQuorum: nextQuorum,
+            },
+          });
+        } else if (content.lifecycleState === "DRAFT") {
+          // "Send for review" on an existing OPEN request.
+          // After rollback / consensus changes we keep content in DRAFT until explicitly re-submitted.
+          await repos.content.updateLifecycleState(
+            input.contentId,
+            "IN_REVIEW",
+          );
+          // Clear prior decisions so reviewers can approve/deny again.
+          await repos.review.resetAssignmentsForRequest(prev.id);
+          await repos.content.createVersion({
+            contentId: input.contentId,
+            authorId: ctx.actorId,
+            changeType: "STATE_TRANSITION",
+            title: content.title ?? "Untitled",
+            metadataSnapshot: {
+              kind: "review_sent_for_review",
+              fromState: "DRAFT",
+              toState: "IN_REVIEW",
+              reviewRequestId: prev.id,
+              quorumRequired: nextQuorum,
               contentVersionId: input.contentVersionId,
-              quorumRequired: Math.max(open[0].quorumRequired, desiredQuorum),
-            })
-          : await repos.review.createRequest({
-              contentId: input.contentId,
-              contentVersionId: input.contentVersionId,
-              requestedById: ctx.actorId,
-              quorumRequired: desiredQuorum,
-            });
+            },
+          });
+        }
+      } else {
+        if (content.lifecycleState === "DRAFT") {
+          await repos.content.updateLifecycleState(
+            input.contentId,
+            "IN_REVIEW",
+          );
+        }
+        request = await repos.review.createRequest({
+          contentId: input.contentId,
+          contentVersionId: input.contentVersionId,
+          requestedById: ctx.actorId,
+          quorumRequired: desiredQuorum,
+        });
+      }
 
       // If multiple OPEN requests exist (legacy), cancel all but the newest one.
       if (open.length > 1) {
@@ -270,7 +321,7 @@ export const reviewService = {
 
         if (request) {
           const fromState = content?.lifecycleState ?? null;
-          await repos.content.updateLifecycleState(request.contentId, "IN_REVIEW");
+          await repos.content.updateLifecycleState(request.contentId, "DRAFT");
           await repos.content.createVersion({
             contentId: request.contentId,
             authorId: ctx.actorId,
@@ -279,7 +330,7 @@ export const reviewService = {
             metadataSnapshot: {
               kind: "review_rollback",
               fromState,
-              toState: "IN_REVIEW",
+              toState: "DRAFT",
               reviewRequestId: request.id,
               reviewAssignmentId: assignment.id,
               justification: trimmedComment,
@@ -390,10 +441,7 @@ export const reviewService = {
       } else if (request && verdict === "ROLLBACK") {
         const content = await repos.content.getById(request.contentId);
         const fromState = content?.lifecycleState ?? null;
-        await repos.content.updateLifecycleState(
-          request.contentId,
-          "IN_REVIEW",
-        );
+        await repos.content.updateLifecycleState(request.contentId, "DRAFT");
         await repos.content.createVersion({
           contentId: request.contentId,
           authorId: ctx.actorId,
@@ -402,7 +450,7 @@ export const reviewService = {
           metadataSnapshot: {
             kind: "review_rollback",
             fromState,
-            toState: "IN_REVIEW",
+            toState: "DRAFT",
             reviewRequestId: request.id,
             reviewAssignmentId: assignment.id,
             justification: trimmedComment,
@@ -475,7 +523,8 @@ export const reviewService = {
   async listAssignmentsForReviewer(reviewerId: string) {
     const prisma = getPrismaClient();
     const repos = new PrismaUnitOfWork(prisma).repos();
-    const assignments = await repos.review.listAssignmentsForReviewer(reviewerId);
+    const assignments =
+      await repos.review.listAssignmentsForReviewer(reviewerId);
     if (assignments.length === 0) return assignments;
 
     const decisions = await prisma.reviewDecision.findMany({
@@ -490,7 +539,11 @@ export const reviewService = {
     const decisionByAssignmentId = new Map(
       decisions.map((d) => [
         d.reviewAssignmentId,
-        { verdict: String(d.verdict), comment: d.comment, createdAt: d.decidedAt },
+        {
+          verdict: String(d.verdict),
+          comment: d.comment,
+          createdAt: d.decidedAt,
+        },
       ]),
     );
 

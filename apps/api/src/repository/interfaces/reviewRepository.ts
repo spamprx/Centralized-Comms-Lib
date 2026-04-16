@@ -43,6 +43,12 @@ export interface ReviewRepository {
 
   rollbackDecision(assignmentId: string): Promise<void>;
 
+  /**
+   * Clears any decisions and resets assignment status back to PENDING for all assignments in a request.
+   * Used when content is re-submitted for review so reviewers can decide again.
+   */
+  resetAssignmentsForRequest(requestId: string): Promise<void>;
+
   addComment(input: ReviewCommentInput): Promise<ReviewComment>;
 
   listComments(assignmentId: string): Promise<ReviewComment[]>;

@@ -26,4 +26,3 @@ export function requiredQuorumFromPolicies(input: {
   if (bestSpecificity < 0) return null;
   return Math.max(1, bestQuorum);
 }
-

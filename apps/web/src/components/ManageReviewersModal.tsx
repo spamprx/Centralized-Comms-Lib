@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Search, UserPlus, Loader2, Check, Users } from 'lucide-react';
+import { X, Search, UserPlus, Loader2, Check, Users, Send } from 'lucide-react';
 import { adminUserService } from '../services/adminService';
 import { contentService } from '../services/contentService';
 import { reviewService } from '../services/reviewService';
@@ -30,9 +30,11 @@ export default function ManageReviewersModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
   const [alreadyReviewerIds, setAlreadyReviewerIds] = useState<Set<string>>(new Set());
   const [reviewPolicyRequirement, setReviewPolicyRequirement] = useState<{
     requiredQuorum: number | null;
@@ -117,6 +119,82 @@ export default function ManageReviewersModal({
   const availableUsers = filteredUsers.filter((u) => !alreadyReviewerIds.has(u.id));
   const requiredQuorum = reviewPolicyRequirement?.requiredQuorum ?? null;
   const selectionTooSmall = requiredQuorum != null && selectedIds.size > 0 && selectedIds.size < requiredQuorum;
+
+  const handleSendForReview = async () => {
+    // "Send for review" should transition content into an approvable/deniable state for all assigned reviewers.
+    // It also assigns any newly selected reviewers to the active request.
+    const totalAssignedCount = alreadyReviewerIds.size + selectedIds.size;
+    if (totalAssignedCount === 0) {
+      setError('Assign at least one reviewer before sending for review.');
+      return;
+    }
+    if (user?.id && selectedIds.has(user.id)) {
+      setError('You cannot add yourself as a reviewer.');
+      return;
+    }
+    setSending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const contentDetails = await contentService.getById(contentId);
+      const versions = contentDetails.versions;
+      if (!versions || versions.length === 0) {
+        setError('No content version found. Save the content first.');
+        setSending(false);
+        return;
+      }
+      const latestVersion = versions.reduce((prev, curr) =>
+        curr.versionNumber > prev.versionNumber ? curr : prev,
+      );
+
+      // Important: don't increase consensus here — keep it stable and let policy enforce minimums.
+      const reviewRequest = await reviewService.createRequest(contentId, latestVersion.id, 1);
+
+      const selected = Array.from(selectedIds);
+      if (selected.length > 0) {
+        const results = await Promise.allSettled(
+          selected.map((reviewerId) => reviewService.assignReviewer(reviewRequest.id, reviewerId)),
+        );
+
+        const already: string[] = [];
+        const failed: string[] = [];
+        results.forEach((r, idx) => {
+          const reviewerId = selected[idx];
+          const u = users.find((x) => x.id === reviewerId);
+          const label = u?.displayName || u?.email || reviewerId;
+          if (r.status === 'fulfilled') {
+            const v = r.value as any;
+            if (v && typeof v === 'object' && 'alreadyAssigned' in v && v.alreadyAssigned) {
+              already.push(label);
+            }
+          } else {
+            failed.push(label);
+          }
+        });
+
+        if (already.length > 0) {
+          setNotice(
+            `${already.join(', ')} ${already.length === 1 ? 'is' : 'are'} already a reviewer. Others were still assigned.`,
+          );
+        }
+        if (failed.length > 0) {
+          setError(
+            `Failed to assign: ${failed.join(', ')}. Other selected reviewers may still have been assigned.`,
+          );
+        }
+      }
+
+      setSendSuccess(true);
+      setTimeout(() => {
+        onAssigned();
+        onClose();
+      }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send for review');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleAssign = async () => {
     if (selectedIds.size === 0) return;
@@ -381,6 +459,33 @@ export default function ManageReviewersModal({
             ) : null}
           </div>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSendForReview}
+              disabled={assigning || sending || success || sendSuccess}
+              className={`flex items-center gap-1.5 rounded-app-md border border-white/12 px-4 py-2.5 text-[13px] font-semibold transition-[filter,opacity] ${
+                sendSuccess
+                  ? 'cursor-not-allowed bg-emerald-500/15 text-emerald-100 opacity-95'
+                  : sending
+                    ? 'cursor-not-allowed bg-app-accent/15 text-app-text opacity-70'
+                    : 'cursor-pointer bg-white/[0.04] text-app-text hover:bg-white/[0.07]'
+              }`}
+              title="Moves content back into review so assigned reviewers can approve/deny"
+            >
+              {sending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Sending…
+                </>
+              ) : sendSuccess ? (
+                <>
+                  <Check size={14} strokeWidth={2.5} /> Sent
+                </>
+              ) : (
+                <>
+                  <Send size={14} strokeWidth={2} /> Send for review
+                </>
+              )}
+            </button>
             <button
               type="button"
               onClick={onClose}

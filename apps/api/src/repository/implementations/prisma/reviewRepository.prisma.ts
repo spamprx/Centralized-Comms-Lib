@@ -189,6 +189,24 @@ export class PrismaReviewRepository implements ReviewRepository {
     });
   }
 
+  async resetAssignmentsForRequest(requestId: string): Promise<void> {
+    const ids = await this.db.reviewAssignment.findMany({
+      where: { reviewRequestId: requestId },
+      select: { id: true },
+    });
+    const assignmentIds = ids.map((r) => r.id);
+    if (assignmentIds.length === 0) return;
+
+    await this.db.reviewDecision.deleteMany({
+      where: { reviewAssignmentId: { in: assignmentIds } },
+    });
+
+    await this.db.reviewAssignment.updateMany({
+      where: { id: { in: assignmentIds } },
+      data: { status: "PENDING", completedAt: null },
+    });
+  }
+
   async addComment(input: ReviewCommentInput): Promise<ReviewComment> {
     const row = await this.db.reviewComment.create({
       data: {

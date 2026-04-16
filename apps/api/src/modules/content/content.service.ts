@@ -445,7 +445,9 @@ export const contentService = {
 
     // Review policy requirement for authors (F-ADM-004): expose the effective requirement so
     // they know how many approvals are needed before publishing.
-    const authorGroups = await repos.userRole.listGroupsForUser(content.authorId);
+    const authorGroups = await repos.userRole.listGroupsForUser(
+      content.authorId,
+    );
     const authorGroupIds = authorGroups.map((g) => g.id);
     const policyCandidates = await repos.reviewPolicy.listActiveCandidates({
       contentType: content.contentType,
@@ -888,11 +890,13 @@ export const contentService = {
                 "Publishing blocked by review policy: content has no versions to review.",
             } as const;
           }
-          const ok = await repos.review.hasClosedRequestMeetingQuorumForVersion({
-            contentId,
-            contentVersionId: latest.id,
-            requiredQuorum,
-          });
+          const ok = await repos.review.hasClosedRequestMeetingQuorumForVersion(
+            {
+              contentId,
+              contentVersionId: latest.id,
+              requiredQuorum,
+            },
+          );
           if (!ok) {
             return {
               policyViolation: true,

@@ -21,4 +21,3 @@ export interface ReviewPolicyRepository {
     userGroupIds: string[];
   }): Promise<ReviewPolicy[]>;
 }
-
