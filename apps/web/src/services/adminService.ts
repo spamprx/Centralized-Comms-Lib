@@ -370,6 +370,67 @@ export const adminSettingsService = {
   },
 };
 
+// ─── Review policies (F-ADM-004) ─────────────────────────────────────────────
+
+export type ApiReviewPolicy = {
+  id: string;
+  contentType: 'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT';
+  channelId: string | null;
+  userGroupId: string | null;
+  quorumRequired: number;
+  isActive: boolean;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const adminReviewPolicyService = {
+  list: async (): Promise<ApiResponse<ApiReviewPolicy[]>> => {
+    const data = await request<ApiReviewPolicy[]>('/admin/review-policies', {
+      method: 'GET',
+    });
+    return wrap(data);
+  },
+
+  create: async (body: {
+    contentType: ApiReviewPolicy['contentType'];
+    channelId?: string | null;
+    userGroupId?: string | null;
+    quorumRequired: number;
+    isActive?: boolean;
+  }): Promise<ApiResponse<ApiReviewPolicy>> => {
+    const data = await request<ApiReviewPolicy>('/admin/review-policies', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return wrap(data);
+  },
+
+  update: async (
+    id: string,
+    body: Partial<{
+      contentType: ApiReviewPolicy['contentType'];
+      channelId: string | null;
+      userGroupId: string | null;
+      quorumRequired: number;
+      isActive: boolean;
+    }>,
+  ): Promise<ApiResponse<ApiReviewPolicy>> => {
+    const data = await request<ApiReviewPolicy>(`/admin/review-policies/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+    return wrap(data);
+  },
+
+  delete: async (id: string): Promise<ApiResponse<{ deleted: boolean }>> => {
+    const data = await request<{ deleted: boolean }>(`/admin/review-policies/${id}`, {
+      method: 'DELETE',
+    });
+    return wrap(data);
+  },
+};
+
 export type {
   ApiUserRow,
   ApiPermission,

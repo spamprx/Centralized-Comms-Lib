@@ -36,6 +36,7 @@ model User {
   reviewAssignments   ReviewAssignment[] @relation("AssignedReviewer")
   reviewAssignmentsBy ReviewAssignment[] @relation("AssignmentAssigner")
   reviewComments      ReviewComment[]    @relation("ReviewCommentAuthor")
+  reviewPoliciesCreated ReviewPolicy[]   @relation("ReviewPolicyCreator")
 
   coAuthorAssignments ContentCoAuthor[] @relation("CoAuthorUser")
   coAuthorRequests    ContentCoAuthor[] @relation("CoAuthorRequester")
@@ -117,6 +118,7 @@ model UserGroup {
 
   memberships UserGroupMembership[]
   contents    Content[]             @relation("VisibilityGroup")
+  reviewPolicies ReviewPolicy[]
 
   @@map("user_groups")
 }
@@ -275,6 +277,7 @@ model Channel {
 
   templateBindings TemplateChannelBinding[]
   contents         Content[]
+  reviewPolicies   ReviewPolicy[]
 
   @@map("channels")
 }
@@ -750,6 +753,30 @@ model ReviewDecision {
   reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Cascade)
 
   @@map("review_decisions")
+}
+
+// ── ReviewPolicy ────────────────────────────────────────────────────────────
+// Admin-defined rules that require review before publishing for matching content.
+model ReviewPolicy {
+  id             String      @id @default(uuid())
+  contentType    ContentType
+  channelId      String?
+  channel        Channel?    @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  userGroupId    String?
+  userGroup      UserGroup?  @relation(fields: [userGroupId], references: [id], onDelete: SetNull)
+  quorumRequired Int         @default(1)
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  createdById String?
+  createdBy   User? @relation("ReviewPolicyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([contentType])
+  @@index([channelId])
+  @@index([userGroupId])
+  @@index([isActive])
+  @@map("review_policies")
 }
 
 model ContentCoAuthor {

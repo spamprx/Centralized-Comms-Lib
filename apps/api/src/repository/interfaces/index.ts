@@ -4,6 +4,7 @@ export * from "./tagRepository";
 export * from "./auditLogRepository";
 export * from "./outboxRepository";
 export * from "./reviewRepository";
+export * from "./reviewPolicyRepository";
 export * from "./channelRepository";
 export * from "./templateRepository";
 export * from "./workspaceRepository";

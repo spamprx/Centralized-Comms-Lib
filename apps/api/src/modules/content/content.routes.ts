@@ -943,6 +943,14 @@ router.post(
         });
         return;
       }
+      if ("policyViolation" in result && result.policyViolation) {
+        res.status(409).json({
+          error: result.error,
+          code: result.code,
+          requiredQuorum: result.requiredQuorum,
+        });
+        return;
+      }
       if ("content" in result) res.status(200).json(result.content);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

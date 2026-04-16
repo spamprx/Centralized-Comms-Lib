@@ -34,18 +34,39 @@ export default function ManageReviewersModal({
   const [notice, setNotice] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [alreadyReviewerIds, setAlreadyReviewerIds] = useState<Set<string>>(new Set());
+  const [reviewPolicyRequirement, setReviewPolicyRequirement] = useState<{
+    requiredQuorum: number | null;
+    isSatisfied: boolean | null;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const [usersRes, reqsRes] = await Promise.all([
+        const [usersRes, reqsRes, detailsRes] = await Promise.all([
           adminUserService.getUsers(),
           reviewService.listForContent(contentId).catch(() => []),
+          contentService.getById(contentId).catch(() => null),
         ]);
 
         const rawUsers = usersRes.data as unknown as SimpleUser[];
         setUsers(rawUsers);
+
+        if (detailsRes && typeof detailsRes === 'object' && 'reviewPolicy' in detailsRes) {
+          const rp = (detailsRes as any).reviewPolicy as
+            | { requiredQuorum: number | null; isSatisfied: boolean | null }
+            | undefined;
+          setReviewPolicyRequirement(
+            rp
+              ? {
+                  requiredQuorum: typeof rp.requiredQuorum === 'number' ? rp.requiredQuorum : null,
+                  isSatisfied: typeof rp.isSatisfied === 'boolean' ? rp.isSatisfied : null,
+                }
+              : null,
+          );
+        } else {
+          setReviewPolicyRequirement(null);
+        }
 
         // Find the active review request (OPEN) for this content and load current assignments.
         const openReq = (reqsRes as any[]).find((r) => (r?.status ?? '') === 'OPEN') ?? null;
@@ -94,9 +115,15 @@ export default function ManageReviewersModal({
 
   const alreadyUsers = filteredUsers.filter((u) => alreadyReviewerIds.has(u.id));
   const availableUsers = filteredUsers.filter((u) => !alreadyReviewerIds.has(u.id));
+  const requiredQuorum = reviewPolicyRequirement?.requiredQuorum ?? null;
+  const selectionTooSmall = requiredQuorum != null && selectedIds.size > 0 && selectedIds.size < requiredQuorum;
 
   const handleAssign = async () => {
     if (selectedIds.size === 0) return;
+    if (selectionTooSmall) {
+      setError(`Review policy requires ${requiredQuorum} approvals. Select at least ${requiredQuorum} reviewers.`);
+      return;
+    }
     if (user?.id && selectedIds.has(user.id)) {
       setError('You cannot add yourself as a reviewer.');
       return;
@@ -191,6 +218,25 @@ export default function ManageReviewersModal({
               </h2>
             </div>
             <p className="m-0 max-w-[340px] truncate text-xs text-app-muted">{contentTitle}</p>
+            {requiredQuorum != null ? (
+              <div
+                className={`mt-2 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                  reviewPolicyRequirement?.isSatisfied
+                    ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200'
+                    : 'border-amber-400/25 bg-amber-500/10 text-amber-100'
+                }`}
+                title={
+                  reviewPolicyRequirement?.isSatisfied
+                    ? `Review policy satisfied (${requiredQuorum} approval(s) required)`
+                    : `Review policy: ${requiredQuorum} approval(s) required before publishing`
+                }
+              >
+                <span className="uppercase tracking-wide opacity-85">Policy</span>
+                <span className="tabular-nums">
+                  {reviewPolicyRequirement?.isSatisfied ? 'Met' : 'Needs'} {requiredQuorum}
+                </span>
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -323,9 +369,17 @@ export default function ManageReviewersModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-white/[0.08] px-6 py-4">
-          <span className="text-[11px] font-medium tabular-nums text-app-faint">
-            {selectedIds.size} reviewer{selectedIds.size !== 1 ? 's' : ''} selected
-          </span>
+          <div className="text-[11px] font-medium tabular-nums text-app-faint">
+            <div>
+              {selectedIds.size} reviewer{selectedIds.size !== 1 ? 's' : ''} selected
+            </div>
+            {selectionTooSmall ? (
+              <div className="mt-1 text-amber-200/90">
+                Policy requires <strong>{requiredQuorum}</strong>. Select{' '}
+                <strong>{requiredQuorum - selectedIds.size}</strong> more.
+              </div>
+            ) : null}
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
@@ -337,7 +391,7 @@ export default function ManageReviewersModal({
             <button
               type="button"
               onClick={handleAssign}
-              disabled={selectedIds.size === 0 || assigning || success}
+              disabled={selectedIds.size === 0 || assigning || success || selectionTooSmall}
               className={`flex items-center gap-1.5 rounded-app-md border border-white/12 px-5 py-2.5 text-[13px] font-semibold text-app-bg shadow-[0_0_22px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 transition-[filter,opacity] ${
                 success
                   ? 'cursor-not-allowed bg-gradient-to-r from-emerald-500 to-app-accent-2 opacity-95'

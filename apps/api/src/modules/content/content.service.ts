@@ -26,6 +26,7 @@ import {
   isTipTapDoc,
   refreshLinkedNodesInDocument,
 } from "../component/libraryComponent";
+import { requiredQuorumFromPolicies } from "../review/reviewPolicy.enforcement";
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
@@ -349,6 +350,10 @@ export const contentService = {
     tags: Array<{ id: string; name: string; slug: string }>;
     versions: ContentVersion[];
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
+    reviewPolicy?: {
+      requiredQuorum: number | null;
+      isSatisfied: boolean | null;
+    };
     /**
      * Convenience for the editor UI: the channel bound to this content's template (if any).
      * Returned as a minimal Channel shape.
@@ -437,6 +442,32 @@ export const contentService = {
 
     const tags = await repos.tag.listForContent(content.id);
     const versions = await repos.content.listVersions(content.id);
+
+    // Review policy requirement for authors (F-ADM-004): expose the effective requirement so
+    // they know how many approvals are needed before publishing.
+    const authorGroups = await repos.userRole.listGroupsForUser(content.authorId);
+    const authorGroupIds = authorGroups.map((g) => g.id);
+    const policyCandidates = await repos.reviewPolicy.listActiveCandidates({
+      contentType: content.contentType,
+      channelId: content.channelId ?? null,
+      userGroupIds: authorGroupIds,
+    });
+    const requiredQuorum = requiredQuorumFromPolicies({
+      policies: policyCandidates,
+      channelId: content.channelId ?? null,
+      userGroupIds: authorGroupIds,
+    });
+    const latest = versions.length > 0 ? versions[0] : null;
+    const isSatisfied =
+      requiredQuorum == null
+        ? null
+        : latest
+          ? await repos.review.hasClosedRequestMeetingQuorumForVersion({
+              contentId: content.id,
+              contentVersionId: latest.id,
+              requiredQuorum,
+            })
+          : false;
     const coAuthorsRows = await prisma.contentCoAuthor.findMany({
       where: { contentId: id, status: "ACCEPTED" },
       include: { user: true },
@@ -459,6 +490,10 @@ export const contentService = {
       tags,
       versions,
       coAuthors,
+      reviewPolicy: {
+        requiredQuorum: requiredQuorum ?? null,
+        isSatisfied,
+      },
       channel: directChannel,
     };
   },
@@ -800,6 +835,12 @@ export const contentService = {
     | { notFound: true }
     | { forbidden: true }
     | { invalidTransition: true; current: LifecycleState }
+    | {
+        policyViolation: true;
+        requiredQuorum: number;
+        error: string;
+        code: "REVIEW_POLICY_VIOLATION";
+      }
   > {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -818,6 +859,49 @@ export const contentService = {
           invalidTransition: true,
           current: existing.lifecycleState,
         } as const;
+      }
+
+      if (lifecycleState === "PUBLISHED") {
+        const authorGroups = await repos.userRole.listGroupsForUser(
+          existing.authorId,
+        );
+        const groupIds = authorGroups.map((g) => g.id);
+        const policies = await repos.reviewPolicy.listActiveCandidates({
+          contentType: existing.contentType,
+          channelId: existing.channelId ?? null,
+          userGroupIds: groupIds,
+        });
+        const requiredQuorum = requiredQuorumFromPolicies({
+          policies,
+          channelId: existing.channelId ?? null,
+          userGroupIds: groupIds,
+        });
+
+        if (requiredQuorum != null) {
+          const latest = await repos.content.getLatestVersion(contentId);
+          if (!latest) {
+            return {
+              policyViolation: true,
+              requiredQuorum,
+              code: "REVIEW_POLICY_VIOLATION",
+              error:
+                "Publishing blocked by review policy: content has no versions to review.",
+            } as const;
+          }
+          const ok = await repos.review.hasClosedRequestMeetingQuorumForVersion({
+            contentId,
+            contentVersionId: latest.id,
+            requiredQuorum,
+          });
+          if (!ok) {
+            return {
+              policyViolation: true,
+              requiredQuorum,
+              code: "REVIEW_POLICY_VIOLATION",
+              error: `Publishing blocked by review policy: requires ${requiredQuorum} approval(s) for this content before publishing. Create a review request and collect approvals, then retry.`,
+            } as const;
+          }
+        }
       }
       const updated = await repos.content.updateLifecycleState(
         contentId,

@@ -5,6 +5,7 @@ import {
   getSettingsSnapshot,
   mergeSettingsSection,
 } from "./adminSettings.defaults";
+import type { ContentType } from "../../repository";
 
 export const adminService = {
   // ── Roles ─────────────────────────────────────────────────────────────────
@@ -575,6 +576,103 @@ export const adminService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
+    });
+  },
+
+  // ── Review Policies (F-ADM-004) ───────────────────────────────────────────
+  async listReviewPolicies() {
+    const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
+    return repos.reviewPolicy.list();
+  },
+
+  async createReviewPolicy(
+    ctx: AuditContext,
+    input: {
+      contentType: ContentType;
+      channelId?: string | null;
+      userGroupId?: string | null;
+      quorumRequired: number;
+      isActive?: boolean;
+    },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const policy = await repos.reviewPolicy.create({
+        contentType: input.contentType,
+        channelId: input.channelId ?? null,
+        userGroupId: input.userGroupId ?? null,
+        quorumRequired: input.quorumRequired,
+        isActive: input.isActive ?? true,
+        createdById: ctx.actorId,
+      });
+      await repos.audit.append({
+        action: "CREATE",
+        resource: "REVIEW_POLICY",
+        resourceId: policy.id,
+        newValue: {
+          contentType: policy.contentType,
+          channelId: policy.channelId,
+          userGroupId: policy.userGroupId,
+          quorumRequired: policy.quorumRequired,
+          isActive: policy.isActive,
+        },
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { policy } as const;
+    });
+  },
+
+  async updateReviewPolicy(
+    ctx: AuditContext,
+    id: string,
+    input: {
+      contentType?: ContentType;
+      channelId?: string | null;
+      userGroupId?: string | null;
+      quorumRequired?: number;
+      isActive?: boolean;
+    },
+  ) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.reviewPolicy.getById(id);
+      if (!existing) return { notFound: true } as const;
+      const updated = await repos.reviewPolicy.update(id, input);
+      await repos.audit.append({
+        action: "UPDATE",
+        resource: "REVIEW_POLICY",
+        resourceId: id,
+        oldValue: existing,
+        newValue: updated,
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { policy: updated } as const;
+    });
+  },
+
+  async deleteReviewPolicy(ctx: AuditContext, id: string) {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    return uow.withTransaction(async (repos) => {
+      const existing = await repos.reviewPolicy.getById(id);
+      if (!existing) return { notFound: true } as const;
+      await repos.reviewPolicy.delete(id);
+      await repos.audit.append({
+        action: "DELETE",
+        resource: "REVIEW_POLICY",
+        resourceId: id,
+        oldValue: existing,
+        actorId: ctx.actorId,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { deleted: true } as const;
     });
   },
 

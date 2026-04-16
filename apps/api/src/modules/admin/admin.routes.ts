@@ -898,6 +898,150 @@ router.post(
   },
 );
 
+// ── Review Policies (F-ADM-004) ─────────────────────────────────────────────
+
+function parseOptionalStringOrNull(
+  value: unknown,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return typeof value === "string" ? value : undefined;
+}
+
+function parseQuorumRequired(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return n;
+}
+
+router.get(
+  "/review-policies",
+  authorize("ADMIN"),
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const policies = await adminService.listReviewPolicies();
+      res.status(200).json(policies);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.post(
+  "/review-policies",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { contentType, channelId, userGroupId, quorumRequired, isActive } =
+        req.body as {
+          contentType?: unknown;
+          channelId?: unknown;
+          userGroupId?: unknown;
+          quorumRequired?: unknown;
+          isActive?: unknown;
+        };
+
+      if (typeof contentType !== "string" || contentType.trim() === "") {
+        res.status(400).json({ error: "contentType is required" });
+        return;
+      }
+      const quorum = parseQuorumRequired(quorumRequired);
+      if (quorum === null) {
+        res
+          .status(400)
+          .json({ error: "quorumRequired must be an integer >= 1" });
+        return;
+      }
+
+      const result = await adminService.createReviewPolicy(auditContext(req), {
+        contentType: contentType.toUpperCase() as any,
+        channelId: parseOptionalStringOrNull(channelId),
+        userGroupId: parseOptionalStringOrNull(userGroupId),
+        quorumRequired: quorum,
+        isActive: typeof isActive === "boolean" ? isActive : undefined,
+      });
+
+      res.status(201).json(result.policy);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.patch(
+  "/review-policies/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { contentType, channelId, userGroupId, quorumRequired, isActive } =
+        req.body as {
+          contentType?: unknown;
+          channelId?: unknown;
+          userGroupId?: unknown;
+          quorumRequired?: unknown;
+          isActive?: unknown;
+        };
+
+      const quorum =
+        quorumRequired === undefined ? undefined : parseQuorumRequired(quorumRequired);
+      if (quorumRequired !== undefined && quorum === null) {
+        res
+          .status(400)
+          .json({ error: "quorumRequired must be an integer >= 1" });
+        return;
+      }
+
+      const result = await adminService.updateReviewPolicy(
+        auditContext(req),
+        req.params.id,
+        {
+          contentType:
+            typeof contentType === "string"
+              ? (contentType.toUpperCase() as any)
+              : undefined,
+          channelId: parseOptionalStringOrNull(channelId),
+          userGroupId: parseOptionalStringOrNull(userGroupId),
+          quorumRequired: quorum ?? undefined,
+          isActive: typeof isActive === "boolean" ? isActive : undefined,
+        },
+      );
+
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Review policy not found" });
+        return;
+      }
+
+      res.status(200).json(result.policy);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.delete(
+  "/review-policies/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await adminService.deleteReviewPolicy(
+        auditContext(req),
+        req.params.id,
+      );
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Review policy not found" });
+        return;
+      }
+      res.status(200).json({ deleted: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
 // ── Groups ──────────────────────────────────────────────────────────────────
 
 /**

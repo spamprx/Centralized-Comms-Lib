@@ -2,6 +2,7 @@ import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import { Prisma } from "@prisma/client";
 import type { ReviewComment } from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
+import { requiredQuorumFromPolicies } from "./reviewPolicy.enforcement";
 
 type Verdict = "APPROVED" | "DENIED" | "ROLLBACK";
 
@@ -32,8 +33,25 @@ export const reviewService = {
       }
       // Enforce: at most ONE active (OPEN) review per content.
       // If an OPEN request already exists, merge by upgrading it to the latest version and quorum.
-      const open = await repos.review.listOpenRequestsForContent(input.contentId);
-      const desiredQuorum = input.quorumRequired ?? 1;
+      const open = await repos.review.listOpenRequestsForContent(
+        input.contentId,
+      );
+      const authorGroups = await repos.userRole.listGroupsForUser(
+        content.authorId,
+      );
+      const policies = await repos.reviewPolicy.listActiveCandidates({
+        contentType: content.contentType,
+        channelId: content.channelId ?? null,
+        userGroupIds: authorGroups.map((g) => g.id),
+      });
+      const requiredQuorum =
+        requiredQuorumFromPolicies({
+          policies,
+          channelId: content.channelId ?? null,
+          userGroupIds: authorGroups.map((g) => g.id),
+        }) ?? 1;
+
+      const desiredQuorum = Math.max(input.quorumRequired ?? 1, requiredQuorum);
       let request =
         open.length > 0
           ? await repos.review.updateRequestVersionAndQuorum(open[0].id, {
@@ -73,7 +91,8 @@ export const reviewService = {
       await repos.outbox.add({
         aggregateType: "REVIEW_REQUEST",
         aggregateId: request.id,
-        eventType: open.length > 0 ? "REVIEW_REQUEST.UPDATED" : "REVIEW_REQUEST.CREATED",
+        eventType:
+          open.length > 0 ? "REVIEW_REQUEST.UPDATED" : "REVIEW_REQUEST.CREATED",
         payload: {
           contentId: input.contentId,
           requestId: request.id,
@@ -147,9 +166,9 @@ export const reviewService = {
       if (reviewerId === ctx.actorId) {
         return { selfAssign: true } as const;
       }
-      let assignment:
-        | Awaited<ReturnType<typeof repos.review.assignReviewer>>
-        | null = null;
+      let assignment: Awaited<
+        ReturnType<typeof repos.review.assignReviewer>
+      > | null = null;
       try {
         assignment = await repos.review.assignReviewer({
           reviewRequestId: request.id,

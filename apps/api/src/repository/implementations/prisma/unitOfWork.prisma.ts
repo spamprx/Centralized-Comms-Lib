@@ -8,6 +8,7 @@ import type {
   ContentRepository,
   ContentSnapshotRepository,
   OutboxRepository,
+  ReviewPolicyRepository,
   ReviewRepository,
   TagRepository,
   TemplateLayoutSectionRepository,
@@ -24,6 +25,7 @@ import { PrismaContentCitationRepository } from "./contentCitationRepository.pri
 import { PrismaContentRepository } from "./contentRepository.prisma";
 import { PrismaContentSnapshotRepository } from "./contentSnapshotRepository.prisma";
 import { PrismaOutboxRepository } from "./outboxRepository.prisma";
+import { PrismaReviewPolicyRepository } from "./reviewPolicyRepository.prisma";
 import { PrismaReviewRepository } from "./reviewRepository.prisma";
 import { PrismaTagRepository } from "./tagRepository.prisma";
 import { PrismaTemplateLayoutSectionRepository } from "./templateLayoutSectionRepository.prisma";
@@ -38,6 +40,7 @@ export interface Repositories {
   userRole: UserRoleRepository;
   tag: TagRepository;
   review: ReviewRepository;
+  reviewPolicy: ReviewPolicyRepository;
   audit: AuditLogRepository;
   outbox: OutboxRepository;
   channel: ChannelRepository;
@@ -58,6 +61,7 @@ export function createPrismaRepositories(
     userRole: new PrismaUserRoleRepository(db),
     tag: new PrismaTagRepository(db),
     review: new PrismaReviewRepository(db),
+    reviewPolicy: new PrismaReviewPolicyRepository(db),
     audit: new PrismaAuditLogRepository(db),
     outbox: new PrismaOutboxRepository(db),
     channel: new PrismaChannelRepository(db),

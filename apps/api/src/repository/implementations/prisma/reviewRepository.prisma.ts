@@ -84,7 +84,9 @@ export class PrismaReviewRepository implements ReviewRepository {
     return rows.map(toRequest);
   }
 
-  async listOpenRequestsForContent(contentId: string): Promise<ReviewRequest[]> {
+  async listOpenRequestsForContent(
+    contentId: string,
+  ): Promise<ReviewRequest[]> {
     const rows = await this.db.reviewRequest.findMany({
       where: { contentId, status: "OPEN" as any },
       orderBy: { createdAt: "desc" },
@@ -218,5 +220,22 @@ export class PrismaReviewRepository implements ReviewRepository {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));
+  }
+
+  async hasClosedRequestMeetingQuorumForVersion(input: {
+    contentId: string;
+    contentVersionId: string;
+    requiredQuorum: number;
+  }): Promise<boolean> {
+    const row = await this.db.reviewRequest.findFirst({
+      where: {
+        contentId: input.contentId,
+        contentVersionId: input.contentVersionId,
+        status: "CLOSED" as any,
+        quorumRequired: { gte: input.requiredQuorum },
+      },
+      select: { id: true },
+    });
+    return !!row;
   }
 }

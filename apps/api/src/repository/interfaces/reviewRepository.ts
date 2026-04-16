@@ -46,4 +46,14 @@ export interface ReviewRepository {
   addComment(input: ReviewCommentInput): Promise<ReviewComment>;
 
   listComments(assignmentId: string): Promise<ReviewComment[]>;
+
+  /**
+   * True when there exists a CLOSED review request for this exact content version
+   * whose quorumRequired meets or exceeds `requiredQuorum`.
+   */
+  hasClosedRequestMeetingQuorumForVersion(input: {
+    contentId: string;
+    contentVersionId: string;
+    requiredQuorum: number;
+  }): Promise<boolean>;
 }

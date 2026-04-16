@@ -15,6 +15,7 @@ import {
   adminGroupService,
   adminMonitoringService,
   adminSettingsService,
+  adminReviewPolicyService,
   // subscribeAdminUsersActivity, // next sprint: live “last online” updates via SSE
 } from '../services/adminService';
 import {
@@ -431,4 +432,103 @@ export function useAdminSettings() {
   };
 
   return { settings, loading, saving, error, updateSection, refetch: fetchSettings };
+}
+
+// ─── Review policies hook (F-ADM-004) ────────────────────────────────────────
+
+export type ReviewPolicyRow = {
+  id: string;
+  contentType: 'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT';
+  channelId: string | null;
+  userGroupId: string | null;
+  quorumRequired: number;
+  isActive: boolean;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function useAdminReviewPolicies() {
+  const [policies, setPolicies] = useState<ReviewPolicyRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPolicies = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminReviewPolicyService.list();
+      setPolicies(res.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load review policies');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchPolicies();
+  }, [fetchPolicies]);
+
+  const createPolicy = async (input: {
+    contentType: ReviewPolicyRow['contentType'];
+    channelId?: string | null;
+    userGroupId?: string | null;
+    quorumRequired: number;
+    isActive?: boolean;
+  }) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const out = await adminReviewPolicyService.create(input);
+      await fetchPolicies();
+      return out.data;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updatePolicy = async (
+    id: string,
+    input: Partial<{
+      contentType: ReviewPolicyRow['contentType'];
+      channelId: string | null;
+      userGroupId: string | null;
+      quorumRequired: number;
+      isActive: boolean;
+    }>,
+  ) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const out = await adminReviewPolicyService.update(id, input);
+      await fetchPolicies();
+      return out.data;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deletePolicy = async (id: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await adminReviewPolicyService.delete(id);
+      await fetchPolicies();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return {
+    policies,
+    loading,
+    saving,
+    error,
+    refetch: fetchPolicies,
+    createPolicy,
+    updatePolicy,
+    deletePolicy,
+  };
 }

@@ -275,6 +275,10 @@ export const contentService = {
     versions: ContentVersion[];
     tags: Array<{ id: string; name: string; slug: string }>;
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
+    reviewPolicy?: {
+      requiredQuorum: number | null;
+      isSatisfied: boolean | null;
+    };
     channel?: {
       id: string;
       name: string;

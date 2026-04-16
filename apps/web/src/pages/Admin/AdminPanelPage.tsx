@@ -1,20 +1,30 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Shield, Activity, LayoutDashboard, ChevronLeft, Radio } from 'lucide-react';
+import {
+  Users,
+  Shield,
+  Activity,
+  LayoutDashboard,
+  ChevronLeft,
+  Radio,
+  ClipboardCheck,
+} from 'lucide-react';
 import UserManagementTab from '../../components/admin/UserManagementTab';
 import RolesAndGroupsTab from '../../components/admin/RolesAndGroupsTab';
 import MonitoringTab from '../../components/admin/MonitoringTab';
 import ChannelManagementTab from '../../components/admin/ChannelManagementTab';
+import ReviewPoliciesTab from '../../components/admin/ReviewPoliciesTab';
 
-export type AdminTab = 'users' | 'roles' | 'channels' | 'monitoring';
+export type AdminTab = 'users' | 'roles' | 'channels' | 'reviewPolicies' | 'monitoring';
 
-const ADMIN_TABS: AdminTab[] = ['users', 'roles', 'channels', 'monitoring'];
+const ADMIN_TABS: AdminTab[] = ['users', 'roles', 'channels', 'reviewPolicies', 'monitoring'];
 
 const TAB_META: Record<AdminTab, { label: string; subtitle: string; icon: React.ElementType }> = {
   users: { label: 'Users', subtitle: 'Accounts and access', icon: Users },
   roles: { label: 'Roles & groups', subtitle: 'Permissions and groups', icon: Shield },
   channels: { label: 'Channels', subtitle: 'Compatibility and restrictions', icon: Radio },
+  reviewPolicies: { label: 'Review policies', subtitle: 'Publish gating rules', icon: ClipboardCheck },
   monitoring: { label: 'Monitoring', subtitle: 'Health and activity', icon: Activity },
 };
 
@@ -31,6 +41,8 @@ export default function AdminPanelPage() {
         return <MonitoringTab />;
       case 'channels':
         return <ChannelManagementTab />;
+      case 'reviewPolicies':
+        return <ReviewPoliciesTab />;
     }
   };
 
