@@ -3,6 +3,7 @@ import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
 import { adminService } from "../../service";
 import type { AuditContext } from "../../shared/context";
 import { getAdminOperationalMetrics } from "../../observability/operationalMetrics";
+import { subscribeUserLastActive } from "../../realtime/adminActivityHub";
 
 const router = Router();
 
@@ -613,6 +614,44 @@ router.get("/users", async (req: AuthRequest, res: Response) => {
 });
 
 /**
+ * Server-sent events: `{ type: 'user_last_active', userId, lastActiveAt?, presencePingAt? }`
+ * when user API activity is recorded (throttled) or a client presence heartbeat fires. ADMIN only.
+ */
+router.get(
+  "/users/activity-stream",
+  authorize("ADMIN"),
+  (_req: AuthRequest, res: Response) => {
+    res.status(200);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    res.flushHeaders();
+
+    const send = (payload: unknown) => {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    const unsubscribe = subscribeUserLastActive((payload) => {
+      send(payload);
+    });
+
+    const ping = setInterval(() => {
+      res.write(": ping\n\n");
+    }, 25000);
+
+    const onClose = () => {
+      clearInterval(ping);
+      unsubscribe();
+    };
+
+    _req.on("close", onClose);
+    res.on("close", onClose);
+  },
+);
+
+/**
  * @openapi
  * /api/v1/admin/users/{id}:
  *   get:
@@ -764,30 +803,29 @@ router.post(
   },
 );
 
-router.patch(
-  "/users/:id/status",
+router.post(
+  "/users/bulk-status",
   authorize("ADMIN"),
   async (req: AuthRequest, res: Response) => {
     try {
-      const { status } = req.body as { status?: string };
-      if (!status) {
-        res.status(400).json({ error: "status is required" });
+      const { ids, isActive } = req.body as {
+        ids?: string[];
+        isActive?: unknown;
+      };
+      if (!Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ error: "ids array is required" });
         return;
       }
-      const active = status === "active" || status === "pending";
-      const result = await adminService.updateUser(
+      if (typeof isActive !== "boolean") {
+        res.status(400).json({ error: "isActive (boolean) is required" });
+        return;
+      }
+      const out = await adminService.bulkSetUsersActive(
         auditContext(req),
-        req.params.id,
-        {
-          isActive: active,
-        },
+        ids,
+        isActive,
       );
-      if ("notFound" in result && result.notFound) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
-      const full = await adminService.getUserById(req.params.id);
-      res.status(200).json(full ?? result.user);
+      res.status(200).json(out);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });

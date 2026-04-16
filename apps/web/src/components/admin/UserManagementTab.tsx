@@ -1,13 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+// import { Plus } from 'lucide-react';
 import SearchAndFilterBar from './SearchAndFilterBar';
 import UsersTable from './UsersTable';
-import UserModal from './UserModal';
-import { useAdminUsers, useAdminRolesAndGroups, type UserFormPayload } from '../../hooks/useAdmin';
-import { adminUserService } from '../../services/adminService';
-import type { User } from '../../types/admin';
+// import UserModal from './UserModal'; // next sprint: invite / row actions
+import { useAdminUsers, useAdminRolesAndGroups } from '../../hooks/useAdmin';
 import { useTwoStepAdminConfirm } from './useTwoStepAdminConfirm';
-import { AdminActionCancelled } from './adminActionCancelled';
 
 export default function UserManagementTab() {
   const {
@@ -19,24 +16,17 @@ export default function UserManagementTab() {
     setFilters,
     setPagination,
     refetch,
-    createUser,
-    deleteUser,
-    bulkDelete,
-    updateStatus,
-    updateUser,
+    // createUser, // next sprint: “Invite user”
+    bulkSetActive,
   } = useAdminUsers({
     role: 'all',
-    status: 'all',
     group: 'all',
+    accountStatus: 'all',
     sortBy: 'createdAt',
     sortOrder: 'desc',
   });
 
-  const { groups, roles } = useAdminRolesAndGroups();
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showPasswordResetToast, setShowPasswordResetToast] = useState(false);
-  const [passwordResetMessage, setPasswordResetMessage] = useState('');
+  const { groups } = useAdminRolesAndGroups();
   const [rowActionError, setRowActionError] = useState<string | null>(null);
   const { promptTwoStep, dialog: twoStepDialog } = useTwoStepAdminConfirm();
 
@@ -45,111 +35,47 @@ export default function UserManagementTab() {
     [groups],
   );
 
-  const roleOptions = useMemo(() => roles.map((r) => ({ id: r.id, name: r.name })), [roles]);
+  /*
+   * ─── Invite user (next sprint) ─────────────────────────────────────────
+   * const [showInviteModal, setShowInviteModal] = useState(false);
+   * const handleInviteUser = async (data: UserFormPayload) => { ... createUser ... };
+   */
 
-  const handleInviteUser = async (data: UserFormPayload) => {
-    const ok = await promptTwoStep({
-      title: 'Invite user',
-      body1: `You are about to create an account for ${data.email}.`,
-      body2:
-        'Final confirmation: the user will be stored in the database with the role and groups you selected.',
-      confirm2: 'Create user',
-    });
-    if (!ok) throw new AdminActionCancelled();
-    await createUser(data);
-    refetch();
-  };
-
-  const handleUpdateUser = async (data: UserFormPayload) => {
-    if (!editingUser) return;
-    const ok = await promptTwoStep({
-      title: 'Update user',
-      body1: `Save changes for ${editingUser.email}?`,
-      body2:
-        'Final confirmation: profile, role, status, and group memberships will be updated on the server.',
-      confirm2: 'Save changes',
-    });
-    if (!ok) throw new AdminActionCancelled();
-    await updateUser(editingUser.id, data);
-    refetch();
-  };
-
-  const handleDeleteUser = async (id: string) => {
+  const handleBulkDeactivate = async (ids: string[]): Promise<boolean> => {
     setRowActionError(null);
-    const u = users.find((x) => x.id === id);
-    const label = u ? `${u.name} (${u.email})` : id;
     const ok = await promptTwoStep({
-      title: 'Deactivate user',
-      body1: `You are about to deactivate ${label}. They will no longer be able to sign in.`,
-      body2:
-        'Final confirmation: this account will be marked inactive. You can still see audit history for past actions.',
+      title: 'Deactivate accounts',
+      body1: `${ids.length} active account(s) will be set to inactive.`,
+      body2: 'Those users will not be able to sign in or use the API until reactivated.',
       confirm2: 'Deactivate',
     });
-    if (!ok) return;
+    if (!ok) return false;
     try {
-      await deleteUser(id);
+      await bulkSetActive(ids, false);
       await refetch();
-    } catch (e) {
-      setRowActionError(e instanceof Error ? e.message : 'Failed to deactivate user');
-    }
-  };
-
-  const handleBulkDelete = async (ids: string[]) => {
-    setRowActionError(null);
-    const ok = await promptTwoStep({
-      title: 'Bulk deactivate users',
-      body1: `You selected ${ids.length} user(s) to deactivate.`,
-      body2: 'Final confirmation: all selected accounts will be marked inactive.',
-      confirm2: 'Deactivate all',
-    });
-    if (!ok) return;
-    try {
-      await bulkDelete(ids);
-      await refetch();
+      return true;
     } catch (e) {
       setRowActionError(e instanceof Error ? e.message : 'Bulk deactivate failed');
+      return false;
     }
   };
 
-  const handleStatusChange = async (id: string, status: User['status']) => {
+  const handleBulkActivate = async (ids: string[]): Promise<boolean> => {
     setRowActionError(null);
-    const u = users.find((x) => x.id === id);
     const ok = await promptTwoStep({
-      title: 'Change account status',
-      body1: `Change status for ${u?.email ?? id} to “${status}”?`,
-      body2: 'Final confirmation: this updates whether the account can sign in.',
-      confirm2: 'Update status',
+      title: 'Activate accounts',
+      body1: `${ids.length} inactive account(s) will be set to active.`,
+      body2: 'Those users will be able to sign in again with their existing password.',
+      confirm2: 'Activate',
     });
-    if (!ok) return;
+    if (!ok) return false;
     try {
-      await updateStatus(id, status);
+      await bulkSetActive(ids, true);
       await refetch();
+      return true;
     } catch (e) {
-      setRowActionError(e instanceof Error ? e.message : 'Failed to update status');
-    }
-  };
-
-  const handleResetPassword = async (id: string) => {
-    setRowActionError(null);
-    const u = users.find((x) => x.id === id);
-    const ok = await promptTwoStep({
-      title: 'Password reset',
-      body1: `Trigger a password reset flow for ${u?.email ?? id}?`,
-      body2:
-        'Final confirmation: the server will attempt to send reset instructions if outbound email is configured.',
-      confirm2: 'Send reset',
-    });
-    if (!ok) return;
-    try {
-      const res = await adminUserService.resetUserPassword(id);
-      const msg = res.data.emailSent
-        ? 'If this account exists, a reset email was sent.'
-        : (res.data.message ?? 'Password reset is not configured for this environment.');
-      setPasswordResetMessage(msg);
-      setShowPasswordResetToast(true);
-      setTimeout(() => setShowPasswordResetToast(false), 5000);
-    } catch (e) {
-      setRowActionError(e instanceof Error ? e.message : 'Password reset request failed');
+      setRowActionError(e instanceof Error ? e.message : 'Bulk activate failed');
+      return false;
     }
   };
 
@@ -190,6 +116,7 @@ export default function UserManagementTab() {
           <h2 className="mb-1 text-lg font-semibold tracking-tight text-app-text">Users</h2>
           <p className="m-0 text-[13px] text-app-muted">Manage accounts, roles, and permissions</p>
         </div>
+        {/*
         <button
           type="button"
           className="admin-glass-button inline-flex items-center justify-center gap-2 self-start rounded-app-lg border border-app-accent/25 bg-app-accent-muted/40 px-4 py-2.5 text-[13px] font-semibold text-app-accent shadow-[0_0_24px_-10px_rgba(147,124,248,0.45)] sm:self-auto"
@@ -197,6 +124,7 @@ export default function UserManagementTab() {
         >
           <Plus size={15} strokeWidth={2} /> Invite user
         </button>
+        */}
       </div>
 
       <SearchAndFilterBar
@@ -211,11 +139,8 @@ export default function UserManagementTab() {
         users={users}
         loading={loading}
         groupLookup={groupLookup}
-        onEdit={setEditingUser}
-        onDelete={handleDeleteUser}
-        onStatusChange={handleStatusChange}
-        onBulkDelete={handleBulkDelete}
-        onResetPassword={handleResetPassword}
+        onBulkDeactivate={handleBulkDeactivate}
+        onBulkActivate={handleBulkActivate}
       />
 
       {pagination.total > pagination.limit && (
@@ -242,6 +167,7 @@ export default function UserManagementTab() {
         </div>
       )}
 
+      {/*
       {showInviteModal && (
         <UserModal
           groups={groups.map((g) => ({ id: g.id, name: g.name }))}
@@ -250,22 +176,7 @@ export default function UserManagementTab() {
           onSave={handleInviteUser}
         />
       )}
-
-      {editingUser && (
-        <UserModal
-          user={editingUser}
-          groups={groups.map((g) => ({ id: g.id, name: g.name }))}
-          roles={roleOptions}
-          onClose={() => setEditingUser(null)}
-          onSave={handleUpdateUser}
-        />
-      )}
-
-      {showPasswordResetToast && (
-        <div className="admin-modal-enter admin-modal-panel fixed bottom-6 right-6 z-[1300] max-w-sm rounded-app-xl px-5 py-3.5 text-[13px] font-medium text-emerald-300 shadow-app-glow">
-          <span>{passwordResetMessage}</span>
-        </div>
-      )}
+      */}
     </div>
   );
 }

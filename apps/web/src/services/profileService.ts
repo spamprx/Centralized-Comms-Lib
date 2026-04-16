@@ -74,4 +74,36 @@ export const profileService = {
     const data = await request<{ items: ProfileBookmarkItem[] }>(`/profile/me/bookmarks${qs}`);
     return data.items;
   },
+
+  /** Heartbeat while the SPA is open — updates server presence for admin “Active now”. */
+  sendPresencePing: async (): Promise<void> => {
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/profile/presence`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+  },
+
+  /** Call before clearing the session so admin “Active now” drops immediately. */
+  clearPresence: async (): Promise<void> => {
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/profile/presence`, {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+  },
 };

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Trash2, Users, Shield, Edit2 } from 'lucide-react';
 import { useAdminRolesAndGroups, useAdminUsers } from '../../hooks/useAdmin';
 import RoleModal from './RoleModal';
@@ -304,60 +305,65 @@ export default function RolesAndGroupsTab() {
         />
       )}
 
-      {showDeleteRoleConfirm && (
-        <div
-          className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
-          onClick={() => {
-            setShowDeleteRoleConfirm(null);
-            setRoleActionError(null);
-          }}
-        >
-          <div
-            className="admin-modal-enter admin-modal-panel w-full max-w-[400px] rounded-app-xl p-6 shadow-app-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="m-0 mb-3 text-base font-semibold text-app-text">Delete role</h3>
-            {showDeleteRoleConfirm.isSystem ? (
-              <p className="m-0 mb-5 text-[13px] leading-relaxed text-amber-200/90">
-                System roles cannot be deleted. Remove the{' '}
-                <strong className="text-app-text">Admin</strong> assignment from users in User
-                Management if you need to change access.
-              </p>
-            ) : (
-              <p className="m-0 mb-5 text-[13px] leading-relaxed text-app-muted">
-                Are you sure you want to delete{' '}
-                <strong className="text-app-text">{showDeleteRoleConfirm.name}</strong>? This cannot
-                be undone.
-              </p>
-            )}
-            {roleActionError ? (
-              <p className="mb-4 rounded-lg border border-red-400/25 bg-red-400/10 px-3 py-2 text-[13px] text-red-300">
-                {roleActionError}
-              </p>
-            ) : null}
-            <div className="flex justify-end gap-2.5">
-              <button
-                type="button"
-                className="rounded-xl px-5 py-2.5 text-[13px] text-app-muted admin-glass-button"
+      {showDeleteRoleConfirm
+        ? typeof document !== 'undefined'
+          ? createPortal(
+              <div
+                className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
                 onClick={() => {
                   setShowDeleteRoleConfirm(null);
                   setRoleActionError(null);
                 }}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="cursor-pointer rounded-xl border border-red-400/20 bg-red-400/10 px-5 py-2.5 text-[13px] font-medium text-red-400 admin-btn-lift hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={Boolean(showDeleteRoleConfirm.isSystem)}
-                onClick={() => void handleDeleteRole()}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <div
+                  className="admin-modal-enter admin-modal-panel w-full max-w-[400px] rounded-app-xl p-6 shadow-app-soft"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="m-0 mb-3 text-base font-semibold text-app-text">Delete role</h3>
+                  {showDeleteRoleConfirm.isSystem ? (
+                    <p className="m-0 mb-5 text-[13px] leading-relaxed text-amber-200/90">
+                      System roles cannot be deleted. Remove the{' '}
+                      <strong className="text-app-text">Admin</strong> assignment from users in User
+                      Management if you need to change access.
+                    </p>
+                  ) : (
+                    <p className="m-0 mb-5 text-[13px] leading-relaxed text-app-muted">
+                      Are you sure you want to delete{' '}
+                      <strong className="text-app-text">{showDeleteRoleConfirm.name}</strong>? This
+                      cannot be undone.
+                    </p>
+                  )}
+                  {roleActionError ? (
+                    <p className="mb-4 rounded-lg border border-red-400/25 bg-red-400/10 px-3 py-2 text-[13px] text-red-300">
+                      {roleActionError}
+                    </p>
+                  ) : null}
+                  <div className="flex justify-end gap-2.5">
+                    <button
+                      type="button"
+                      className="rounded-xl px-5 py-2.5 text-[13px] text-app-muted admin-glass-button"
+                      onClick={() => {
+                        setShowDeleteRoleConfirm(null);
+                        setRoleActionError(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-xl border border-red-400/20 bg-red-400/10 px-5 py-2.5 text-[13px] font-medium text-red-400 admin-btn-lift hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={Boolean(showDeleteRoleConfirm.isSystem)}
+                      onClick={() => void handleDeleteRole()}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )
+          : null
+        : null}
     </div>
   );
 }

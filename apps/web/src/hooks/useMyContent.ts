@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { MyContentItem, ContentStats } from '../data/mockMyContentData';
-import {
-  contentService,
-  type Content,
-  type LifecycleState,
-} from '../services/contentService';
+import { contentService, type Content, type LifecycleState } from '../services/contentService';
 import { useAuth } from '../context/AuthContext';
 
 function mapLifecycleToStatus(state: LifecycleState): MyContentItem['status'] {

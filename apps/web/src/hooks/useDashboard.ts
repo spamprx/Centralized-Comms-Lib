@@ -90,9 +90,7 @@ type RequestCacheEntry =
     };
 
 async function buildPendingItems(assignments: ReviewAssignment[]): Promise<PendingItem[]> {
-  const active = assignments.filter(
-    (a) => a.status === 'PENDING' || a.status === 'IN_PROGRESS',
-  );
+  const active = assignments.filter((a) => a.status === 'PENDING' || a.status === 'IN_PROGRESS');
   const cache = new Map<string, RequestCacheEntry>();
 
   const resolve = async (reviewRequestId: string): Promise<RequestCacheEntry> => {
@@ -191,8 +189,7 @@ export function useDashboard() {
           setStatCards([]);
         }
 
-        const actorLabel =
-          meRes.status === 'fulfilled' ? meRes.value.displayName || 'You' : 'You';
+        const actorLabel = meRes.status === 'fulfilled' ? meRes.value.displayName || 'You' : 'You';
 
         if (activityRes.status === 'fulfilled') {
           setRecentActivity(mapActivityRows(activityRes.value, actorLabel));

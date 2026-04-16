@@ -17,6 +17,63 @@ import type {
 } from '../lib/adminApi';
 import { getAuthToken } from './tokenStore';
 
+export type AdminUserActivityEvent = {
+  type: 'user_last_active';
+  userId: string;
+  lastActiveAt?: string;
+  presencePingAt?: string | null;
+};
+
+/**
+ * Long-lived fetch to the admin SSE endpoint. Call the returned function to abort.
+ * No-op if there is no auth token.
+ */
+export function subscribeAdminUsersActivity(
+  onEvent: (e: AdminUserActivityEvent) => void,
+): () => void {
+  const token = getAuthToken();
+  if (!token) return () => {};
+
+  const url = joinApiV1Path('/admin/users/activity-stream');
+  const ac = new AbortController();
+
+  void (async () => {
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: ac.signal,
+      });
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          for (const line of block.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const data = JSON.parse(line.slice(6)) as AdminUserActivityEvent;
+              if (data.type === 'user_last_active') onEvent(data);
+            } catch {
+              /* ignore malformed */
+            }
+          }
+        }
+      }
+    } catch {
+      /* aborted or network */
+    }
+  })();
+
+  return () => ac.abort();
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const url = joinApiV1Path(path);
@@ -64,7 +121,6 @@ export const adminUserService = {
     const params = new URLSearchParams();
     if (filters?.search) params.set('search', filters.search);
     if (filters?.role && filters.role !== 'all') params.set('role', filters.role);
-    if (filters?.status && filters.status !== 'all') params.set('status', filters.status);
     if (filters?.sortBy) params.set('sortBy', filters.sortBy);
     if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
     if (pagination?.page) params.set('page', String(pagination.page));
@@ -117,15 +173,15 @@ export const adminUserService = {
     return wrap({ deleted: out.count });
   },
 
-  updateUserStatus: async (
-    id: string,
-    status: 'active' | 'inactive',
-  ): Promise<ApiResponse<ApiUserRow>> => {
-    const data = await request<ApiUserRow>(`/admin/users/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
+  bulkSetUsersActive: async (
+    ids: string[],
+    isActive: boolean,
+  ): Promise<ApiResponse<{ count: number }>> => {
+    const out = await request<{ count: number }>('/admin/users/bulk-status', {
+      method: 'POST',
+      body: JSON.stringify({ ids, isActive }),
     });
-    return wrap(data);
+    return wrap({ count: out.count });
   },
 
   assignUserRole: async (userId: string, roleId: string): Promise<void> => {

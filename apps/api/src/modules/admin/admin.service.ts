@@ -382,20 +382,28 @@ export const adminService = {
     });
   },
 
-  async bulkDeactivateUsers(ctx: AuditContext, ids: string[]) {
+  async bulkSetUsersActive(
+    ctx: AuditContext,
+    ids: string[],
+    isActive: boolean,
+  ) {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     await uow.withTransaction(async (repos) => {
       for (const id of ids) {
         const existing = await repos.userRole.getUserById(id);
         if (!existing) continue;
-        await repos.userRole.deleteUser(id);
+        if (isActive) {
+          await repos.userRole.updateUser(id, { isActive: true });
+        } else {
+          await repos.userRole.deleteUser(id);
+        }
         await repos.audit.append({
           action: "UPDATE",
           resource: "USER",
           resourceId: id,
           oldValue: { isActive: existing.isActive },
-          newValue: { isActive: false },
+          newValue: { isActive },
           actorId: ctx.actorId,
           ipAddress: ctx.ipAddress,
           userAgent: ctx.userAgent,
@@ -403,6 +411,10 @@ export const adminService = {
       }
     });
     return { count: ids.length } as const;
+  },
+
+  async bulkDeactivateUsers(ctx: AuditContext, ids: string[]) {
+    return adminService.bulkSetUsersActive(ctx, ids, false);
   },
 
   async resetUserPassword(_ctx: AuditContext, id: string) {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Role, Permission } from '../../types/admin';
 import { isAdminActionCancelled } from './adminActionCancelled';
@@ -73,13 +74,15 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
 
   const isSystem = Boolean(role?.isSystem);
 
-  return (
+  const modal = (
     <div
-      className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
-      onClick={onClose}
+      className="admin-modal-backdrop fixed inset-0 z-[1100] overflow-y-auto bg-black/75 p-4 py-10 backdrop-blur-md"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="admin-modal-enter admin-modal-panel max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-app-xl shadow-app-soft"
+        className="admin-modal-enter admin-modal-panel mx-auto flex max-h-[90vh] w-full max-w-[600px] flex-col overflow-hidden rounded-app-xl shadow-app-soft"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-5">
@@ -95,7 +98,8 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {isSystem ? (
             <p className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200/95">
               This is a system role. The name cannot be changed; you can still adjust description
@@ -168,7 +172,9 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 border-t border-white/[0.08] pt-5">
+          </div>
+
+          <div className="sticky bottom-0 flex justify-end gap-3 border-t border-white/[0.08] bg-[rgba(15,20,32,0.92)] px-6 py-5 backdrop-blur-md">
             <button
               type="button"
               className="admin-glass-button rounded-app-lg px-5 py-2.5 text-[13px] font-semibold text-app-muted"
@@ -188,4 +194,7 @@ export default function RoleModal({ role, onClose, onSave }: RoleModalProps) {
       </div>
     </div>
   );
+
+  // Prevent clipping by ancestor containers (overflow/transform/backdrop-filter).
+  return typeof document !== 'undefined' ? createPortal(modal, document.body) : modal;
 }

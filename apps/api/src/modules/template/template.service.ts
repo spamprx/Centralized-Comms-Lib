@@ -637,12 +637,6 @@ export const templateService = {
           message: "Layout must declare at least one region",
         } as const;
       }
-      if (current.bindings.length < 1) {
-        return {
-          invalid: true,
-          message: "Activate requires at least one channel binding",
-        } as const;
-      }
 
       for (const b of current.bindings) {
         const ch = await repos.channel.getById(b.channelId);

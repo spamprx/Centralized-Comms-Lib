@@ -308,26 +308,25 @@ router.get(
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const [
-        userCount,
-        publishedInRange,
-        totalViews,
-        likeCount,
-        commentCount,
-      ] = await Promise.all([
-        repos.userRole.listUsers().then((u: any[]) => u.length),
-        prisma.content.count({
-          where: {
-            lifecycleState: "PUBLISHED",
-            createdAt: { gte: startDate },
-          },
-        }),
-        prisma.contentView.count({ where: { createdAt: { gte: startDate } } }),
-        prisma.contentLike.count({ where: { createdAt: { gte: startDate } } }),
-        prisma.contentComment.count({
-          where: { createdAt: { gte: startDate } },
-        }),
-      ]);
+      const [userCount, publishedInRange, totalViews, likeCount, commentCount] =
+        await Promise.all([
+          repos.userRole.listUsers().then((u: any[]) => u.length),
+          prisma.content.count({
+            where: {
+              lifecycleState: "PUBLISHED",
+              createdAt: { gte: startDate },
+            },
+          }),
+          prisma.contentView.count({
+            where: { createdAt: { gte: startDate } },
+          }),
+          prisma.contentLike.count({
+            where: { createdAt: { gte: startDate } },
+          }),
+          prisma.contentComment.count({
+            where: { createdAt: { gte: startDate } },
+          }),
+        ]);
 
       const interactions = likeCount + commentCount;
       const interactionRatePct =

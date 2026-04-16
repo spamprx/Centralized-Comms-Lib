@@ -18,6 +18,8 @@ function toUser(row: {
   displayName: string;
   avatarUrl: string | null;
   isActive: boolean;
+  lastActiveAt: Date | null;
+  presencePingAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): User {
@@ -27,6 +29,8 @@ function toUser(row: {
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,
     isActive: row.isActive,
+    lastActiveAt: row.lastActiveAt,
+    presencePingAt: row.presencePingAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -39,6 +43,8 @@ function toUserWithPassword(row: {
   passwordHash: string;
   avatarUrl: string | null;
   isActive: boolean;
+  lastActiveAt: Date | null;
+  presencePingAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): UserWithPassword {
@@ -133,6 +139,44 @@ export class PrismaUserRoleRepository implements UserRoleRepository {
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toUser);
+  }
+
+  async touchLastActiveAt(userId: string): Promise<Date | null> {
+    try {
+      const row = await this.db.user.update({
+        where: { id: userId },
+        data: { lastActiveAt: new Date() },
+        select: { lastActiveAt: true },
+      });
+      return row.lastActiveAt;
+    } catch {
+      return null;
+    }
+  }
+
+  async touchPresencePingAt(userId: string): Promise<Date | null> {
+    try {
+      const existing = await this.db.user.findUnique({
+        where: { id: userId },
+        select: { isActive: true },
+      });
+      if (!existing?.isActive) return null;
+      const row = await this.db.user.update({
+        where: { id: userId },
+        data: { presencePingAt: new Date() },
+        select: { presencePingAt: true },
+      });
+      return row.presencePingAt;
+    } catch {
+      return null;
+    }
+  }
+
+  async clearPresencePingAt(userId: string): Promise<void> {
+    await this.db.user.updateMany({
+      where: { id: userId },
+      data: { presencePingAt: null },
+    });
   }
 
   async updateUser(

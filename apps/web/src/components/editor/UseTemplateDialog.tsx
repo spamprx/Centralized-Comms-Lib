@@ -36,10 +36,10 @@ export default function UseTemplateDialog({ onClose, onSelectTemplate }: UseTemp
   useEffect(() => {
     let cancelled = false;
     void templateCrudService
-      .list({ status: 'ALL' })
+      .list({ status: 'ACTIVE' })
       .then((rows) => {
         if (cancelled) return;
-        setTemplates(rows.filter((t) => t.status !== 'ARCHIVED'));
+        setTemplates(rows);
         setError(null);
       })
       .catch((e: unknown) => {
@@ -132,7 +132,7 @@ export default function UseTemplateDialog({ onClose, onSelectTemplate }: UseTemp
           ) : filtered.length === 0 ? (
             <p className="px-2 py-6 text-center text-[12px] text-app-faint">
               {templates.length === 0
-                ? 'No templates available.'
+                ? 'No active templates. Activate one on the Templates page to use it here.'
                 : 'No templates match your search.'}
             </p>
           ) : (

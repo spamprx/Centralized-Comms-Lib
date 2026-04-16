@@ -131,6 +131,14 @@ router.post("/login", async (req: Request, res: Response) => {
       { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
       { email, password },
     );
+    if ("accountInactive" in result) {
+      res.status(403).json({
+        error:
+          "This account has been deactivated. Contact an administrator if you need access.",
+        code: "ACCOUNT_INACTIVE",
+      });
+      return;
+    }
     if ("invalidCredentials" in result) {
       res.status(401).json({ error: "Invalid credentials" });
       return;
@@ -142,6 +150,11 @@ router.post("/login", async (req: Request, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
+});
+
+/** Stateless JWT logout — client clears credentials; optional hook for future token blocklists. */
+router.post("/logout", (_req: Request, res: Response) => {
+  res.status(204).end();
 });
 
 export default router;

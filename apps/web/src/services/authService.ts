@@ -33,7 +33,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new Error(err.error || err.message || `HTTP ${res.status}`);
   }
 
-  return res.json();
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
 }
 
 export const authService = {

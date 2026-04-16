@@ -486,8 +486,8 @@ export default function MyContentLayout() {
                             <div className="text-[11px] leading-snug text-app-muted">
                               {item.workspaceRole === 'author' ? (
                                 <>
-                                  <span className="font-medium text-app-text/90">You</span> — primary
-                                  author
+                                  <span className="font-medium text-app-text/90">You</span> —
+                                  primary author
                                   {item.collaborators > 0
                                     ? ` · ${item.collaborators} co-author(s)`
                                     : ''}
@@ -495,8 +495,7 @@ export default function MyContentLayout() {
                               ) : (
                                 <>
                                   <span className="font-medium text-app-text/90">You</span> —{' '}
-                                  co-author · Primary:{' '}
-                                  {item.primaryAuthor?.displayName ?? '—'}
+                                  co-author · Primary: {item.primaryAuthor?.displayName ?? '—'}
                                 </>
                               )}
                             </div>
@@ -689,7 +688,9 @@ export default function MyContentLayout() {
             loading={pendingCoAuthorLoading}
             busyContentId={inviteRespondBusy}
             onClose={() => setCoAuthorInvitesOpen(false)}
-            onRespond={(contentId, decision) => void handleCoAuthorInviteRespond(contentId, decision)}
+            onRespond={(contentId, decision) =>
+              void handleCoAuthorInviteRespond(contentId, decision)
+            }
           />
         ) : null}
 

@@ -184,12 +184,15 @@ export default function ManageCoAuthorsModal({
 
               {canInvite ? (
                 <div className="border-t border-white/[0.08] pt-4">
-                  <label htmlFor="co-author-invite-email" className="mb-1.5 block text-[12px] font-medium text-app-text">
+                  <label
+                    htmlFor="co-author-invite-email"
+                    className="mb-1.5 block text-[12px] font-medium text-app-text"
+                  >
                     Invite by email
                   </label>
                   <p className="mb-2 text-[11px] leading-snug text-app-faint">
-                    They need an existing account. Co-authors can edit but cannot delete this content
-                    or invite others.
+                    They need an existing account. Co-authors can edit but cannot delete this
+                    content or invite others.
                   </p>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <input

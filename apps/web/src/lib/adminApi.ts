@@ -1,12 +1,4 @@
-import type {
-  ActivityLog,
-  Group,
-  Permission,
-  Role,
-  User,
-  UserRole,
-  UserStatus,
-} from '../types/admin';
+import type { ActivityLog, Group, Permission, Role, User, UserRole } from '../types/admin';
 
 /** Raw shapes from GET /admin/users (with associations). */
 export type ApiUserRow = {
@@ -15,6 +7,8 @@ export type ApiUserRow = {
   displayName: string;
   avatarUrl: string | null;
   isActive: boolean;
+  lastActiveAt: string | null;
+  presencePingAt: string | null;
   createdAt: string;
   updatedAt: string;
   roles: { id: string; name: string; description?: string | null }[];
@@ -110,24 +104,20 @@ export function apiUserRowToUser(row: ApiUserRow): User {
   const roles = row.roles ?? [];
   const primary = roles[0];
   const role = primary ? backendRoleNameToUserRole(primary.name) : 'viewer';
-  const status: UserStatus = row.isActive ? 'active' : 'inactive';
+  const lastActiveSource = row.lastActiveAt ?? row.createdAt;
   return {
     id: row.id,
     name: row.displayName,
     email: row.email,
     avatar: row.avatarUrl ?? undefined,
     role,
-    status,
+    isActive: row.isActive,
     groups: (row.groups ?? []).map((g) => g.id),
-    lastActive: toIso(row.updatedAt),
+    lastActive: toIso(lastActiveSource),
+    presencePingAt: row.presencePingAt ? toIso(row.presencePingAt) : null,
     createdAt: toIso(row.createdAt),
     primaryRoleId: primary?.id,
   };
-}
-
-/** Body for PATCH `/admin/users/:id/status` — backend maps active vs everything else to `isActive`. */
-export function uiStatusToPatchStatus(status: UserStatus): 'active' | 'inactive' {
-  return status === 'active' ? 'active' : 'inactive';
 }
 
 export function mapApiGroupDetail(g: ApiGroupDetail): Group {

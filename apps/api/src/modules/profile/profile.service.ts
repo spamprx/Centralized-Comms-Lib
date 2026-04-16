@@ -11,6 +11,26 @@ export type ProfileActivityItem = {
 };
 
 export const profileService = {
+  /**
+   * Records a lightweight “still here” ping for admin presence / “Active now”.
+   * No-op for deactivated accounts.
+   */
+  async recordPresencePing(
+    userId: string,
+  ): Promise<{ presencePingAt: Date } | null> {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    const at = await uow.repos().userRole.touchPresencePingAt(userId);
+    if (!at) return null;
+    return { presencePingAt: at };
+  },
+
+  async clearPresencePing(userId: string): Promise<void> {
+    const prisma = getPrismaClient();
+    const uow = new PrismaUnitOfWork(prisma);
+    await uow.repos().userRole.clearPresencePingAt(userId);
+  },
+
   async getMe(userId: string): Promise<{
     id: string;
     displayName: string;

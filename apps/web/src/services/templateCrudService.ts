@@ -187,6 +187,10 @@ export const templateCrudService = {
     return request<ChannelRecord[]>('/channels');
   },
 
+  async getChannelById(id: string): Promise<ChannelRecord> {
+    return request<ChannelRecord>(`/channels/${id}`);
+  },
+
   async createChannel(input: {
     name: string;
     key?: string;

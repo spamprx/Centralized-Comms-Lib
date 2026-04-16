@@ -3,6 +3,7 @@ import { Router } from "express";
 import { sanitize } from "../../middlewares/sanitize.middleware";
 import { rateLimiter } from "../../middlewares/rateLimit.middleware";
 import { authenticate } from "../../middlewares/auth.middleware";
+import { recordUserActivity } from "../../middlewares/recordUserActivity.middleware";
 import { registerPublicRoutes } from "../../application/http/registerPublicRoutes";
 import { registerProtectedRoutes } from "../../application/http/registerProtectedRoutes";
 
@@ -21,6 +22,7 @@ export function createGatewayRouter(): Router {
   registerPublicRoutes(router);
 
   router.use(authenticate);
+  router.use(recordUserActivity);
   registerProtectedRoutes(router);
 
   return router;

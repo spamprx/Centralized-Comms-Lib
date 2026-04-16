@@ -311,7 +311,7 @@ router.patch("/:id/layout/draft", async (req: AuthRequest, res: Response) => {
  * @openapi
  * /api/v1/templates/{id}/activate:
  *   post:
- *     summary: Promote draft layout to active (requires bindings and valid layout)
+ *     summary: Promote draft layout to active (valid draft layout required; channel bindings optional)
  *     tags:
  *       - Templates
  *     security:
@@ -327,7 +327,7 @@ router.patch("/:id/layout/draft", async (req: AuthRequest, res: Response) => {
  *       200:
  *         description: Activated template
  *       400:
- *         description: Missing layout or bindings
+ *         description: Invalid or missing draft layout
  *       404:
  *         description: Template not found
  */

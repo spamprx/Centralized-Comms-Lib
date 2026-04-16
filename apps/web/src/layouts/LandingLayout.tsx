@@ -49,11 +49,12 @@ export default function LandingLayout() {
             <div className="mt-8 rounded-app-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-app-muted">
               {isAuthenticated ? (
                 <>
-                  You’re signed in. Use the header to open <span className="font-semibold text-app-text">Dashboard</span>.
+                  You’re signed in. Use the header to open{' '}
+                  <span className="font-semibold text-app-text">Dashboard</span>.
                 </>
               ) : (
                 <>
-                  Use the header to <span className="font-semibold text-app-text">Sign in</span> or{" "}
+                  Use the header to <span className="font-semibold text-app-text">Sign in</span> or{' '}
                   <span className="font-semibold text-app-text">Create account</span>.
                 </>
               )}
@@ -78,8 +79,8 @@ export default function LandingLayout() {
                 Templates with channel restrictions and validation.
               </li>
               <li className="flex gap-2">
-                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/25" />
-                A library to find and reuse approved content.
+                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/25" />A library
+                to find and reuse approved content.
               </li>
             </ul>
           </div>
@@ -125,9 +126,7 @@ export default function LandingLayout() {
             </li>
             <li className="rounded-app-lg border border-white/10 bg-transparent p-4">
               <p className="m-0 font-semibold text-app-text">3) Publish</p>
-              <p className="mt-1 leading-relaxed">
-                Validate channel rules before content ships.
-              </p>
+              <p className="mt-1 leading-relaxed">Validate channel rules before content ships.</p>
             </li>
           </ol>
         </section>

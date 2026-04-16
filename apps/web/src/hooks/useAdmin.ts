@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type {
   User,
   Role,
@@ -15,6 +15,7 @@ import {
   adminGroupService,
   adminMonitoringService,
   adminSettingsService,
+  // subscribeAdminUsersActivity, // next sprint: live “last online” updates via SSE
 } from '../services/adminService';
 import {
   apiUserRowToUser,
@@ -22,7 +23,6 @@ import {
   mapApiGroupDetail,
   mapRoleWithPermissions,
   uiPermissionToApiPayload,
-  uiStatusToPatchStatus,
 } from '../lib/adminApi';
 import type { ApiAuditEntry, ApiPermission, ApiUserRow } from '../lib/adminApi';
 
@@ -55,19 +55,27 @@ function applyUserFilters(rows: User[], filters: Partial<UserFilters>): User[] {
   if (filters.role && filters.role !== 'all') {
     out = out.filter((u) => u.role === filters.role);
   }
-  if (filters.status && filters.status !== 'all') {
-    out = out.filter((u) => u.status === filters.status);
-  }
   const groupFilter = filters.group;
   if (groupFilter && groupFilter !== 'all') {
     out = out.filter((u) => u.groups.includes(groupFilter));
   }
+  const acct = filters.accountStatus ?? 'all';
+  if (acct === 'active') out = out.filter((u) => u.isActive);
+  if (acct === 'inactive') out = out.filter((u) => !u.isActive);
   const sortBy = filters.sortBy || 'createdAt';
   const sortOrder = filters.sortOrder || 'desc';
   out.sort((a, b) => {
     let aVal: string | number = String(a[sortBy as keyof User] ?? '');
     let bVal: string | number = String(b[sortBy as keyof User] ?? '');
-    if (sortBy === 'lastActive' || sortBy === 'createdAt') {
+    if (sortBy === 'lastActive') {
+      const ts = (u: User) =>
+        Math.max(
+          new Date(u.lastActive).getTime(),
+          u.presencePingAt ? new Date(u.presencePingAt).getTime() : 0,
+        );
+      aVal = ts(a);
+      bVal = ts(b);
+    } else if (sortBy === 'createdAt') {
       aVal = new Date(String(aVal)).getTime();
       bVal = new Date(String(bVal)).getTime();
     } else {
@@ -89,14 +97,13 @@ export type UserFormPayload = {
   name: string;
   email: string;
   roleId: string;
-  status: User['status'];
   groups: string[];
   avatar?: string;
   password?: string;
 };
 
 export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
-  const [users, setUsers] = useState<User[]>([]);
+  const [remoteUsers, setRemoteUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationParams>({ page: 1, limit: 20, total: 0 });
@@ -104,28 +111,52 @@ export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
     initialFilters ?? { sortBy: 'createdAt', sortOrder: 'desc' },
   );
 
+  const filteredUsers = useMemo(
+    () => applyUserFilters(remoteUsers, filters),
+    [remoteUsers, filters],
+  );
+
+  const users = useMemo(() => {
+    const { page, limit } = pagination;
+    const start = (page - 1) * limit;
+    return filteredUsers.slice(start, start + limit);
+  }, [filteredUsers, pagination.page, pagination.limit]);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await adminUserService.getUsers();
       const rows = (res.data as unknown as ApiUserRow[]).map(apiUserRowToUser);
-      const filtered = applyUserFilters(rows, filters);
-      const total = filtered.length;
-      const { page, limit } = pagination;
-      const start = (page - 1) * limit;
-      setUsers(filtered.slice(start, start + limit));
-      setPagination((p) => ({ ...p, total }));
+      setRemoteUsers(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.limit]);
+  }, []);
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    setPagination((p) => {
+      const total = filteredUsers.length;
+      const maxPage = Math.max(1, Math.ceil(total / p.limit) || 1);
+      const page = Math.min(p.page, maxPage);
+      if (p.total === total && p.page === page) return p;
+      return { ...p, total, page };
+    });
+  }, [filteredUsers.length, pagination.limit]);
+
+  /*
+   * Live merge of activity/presence (next sprint): restore import + effect.
+   * useEffect(() => {
+   *   const stop = subscribeAdminUsersActivity((evt) => { ... });
+   *   return stop;
+   * }, []);
+   */
 
   const syncUserGroups = async (userId: string, desiredGroupIds: string[]) => {
     const detail = (await adminUserService.getUserById(userId)).data as unknown as ApiUserRow;
@@ -157,11 +188,9 @@ export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
   };
 
   const updateUser = async (id: string, data: UserFormPayload) => {
-    const isActive = data.status === 'active';
     await adminUserService.updateUser(id, {
       displayName: data.name.trim(),
       email: data.email.trim(),
-      isActive,
       avatarUrl: data.avatar?.trim() || null,
       ...(data.roleId?.trim() ? { roleId: data.roleId.trim() } : {}),
     });
@@ -180,8 +209,8 @@ export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
     await fetchUsers();
   };
 
-  const updateStatus = async (id: string, status: User['status']) => {
-    await adminUserService.updateUserStatus(id, uiStatusToPatchStatus(status));
+  const bulkSetActive = async (ids: string[], isActive: boolean) => {
+    await adminUserService.bulkSetUsersActive(ids, isActive);
     await fetchUsers();
   };
 
@@ -198,7 +227,7 @@ export function useAdminUsers(initialFilters?: Partial<UserFilters>) {
     updateUser,
     deleteUser,
     bulkDelete,
-    updateStatus,
+    bulkSetActive,
   };
 }
 

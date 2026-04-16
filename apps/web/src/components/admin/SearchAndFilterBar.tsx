@@ -34,7 +34,7 @@ export default function SearchAndFilterBar({
     width: 0,
   });
 
-  const currentStatus = filters.status || 'all';
+  const currentStatus = filters.accountStatus || 'all';
   const activeIdx = STATUS_CHIPS.findIndex((c) => c.value === currentStatus);
 
   const updateIndicator = useCallback(() => {
@@ -117,14 +117,19 @@ export default function SearchAndFilterBar({
           <option value="createdAt:asc">Oldest first</option>
           <option value="name:asc">Name A→Z</option>
           <option value="name:desc">Name Z→A</option>
-          <option value="lastActive:desc">Recently active</option>
+          <option value="lastActive:desc">Last online (newest)</option>
         </select>
 
         {/* Role filter toggle */}
         {groups.length > 0 && (
           <select
             value={filters.group ?? 'all'}
-            onChange={(e) => onFilterChange({ ...filters, group: e.target.value as any })}
+            onChange={(e) =>
+              onFilterChange({
+                ...filters,
+                group: e.target.value as UserFilters['group'],
+              })
+            }
             className={selectClass}
           >
             <option value="all">All groups</option>
@@ -162,7 +167,12 @@ export default function SearchAndFilterBar({
               }}
               type="button"
               data-active={currentStatus === chip.value}
-              onClick={() => onFilterChange({ ...filters, status: chip.value as any })}
+              onClick={() =>
+                onFilterChange({
+                  ...filters,
+                  accountStatus: chip.value as UserFilters['accountStatus'],
+                })
+              }
             >
               {chip.label}
             </button>
@@ -183,7 +193,6 @@ export default function SearchAndFilterBar({
         </button>
       </div>
 
-      {/* Role filter row */}
       {showRoleFilters && (
         <div className="flex gap-1.5 flex-wrap admin-row-enter">
           {ROLES.map((role) => (

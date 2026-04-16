@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Group } from '../../types/admin';
 import { isAdminActionCancelled } from './adminActionCancelled';
@@ -70,13 +71,15 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
     }));
   };
 
-  return (
+  const modal = (
     <div
-      className="admin-modal-backdrop fixed inset-0 z-[1100] flex items-center justify-center bg-black/75 backdrop-blur-md"
-      onClick={onClose}
+      className="admin-modal-backdrop fixed inset-0 z-[1100] overflow-y-auto bg-black/75 p-4 py-10 backdrop-blur-md"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="admin-modal-enter admin-modal-panel max-h-[90vh] w-full max-w-[520px] overflow-y-auto rounded-app-xl shadow-app-soft"
+        className="admin-modal-enter admin-modal-panel mx-auto flex max-h-[90vh] w-full max-w-[520px] flex-col overflow-hidden rounded-app-xl shadow-app-soft"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-5">
@@ -91,7 +94,8 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {error && (
             <div className="bg-red-400/10 border border-red-400/25 rounded-xl p-3 text-red-400 text-[13px] mb-4">
               {error}
@@ -173,7 +177,9 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 border-t border-white/[0.08] pt-5">
+          </div>
+
+          <div className="sticky bottom-0 flex justify-end gap-3 border-t border-white/[0.08] bg-[rgba(15,20,32,0.92)] px-6 py-5 backdrop-blur-md">
             <button
               type="button"
               className="admin-glass-button rounded-app-lg px-5 py-2.5 text-[13px] font-semibold text-app-muted"
@@ -193,4 +199,7 @@ export default function GroupModal({ group, users, roles, onClose, onSave }: Gro
       </div>
     </div>
   );
+
+  // Prevent clipping by ancestor containers (overflow/transform/backdrop-filter).
+  return typeof document !== 'undefined' ? createPortal(modal, document.body) : modal;
 }

@@ -63,6 +63,7 @@ export const authService = {
         role: "ADMIN" | "USER";
       }
     | { invalidCredentials: true }
+    | { accountInactive: true }
   > {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -91,6 +92,18 @@ export const authService = {
         userAgent: ctx.userAgent,
       });
       return { invalidCredentials: true };
+    }
+    if (!user.isActive) {
+      await repos.audit.append({
+        action: "LOGIN_FAILED",
+        resource: "USER",
+        resourceId: user.id,
+        newValue: { email: input.email, reason: "account_inactive" },
+        actorId: user.id,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { accountInactive: true };
     }
     const roles = await repos.userRole.listRolesForUser(user.id);
     const isAdmin = roles.some((r) => r.name.toUpperCase() === "ADMIN");

@@ -16,6 +16,12 @@ export interface UserRoleRepository {
   getUserByEmail(email: string): Promise<User | null>;
   getUserByEmailWithPassword(email: string): Promise<UserWithPassword | null>;
   listUsers(): Promise<User[]>;
+  /** Updates `lastActiveAt` to now. Returns the new timestamp, or null if the user row is missing. */
+  touchLastActiveAt(userId: string): Promise<Date | null>;
+  /** Updates `presencePingAt` for an active account (used by app heartbeat). */
+  touchPresencePingAt(userId: string): Promise<Date | null>;
+  /** Clears app presence (logout / tab strategy). */
+  clearPresencePingAt(userId: string): Promise<void>;
   updateUser(
     id: string,
     input: {

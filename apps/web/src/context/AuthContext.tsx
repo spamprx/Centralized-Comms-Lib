@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { authService } from '../services/authService';
+import { profileService } from '../services/profileService';
 import { setAuthToken, decodeTokenPayload } from '../services/tokenStore';
 
 type AuthUser = {
@@ -46,11 +47,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    void authService.logout();
-    // Clear token from cookie and memory
-    setAuthToken(null);
-    setUser(null);
-    setIsAuthenticated(false);
+    void (async () => {
+      try {
+        await profileService.clearPresence();
+      } catch {
+        /* still sign out */
+      }
+      try {
+        await authService.logout();
+      } catch {
+        /* /auth/logout may be unimplemented */
+      }
+      setAuthToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    })();
   };
 
   return (

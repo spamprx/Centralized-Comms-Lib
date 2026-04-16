@@ -1,4 +1,5 @@
 import { useState, useCallback, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 type Pending = {
   step: 1 | 2;
@@ -71,7 +72,7 @@ export function useTwoStepAdminConfirm(): {
     });
   }, []);
 
-  const dialog = pending ? (
+  const dialogInner = pending ? (
     <div
       className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
@@ -128,6 +129,9 @@ export function useTwoStepAdminConfirm(): {
       </div>
     </div>
   ) : null;
+
+  const dialog =
+    typeof document !== 'undefined' && dialogInner ? createPortal(dialogInner, document.body) : dialogInner;
 
   return { promptTwoStep, dialog };
 }

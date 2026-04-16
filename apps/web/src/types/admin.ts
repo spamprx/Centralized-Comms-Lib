@@ -1,6 +1,4 @@
 export type UserRole = 'super_admin' | 'admin' | 'moderator' | 'editor' | 'viewer';
-/** Mirrors `User.isActive` from the API (no separate suspended/pending in schema). */
-export type UserStatus = 'active' | 'inactive';
 
 export interface User {
   id: string;
@@ -8,10 +6,13 @@ export interface User {
   email: string;
   avatar?: string;
   role: UserRole;
-  status: UserStatus;
+  /** Whether the account can sign in (`User.isActive` in the API). */
+  isActive: boolean;
   /** Group membership ids from the API */
   groups: string[];
   lastActive: string;
+  /** Client heartbeat timestamp when the user has the app open (`User.presencePingAt`). */
+  presencePingAt: string | null;
   createdAt: string;
   /** First role assignment id (for counts / admin sync) */
   primaryRoleId?: string;
@@ -98,8 +99,9 @@ export interface SystemSettings {
 export interface UserFilters {
   search: string;
   role: UserRole | 'all';
-  status: UserStatus | 'all';
   group: string | 'all';
+  /** Filter by `User.isActive` (admin). Omitted or `'all'` shows everyone. */
+  accountStatus?: 'all' | 'active' | 'inactive';
   sortBy: 'name' | 'email' | 'role' | 'lastActive' | 'createdAt';
   sortOrder: 'asc' | 'desc';
 }

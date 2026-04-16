@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { User, UserStatus } from '../../types/admin';
+import type { User } from '../../types/admin';
 import type { UserFormPayload } from '../../hooks/useAdmin';
 import { isAdminActionCancelled } from './adminActionCancelled';
 
@@ -12,11 +12,6 @@ interface UserModalProps {
   onSave: (data: UserFormPayload) => Promise<void>;
 }
 
-const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
-  { value: 'active', label: 'Active (can sign in)' },
-  { value: 'inactive', label: 'Inactive (cannot sign in)' },
-];
-
 const inputClass =
   'w-full rounded-app-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 placeholder-transparent focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/12';
 
@@ -25,7 +20,6 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
     name: '',
     email: '',
     roleId: '',
-    status: 'active' as UserStatus,
     groups: [] as string[],
     avatar: '',
     password: '',
@@ -39,7 +33,6 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
         name: user.name,
         email: user.email,
         roleId: user.primaryRoleId ?? '',
-        status: user.status,
         groups: [...user.groups],
         avatar: user.avatar || '',
         password: '',
@@ -49,7 +42,6 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
         name: '',
         email: '',
         roleId: roles[0]?.id ?? '',
-        status: 'active',
         groups: [],
         avatar: '',
         password: '',
@@ -66,7 +58,6 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
         name: formData.name,
         email: formData.email,
         roleId: formData.roleId,
-        status: formData.status,
         groups: formData.groups,
         avatar: formData.avatar || undefined,
         ...(!user ? { password: formData.password } : {}),
@@ -173,21 +164,6 @@ export default function UserModal({ user, groups, roles, onClose, onSave }: User
                   </option>
                 ))
               )}
-            </select>
-          </div>
-
-          <div className="mb-5">
-            <label className="block text-[13px] font-medium text-app-muted mb-2">Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as UserStatus })}
-              className={`${inputClass} cursor-pointer`}
-            >
-              {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
             </select>
           </div>
 
