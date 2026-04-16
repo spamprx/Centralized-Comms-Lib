@@ -293,6 +293,19 @@ export const contentService = {
     return request(`/content/${id}`);
   },
 
+  assignTag: async (contentId: string, tagId: string): Promise<{ message: string }> => {
+    return request<{ message: string }>(`/content/${contentId}/tags`, {
+      method: 'POST',
+      body: JSON.stringify({ tagId }),
+    });
+  },
+
+  removeTag: async (contentId: string, tagId: string): Promise<{ message: string }> => {
+    return request<{ message: string }>(`/content/${contentId}/tags/${tagId}`, {
+      method: 'DELETE',
+    });
+  },
+
   /** Primary author only: invite someone who already has an account (matches email). */
   requestCoAuthorByEmail: async (
     contentId: string,

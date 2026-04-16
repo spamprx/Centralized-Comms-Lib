@@ -2,8 +2,12 @@ import { useEffect } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import Image from '@tiptap/extension-image';
 import type { JSONContent } from '@tiptap/core';
 import { templateLayoutDocExtensions } from '../../tiptap/templateLayoutDoc';
+import { CitationMarker } from '../../tiptap/CitationMarker';
+import { ComponentReference } from '../../tiptap/ComponentReference';
 
 type TipTapReadonlyProps = {
   doc: JSONContent;
@@ -19,6 +23,9 @@ export default function TipTapReadonly({
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
+      CitationMarker,
+      ComponentReference,
       Link.configure({
         openOnClick: true,
         autolink: true,
@@ -27,6 +34,11 @@ export default function TipTapReadonly({
           rel: 'noopener noreferrer nofollow',
           target: '_blank',
         },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+        HTMLAttributes: { class: 'max-w-full rounded-lg border border-white/[0.08]' },
       }),
       ...templateLayoutDocExtensions,
     ],

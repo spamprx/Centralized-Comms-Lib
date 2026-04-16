@@ -26,8 +26,10 @@ import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
+import type { JSONContent } from '@tiptap/core';
 import { contentService, ContentSaveConflictError } from '../services/contentService';
 import { componentService } from '../services/componentService';
+import { tagService, type Tag } from '../services/tagService';
 import { getAuthToken } from '../services/tokenStore';
 import {
   renderCitationWithFallback,
@@ -418,6 +420,12 @@ export default function EditorLayout() {
   const [contentType, setContentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>(
     'ARTICLE',
   );
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [tagQuery, setTagQuery] = useState('');
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [tagBusy, setTagBusy] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
   const [lifecycleState, setLifecycleState] = useState<
     'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'
   >('DRAFT');
@@ -428,6 +436,63 @@ export default function EditorLayout() {
   const persistedContentId = useMemo(
     () => contentId ?? (routeContentId && routeContentId !== 'new' ? routeContentId : null),
     [contentId, routeContentId],
+  );
+
+  const filteredTagSuggestions = useMemo(() => {
+    const q = tagQuery.trim().toLowerCase();
+    const unused = availableTags.filter((t) => !tags.some((x) => x.id === t.id));
+    if (!q) return unused.slice(0, 10);
+    return unused
+      .filter((t) => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q))
+      .slice(0, 10);
+  }, [availableTags, tagQuery, tags]);
+
+  const handleAddTag = useCallback(
+    async (name: string) => {
+      const contentIdForTags = persistedContentId;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      setTagError(null);
+      if (!contentIdForTags) {
+        setTagError('Save this draft once before adding tags.');
+        return;
+      }
+      if (tagBusy) return;
+      setTagBusy(true);
+      try {
+        const existing = availableTags.find((t) => t.name.toLowerCase() === trimmed.toLowerCase());
+        const tag = existing ?? (await tagService.create({ name: trimmed }));
+        if (!existing) setAvailableTags((prev) => [...prev, tag]);
+        await contentService.assignTag(contentIdForTags, tag.id);
+        setTags((prev) => (prev.some((t) => t.id === tag.id) ? prev : [...prev, tag]));
+        setTagQuery('');
+        setShowTagSuggestions(false);
+      } catch (e) {
+        setTagError(e instanceof Error ? e.message : 'Failed to add tag');
+      } finally {
+        setTagBusy(false);
+      }
+    },
+    [availableTags, persistedContentId, tagBusy],
+  );
+
+  const handleRemoveTag = useCallback(
+    async (tagId: string) => {
+      const contentIdForTags = persistedContentId;
+      setTagError(null);
+      if (!contentIdForTags) return;
+      if (tagBusy) return;
+      setTagBusy(true);
+      try {
+        await contentService.removeTag(contentIdForTags, tagId);
+        setTags((prev) => prev.filter((t) => t.id !== tagId));
+      } catch (e) {
+        setTagError(e instanceof Error ? e.message : 'Failed to remove tag');
+      } finally {
+        setTagBusy(false);
+      }
+    },
+    [persistedContentId, tagBusy],
   );
 
   const dirty = useMemo(() => {
@@ -492,22 +557,28 @@ export default function EditorLayout() {
           return;
         }
         if (m.type === 'presence:update' && m.contentId === persistedContentId) {
-          const users = Array.isArray(m.users) ? (m.users as any[]) : [];
+          const users = Array.isArray(m.users) ? (m.users as unknown[]) : [];
           const normalized = users
-            .map((p) => ({
-              userId: String(p.userId ?? ''),
-              displayName: String(p.displayName ?? ''),
-              email: String(p.email ?? ''),
-              lastSeenAt: '',
-            }))
+            .map((u) => {
+              const p = u && typeof u === 'object' ? (u as Record<string, unknown>) : {};
+              return {
+                userId: String(p.userId ?? ''),
+                displayName: String(p.displayName ?? ''),
+                email: String(p.email ?? ''),
+                lastSeenAt: '',
+              };
+            })
             .filter((p) => p.userId && p.userId !== user.id);
           setPresenceStatus({ kind: 'ok' });
           setEditorPresenceOthers(normalized);
         }
         if (m.type === 'presence:restore_requested' && m.contentId === persistedContentId) {
           const by =
-            m.requestedBy && typeof m.requestedBy === 'object' ? (m.requestedBy as any) : null;
-          const name = by && typeof by.displayName === 'string' ? by.displayName : 'The author';
+            m.requestedBy && typeof m.requestedBy === 'object'
+              ? (m.requestedBy as Record<string, unknown>)
+              : null;
+          const name =
+            by && typeof by.displayName === 'string' ? by.displayName : 'The author';
           setRestoreNotice(
             `${name} requested a version restore. Please finish up and leave the editor.`,
           );
@@ -546,6 +617,21 @@ export default function EditorLayout() {
   useEffect(() => {
     setDraftContent(content);
   }, [content, setDraftContent]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const all = await tagService.list();
+        if (!cancelled) setAvailableTags(all);
+      } catch {
+        if (!cancelled) setAvailableTags([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const editor = useEditor(
     {
@@ -659,7 +745,8 @@ export default function EditorLayout() {
         setTitle(nextTitle);
         setContentType(nextType);
         setLifecycleState(nextLifecycle);
-        editor.commands.setContent(doc as any);
+        setTags((details.tags as Tag[]) ?? []);
+        editor.commands.setContent(doc as JSONContent);
         const html = editor.getHTML();
         setContent(html);
         setSavedSnapshot({ title: nextTitle.trim(), content: html });
@@ -1670,22 +1757,87 @@ export default function EditorLayout() {
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">
                     Tags
                   </label>
+                  {tagError ? (
+                    <div className="mb-2 rounded-[var(--editor-radius-input)] border-[0.5px] border-red-400/35 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">
+                      {tagError}
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-1">
-                    {['tutorial', 'guide', '2026'].map((tag) => (
-                      <span
-                        key={tag}
-                        className="flex items-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-0.5 text-[11px] text-[var(--editor-muted)]"
-                      >
-                        {tag}
-                        <span className="cursor-pointer text-[var(--editor-faint)]">×</span>
-                      </span>
-                    ))}
-                    <button
-                      type="button"
-                      className="cursor-pointer rounded-[var(--editor-radius-input)] border-[0.5px] border-dashed border-[var(--editor-border)] bg-transparent px-2 py-0.5 text-[11px] text-[var(--editor-faint)]"
-                    >
-                      + Add
-                    </button>
+                    {tags.length === 0 ? (
+                      <span className="text-[11px] text-[var(--editor-faint)]">No tags</span>
+                    ) : (
+                      tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="flex items-center gap-1 rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2 py-0.5 text-[11px] text-[var(--editor-muted)]"
+                        >
+                          {tag.name}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag.id)}
+                            disabled={tagBusy || !persistedContentId}
+                            className="cursor-pointer text-[var(--editor-faint)] disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label={`Remove tag ${tag.name}`}
+                            title="Remove tag"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="relative mt-2">
+                    <input
+                      value={tagQuery}
+                      onChange={(e) => setTagQuery(e.target.value)}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowTagSuggestions(false), 150)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleAddTag(tagQuery);
+                        }
+                      }}
+                      disabled={tagBusy}
+                      placeholder={
+                        persistedContentId ? 'Type to search/create tags…' : 'Save once to add tags…'
+                      }
+                      className="box-border w-full rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-card-bg)] px-2.5 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none placeholder:text-[var(--editor-faint)]"
+                    />
+                    {showTagSuggestions && persistedContentId ? (
+                      <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-[var(--editor-radius-input)] border-[0.5px] border-[var(--editor-border)] bg-[var(--editor-panel-bg)] p-1 shadow-[0_18px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                        {filteredTagSuggestions.length > 0 ? (
+                          filteredTagSuggestions.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => void handleAddTag(t.name)}
+                              disabled={tagBusy}
+                              className="flex w-full items-center justify-between rounded-[10px] px-2.5 py-2 text-left text-[12px] text-[var(--editor-doc-text)] hover:bg-white/[0.06] disabled:opacity-50"
+                            >
+                              <span>{t.name}</span>
+                              <span className="text-[10px] text-[var(--editor-faint)]">{t.slug}</span>
+                            </button>
+                          ))
+                        ) : tagQuery.trim() ? (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => void handleAddTag(tagQuery)}
+                            disabled={tagBusy}
+                            className="w-full rounded-[10px] px-2.5 py-2 text-left text-[12px] text-[var(--editor-doc-text)] hover:bg-white/[0.06] disabled:opacity-50"
+                          >
+                            Create “{tagQuery.trim()}”
+                          </button>
+                        ) : (
+                          <div className="px-2.5 py-2 text-[11px] text-[var(--editor-faint)]">
+                            No available tags
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div>
