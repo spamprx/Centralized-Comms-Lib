@@ -300,7 +300,8 @@ router.post(
  */
 router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
   try {
-    const { title, body, aiGenerated, templateId, contentType } = req.body;
+    const { title, body, aiGenerated, templateId, channelId, contentType } =
+      req.body;
     if (!title) {
       res.status(400).json({ error: "title is required" });
       return;
@@ -317,6 +318,7 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
       body: body ?? undefined,
       aiGenerated,
       templateId: templateId ?? undefined,
+      channelId: typeof channelId === "string" ? channelId : undefined,
       contentType: contentType ?? undefined,
     });
     if ("invalidFormatting" in result && result.invalidFormatting) {
@@ -788,7 +790,14 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.post("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { body, title, contentType, baseVersionNumber } = req.body;
+    const {
+      body,
+      title,
+      contentType,
+      baseVersionNumber,
+      templateId,
+      channelId,
+    } = req.body;
     if (body !== undefined && body !== null && !isValidTipTapDocument(body)) {
       res.status(400).json({
         error:
@@ -817,6 +826,8 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
         title,
         contentType: contentType ?? undefined,
         baseVersionNumber: baseN,
+        templateId: typeof templateId === "string" ? templateId : undefined,
+        channelId: typeof channelId === "string" ? channelId : undefined,
       },
     );
     if ("notFound" in result && result.notFound) {

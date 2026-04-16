@@ -79,10 +79,18 @@ export const authenticate = (
     // but the client is still holding an old JWT.
     const user = await getPrismaClient().user.findUnique({
       where: { id: decoded.id },
-      select: { id: true },
+      select: { id: true, isActive: true },
     });
     if (!user) {
       res.status(401).json({ error: "User not found for token" });
+      return;
+    }
+    if (!user.isActive) {
+      res.status(403).json({
+        error:
+          "This account has been deactivated. Contact an administrator if you need access.",
+        code: "ACCOUNT_INACTIVE",
+      });
       return;
     }
 

@@ -3,6 +3,7 @@ import {
   PrismaUnitOfWork,
   type Content,
   type ContentListFilters,
+  type ContentType,
   type ContentVersion,
   type LifecycleState,
   type TipTapDocument,
@@ -87,6 +88,8 @@ export const contentService = {
       body?: TipTapDocument | null;
       aiGenerated?: boolean;
       templateId?: string | null;
+      /** Direct channel id (stored alongside templateId for O(1) lookup on GET). */
+      channelId?: string | null;
       contentType?: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
     },
   ): Promise<
@@ -112,6 +115,7 @@ export const contentService = {
         aiGenerated: input.aiGenerated ?? false,
         contentType: input.contentType ?? "ARTICLE",
         templateId: input.templateId ?? undefined,
+        channelId: input.channelId ?? undefined,
       });
       const version = await repos.content.createVersion({
         contentId: content.id,
@@ -256,6 +260,7 @@ export const contentService = {
       authorId: row.authorId,
       visibilityGroupId: row.visibilityGroupId,
       templateId: row.templateId ?? null,
+      channelId: row.channelId ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));
@@ -344,12 +349,59 @@ export const contentService = {
     tags: Array<{ id: string; name: string; slug: string }>;
     versions: ContentVersion[];
     coAuthors: Array<{ id: string; displayName: string; email: string }>;
+    /**
+     * Convenience for the editor UI: the channel bound to this content's template (if any).
+     * Returned as a minimal Channel shape.
+     */
+    channel?: {
+      id: string;
+      name: string;
+      key: string;
+      description: string | null;
+      priority: number;
+      compatibility: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null;
   } | null> {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     const repos = uow.repos();
-    const content = await repos.content.getById(id);
-    if (!content) return null;
+    // Fetch content + channel in one query using the direct channelId FK.
+    const contentRow = await prisma.content.findUnique({
+      where: { id },
+      include: {
+        channel: {
+          select: {
+            id: true,
+            name: true,
+            key: true,
+            description: true,
+            priority: true,
+            compatibility: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+    if (!contentRow) return null;
+    const content: Content = {
+      id: contentRow.id,
+      title: contentRow.title,
+      slug: contentRow.slug,
+      lifecycleState: contentRow.lifecycleState as LifecycleState,
+      visibility: contentRow.visibility as Visibility,
+      contentType: contentRow.contentType as ContentType,
+      aiGenerated: contentRow.aiGenerated,
+      authorId: contentRow.authorId,
+      visibilityGroupId: contentRow.visibilityGroupId,
+      templateId: contentRow.templateId ?? null,
+      channelId: contentRow.channelId ?? null,
+      createdAt: contentRow.createdAt,
+      updatedAt: contentRow.updatedAt,
+    };
+    const directChannel = contentRow.channel ?? null;
 
     // Check if requester is an accepted co-author for this content
     let isCoAuthor = false;
@@ -402,7 +454,13 @@ export const contentService = {
       select: { id: true, displayName: true, email: true },
     });
 
-    return { content: { ...content, author }, tags, versions, coAuthors };
+    return {
+      content: { ...content, author },
+      tags,
+      versions,
+      coAuthors,
+      channel: directChannel,
+    };
   },
 
   async delete(
@@ -481,6 +539,10 @@ export const contentService = {
       contentType?: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
       /** When set, save fails if the latest revision number no longer matches (non-live multi-editor safety). */
       baseVersionNumber?: number;
+      /** Bind (or rebind) the content to a template so channel restrictions persist across refreshes. */
+      templateId?: string | null;
+      /** Directly store the bound channelId so GET /content/:id can return channel info without a join. */
+      channelId?: string | null;
     },
   ): Promise<
     | { version: ContentVersion }
@@ -491,13 +553,6 @@ export const contentService = {
     | { conflict: true; currentVersionNumber: number }
   > {
     const prisma = getPrismaClient();
-    const existingForRules = await prisma.content.findUnique({
-      where: { id: contentId },
-      select: { templateId: true },
-    });
-    const rules = await getFormattingRulesForTemplateId(
-      existingForRules?.templateId,
-    );
 
     let effectiveBody: TipTapDocument | null | undefined = input.body;
     if (input.body !== undefined && input.body !== null) {
@@ -520,13 +575,8 @@ export const contentService = {
       }
     }
 
-    let violations: FormattingViolation[] = [];
-    if (input.body !== undefined) {
-      violations = enforceFormattingRules(effectiveBody ?? null, rules);
-    }
-    if (violations.length > 0) {
-      return { invalidFormatting: true, violations };
-    }
+    // Violations are resolved inside the transaction so formatting rules are always
+    // derived from the *effective* templateId for this save.
 
     const uow = new PrismaUnitOfWork(prisma);
     const result = await uow.withTransaction(async (repos) => {
@@ -562,6 +612,34 @@ export const contentService = {
       if (input.contentType) {
         await repos.content.updateContentType(contentId, input.contentType);
       }
+      // Persist template + channel binding when provided.
+      if (
+        input.templateId !== undefined &&
+        input.templateId !== content.templateId
+      ) {
+        await repos.content.updateTemplateId(contentId, input.templateId);
+      }
+      if (
+        input.channelId !== undefined &&
+        input.channelId !== content.channelId
+      ) {
+        await repos.content.updateChannelId(contentId, input.channelId);
+      }
+
+      // Load formatting rules using the *effective* templateId for this save to avoid the
+      // pre-transaction race where rules were based on the old templateId.
+      const effectiveTemplateId =
+        input.templateId !== undefined ? input.templateId : content.templateId;
+      const rules = await getFormattingRulesForTemplateId(
+        effectiveTemplateId ?? undefined,
+      );
+      if (input.body !== undefined) {
+        const violations = enforceFormattingRules(effectiveBody ?? null, rules);
+        if (violations.length > 0) {
+          return { invalidFormatting: true, violations } as const;
+        }
+      }
+
       const version = await repos.content.createVersion({
         contentId,
         authorId: ctx.actorId,

@@ -18,6 +18,10 @@ model User {
   passwordHash String
   avatarUrl    String?
   isActive     Boolean  @default(true)
+  /// Last authenticated API activity (throttled server-side); not the same as `updatedAt`.
+  lastActiveAt DateTime?
+  /// Client heartbeat while the app is open — drives “Active now” in admin for all signed-in users.
+  presencePingAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -270,6 +274,7 @@ model Channel {
   updatedAt   DateTime @updatedAt
 
   templateBindings TemplateChannelBinding[]
+  contents         Content[]
 
   @@map("channels")
 }
@@ -430,6 +435,9 @@ model Content {
   templateId String?
   template   Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
+  channelId String?
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
   versions       ContentVersion[]
   tags           ContentTag[]
   reviewRequests ReviewRequest[]
@@ -448,6 +456,7 @@ model Content {
   @@index([visibility])
   @@index([createdAt])
   @@index([templateId])
+  @@index([channelId])
   @@index([title])
   @@map("contents")
 }

@@ -27,6 +27,8 @@ export interface Content {
   author?: { id: string; displayName: string; email: string } | null;
   visibilityGroupId: string | null;
   templateId: string | null;
+  /** Direct FK to the channel this content must comply with (set alongside templateId). */
+  channelId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +40,7 @@ export interface CreateDraftInput {
   contentType?: ContentType;
   aiGenerated?: boolean;
   templateId?: string | null;
+  channelId?: string | null;
 }
 
 export interface ContentVersion {

@@ -1,7 +1,8 @@
 import http from "node:http";
 import jwt from "jsonwebtoken";
 import { WebSocketServer, type WebSocket } from "ws";
-import { getPrismaClient } from "../repository";
+import { getPrismaClient, PrismaUnitOfWork } from "../repository";
+import { emitAdminUserActivity } from "./adminActivityHub";
 import {
   editorPresenceStore,
   userMayJoinEditorPresence,
@@ -9,11 +10,6 @@ import {
 } from "./editorPresenceStore";
 
 type JwtPayload = { id: string; email: string; role: "USER" | "ADMIN" };
-
-type ClientMsg =
-  | { type: "presence:join"; contentId: string }
-  | { type: "presence:leave"; contentId: string }
-  | { type: "presence:ping"; contentId: string };
 
 type ServerMsg =
   | {
@@ -165,14 +161,29 @@ export function attachWebsocketServer(server: http.Server): void {
     socketJoinedContent.set(ws, new Set<string>());
 
     ws.on("message", async (raw) => {
+      // Parsed as a loose record: `presence:*` requires `contentId`; `app:ping` does not.
       const text = typeof raw === "string" ? raw : raw.toString("utf8");
       const parsed = safeJsonParse(text);
       if (!parsed || typeof parsed !== "object") return;
-      const msg = parsed as Partial<ClientMsg>;
-      if (typeof msg.type !== "string" || typeof msg.contentId !== "string")
-        return;
+      const msg = parsed as Record<string, unknown>;
+      if (typeof msg.type !== "string") return;
 
-      const contentId = msg.contentId;
+      if (msg.type === "app:ping") {
+        const prisma = getPrismaClient();
+        const uow = new PrismaUnitOfWork(prisma);
+        const at = await uow.repos().userRole.touchPresencePingAt(dbUser.id);
+        if (at) {
+          emitAdminUserActivity({
+            userId: dbUser.id,
+            presencePingAt: at,
+          });
+        }
+        return;
+      }
+
+      const contentId =
+        typeof msg.contentId === "string" ? msg.contentId : null;
+      if (!contentId) return;
       const isAdmin = payload.role === "ADMIN";
 
       // Validate access before joining/touching.

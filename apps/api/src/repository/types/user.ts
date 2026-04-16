@@ -4,6 +4,8 @@ export interface User {
   displayName: string;
   avatarUrl: string | null;
   isActive: boolean;
+  lastActiveAt: Date | null;
+  presencePingAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

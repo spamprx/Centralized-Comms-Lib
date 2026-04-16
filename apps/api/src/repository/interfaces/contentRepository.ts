@@ -22,6 +22,16 @@ export interface ContentRepository {
     contentType: ContentType,
   ): Promise<Content>;
 
+  updateTemplateId(
+    contentId: string,
+    templateId: string | null,
+  ): Promise<Content>;
+
+  updateChannelId(
+    contentId: string,
+    channelId: string | null,
+  ): Promise<Content>;
+
   updateLifecycleState(
     contentId: string,
     lifecycleState: LifecycleState,

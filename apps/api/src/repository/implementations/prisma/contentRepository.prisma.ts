@@ -26,6 +26,7 @@ function toContent(row: {
   authorId: string;
   visibilityGroupId: string | null;
   templateId: string | null;
+  channelId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): Content {
@@ -40,6 +41,7 @@ function toContent(row: {
     authorId: row.authorId,
     visibilityGroupId: row.visibilityGroupId,
     templateId: row.templateId ?? null,
+    channelId: row.channelId ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -86,6 +88,7 @@ export class PrismaContentRepository implements ContentRepository {
         aiGenerated: input.aiGenerated ?? false,
         contentType: (input.contentType ?? "ARTICLE") as any,
         templateId: input.templateId ?? undefined,
+        channelId: input.channelId ?? undefined,
       },
     });
 
@@ -137,6 +140,28 @@ export class PrismaContentRepository implements ContentRepository {
     const row = await this.db.content.update({
       where: { id: contentId },
       data: { contentType: contentType as any },
+    });
+    return toContent(row);
+  }
+
+  async updateTemplateId(
+    contentId: string,
+    templateId: string | null,
+  ): Promise<Content> {
+    const row = await this.db.content.update({
+      where: { id: contentId },
+      data: { templateId },
+    });
+    return toContent(row);
+  }
+
+  async updateChannelId(
+    contentId: string,
+    channelId: string | null,
+  ): Promise<Content> {
+    const row = await this.db.content.update({
+      where: { id: contentId },
+      data: { channelId },
     });
     return toContent(row);
   }
