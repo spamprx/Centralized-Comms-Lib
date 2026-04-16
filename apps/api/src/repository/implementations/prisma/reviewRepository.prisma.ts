@@ -84,6 +84,32 @@ export class PrismaReviewRepository implements ReviewRepository {
     return rows.map(toRequest);
   }
 
+  async listOpenRequestsForContent(contentId: string): Promise<ReviewRequest[]> {
+    const rows = await this.db.reviewRequest.findMany({
+      where: { contentId, status: "OPEN" as any },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(toRequest);
+  }
+
+  async updateRequestVersionAndQuorum(
+    requestId: string,
+    input: { contentVersionId?: string; quorumRequired?: number },
+  ): Promise<ReviewRequest> {
+    const row = await this.db.reviewRequest.update({
+      where: { id: requestId },
+      data: {
+        ...(input.contentVersionId !== undefined
+          ? { contentVersionId: input.contentVersionId }
+          : {}),
+        ...(input.quorumRequired !== undefined
+          ? { quorumRequired: input.quorumRequired }
+          : {}),
+      },
+    });
+    return toRequest(row);
+  }
+
   async updateRequestStatus(
     requestId: string,
     status: ReviewRequestStatus,

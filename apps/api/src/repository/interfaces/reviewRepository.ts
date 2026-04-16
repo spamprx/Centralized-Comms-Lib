@@ -17,6 +17,13 @@ export interface ReviewRepository {
 
   getRequestById(id: string): Promise<ReviewRequest | null>;
   listRequestsForContent(contentId: string): Promise<ReviewRequest[]>;
+  /** Active review request(s) for a content (used to merge to latest). */
+  listOpenRequestsForContent(contentId: string): Promise<ReviewRequest[]>;
+  /** Update which version is under review (used when merging/upgrading). */
+  updateRequestVersionAndQuorum(
+    requestId: string,
+    input: { contentVersionId?: string; quorumRequired?: number },
+  ): Promise<ReviewRequest>;
   updateRequestStatus(
     requestId: string,
     status: ReviewRequestStatus,

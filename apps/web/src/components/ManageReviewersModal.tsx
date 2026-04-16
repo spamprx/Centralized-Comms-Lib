@@ -31,24 +31,47 @@ export default function ManageReviewersModal({
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [alreadyReviewerIds, setAlreadyReviewerIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const res = await adminUserService.getUsers();
-        const rawUsers = res.data as unknown as SimpleUser[];
+        const [usersRes, reqsRes] = await Promise.all([
+          adminUserService.getUsers(),
+          reviewService.listForContent(contentId).catch(() => []),
+        ]);
+
+        const rawUsers = usersRes.data as unknown as SimpleUser[];
         setUsers(rawUsers);
+
+        // Find the active review request (OPEN) for this content and load current assignments.
+        const openReq = (reqsRes as any[]).find((r) => (r?.status ?? '') === 'OPEN') ?? null;
+        if (openReq?.id) {
+          try {
+            const detail = await reviewService.getRequestById(openReq.id);
+            const ids = new Set<string>(
+              (detail.assignments ?? []).map((a: any) => String(a.reviewerId)),
+            );
+            setAlreadyReviewerIds(ids);
+          } catch {
+            setAlreadyReviewerIds(new Set());
+          }
+        } else {
+          setAlreadyReviewerIds(new Set());
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load users');
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [contentId]);
 
   const toggleUser = (userId: string) => {
+    if (alreadyReviewerIds.has(userId)) return;
     if (user?.id && userId === user.id) {
       setError('You cannot add yourself as a reviewer.');
       return;
@@ -61,12 +84,16 @@ export default function ManageReviewersModal({
     });
   };
 
+  const q = searchQuery.toLowerCase().trim();
   const filteredUsers = users
     .filter((u) => !(user?.id && u.id === user.id))
     .filter((u) => {
-    const q = searchQuery.toLowerCase();
-    return (u.displayName || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-  });
+      if (!q) return true;
+      return (u.displayName || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    });
+
+  const alreadyUsers = filteredUsers.filter((u) => alreadyReviewerIds.has(u.id));
+  const availableUsers = filteredUsers.filter((u) => !alreadyReviewerIds.has(u.id));
 
   const handleAssign = async () => {
     if (selectedIds.size === 0) return;
@@ -76,6 +103,7 @@ export default function ManageReviewersModal({
     }
     setAssigning(true);
     setError(null);
+    setNotice(null);
     try {
       const contentDetails = await contentService.getById(contentId);
       const versions = contentDetails.versions;
@@ -94,10 +122,37 @@ export default function ManageReviewersModal({
         selectedIds.size,
       );
 
-      const assignPromises = Array.from(selectedIds).map((reviewerId) =>
-        reviewService.assignReviewer(reviewRequest.id, reviewerId),
+      const selected = Array.from(selectedIds);
+      const results = await Promise.allSettled(
+        selected.map((reviewerId) => reviewService.assignReviewer(reviewRequest.id, reviewerId)),
       );
-      await Promise.all(assignPromises);
+
+      const already: string[] = [];
+      const failed: string[] = [];
+      results.forEach((r, idx) => {
+        const reviewerId = selected[idx];
+        const u = users.find((x) => x.id === reviewerId);
+        const label = u?.displayName || u?.email || reviewerId;
+        if (r.status === 'fulfilled') {
+          const v = r.value as any;
+          if (v && typeof v === 'object' && 'alreadyAssigned' in v && v.alreadyAssigned) {
+            already.push(label);
+          }
+        } else {
+          failed.push(label);
+        }
+      });
+
+      if (already.length > 0) {
+        setNotice(
+          `${already.join(', ')} ${already.length === 1 ? 'is' : 'are'} already a reviewer. Others were still assigned.`,
+        );
+      }
+      if (failed.length > 0) {
+        setError(
+          `Failed to assign: ${failed.join(', ')}. Other selected reviewers may still have been assigned.`,
+        );
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -113,7 +168,7 @@ export default function ManageReviewersModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/10 p-4"
       onClick={onClose}
     >
       <div
@@ -176,50 +231,92 @@ export default function ManageReviewersModal({
             <div className="py-10 text-center text-[13px] text-app-muted">No users found</div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              {filteredUsers.map((user) => {
-                const isSelected = selectedIds.has(user.id);
-                return (
-                  <button
-                    type="button"
-                    key={user.id}
-                    onClick={() => toggleUser(user.id)}
-                    className={`flex cursor-pointer items-center gap-3 rounded-app-lg border px-3.5 py-3 text-left transition-[border-color,background-color] duration-150 ${
-                      isSelected
-                        ? 'border-app-accent/40 bg-app-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
-                        : 'border-white/[0.08] bg-white/[0.02] hover:border-white/14 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <div
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                        isSelected
-                          ? 'border-app-accent bg-app-accent text-app-bg'
-                          : 'border-white/20 bg-transparent'
-                      }`}
-                    >
-                      {isSelected && <Check size={12} strokeWidth={3} />}
-                    </div>
-
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white shadow-inner ${
-                        isSelected
-                          ? 'bg-gradient-to-br from-app-accent to-app-accent-2'
-                          : 'bg-gradient-to-br from-white/10 to-white/[0.03]'
-                      }`}
-                    >
-                      {(user.displayName || user.email)[0].toUpperCase()}
-                    </div>
-
-                    <div className="min-w-0 flex-1 overflow-hidden">
+              {alreadyUsers.length > 0 ? (
+                <div className="mb-2">
+                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-app-faint">
+                    Already assigned
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {alreadyUsers.map((u) => (
                       <div
-                        className={`truncate text-[13px] font-medium ${isSelected ? 'text-app-text' : 'text-app-muted'}`}
+                        key={u.id}
+                        className="flex items-center gap-3 rounded-app-lg border border-white/[0.08] bg-white/[0.02] px-3.5 py-3 opacity-80"
+                        title="Already a reviewer"
                       >
-                        {user.displayName || 'No name'}
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-emerald-400/40 bg-emerald-500/10 text-emerald-200">
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/40 to-app-accent-2/25 text-sm font-semibold text-white shadow-inner">
+                          {(u.displayName || u.email)[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="truncate text-[13px] font-medium text-app-muted">
+                            {u.displayName || 'No name'}
+                          </div>
+                          <div className="truncate text-[11px] text-app-faint">{u.email}</div>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
+                          assigned
+                        </span>
                       </div>
-                      <div className="truncate text-[11px] text-app-faint">{user.email}</div>
-                    </div>
-                  </button>
-                );
-              })}
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mb-2 mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-app-faint">
+                Available users
+              </div>
+              {availableUsers.length === 0 ? (
+                <div className="py-6 text-center text-[12px] text-app-muted">
+                  No additional users match your search.
+                </div>
+              ) : (
+                availableUsers.map((user) => {
+                  const isSelected = selectedIds.has(user.id);
+                  return (
+                    <button
+                      type="button"
+                      key={user.id}
+                      onClick={() => toggleUser(user.id)}
+                      className={`flex cursor-pointer items-center gap-3 rounded-app-lg border px-3.5 py-3 text-left transition-[border-color,background-color] duration-150 ${
+                        isSelected
+                          ? 'border-app-accent/40 bg-app-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                          : 'border-white/[0.08] bg-white/[0.02] hover:border-white/14 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                          isSelected
+                            ? 'border-app-accent bg-app-accent text-app-bg'
+                            : 'border-white/20 bg-transparent'
+                        }`}
+                      >
+                        {isSelected && <Check size={12} strokeWidth={3} />}
+                      </div>
+
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white shadow-inner ${
+                          isSelected
+                            ? 'bg-gradient-to-br from-app-accent to-app-accent-2'
+                            : 'bg-gradient-to-br from-white/10 to-white/[0.03]'
+                        }`}
+                      >
+                        {(user.displayName || user.email)[0].toUpperCase()}
+                      </div>
+
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <div
+                          className={`truncate text-[13px] font-medium ${isSelected ? 'text-app-text' : 'text-app-muted'}`}
+                        >
+                          {user.displayName || 'No name'}
+                        </div>
+                        <div className="truncate text-[11px] text-app-faint">{user.email}</div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           )}
         </div>
@@ -266,6 +363,11 @@ export default function ManageReviewersModal({
           </div>
         </div>
 
+        {notice && (
+          <div className="border-t border-amber-400/25 bg-amber-500/10 px-6 py-2.5 text-center text-xs text-amber-200">
+            {notice}
+          </div>
+        )}
         {error && (
           <div className="border-t border-red-400/25 bg-red-500/10 px-6 py-2.5 text-center text-xs text-red-300">
             {error}

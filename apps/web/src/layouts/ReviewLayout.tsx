@@ -10,6 +10,7 @@ import {
   Send,
   Check,
   History,
+  Languages,
 } from 'lucide-react';
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService } from '../services/contentService';
@@ -17,6 +18,8 @@ import { adminUserService } from '../services/adminService';
 import { useReviewStore } from '../store/reviewStore';
 import { Surface } from '../components/ui/Surface';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
+import TranslatePlainTextModal from '../components/common/TranslatePlainTextModal';
+import { tipTapJsonToPlainText } from '../lib/tipTapPlainText';
 
 const screeningData = {
   score: 85,
@@ -36,6 +39,7 @@ type ReviewItem = {
   submittedAt: string;
   status: string;
   contentId: string;
+  contentVersionId: string;
   contentBody?: unknown;
   requestedBy: string;
   verdict?: 'APPROVED' | 'DENIED';
@@ -77,6 +81,11 @@ export default function ReviewLayout() {
   const commentText = (currentAssignmentId ? draftComments[currentAssignmentId] : '') || '';
   const [loading, setLoading] = useState(true);
   const [loadingContent, setLoadingContent] = useState(false);
+  const [readingSelection, setReadingSelection] = useState({ from: 0, to: 0, text: '' });
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateSource, setTranslateSource] = useState<{ text: string; modeLabel: string } | null>(
+    null,
+  );
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -112,6 +121,7 @@ export default function ReviewLayout() {
         try {
           const reviewReq = await reviewService.getRequestById(assignment.reviewRequestId);
           const contentId = reviewReq.contentId;
+          const contentVersionId = reviewReq.contentVersionId;
 
           // Step 4: Fetch content details via getById (backend now allows reviewers)
           let title = 'Untitled';
@@ -143,6 +153,7 @@ export default function ReviewLayout() {
             }),
             status: assignment.status,
             contentId,
+            contentVersionId,
             requestedBy: requestedByUser?.displayName || 'Unknown',
           });
         } catch {
@@ -176,18 +187,26 @@ export default function ReviewLayout() {
 
         const versions = details.versions;
         if (versions && versions.length > 0) {
-          const bodyVersions = versions.filter(
-            (v) => v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED',
-          );
-          const versionWithBody =
-            bodyVersions.length > 0
-              ? bodyVersions.reduce((prev, curr) =>
-                  curr.versionNumber > prev.versionNumber ? curr : prev,
-                )
-              : null;
-
-          if (versionWithBody) {
-            bodyDoc = (versionWithBody as unknown as { body?: unknown })?.body ?? null;
+          // Prefer the exact contentVersionId captured on the review request.
+          const matching = versions.find((v) => v.id === selectedItem.contentVersionId);
+          if (matching && (matching as unknown as { body?: unknown })?.body != null) {
+            bodyDoc = (matching as unknown as { body?: unknown })?.body ?? null;
+          } else {
+            // Fallback: latest version with body
+            const bodyVersions = versions.filter(
+              (v) =>
+                (v.changeType === 'MANUAL_SAVE' || v.changeType === 'AI_GENERATED') &&
+                (v as unknown as { body?: unknown })?.body != null,
+            );
+            const versionWithBody =
+              bodyVersions.length > 0
+                ? bodyVersions.reduce((prev, curr) =>
+                    curr.versionNumber > prev.versionNumber ? curr : prev,
+                  )
+                : null;
+            if (versionWithBody) {
+              bodyDoc = (versionWithBody as unknown as { body?: unknown })?.body ?? null;
+            }
           }
         }
 
@@ -365,6 +384,28 @@ export default function ReviewLayout() {
 
   const isAlreadyDecided = selectedItem?.status === 'COMPLETED';
 
+  const bodyIsTipTapDoc =
+    selectedItem?.contentBody &&
+    typeof selectedItem.contentBody === 'object' &&
+    selectedItem.contentBody !== null &&
+    'type' in (selectedItem.contentBody as Record<string, unknown>);
+
+  const openReviewTranslate = () => {
+    const sel = readingSelection.text.trim();
+    if (sel) {
+      setTranslateSource({ text: sel, modeLabel: 'Selected text in submission body' });
+      setTranslateOpen(true);
+      return;
+    }
+    if (bodyIsTipTapDoc && selectedItem?.contentBody) {
+      setTranslateSource({
+        text: tipTapJsonToPlainText(selectedItem.contentBody),
+        modeLabel: 'Full submission body (plain text extracted from layout)',
+      });
+      setTranslateOpen(true);
+    }
+  };
+
   return (
     <div className="review-layout-root relative isolate flex min-h-0 flex-1 flex-col overflow-hidden bg-app-bg">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -494,6 +535,23 @@ export default function ReviewLayout() {
                 </div>
               </div>
 
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={openReviewTranslate}
+                  disabled={
+                    loadingContent ||
+                    !selectedItem ||
+                    (!readingSelection.text.trim() && !bodyIsTipTapDoc)
+                  }
+                  title="Translate selection or full body as plain text (not saved; does not affect review)"
+                  className="inline-flex items-center gap-1.5 rounded-app-md border border-emerald-400/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 transition-colors hover:border-emerald-400/40 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Languages size={14} strokeWidth={2} />
+                  Translate
+                </button>
+              </div>
+
               <div className="mb-6 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
 
               {/* Content body */}
@@ -505,6 +563,7 @@ export default function ReviewLayout() {
                   <TipTapReadonly
                     doc={selectedItem.contentBody as any}
                     className="ProseMirror review-body-prose text-[15px] leading-relaxed text-app-muted outline-none"
+                    onSelectionChange={setReadingSelection}
                   />
                 </div>
               ) : (
@@ -802,6 +861,18 @@ export default function ReviewLayout() {
           </div>
         </Surface>
       </div>
+      <TranslatePlainTextModal
+        open={translateOpen}
+        onClose={() => {
+          setTranslateOpen(false);
+          setTranslateSource(null);
+        }}
+        subjectLabel={selectedItem?.title ?? 'Review'}
+        contextHint="Reviews · submission reader"
+        sourceModeLabel={translateSource?.modeLabel ?? ''}
+        sourceText={translateSource?.text ?? ''}
+        cautionText="This translation runs in your browser only. It is not saved and does not change the submitted draft or your approve/deny decision. If the author should publish translated text, they must edit the content in the editor and save. Only plain text is sent — formatting and media are not preserved."
+      />
     </div>
   );
 }

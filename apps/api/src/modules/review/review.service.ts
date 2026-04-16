@@ -1,4 +1,5 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
+import { Prisma } from "@prisma/client";
 import type { ReviewComment } from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
 
@@ -29,20 +30,41 @@ export const reviewService = {
       if (content.lifecycleState === "DRAFT") {
         await repos.content.updateLifecycleState(input.contentId, "IN_REVIEW");
       }
-      const request = await repos.review.createRequest({
-        contentId: input.contentId,
-        contentVersionId: input.contentVersionId,
-        requestedById: ctx.actorId,
-        quorumRequired: input.quorumRequired ?? 1,
-      });
+      // Enforce: at most ONE active (OPEN) review per content.
+      // If an OPEN request already exists, merge by upgrading it to the latest version and quorum.
+      const open = await repos.review.listOpenRequestsForContent(input.contentId);
+      const desiredQuorum = input.quorumRequired ?? 1;
+      let request =
+        open.length > 0
+          ? await repos.review.updateRequestVersionAndQuorum(open[0].id, {
+              contentVersionId: input.contentVersionId,
+              quorumRequired: Math.max(open[0].quorumRequired, desiredQuorum),
+            })
+          : await repos.review.createRequest({
+              contentId: input.contentId,
+              contentVersionId: input.contentVersionId,
+              requestedById: ctx.actorId,
+              quorumRequired: desiredQuorum,
+            });
+
+      // If multiple OPEN requests exist (legacy), cancel all but the newest one.
+      if (open.length > 1) {
+        for (const r of open.slice(1)) {
+          try {
+            await repos.review.updateRequestStatus(r.id, "CANCELLED");
+          } catch {
+            // ignore best-effort cancellation
+          }
+        }
+      }
       await repos.audit.append({
-        action: "CREATE",
+        action: open.length > 0 ? "UPDATE" : "CREATE",
         resource: "REVIEW_REQUEST",
         resourceId: request.id,
         newValue: {
           contentId: input.contentId,
           contentVersionId: input.contentVersionId,
-          quorumRequired: input.quorumRequired ?? 1,
+          quorumRequired: request.quorumRequired,
         },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
@@ -51,7 +73,7 @@ export const reviewService = {
       await repos.outbox.add({
         aggregateType: "REVIEW_REQUEST",
         aggregateId: request.id,
-        eventType: "REVIEW_REQUEST.CREATED",
+        eventType: open.length > 0 ? "REVIEW_REQUEST.UPDATED" : "REVIEW_REQUEST.CREATED",
         payload: {
           contentId: input.contentId,
           requestId: request.id,
@@ -125,11 +147,25 @@ export const reviewService = {
       if (reviewerId === ctx.actorId) {
         return { selfAssign: true } as const;
       }
-      const assignment = await repos.review.assignReviewer({
-        reviewRequestId: request.id,
-        reviewerId,
-        assignedById: ctx.actorId,
-      });
+      let assignment:
+        | Awaited<ReturnType<typeof repos.review.assignReviewer>>
+        | null = null;
+      try {
+        assignment = await repos.review.assignReviewer({
+          reviewRequestId: request.id,
+          reviewerId,
+          assignedById: ctx.actorId,
+        });
+      } catch (e) {
+        // Idempotent behavior: if reviewer already assigned, don't fail the whole flow.
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          return { alreadyAssigned: true } as const;
+        }
+        throw e;
+      }
       await repos.audit.append({
         action: "ASSIGN",
         resource: "REVIEW_ASSIGNMENT",
