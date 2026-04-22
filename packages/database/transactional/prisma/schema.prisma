@@ -251,6 +251,28 @@ enum SmsDeliveryStatus {
   FAILED
 }
 
+enum WhatsAppTemplateApprovalState {
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+}
+
+enum WhatsAppTemplateSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum WhatsAppMessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 // ── Workspace ───────────────────────────────────────────────────────────────
 // Isolation boundary for template name/slug uniqueness and future tenancy.
 
@@ -283,6 +305,8 @@ model Channel {
   contents         Content[]
   reviewPolicies   ReviewPolicy[]
   smsDeliveries    SmsDeliveryLog[]
+  whatsAppTemplates WhatsAppTemplateRegistry[]
+  whatsAppMessages  WhatsAppMessageLog[]
 
   @@map("channels")
 }
@@ -454,6 +478,7 @@ model Content {
   snapshots      ContentSnapshot[]
   analyticsEvents ContentAnalyticsEvent[]
   smsDeliveries   SmsDeliveryLog[]
+  whatsAppMessages WhatsAppMessageLog[]
   annotations   ContentAnnotation[] @relation("ContentAnnotations")
   bookmarks     ContentBookmark[] @relation("ContentBookmarks")
   comments      ContentComment[] @relation("ContentComments")
@@ -540,6 +565,58 @@ model SmsDeliveryLog {
   @@index([status, createdAt])
   @@index([toPhoneNumber, createdAt])
   @@map("sms_delivery_logs")
+}
+
+// ── WhatsAppTemplateRegistry ────────────────────────────────────────────────
+// Meta-approved WhatsApp templates synchronized for outbound sends.
+model WhatsAppTemplateRegistry {
+  id            String                         @id @default(uuid())
+  channelId     String
+  channel       Channel                        @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  templateName  String
+  language      String
+  approvalState WhatsAppTemplateApprovalState  @default(PENDING)
+  syncStatus    WhatsAppTemplateSyncStatus     @default(PENDING)
+  lastSyncAt    DateTime?
+  metaTemplateId String?
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+
+  messages WhatsAppMessageLog[]
+
+  @@unique([channelId, templateName, language])
+  @@index([approvalState, updatedAt])
+  @@index([syncStatus, updatedAt])
+  @@index([lastSyncAt])
+  @@map("whatsapp_template_registry")
+}
+
+// ── WhatsAppMessageLog ──────────────────────────────────────────────────────
+// Outbound WhatsApp messages keyed by Meta wamid for status webhooks/audits.
+model WhatsAppMessageLog {
+  id               String            @id @default(uuid())
+  wamid            String            @unique
+  contentId        String?
+  content          Content?          @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  channelId        String
+  channel          Channel           @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  templateId       String?
+  template         WhatsAppTemplateRegistry? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  toPhoneNumber    String
+  status           WhatsAppMessageStatus @default(QUEUED)
+  failureCode      String?
+  failureMessage   String?
+  sentAt           DateTime?
+  statusUpdatedAt  DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([contentId, createdAt])
+  @@index([channelId, createdAt])
+  @@index([templateId, createdAt])
+  @@index([status, createdAt])
+  @@index([toPhoneNumber, createdAt])
+  @@map("whatsapp_message_logs")
 }
 
 // ── ContentVersion ──────────────────────────────────────────────────────────
