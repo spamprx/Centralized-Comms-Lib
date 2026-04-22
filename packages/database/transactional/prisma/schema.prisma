@@ -244,6 +244,13 @@ enum LayoutPhase {
   ACTIVE
 }
 
+enum SmsDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+}
+
 // ── Workspace ───────────────────────────────────────────────────────────────
 // Isolation boundary for template name/slug uniqueness and future tenancy.
 
@@ -275,6 +282,7 @@ model Channel {
   templateBindings TemplateChannelBinding[]
   contents         Content[]
   reviewPolicies   ReviewPolicy[]
+  smsDeliveries    SmsDeliveryLog[]
 
   @@map("channels")
 }
@@ -445,6 +453,7 @@ model Content {
   citations      ContentCitation[]
   snapshots      ContentSnapshot[]
   analyticsEvents ContentAnalyticsEvent[]
+  smsDeliveries   SmsDeliveryLog[]
   annotations   ContentAnnotation[] @relation("ContentAnnotations")
   bookmarks     ContentBookmark[] @relation("ContentBookmarks")
   comments      ContentComment[] @relation("ContentComments")
@@ -506,6 +515,31 @@ model ContentAnalyticsEvent {
   @@index([contentId, createdAt])
   @@index([createdAt])
   @@map("content_analytics_events")
+}
+
+// ── SmsDeliveryLog ───────────────────────────────────────────────────────────
+// Outbound SMS send attempts and provider receipts for compliance/auditing.
+model SmsDeliveryLog {
+  id               String            @id @default(uuid())
+  contentId        String
+  content          Content           @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  channelId        String
+  channel          Channel           @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  toPhoneNumber    String
+  providerSid      String?           @unique
+  status           SmsDeliveryStatus @default(QUEUED)
+  failureCode      String?
+  failureMessage   String?
+  requestedAt      DateTime          @default(now())
+  providerUpdatedAt DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([contentId, createdAt])
+  @@index([channelId, createdAt])
+  @@index([status, createdAt])
+  @@index([toPhoneNumber, createdAt])
+  @@map("sms_delivery_logs")
 }
 
 // ── ContentVersion ──────────────────────────────────────────────────────────
