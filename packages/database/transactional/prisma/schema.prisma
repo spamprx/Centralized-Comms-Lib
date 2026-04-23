@@ -50,6 +50,7 @@ model User {
   contentComments   ContentComment[] @relation("ContentCommentAuthor")
   contentLikes      ContentLike[] @relation("ContentLikeUser")
   contentViews      ContentView[] @relation("ContentViewUser")
+  contentReadingProgresses ContentReadingProgress[]
 
   @@map("users")
 }
@@ -273,6 +274,12 @@ enum WhatsAppMessageStatus {
   FAILED
 }
 
+enum ReadingProgressStatus {
+  NOT_STARTED
+  READING
+  DONE
+}
+
 // ── Workspace ───────────────────────────────────────────────────────────────
 // Isolation boundary for template name/slug uniqueness and future tenancy.
 
@@ -479,6 +486,7 @@ model Content {
   analyticsEvents ContentAnalyticsEvent[]
   smsDeliveries   SmsDeliveryLog[]
   whatsAppMessages WhatsAppMessageLog[]
+  readingProgresses ContentReadingProgress[]
   annotations   ContentAnnotation[] @relation("ContentAnnotations")
   bookmarks     ContentBookmark[] @relation("ContentBookmarks")
   comments      ContentComment[] @relation("ContentComments")
@@ -617,6 +625,25 @@ model WhatsAppMessageLog {
   @@index([status, createdAt])
   @@index([toPhoneNumber, createdAt])
   @@map("whatsapp_message_logs")
+}
+
+// ── ContentReadingProgress ──────────────────────────────────────────────────
+// Per-user reading progress for cross-device sync.
+model ContentReadingProgress {
+  id        String                @id @default(uuid())
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content               @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  percent   Int                   @default(0)
+  status    ReadingProgressStatus @default(NOT_STARTED)
+  updatedAt DateTime              @updatedAt
+
+  @@unique([userId, contentId])
+  @@index([contentId, updatedAt])
+  @@index([userId, updatedAt])
+  @@index([status, updatedAt])
+  @@map("content_reading_progress")
 }
 
 // ── ContentVersion ──────────────────────────────────────────────────────────
