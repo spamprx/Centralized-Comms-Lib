@@ -4,7 +4,7 @@ import { analyticsService } from '../services/analyticsService';
 import { profileService, type ProfileActivityItem } from '../services/profileService';
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService, type Content } from '../services/contentService';
-import type { KPI } from '../types/analytics';
+import type { KPI, TopContentItem } from '../types/analytics';
 
 function kpiIcon(label: string): StatCard['icon'] {
   const l = label.toLowerCase();
@@ -166,6 +166,7 @@ export function useDashboard() {
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [topContent, setTopContent] = useState<TopContentItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -174,11 +175,12 @@ export function useDashboard() {
     async function fetchData() {
       setLoading(true);
       try {
-        const [kpisRes, meRes, activityRes, assignmentsRes] = await Promise.allSettled([
+        const [kpisRes, meRes, activityRes, assignmentsRes, topContentRes] = await Promise.allSettled([
           analyticsService.getKPIs('30d'),
           profileService.me(),
           profileService.listActivity(),
           reviewService.listMyAssignments(),
+          analyticsService.getTopContent(5, '7d'),
         ]);
 
         if (cancelled) return;
@@ -205,6 +207,10 @@ export function useDashboard() {
           setPendingItems(pending);
           setNotifications(buildNotifications(pending.length));
         }
+
+        if (!cancelled && topContentRes.status === 'fulfilled') {
+          setTopContent(topContentRes.value);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -221,6 +227,7 @@ export function useDashboard() {
     recentActivity,
     pendingItems,
     notifications,
+    topContent,
     loading,
   };
 }

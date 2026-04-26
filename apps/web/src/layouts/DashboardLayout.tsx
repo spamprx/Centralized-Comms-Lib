@@ -4,11 +4,12 @@ import {
   RecentActivityFeed,
   PendingItemsList,
   NotificationsSummary,
+  TopEngagingContent,
 } from '../components/dashboard';
 import { PageHeader, PageShell } from '../components/ui';
 
 export default function DashboardLayout() {
-  const { statCards, recentActivity, pendingItems, notifications, loading } = useDashboard();
+  const { statCards, recentActivity, pendingItems, notifications, topContent, loading } = useDashboard();
 
   if (loading) {
     return (
@@ -93,7 +94,10 @@ export default function DashboardLayout() {
       <div className="animate-fade-in space-y-10">
         <StatCardsRow statCards={statCards} />
 
-        <RecentActivityFeed activities={recentActivity} />
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          <RecentActivityFeed activities={recentActivity} />
+          <TopEngagingContent items={topContent} />
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <PendingItemsList items={pendingItems} />

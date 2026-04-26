@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
+  Bell,
   Bookmark,
+  Check,
   Camera,
   FileText,
+  Folder,
+  FolderPlus,
   Loader2,
   Mail,
   MapPin,
@@ -18,7 +23,9 @@ import {
 import {
   profileService,
   type ProfileActivityItem,
+  type ProfileBookmarkFolder,
   type ProfileBookmarkItem,
+  type ProfileBookmarkNotification,
 } from '../services/profileService';
 
 type TabId = 'personal' | 'activity' | 'bookmarks';
@@ -42,12 +49,26 @@ const ease =
   'duration-[var(--duration-app-slow)] ease-[var(--ease-app-out)] motion-reduce:transition-none';
 
 export default function ProfileLayout() {
-  const [activeTab, setActiveTab] = useState<TabId>('personal');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const tabFromUrl = (searchParams.get('tab') ?? '').toLowerCase();
+  const initialTab: TabId =
+    location.pathname === '/bookmarks' || tabFromUrl === 'bookmarks'
+      ? 'bookmarks'
+      : tabFromUrl === 'activity'
+        ? 'activity'
+        : 'personal';
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [bookmarks, setBookmarks] = useState<ProfileBookmarkItem[]>([]);
+  const [folders, setFolders] = useState<ProfileBookmarkFolder[]>([]);
+  const [activeFolder, setActiveFolder] = useState<string | 'default' | ''>('');
+  const [newFolderName, setNewFolderName] = useState('');
+  const [notifications, setNotifications] = useState<ProfileBookmarkNotification[]>([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const [activity, setActivity] = useState<ProfileActivityItem[]>([]);
   const [stats, setStats] = useState({ contentCreated: 0, totalViews: 0, following: 0 });
   const [form, setForm] = useState<ProfileForm>({
@@ -58,11 +79,31 @@ export default function ProfileLayout() {
     bio: '',
   });
   const [initialForm, setInitialForm] = useState<ProfileForm>(form);
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((n) => !n.readAt).length,
+    [notifications],
+  );
 
   const isDirty = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(initialForm),
     [form, initialForm],
   );
+
+  useEffect(() => {
+    const tabValue = activeTab === 'personal' ? null : activeTab;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tabValue) next.set('tab', tabValue);
+      else next.delete('tab');
+      return next;
+    }, { replace: true });
+  }, [activeTab, setSearchParams]);
+
+  useEffect(() => {
+    if (location.pathname === '/bookmarks' && activeTab !== 'bookmarks') {
+      setActiveTab('bookmarks');
+    }
+  }, [location.pathname, activeTab]);
   const initials = useMemo(
     () =>
       form.displayName
@@ -79,10 +120,13 @@ export default function ProfileLayout() {
       try {
         setLoading(true);
         setError(null);
-        const [me, activityItems, bookmarkItems] = await Promise.all([
+        const [me, activityItems, bookmarkItems, folderItems, bookmarkNotifications] =
+          await Promise.all([
           profileService.me(),
           profileService.listActivity(),
           profileService.listBookmarks(),
+          profileService.listBookmarkFolders(),
+          profileService.listBookmarkNotifications(),
         ]);
         const nextForm: ProfileForm = {
           displayName: me.displayName,
@@ -96,6 +140,8 @@ export default function ProfileLayout() {
         setStats(me.stats);
         setActivity(activityItems);
         setBookmarks(bookmarkItems);
+        setFolders(folderItems);
+        setNotifications(bookmarkNotifications);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load profile');
       } finally {
@@ -109,14 +155,20 @@ export default function ProfileLayout() {
     if (activeTab !== 'bookmarks') return;
     const t = setTimeout(async () => {
       try {
-        const items = await profileService.listBookmarks(search);
+        const [items, folderItems, bookmarkNotifications] = await Promise.all([
+          profileService.listBookmarks(search, activeFolder || undefined),
+          profileService.listBookmarkFolders(),
+          profileService.listBookmarkNotifications(),
+        ]);
         setBookmarks(items);
+        setFolders(folderItems);
+        setNotifications(bookmarkNotifications);
       } catch {
         setError('Failed to load bookmarks');
       }
     }, 220);
     return () => clearTimeout(t);
-  }, [activeTab, search]);
+  }, [activeTab, search, activeFolder]);
 
   const save = async () => {
     try {
@@ -127,6 +179,48 @@ export default function ProfileLayout() {
       setError(err instanceof Error ? err.message : 'Failed to save profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const createFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+    try {
+      await profileService.createBookmarkFolder(name);
+      setNewFolderName('');
+      const folderItems = await profileService.listBookmarkFolders();
+      setFolders(folderItems);
+    } catch {
+      setError('Failed to create folder');
+    }
+  };
+
+  const removeFolder = async (folderId: string) => {
+    try {
+      await profileService.deleteBookmarkFolder(folderId);
+      if (activeFolder === folderId) setActiveFolder('');
+      const [folderItems, items] = await Promise.all([
+        profileService.listBookmarkFolders(),
+        profileService.listBookmarks(search),
+      ]);
+      setFolders(folderItems);
+      setBookmarks(items);
+    } catch {
+      setError('Failed to delete folder');
+    }
+  };
+
+  const moveBookmark = async (bookmarkId: string, folderId: string | null) => {
+    try {
+      await profileService.moveBookmarkToFolder(bookmarkId, folderId);
+      const [items, folderItems] = await Promise.all([
+        profileService.listBookmarks(search, activeFolder || undefined),
+        profileService.listBookmarkFolders(),
+      ]);
+      setBookmarks(items);
+      setFolders(folderItems);
+    } catch {
+      setError('Failed to move bookmark');
     }
   };
 
@@ -455,7 +549,7 @@ export default function ProfileLayout() {
             <section className={glassCard}>
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
               <div className="p-6 sm:p-8">
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="inline-flex items-center gap-3">
                     <h2 className="text-base font-semibold tracking-tight text-app-text sm:text-lg">
                       Bookmarked content
@@ -464,58 +558,229 @@ export default function ProfileLayout() {
                       {bookmarks.length}
                     </span>
                   </div>
-                  <label className="relative block w-full sm:w-[220px]">
-                    <Search
-                      size={15}
-                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-app-faint"
-                      strokeWidth={2}
-                    />
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search bookmarks"
-                      className={`h-10 w-full rounded-app-md border border-white/[0.1] bg-white/[0.04] py-2 pl-10 pr-3 text-[13px] text-app-text shadow-inner outline-none transition-[border-color,box-shadow] placeholder:text-app-faint focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/15 ${ease}`}
-                    />
-                  </label>
-                </div>
-                <div className="space-y-2.5">
-                  {bookmarks.map((item) => {
-                    const fileIcon = item.contentType === 'VIDEO' ? Play : FileText;
-                    const leftTone =
-                      item.contentType === 'VIDEO'
-                        ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/25'
-                        : item.contentType === 'DOCUMENT'
-                          ? 'bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/25'
-                          : 'bg-app-accent-muted text-app-accent ring-1 ring-app-accent/25';
-                    const Icon = fileIcon;
-                    return (
-                      <a
-                        key={item.id}
-                        href={`/library/${item.contentId}`}
-                        className={`group flex items-center gap-4 rounded-app-md border border-white/[0.08] bg-white/[0.02] px-4 py-3.5 transition-[border-color,background-color,box-shadow] hover:border-white/[0.14] hover:bg-white/[0.05] hover:shadow-app-soft ${ease}`}
+                  <div className="flex items-center gap-2">
+                    <label className="relative block w-full sm:w-[220px]">
+                      <Search
+                        size={15}
+                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-app-faint"
+                        strokeWidth={2}
+                      />
+                      <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search bookmarks"
+                        className={`h-10 w-full rounded-app-md border border-white/[0.1] bg-white/[0.04] py-2 pl-10 pr-3 text-[13px] text-app-text shadow-inner outline-none transition-[border-color,box-shadow] placeholder:text-app-faint focus:border-app-accent/45 focus:ring-2 focus:ring-app-accent/15 ${ease}`}
+                      />
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setNotificationOpen((v) => !v)}
+                        className="relative inline-flex h-10 items-center justify-center rounded-app-md border border-white/[0.1] bg-white/[0.04] px-3 text-app-muted transition-colors hover:text-app-text"
+                        title="Bookmark update notifications"
                       >
-                        <span
-                          className={`inline-flex size-11 shrink-0 items-center justify-center rounded-app-md ${leftTone}`}
-                        >
-                          <Icon size={17} strokeWidth={2} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-semibold text-app-text">
-                            {item.title}
+                        <Bell size={16} />
+                        {unreadNotificationCount > 0 ? (
+                          <span className="absolute -right-1.5 -top-1.5 rounded-full bg-app-accent px-1.5 py-0.5 text-[10px] font-bold text-app-bg">
+                            {unreadNotificationCount}
+                          </span>
+                        ) : null}
+                      </button>
+                      {notificationOpen ? (
+                        <div className="absolute right-0 z-20 mt-2 w-[300px] rounded-app-lg border border-white/[0.12] bg-app-bg/95 p-3 shadow-app-lift backdrop-blur-xl">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-[12px] font-semibold text-app-text">Updates</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void (async () => {
+                                  await profileService.markAllBookmarkNotificationsRead();
+                                  const rows = await profileService.listBookmarkNotifications();
+                                  setNotifications(rows);
+                                })()
+                              }
+                              className="text-[11px] text-app-accent"
+                            >
+                              Mark all read
+                            </button>
                           </div>
-                          <span className="mt-1.5 inline-flex rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-app-muted">
-                            {item.contentType.toLowerCase()}
-                          </span>
+                          <div className="max-h-64 space-y-2 overflow-y-auto">
+                            {notifications.length === 0 ? (
+                              <div className="rounded-app-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[12px] text-app-faint">
+                                No notifications
+                              </div>
+                            ) : (
+                              notifications.map((n) => (
+                                <button
+                                  key={n.id}
+                                  type="button"
+                                  onClick={() =>
+                                    void (async () => {
+                                      await profileService.markBookmarkNotificationRead(n.id);
+                                      const rows = await profileService.listBookmarkNotifications();
+                                      setNotifications(rows);
+                                    })()
+                                  }
+                                  className={`w-full rounded-app-md border px-3 py-2 text-left transition-colors ${
+                                    n.readAt
+                                      ? 'border-white/[0.06] bg-white/[0.02] text-app-faint'
+                                      : 'border-app-accent/25 bg-app-accent/10 text-app-text'
+                                  }`}
+                                >
+                                  <div className="text-[12px] font-medium">{n.message}</div>
+                                  <div className="mt-1 text-[10px] text-app-faint">
+                                    {new Date(n.createdAt).toLocaleString()}
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+                  <aside className="rounded-app-md border border-white/[0.08] bg-white/[0.03] p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[12px] font-semibold text-app-text">Folders</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setActiveFolder('')}
+                        className={`flex w-full items-center justify-between rounded-app-sm px-2.5 py-1.5 text-left text-[12px] ${
+                          activeFolder === ''
+                            ? 'bg-app-accent/15 text-app-accent'
+                            : 'text-app-muted hover:bg-white/[0.05] hover:text-app-text'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Folder size={14} /> All bookmarks
                         </span>
-                        <span className="inline-flex shrink-0 items-center gap-2 text-app-accent">
-                          <Bookmark size={16} className="fill-current" strokeWidth={2} />
-                          <span className="hidden text-[11px] font-medium text-red-400/90 group-hover:inline">
-                            Remove
-                          </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFolder('default')}
+                        className={`flex w-full items-center justify-between rounded-app-sm px-2.5 py-1.5 text-left text-[12px] ${
+                          activeFolder === 'default'
+                            ? 'bg-app-accent/15 text-app-accent'
+                            : 'text-app-muted hover:bg-white/[0.05] hover:text-app-text'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Folder size={14} /> Default
                         </span>
-                      </a>
-                    );
-                  })}
+                      </button>
+                      {folders.map((folder) => (
+                        <div key={folder.id} className="group/folder flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setActiveFolder(folder.id)}
+                            className={`flex min-w-0 flex-1 items-center justify-between rounded-app-sm px-2.5 py-1.5 text-left text-[12px] ${
+                              activeFolder === folder.id
+                                ? 'bg-app-accent/15 text-app-accent'
+                                : 'text-app-muted hover:bg-white/[0.05] hover:text-app-text'
+                            }`}
+                          >
+                            <span className="truncate">{folder.name}</span>
+                            <span className="ml-2 tabular-nums text-[10px] text-app-faint">
+                              {folder.bookmarkCount}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeFolder(folder.id)}
+                            className="rounded-app-sm p-1 text-red-400/80 opacity-0 transition-opacity hover:bg-red-500/10 group-hover/folder:opacity-100"
+                            title="Delete folder"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5">
+                      <input
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        placeholder="New folder"
+                        className="h-8 min-w-0 flex-1 rounded-app-sm border border-white/[0.1] bg-white/[0.04] px-2 text-[11px] text-app-text outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void createFolder()}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-app-sm border border-white/[0.12] bg-white/[0.04] text-app-muted hover:text-app-text"
+                        title="Create folder"
+                      >
+                        <FolderPlus size={14} />
+                      </button>
+                    </div>
+                  </aside>
+
+                  <div className="space-y-2.5">
+                    {bookmarks.map((item) => {
+                      const fileIcon = item.contentType === 'VIDEO' ? Play : FileText;
+                      const leftTone =
+                        item.contentType === 'VIDEO'
+                          ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/25'
+                          : item.contentType === 'DOCUMENT'
+                            ? 'bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/25'
+                            : 'bg-app-accent-muted text-app-accent ring-1 ring-app-accent/25';
+                      const Icon = fileIcon;
+                      return (
+                        <div
+                          key={item.id}
+                          className={`group flex items-center gap-4 rounded-app-md border border-white/[0.08] bg-white/[0.02] px-4 py-3.5 transition-[border-color,background-color,box-shadow] hover:border-white/[0.14] hover:bg-white/[0.05] hover:shadow-app-soft ${ease}`}
+                        >
+                          <a href={`/library/${item.contentId}`} className="inline-flex shrink-0">
+                            <span
+                              className={`inline-flex size-11 items-center justify-center rounded-app-md ${leftTone}`}
+                            >
+                              <Icon size={17} strokeWidth={2} />
+                            </span>
+                          </a>
+                          <a href={`/library/${item.contentId}`} className="min-w-0 flex-1">
+                            <div className="truncate text-[13px] font-semibold text-app-text">
+                              {item.title}
+                            </div>
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <span className="inline-flex rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-app-muted">
+                                {item.contentType.toLowerCase()}
+                              </span>
+                              <span className="text-[10px] text-app-faint">
+                                {item.folderName ?? 'Default'}
+                              </span>
+                            </div>
+                          </a>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={item.folderId ?? 'default'}
+                              onChange={(e) =>
+                                void moveBookmark(
+                                  item.id,
+                                  e.target.value === 'default' ? null : e.target.value,
+                                )
+                              }
+                              className="rounded-app-sm border border-white/[0.12] bg-white/[0.04] px-2 py-1 text-[11px] text-app-muted outline-none"
+                              title="Move bookmark"
+                            >
+                              <option value="default">Default</option>
+                              {folders.map((folder) => (
+                                <option key={folder.id} value={folder.id}>
+                                  {folder.name}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="inline-flex shrink-0 items-center gap-2 text-app-accent">
+                              <Bookmark size={16} className="fill-current" strokeWidth={2} />
+                              {!item.folderId ? <Check size={12} className="text-app-faint" /> : null}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </section>

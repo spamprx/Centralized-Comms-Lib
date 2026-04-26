@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Bookmark,
+  Copy,
   Share2,
   MessageSquare,
   ThumbsUp,
@@ -13,7 +14,12 @@ import {
 import { Surface } from '../components/ui/Surface';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
 import TranslatePlainTextModal from '../components/common/TranslatePlainTextModal';
-import { contentService, type ContentComment } from '../services/contentService';
+import {
+  contentService,
+  type ContentComment,
+  type ReadingProgressStatus,
+  type ReactionEmoji,
+} from '../services/contentService';
 import { fetchSimilarByContentId } from '../services/searchService';
 import { tipTapJsonToPlainText } from '../lib/tipTapPlainText';
 
@@ -63,6 +69,15 @@ const STOP = new Set([
   'by',
 ]);
 
+const REACTION_CHOICES: Array<{ emoji: ReactionEmoji; label: string; glyph: string }> = [
+  { emoji: 'LIKE', label: 'Like', glyph: '👍' },
+  { emoji: 'LOVE', label: 'Love', glyph: '❤️' },
+  { emoji: 'CLAP', label: 'Clap', glyph: '👏' },
+  { emoji: 'INSIGHTFUL', label: 'Insightful', glyph: '💡' },
+  { emoji: 'LAUGH', label: 'Laugh', glyph: '😂' },
+  { emoji: 'CELEBRATE', label: 'Celebrate', glyph: '🎉' },
+];
+
 function tokenize(text: string): Set<string> {
   const words = text
     .toLowerCase()
@@ -84,9 +99,18 @@ export default function ReadingLayout() {
   const { contentId } = useParams<{ contentId: string }>();
   const navigate = useNavigate();
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [readingPercent, setReadingPercent] = useState(0);
+  const [readingStatus, setReadingStatus] = useState<ReadingProgressStatus>('NOT_STARTED');
+  const [progressSaving, setProgressSaving] = useState(false);
+  const [progressHydrated, setProgressHydrated] = useState(false);
+  const mainScrollRef = useRef<HTMLDivElement | null>(null);
+  const skipNextScrollSyncRef = useRef(false);
+  const appliedInitialProgressRef = useRef(false);
   const [fontSize, setFontSize] = useState(16);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [viewsCount, setViewsCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
@@ -97,8 +121,15 @@ export default function ReadingLayout() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [comments, setComments] = useState<ContentComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyOpenFor, setReplyOpenFor] = useState<string | null>(null);
   const [commentSaving, setCommentSaving] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<Array<{ emoji: ReactionEmoji; count: number }>>(
+    REACTION_CHOICES.map((r) => ({ emoji: r.emoji, count: 0 })),
+  );
+  const [myReaction, setMyReaction] = useState<ReactionEmoji | null>(null);
+  const [reactionBusy, setReactionBusy] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -142,6 +173,10 @@ export default function ReadingLayout() {
     const denom = scrollHeight - clientHeight;
     const progress = denom > 0 ? (scrollTop / denom) * 100 : 0;
     setScrollProgress(progress);
+    const nextPercent = Math.max(0, Math.min(100, Math.round(progress)));
+    setReadingPercent(nextPercent);
+    if (nextPercent >= 100) setReadingStatus('DONE');
+    else if (nextPercent > 0 && readingStatus === 'NOT_STARTED') setReadingStatus('READING');
   };
 
   useEffect(() => {
@@ -184,6 +219,67 @@ export default function ReadingLayout() {
       cancelled = true;
     };
   }, [contentId]);
+
+  useEffect(() => {
+    if (!contentId) return;
+    let cancelled = false;
+    appliedInitialProgressRef.current = false;
+    setProgressHydrated(false);
+    void (async () => {
+      try {
+        const p = await contentService.getReadingProgress(contentId);
+        if (cancelled) return;
+        setReadingPercent(p.percent);
+        setReadingStatus(p.status);
+        setScrollProgress(p.percent);
+      } catch {
+        if (cancelled) return;
+        setReadingPercent(0);
+        setReadingStatus('NOT_STARTED');
+      } finally {
+        if (!cancelled) setProgressHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  useEffect(() => {
+    if (!progressHydrated || !mainScrollRef.current || loading) return;
+    if (appliedInitialProgressRef.current) return;
+    const el = mainScrollRef.current;
+    const maxScrollable = Math.max(0, el.scrollHeight - el.clientHeight);
+    if (maxScrollable <= 0) {
+      appliedInitialProgressRef.current = true;
+      return;
+    }
+    const target = Math.round((readingPercent / 100) * maxScrollable);
+    skipNextScrollSyncRef.current = true;
+    el.scrollTop = target;
+    appliedInitialProgressRef.current = true;
+    window.setTimeout(() => {
+      skipNextScrollSyncRef.current = false;
+    }, 120);
+  }, [progressHydrated, loading, contentId]);
+
+  useEffect(() => {
+    if (!contentId || !progressHydrated) return;
+    if (skipNextScrollSyncRef.current) return;
+    const timer = window.setTimeout(() => {
+      setProgressSaving(true);
+      void contentService
+        .patchReadingProgress(contentId, { percent: readingPercent })
+        .then((row) => {
+          setReadingPercent(row.percent);
+          setReadingStatus(row.status);
+          setScrollProgress(row.percent);
+        })
+        .catch(() => undefined)
+        .finally(() => setProgressSaving(false));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [contentId, readingPercent, progressHydrated]);
 
   useEffect(() => {
     if (!contentId) return;
@@ -262,7 +358,8 @@ export default function ReadingLayout() {
       try {
         const rows = await contentService.listComments(id);
         setComments(rows);
-        setCommentsCount(rows.length);
+        const total = rows.reduce((acc, item) => acc + 1 + (item.replies?.length ?? 0), 0);
+        setCommentsCount(total);
       } catch {
         setComments([]);
       } finally {
@@ -270,6 +367,44 @@ export default function ReadingLayout() {
       }
     };
   }, []);
+
+  const loadReactions = useMemo(() => {
+    return async (id: string) => {
+      try {
+        const summary = await contentService.getReactions(id);
+        setReactions(summary.counts);
+        setMyReaction(summary.myReaction);
+      } catch {
+        setReactions(REACTION_CHOICES.map((r) => ({ emoji: r.emoji, count: 0 })));
+        setMyReaction(null);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!contentId) return;
+    void loadReactions(contentId);
+  }, [contentId, loadReactions]);
+
+  useEffect(() => {
+    if (!contentId) return;
+    const timer = window.setInterval(() => {
+      void loadReactions(contentId);
+      if (commentsOpen) void loadComments(contentId);
+      setEngagementLoading(true);
+      void contentService
+        .getEngagement(contentId)
+        .then((e) => {
+          setViewsCount(e.views);
+          setLikesCount(e.likes);
+          setCommentsCount(e.comments);
+          setLikedByMe(!!e.likedByMe);
+        })
+        .catch(() => undefined)
+        .finally(() => setEngagementLoading(false));
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [contentId, commentsOpen, loadComments, loadReactions]);
 
   const toggleLike = async () => {
     if (!contentId) return;
@@ -288,9 +423,9 @@ export default function ReadingLayout() {
     }
   };
 
-  const submitComment = async () => {
+  const submitComment = async (parentId?: string) => {
     if (!contentId) return;
-    const body = newComment.trim();
+    const body = (parentId ? replyDrafts[parentId] : newComment).trim();
     if (!body) {
       setCommentError('Comment text is required');
       return;
@@ -298,13 +433,50 @@ export default function ReadingLayout() {
     setCommentSaving(true);
     setCommentError(null);
     try {
-      await contentService.addComment(contentId, body);
-      setNewComment('');
+      await contentService.addComment(contentId, body, parentId ?? null);
+      if (parentId) {
+        setReplyDrafts((prev) => ({ ...prev, [parentId]: '' }));
+        setReplyOpenFor(null);
+      } else {
+        setNewComment('');
+      }
       await loadComments(contentId);
     } catch (e) {
       setCommentError(e instanceof Error ? e.message : 'Failed to add comment');
     } finally {
       setCommentSaving(false);
+    }
+  };
+
+  const toggleReaction = async (emoji: ReactionEmoji) => {
+    if (!contentId || reactionBusy) return;
+    setReactionBusy(true);
+    try {
+      const summary = await contentService.toggleReaction(contentId, emoji);
+      setReactions(summary.counts);
+      setMyReaction(summary.myReaction);
+    } catch {
+      // ignore transient failures
+    } finally {
+      setReactionBusy(false);
+    }
+  };
+
+  const setManualReadingStatus = async (status: ReadingProgressStatus) => {
+    if (!contentId) return;
+    setProgressSaving(true);
+    try {
+      const payload: { status: ReadingProgressStatus; percent?: number } = { status };
+      if (status === 'DONE') payload.percent = 100;
+      if (status === 'NOT_STARTED') payload.percent = 0;
+      const row = await contentService.patchReadingProgress(contentId, payload);
+      setReadingPercent(row.percent);
+      setReadingStatus(row.status);
+      setScrollProgress(row.percent);
+    } catch {
+      // ignore transient failures; polling/debounce will reconcile later
+    } finally {
+      setProgressSaving(false);
     }
   };
 
@@ -412,7 +584,7 @@ export default function ReadingLayout() {
         };
 
         // Start with primary (index) results.
-        let cards = primaryIds.length ? await hydrateCards(primaryIds) : [];
+        const cards = primaryIds.length ? await hydrateCards(primaryIds) : [];
 
         // Fallback: body-to-body similarity using DB list + getById bodies.
         if (cards.length < 3) {
@@ -495,6 +667,80 @@ export default function ReadingLayout() {
     }
   };
 
+  const copySourceText = useMemo(() => {
+    const selected = selection.text.trim();
+    if (selected) return selected;
+    if (hasTipTapDoc) {
+      return tipTapJsonToPlainText(bodyDoc).trim();
+    }
+    return '';
+  }, [selection.text, hasTipTapDoc, bodyDoc]);
+
+  const writeClipboardWithFallback = async (text: string): Promise<void> => {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // fallback below
+      }
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    area.style.top = '0';
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(area);
+    if (!copied) {
+      throw new Error('Clipboard copy failed');
+    }
+  };
+
+  const handleCopyWithAttribution = async () => {
+    if (!contentId || !copySourceText || copyBusy) return;
+    setCopyBusy(true);
+    setCopyMessage(null);
+    try {
+      const policy = await contentService.getCopyPolicy(contentId);
+      const textToCopy =
+        policy.enabled && policy.footer
+          ? `${copySourceText}\n\n${policy.footer}`
+          : copySourceText;
+      await writeClipboardWithFallback(textToCopy);
+      setCopyMessage(policy.enabled && policy.footer ? 'Copied with attribution' : 'Copied');
+    } catch (e) {
+      setCopyMessage(e instanceof Error ? e.message : 'Copy failed');
+    } finally {
+      setCopyBusy(false);
+      window.setTimeout(() => setCopyMessage(null), 2200);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!contentId) return;
+    const canonicalUrl = `${window.location.origin}/library/${contentId}`;
+    const shareText = `${title} — ${canonicalUrl}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title,
+          text: title,
+          url: canonicalUrl,
+        });
+        return;
+      }
+      await writeClipboardWithFallback(shareText);
+      setCopyMessage('Link copied');
+      window.setTimeout(() => setCopyMessage(null), 2200);
+    } catch {
+      // user cancel or share unavailable failure
+    }
+  };
+
   return (
     <div className="reading-layout-root relative flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-app-text">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -524,6 +770,35 @@ export default function ReadingLayout() {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-2 rounded-app-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[11px] sm:text-xs">
+            <span className="hidden pl-1 font-medium text-app-faint sm:inline">Progress</span>
+            <div className="flex items-center rounded-app-sm border border-white/10 bg-app-bg/40 p-0.5">
+              {([
+                { value: 'NOT_STARTED', label: 'Not Started' },
+                { value: 'READING', label: 'Reading' },
+                { value: 'DONE', label: 'Done' },
+              ] as const).map((opt) => {
+                const active = readingStatus === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => void setManualReadingStatus(opt.value)}
+                    disabled={!contentId || progressSaving}
+                    className={`rounded-app-sm px-2 py-1 text-[10px] font-medium transition-colors sm:px-2.5 sm:text-[11px] ${
+                      active
+                        ? 'bg-app-accent/20 text-app-accent'
+                        : 'text-app-faint hover:bg-white/[0.06] hover:text-app-text'
+                    }`}
+                    title={`Set status: ${opt.label}`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="tabular-nums text-app-faint">{readingPercent}%</span>
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -560,6 +835,21 @@ export default function ReadingLayout() {
           </button>
           <button
             type="button"
+            onClick={() => void handleCopyWithAttribution()}
+            disabled={copyBusy || !copySourceText}
+            className="flex items-center gap-1.5 rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-medium text-app-muted transition-colors hover:border-white/16 hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60 sm:text-xs"
+            title={
+              copySourceText
+                ? 'Copy selected text (or full article) with attribution policy'
+                : 'No readable content to copy'
+            }
+          >
+            <Copy size={16} strokeWidth={2} />
+            {copyBusy ? 'Copying…' : 'Copy'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleShare()}
             className="flex items-center gap-1.5 rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-medium text-app-muted transition-colors hover:border-white/16 hover:text-app-text sm:text-xs"
           >
             <Share2 size={16} strokeWidth={2} /> Share
@@ -596,6 +886,7 @@ export default function ReadingLayout() {
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <main
+          ref={mainScrollRef}
           className="reading-main-scroll min-h-0 flex-1 scroll-smooth overflow-y-auto px-4 py-8 sm:px-8 sm:py-10 md:px-12 md:py-12"
           onScroll={handleScroll}
         >
@@ -605,13 +896,24 @@ export default function ReadingLayout() {
             className="mx-auto max-w-[min(100%,42rem)] overflow-hidden border border-white/[0.09] shadow-app-lift"
           >
             <div className="border-b border-white/[0.06] px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-12">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-faint">
-                {contentTypeLabel(currentType)}
-              </p>
+              {loading ? (
+                <div className="mb-3 h-3 w-24 animate-pulse rounded bg-white/10" />
+              ) : (
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-faint">
+                  {contentTypeLabel(currentType)}
+                </p>
+              )}
               <header className="mb-0">
-                <h1 className="mb-6 font-serif text-[clamp(1.65rem,4vw,2.25rem)] font-semibold leading-[1.15] tracking-[-0.03em] text-app-text">
-                  {title}
-                </h1>
+                {loading ? (
+                  <div className="mb-6 space-y-2">
+                    <div className="h-9 w-full animate-pulse rounded bg-white/10" />
+                    <div className="h-9 w-2/3 animate-pulse rounded bg-white/10" />
+                  </div>
+                ) : (
+                  <h1 className="mb-6 font-serif text-[clamp(1.65rem,4vw,2.25rem)] font-semibold leading-[1.15] tracking-[-0.03em] text-app-text">
+                    {title}
+                  </h1>
+                )}
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-app-accent/90 to-app-accent-deep text-sm font-bold text-white shadow-[0_0_20px_-6px_rgba(147,124,248,0.5)]">
@@ -623,23 +925,41 @@ export default function ReadingLayout() {
                         .join('')
                         .toUpperCase()}
                     </div>
-                    <div>
-                      <div className="text-[14px] font-medium tracking-tight text-app-text">
-                        {authorName}
+                    {loading ? (
+                      <div className="space-y-1.5">
+                        <div className="h-4 w-28 animate-pulse rounded bg-white/10" />
+                        <div className="h-3 w-20 animate-pulse rounded bg-white/10" />
                       </div>
-                      <div className="mt-0.5 text-[11px] text-app-muted">
-                        {loading ? 'Loading…' : loadError ? 'Error' : 'Loaded'} · {readTimeLabel}
+                    ) : (
+                      <div>
+                        <div className="text-[14px] font-medium tracking-tight text-app-text">
+                          {authorName}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-app-muted">
+                          {loadError ? 'Error' : 'Loaded'} · {readTimeLabel}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </header>
             </div>
 
             <div className="border-b border-white/[0.06] px-6 py-10 sm:px-10 sm:py-12">
-              <div className="leading-[1.75] text-app-muted/95" style={{ fontSize }}>
+              <div
+                className="leading-[1.8] text-[15px] text-app-muted/95 sm:text-base"
+                style={{ fontSize }}
+              >
                 {loadError ? (
                   <p className="m-0 text-sm leading-relaxed text-red-400">{loadError}</p>
+                ) : loading ? (
+                  <div className="space-y-3">
+                    <div className="h-4 w-full animate-pulse rounded bg-white/10" />
+                    <div className="h-4 w-11/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-4 w-10/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-4 w-9/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-4 w-10/12 animate-pulse rounded bg-white/10" />
+                  </div>
                 ) : hasTipTapDoc ? (
                   <div className="tiptap-content" style={{ fontSize }}>
                     <TipTapReadonly
@@ -664,107 +984,307 @@ export default function ReadingLayout() {
               </div>
             </div>
 
-            <div className="flex flex-col justify-between gap-4 px-6 py-6 sm:flex-row sm:items-center sm:px-10">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-app-md border border-app-accent/35 bg-app-accent/10 px-4 py-2.5 text-[13px] font-semibold text-app-accent transition-colors hover:bg-app-accent/16"
-                  onClick={() => void toggleLike()}
-                  title={engagementLoading ? 'Loading…' : likedByMe ? 'Unlike' : 'Like'}
-                >
-                  <ThumbsUp
-                    size={16}
-                    strokeWidth={2}
-                    className={likedByMe ? 'fill-app-accent text-app-accent' : ''}
-                  />
-                  Helpful
-                  <span className="ml-0.5 text-[11px] font-normal tabular-nums text-app-faint">
-                    ({likesCount})
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-app-md border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-app-muted transition-colors hover:border-white/16 hover:bg-white/[0.06] hover:text-app-text"
-                  onClick={() => {
-                    const next = !commentsOpen;
-                    setCommentsOpen(next);
-                    if (next && contentId) void loadComments(contentId);
-                  }}
-                  title={commentsOpen ? 'Hide comments' : 'Show comments'}
-                >
-                  <MessageSquare size={16} strokeWidth={2} /> Comments
-                  <span className="ml-0.5 text-[11px] font-normal tabular-nums text-app-faint">
-                    ({commentsCount})
-                  </span>
-                </button>
+            {/* ─── Engagement Bar ─────────────────────────────────────────────── */}
+            <div className="border-t border-white/[0.06] px-6 pb-2 pt-5 sm:px-10">
+              {/* Reaction pills row */}
+              <div className="mb-4">
+                <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint">
+                  React to this article
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {REACTION_CHOICES.map((item) => {
+                    const count = reactions.find((r) => r.emoji === item.emoji)?.count ?? 0;
+                    const active = myReaction === item.emoji;
+                    return (
+                      <button
+                        key={item.emoji}
+                        type="button"
+                        disabled={reactionBusy}
+                        onClick={() => void toggleReaction(item.emoji)}
+                        title={item.label}
+                        aria-pressed={active}
+                        className={[
+                          'group/rxn relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition-all duration-200 select-none',
+                          active
+                            ? 'border-app-accent/50 bg-gradient-to-br from-app-accent/20 to-app-accent-2/15 text-app-text shadow-[0_0_18px_-6px_rgba(147,124,248,0.45),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-app-accent/25'
+                            : 'border-white/10 bg-white/[0.04] text-app-muted hover:border-white/20 hover:bg-white/[0.08] hover:text-app-text',
+                        ].join(' ')}
+                      >
+                        <span
+                          className="text-[18px] leading-none transition-transform duration-150 group-hover/rxn:scale-125"
+                          style={{ display: 'inline-block' }}
+                        >
+                          {item.glyph}
+                        </span>
+                        {count > 0 && (
+                          <span
+                            className={`tabular-nums text-[11px] font-semibold leading-none ${active ? 'text-app-accent' : 'text-app-muted'}`}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex items-center text-[11px] font-medium tabular-nums text-app-faint">
-                <span className="rounded-app-md border border-white/8 bg-white/[0.03] px-3 py-1.5">
-                  Views: {viewsCount}
-                </span>
+
+              {/* Action row: like · comments · views */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.05] py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className={[
+                      'flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition-all duration-200',
+                      likedByMe
+                        ? 'border-app-accent/40 bg-app-accent/12 text-app-accent shadow-[0_0_16px_-6px_rgba(147,124,248,0.4)]'
+                        : 'border-white/10 bg-white/[0.04] text-app-muted hover:border-app-accent/25 hover:bg-app-accent/8 hover:text-app-text',
+                    ].join(' ')}
+                    onClick={() => void toggleLike()}
+                    title={engagementLoading ? 'Loading…' : likedByMe ? 'Unlike' : 'Like'}
+                  >
+                    <ThumbsUp
+                      size={14}
+                      strokeWidth={2.5}
+                      className={likedByMe ? 'fill-app-accent text-app-accent' : ''}
+                    />
+                    Helpful
+                    {likesCount > 0 && (
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none ${likedByMe ? 'bg-app-accent/20 text-app-accent' : 'bg-white/[0.06] text-app-faint'}`}
+                      >
+                        {likesCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={[
+                      'flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition-all duration-200',
+                      commentsOpen
+                        ? 'border-white/18 bg-white/[0.07] text-app-text'
+                        : 'border-white/10 bg-white/[0.04] text-app-muted hover:border-white/18 hover:bg-white/[0.07] hover:text-app-text',
+                    ].join(' ')}
+                    onClick={() => {
+                      const next = !commentsOpen;
+                      setCommentsOpen(next);
+                      if (next && contentId) void loadComments(contentId);
+                    }}
+                    title={commentsOpen ? 'Hide comments' : 'Show comments'}
+                  >
+                    <MessageSquare size={14} strokeWidth={2.5} />
+                    Discussion
+                    {commentsCount > 0 && (
+                      <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none text-app-faint">
+                        {commentsCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] tabular-nums text-app-faint">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <span className="font-medium">{viewsCount.toLocaleString()}</span>
+                  <span className="text-app-faint/60">views</span>
+                </div>
               </div>
             </div>
 
             {commentsOpen ? (
-              <div className="border-t border-white/[0.06] bg-white/[0.02] px-6 py-8 sm:px-10">
-                <h3 className="mb-4 font-serif text-lg font-semibold tracking-tight text-app-text">
-                  Comments
-                </h3>
+              <div className="border-t border-white/[0.06] bg-white/[0.015] px-6 py-8 sm:px-10">
+                <div className="mb-5 flex items-center gap-2">
+                  <MessageSquare size={16} strokeWidth={2} className="text-app-accent" />
+                  <h3 className="font-serif text-lg font-semibold tracking-tight text-app-text">
+                    Discussion
+                  </h3>
+                  {commentsCount > 0 && (
+                    <span className="rounded-full border border-app-accent/30 bg-app-accent/12 px-2.5 py-0.5 text-[11px] font-semibold text-app-accent">
+                      {commentsCount}
+                    </span>
+                  )}
+                </div>
 
-                <div className="rounded-app-xl border border-white/10 bg-app-bg/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <label
-                    htmlFor="reading-new-comment"
-                    className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-app-faint"
-                  >
-                    Add a comment
-                  </label>
+                {/* New comment composer */}
+                <div className="mb-6 overflow-hidden rounded-app-xl border border-white/10 bg-app-bg/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                   <textarea
                     id="reading-new-comment"
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Write your comment…"
-                    className="mt-2 w-full rounded-app-md border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[13px] leading-relaxed text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
+                    placeholder="Share your thoughts on this article…"
+                    className="w-full resize-none bg-transparent px-4 py-4 text-[13px] leading-relaxed text-app-text placeholder-app-faint outline-none"
                     rows={3}
                   />
-                  {commentError ? (
-                    <p className="mt-2 mb-0 text-[11px] text-red-400">{commentError}</p>
-                  ) : null}
-                  <div className="mt-3 flex justify-end">
+                  <div className="flex items-center justify-between border-t border-white/[0.06] px-4 py-2.5">
+                    {commentError ? (
+                      <p className="text-[11px] text-red-400">{commentError}</p>
+                    ) : (
+                      <span className="text-[11px] text-app-faint">
+                        {newComment.length > 0 ? `${newComment.length} chars` : 'Be respectful and constructive'}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => void submitComment()}
-                      disabled={commentSaving}
-                      className="rounded-app-md border border-white/12 bg-gradient-to-r from-app-accent to-app-accent-2 px-4 py-2 text-xs font-semibold text-app-bg shadow-[0_0_18px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={commentSaving || !newComment.trim()}
+                      className="rounded-full bg-gradient-to-r from-app-accent to-app-accent-2 px-5 py-1.5 text-[12px] font-semibold text-app-bg shadow-[0_0_18px_-8px_rgba(147,124,248,0.5)] transition-[filter,opacity] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      {commentSaving ? 'Posting…' : 'Post comment'}
+                      {commentSaving ? 'Posting…' : 'Post'}
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-2.5">
+                {/* Comments list */}
+                <div className="flex flex-col gap-3">
                   {commentsLoading ? (
-                    <div className="rounded-app-lg border border-white/10 bg-white/[0.03] p-4 text-[13px] text-app-faint">
-                      Loading comments…
+                    <div className="space-y-3">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="rounded-app-xl border border-white/[0.06] bg-white/[0.02] p-4">
+                          <div className="flex gap-3">
+                            <div className="app-skeleton-shimmer size-8 shrink-0 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                              <div className="app-skeleton-shimmer h-3 w-28 rounded-full" />
+                              <div className="app-skeleton-shimmer h-3 w-full rounded-full" />
+                              <div className="app-skeleton-shimmer h-3 w-3/4 rounded-full" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : comments.length === 0 ? (
-                    <div className="rounded-app-lg border border-white/10 bg-white/[0.03] p-4 text-[13px] text-app-muted">
-                      No comments yet.
+                    <div className="flex flex-col items-center gap-2 rounded-app-xl border border-dashed border-white/10 py-10 text-center">
+                      <MessageSquare size={24} strokeWidth={1.5} className="text-app-faint" />
+                      <p className="text-[13px] text-app-muted">No comments yet. Start the discussion!</p>
                     </div>
                   ) : (
-                    comments.map((c) => (
-                      <div
-                        key={c.id}
-                        className="rounded-app-lg border border-white/[0.08] bg-white/[0.03] p-4 transition-colors hover:border-white/12"
-                      >
-                        <p className="mb-2 text-[13px] leading-relaxed text-app-text/90">
-                          {c.body}
-                        </p>
-                        <div className="text-[11px] text-app-faint">
-                          {(c.author?.displayName || c.author?.email || '—') as string} ·{' '}
-                          {new Date(c.createdAt).toLocaleString()}
+                    comments.map((c) => {
+                      const authorInitials = (c.author?.displayName || c.author?.email || 'U')
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase();
+                      return (
+                        <div
+                          key={c.id}
+                          className="group/comment overflow-hidden rounded-app-xl border border-white/[0.07] bg-white/[0.025] transition-[border-color] duration-200 hover:border-white/12"
+                        >
+                          <div className="p-4">
+                            <div className="mb-3 flex items-start gap-3">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-app-accent/70 to-app-accent-deep/80 text-[11px] font-bold text-white shadow-[0_0_14px_-4px_rgba(147,124,248,0.4)]">
+                                {authorInitials}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-baseline gap-2">
+                                  <span className="text-[13px] font-semibold text-app-text">
+                                    {(c.author?.displayName || c.author?.email || '—') as string}
+                                  </span>
+                                  <span className="text-[11px] tabular-nums text-app-faint">
+                                    {new Date(c.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </div>
+                                <p className="mt-2 text-[13px] leading-relaxed text-app-text/85">
+                                  {c.body}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 pl-11">
+                              <button
+                                type="button"
+                                className="text-[11px] font-medium text-app-faint transition-colors hover:text-app-accent"
+                                onClick={() => setReplyOpenFor(replyOpenFor === c.id ? null : c.id)}
+                              >
+                                {replyOpenFor === c.id ? '↩ Cancel' : '↩ Reply'}
+                              </button>
+                              {(c.replies ?? []).length > 0 && (
+                                <span className="text-[11px] text-app-faint">
+                                  {(c.replies ?? []).length} {(c.replies ?? []).length === 1 ? 'reply' : 'replies'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {replyOpenFor === c.id ? (
+                            <div className="border-t border-white/[0.06] bg-white/[0.02] px-4 pb-4 pt-3">
+                              <div className="flex gap-2">
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-app-muted">
+                                  Me
+                                </div>
+                                <div className="flex-1 overflow-hidden rounded-app-lg border border-white/10 bg-app-bg/50">
+                                  <textarea
+                                    value={replyDrafts[c.id] ?? ''}
+                                    onChange={(e) =>
+                                      setReplyDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))
+                                    }
+                                    placeholder="Write a reply…"
+                                    className="w-full resize-none bg-transparent px-3 py-2.5 text-[12px] leading-relaxed text-app-text placeholder-app-faint outline-none"
+                                    rows={2}
+                                  />
+                                  <div className="flex justify-end border-t border-white/[0.06] px-3 py-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void submitComment(c.id)}
+                                      disabled={commentSaving || !(replyDrafts[c.id] ?? '').trim()}
+                                      className="rounded-full bg-gradient-to-r from-app-accent to-app-accent-2 px-4 py-1 text-[11px] font-semibold text-app-bg transition-[filter,opacity] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      {commentSaving ? 'Posting…' : 'Reply'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {(c.replies ?? []).length > 0 ? (
+                            <div className="border-t border-white/[0.04] bg-white/[0.01] px-4 py-3">
+                              <div className="space-y-3 pl-8 border-l border-white/[0.07]">
+                                {(c.replies ?? []).map((r) => {
+                                  const replyInitials = (r.author?.displayName || r.author?.email || 'U')
+                                    .split(' ')
+                                    .filter(Boolean)
+                                    .slice(0, 2)
+                                    .map((n) => n[0])
+                                    .join('')
+                                    .toUpperCase();
+                                  return (
+                                    <div key={r.id} className="flex items-start gap-2.5">
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-app-accent-2/60 to-teal-500/50 text-[9px] font-bold text-white">
+                                        {replyInitials}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-baseline gap-1.5">
+                                          <span className="text-[12px] font-semibold text-app-text">
+                                            {(r.author?.displayName || r.author?.email || '—') as string}
+                                          </span>
+                                          <span className="text-[10px] tabular-nums text-app-faint">
+                                            {new Date(r.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                          </span>
+                                        </div>
+                                        <p className="mt-1 text-[12px] leading-relaxed text-app-text/80">
+                                          {r.body}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -913,6 +1433,11 @@ export default function ReadingLayout() {
         sourceText={translateSource?.text ?? ''}
         cautionText="This translation runs in your browser only. It is not saved to this article and does not change what other readers see. To publish translated text, edit the content in the editor and save a new version. Only plain text is sent — formatting and embedded media are not preserved."
       />
+      {copyMessage ? (
+        <div className="pointer-events-none fixed bottom-4 right-4 z-50 rounded-app-md border border-white/12 bg-app-bg/90 px-3 py-2 text-xs text-app-text shadow-app-lift backdrop-blur-md">
+          {copyMessage}
+        </div>
+      ) : null}
     </div>
   );
 }

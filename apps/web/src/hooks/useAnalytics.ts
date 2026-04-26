@@ -23,6 +23,7 @@ export function useAnalytics(dateRange: string | DateRange = '30d') {
   const [contentTypeData, setContentTypeData] = useState<ContentTypeBreakdown[]>([]);
   const [topContent, setTopContent] = useState<TopContentItem[]>([]);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [reactionSummary, setReactionSummary] = useState<Array<{ emoji: string; count: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +43,7 @@ export function useAnalytics(dateRange: string | DateRange = '30d') {
           contentTypeDataResult,
           topContentResult,
           aiInsightsResult,
+          reactionSummaryResult,
         ] = await Promise.all([
           analyticsService.getKPIs(param),
           analyticsService.getViewsData(param),
@@ -50,6 +52,7 @@ export function useAnalytics(dateRange: string | DateRange = '30d') {
           analyticsService.getContentTypeData(param),
           analyticsService.getTopContent(10, param),
           analyticsService.getAIInsights(param),
+          analyticsService.getReactionSummary(param).catch(() => [] as Array<{ emoji: string; count: number }>),
         ]);
 
         if (!mounted) return;
@@ -61,6 +64,7 @@ export function useAnalytics(dateRange: string | DateRange = '30d') {
         setContentTypeData(contentTypeDataResult);
         setTopContent(topContentResult);
         setAiInsights(aiInsightsResult);
+        setReactionSummary(reactionSummaryResult);
       } catch (e) {
         if (mounted) setError(e instanceof Error ? e.message : 'Failed to load analytics data');
       } finally {
@@ -83,6 +87,7 @@ export function useAnalytics(dateRange: string | DateRange = '30d') {
     contentTypeData,
     topContent,
     aiInsights,
+    reactionSummary,
     loading,
     error,
     refetch: () => {},

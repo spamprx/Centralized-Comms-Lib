@@ -1,7 +1,9 @@
 import type { CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, FileText, Video, Mic, File, ThumbsUp } from 'lucide-react';
+import { ArrowUpRight, FileText, Video, Mic, File, Eye, MessageSquare } from 'lucide-react';
 import type { ContentItem } from '../../data/mockLibraryData';
+import { contentService } from '../../services/contentService';
 
 const typeIcons = {
   article: FileText,
@@ -27,9 +29,58 @@ interface ContentCardProps {
   item: ContentItem;
 }
 
+const TOP_EMOJIS = ['👍', '❤️', '👏', '💡'];
+
+function useCardEngagement(id: string, initialLikes: number, initialViews: number, initialComments: number) {
+  const [likes, setLikes] = useState(initialLikes);
+  const [views, setViews] = useState(initialViews);
+  const [comments, setComments] = useState(initialComments);
+  const [topEmojis, setTopEmojis] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const [eng, rxn] = await Promise.allSettled([
+          contentService.getEngagement(id),
+          contentService.getReactions(id),
+        ]);
+        if (cancelled) return;
+        if (eng.status === 'fulfilled') {
+          setLikes(eng.value.likes);
+          setViews(eng.value.views);
+          setComments(eng.value.comments);
+        }
+        if (rxn.status === 'fulfilled') {
+          const GLYPH: Record<string, string> = {
+            LIKE: '👍', LOVE: '❤️', CLAP: '👏', INSIGHTFUL: '💡', LAUGH: '😂', CELEBRATE: '🎉',
+          };
+          const active = rxn.value.counts
+            .filter((r) => r.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3)
+            .map((r) => GLYPH[r.emoji] ?? '👍');
+          setTopEmojis(active);
+        }
+      } catch { /* silent */ }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 30_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [id]);
+
+  return { likes, views, comments, topEmojis };
+}
+
 export function ContentCard({ item }: ContentCardProps) {
   const TypeIcon = typeIcons[item.type];
   const c = typeColors[item.type];
+  const { likes, views, comments, topEmojis } = useCardEngagement(
+    item.id,
+    item.likes ?? 0,
+    item.views,
+    item.commentsCount ?? 0,
+  );
 
   return (
     <Link
@@ -81,38 +132,64 @@ export function ContentCard({ item }: ContentCardProps) {
         </h3>
         <p className="mt-1.5 text-xs text-app-muted">by {item.author}</p>
 
-        <div className="mb-3 mt-2.5 flex flex-wrap gap-1.5">
-          {item.tags.slice(0, 4).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md border border-white/8 bg-white/[0.04] px-2 py-0.5 text-[10px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm transition-colors duration-(--duration-app) group-hover/card:border-white/12 group-hover/card:text-app-text"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
+        {item.tags.length > 0 && (
+          <div className="mb-3 mt-2.5 flex flex-wrap gap-1.5">
+            {item.tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-md border border-white/8 bg-white/[0.04] px-2 py-0.5 text-[10px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm transition-colors duration-(--duration-app) group-hover/card:border-white/12 group-hover/card:text-app-text"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
-        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-3">
-          <span className="text-[11px] text-app-faint">
-            {item.type === 'video' || item.type === 'article'
-              ? `${item.views.toLocaleString()} views`
-              : 'New'}
-          </span>
-          <span className="flex items-center gap-1 text-[11px] text-app-faint">
-            <ThumbsUp
-              size={14}
-              className={`transition-colors duration-(--duration-app) ${item.likes ? 'text-app-accent' : ''}`}
-            />
-            {(item.likes ?? 0).toLocaleString()}
-          </span>
-          <div className="relative min-h-[1.25rem] shrink-0 text-right">
-            <span className="text-[11px] text-app-faint transition-opacity duration-300 group-hover/card:opacity-0">
-              {new Date(item.createdAt).toLocaleDateString()}
-            </span>
-            <span className="absolute right-0 top-0 flex items-center gap-0.5 text-[11px] font-semibold text-app-accent opacity-0 transition-opacity duration-300 group-hover/card:opacity-100">
-              Open
-              <ArrowUpRight size={14} aria-hidden />
-            </span>
+        {/* Live engagement bar */}
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-3">
+          <div className="flex items-center gap-3">
+            {/* Emoji reaction stack */}
+            <div className="flex items-center gap-1">
+              {(topEmojis.length > 0 ? topEmojis : TOP_EMOJIS.slice(0, 2)).map((g, i) => (
+                <span
+                  key={i}
+                  className="text-[14px] leading-none opacity-80 transition-transform duration-200 group-hover/card:opacity-100 group-hover/card:scale-110"
+                  style={{ transitionDelay: `${i * 30}ms` }}
+                >
+                  {g}
+                </span>
+              ))}
+              {likes > 0 && (
+                <span className="ml-1 text-[11px] font-semibold tabular-nums text-app-muted">
+                  {likes.toLocaleString()}
+                </span>
+              )}
+            </div>
+            {/* Comments */}
+            {comments > 0 && (
+              <span className="flex items-center gap-1 text-[11px] text-app-faint">
+                <MessageSquare size={12} strokeWidth={2} />
+                {comments}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {views > 0 && (
+              <span className="flex items-center gap-1 text-[11px] text-app-faint">
+                <Eye size={12} strokeWidth={2} />
+                {views.toLocaleString()}
+              </span>
+            )}
+            <div className="relative min-h-[1.25rem] shrink-0 text-right">
+              <span className="text-[11px] text-app-faint transition-opacity duration-300 group-hover/card:opacity-0">
+                {new Date(item.createdAt).toLocaleDateString()}
+              </span>
+              <span className="absolute right-0 top-0 flex items-center gap-0.5 text-[11px] font-semibold text-app-accent opacity-0 transition-opacity duration-300 group-hover/card:opacity-100">
+                Open
+                <ArrowUpRight size={14} aria-hidden />
+              </span>
+            </div>
           </div>
         </div>
       </div>

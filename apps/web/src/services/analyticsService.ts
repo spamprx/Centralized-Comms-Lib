@@ -93,6 +93,11 @@ export const analyticsService = {
     const params = buildDateParams(dateRange);
     return request<AIInsight[]>(`/analytics/ai-insights${params}`);
   },
+
+  getReactionSummary: async (dateRange?: string | DateRange): Promise<Array<{ emoji: string; count: number }>> => {
+    const params = buildDateParams(dateRange);
+    return request<Array<{ emoji: string; count: number }>>(`/analytics/reactions${params}`);
+  },
 };
 
 // Re-export types for convenience

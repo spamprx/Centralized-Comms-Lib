@@ -57,6 +57,14 @@ export const routeGroups: RouteGroup[] = [
           </ProtectedRoute>
         ),
       },
+      {
+        path: '/bookmarks',
+        element: (
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
   {

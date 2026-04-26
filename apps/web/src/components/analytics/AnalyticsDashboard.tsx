@@ -741,6 +741,73 @@ function TopPerformingContentTable({ rows }: { rows: TopContentItem[] }) {
   );
 }
 
+const REACTION_GLYPHS: Record<string, string> = {
+  LIKE: '👍',
+  LOVE: '❤️',
+  CLAP: '👏',
+  INSIGHTFUL: '💡',
+  LAUGH: '😂',
+  CELEBRATE: '🎉',
+};
+
+function ReactionsBreakdownCard({ data }: { data: Array<{ emoji: string; count: number }> }) {
+  const total = data.reduce((s, d) => s + d.count, 0);
+  if (!data.length || total === 0) {
+    return (
+      <div className={`${SURFACE_GLASS} flex min-h-[160px] flex-col p-5`}>
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/35 to-transparent"
+          aria-hidden
+        />
+        <h2 className="text-[15px] font-semibold tracking-tight text-app-text">Reactions breakdown</h2>
+        <p className="mt-4 text-[12px] leading-relaxed text-app-muted">No reactions data for this range.</p>
+      </div>
+    );
+  }
+
+  const sorted = [...data].sort((a, b) => b.count - a.count);
+  const max = sorted[0]?.count ?? 1;
+
+  return (
+    <div className={`${SURFACE_GLASS} flex min-h-0 min-w-0 flex-col p-5`}>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/35 to-transparent"
+        aria-hidden
+      />
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="text-[15px] font-semibold tracking-tight text-app-text">Reactions breakdown</h2>
+        <span className="rounded-app-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tabular-nums text-app-muted">
+          {total.toLocaleString()} total
+        </span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {sorted.map((item) => {
+          const glyph = REACTION_GLYPHS[item.emoji] ?? item.emoji;
+          const pct = total > 0 ? Math.round((item.count / total) * 1000) / 10 : 0;
+          const barPct = max > 0 ? (item.count / max) * 100 : 0;
+          return (
+            <div key={item.emoji} className="flex items-center gap-3">
+              <span className="text-[20px] leading-none w-7 shrink-0 text-center">{glyph}</span>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium text-app-muted capitalize">{item.emoji.toLowerCase()}</span>
+                  <span className="text-[11px] tabular-nums text-app-faint">{item.count.toLocaleString()} · {pct}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-app-accent to-app-accent-2 transition-[width] duration-700 ease-out"
+                    style={{ width: `${barPct}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export interface AnalyticsDashboardProps {
   dateRange: string | DateRange;
   onDateRangeChange: (v: string | DateRange) => void;
@@ -751,6 +818,7 @@ export interface AnalyticsDashboardProps {
   contentTypeData: ContentTypeBreakdown[];
   topContent: TopContentItem[];
   aiInsights: AIInsight[];
+  reactionSummary?: Array<{ emoji: string; count: number }>;
   exporting: boolean;
   exportError: string | null;
   onExportCsv: () => void;
@@ -766,6 +834,7 @@ export function AnalyticsDashboard({
   contentTypeData,
   topContent,
   aiInsights,
+  reactionSummary = [],
   exporting,
   exportError,
   onExportCsv,
@@ -857,8 +926,10 @@ export function AnalyticsDashboard({
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <ReadingTimeCard data={readingTimeData} />
             <ContentTypeCard data={contentTypeData} />
-            <AIInsightsCard insights={aiInsights} />
+            <ReactionsBreakdownCard data={reactionSummary} />
           </div>
+
+          <AIInsightsCard insights={aiInsights} />
 
           <TopPerformingContentTable rows={topContent} />
         </div>

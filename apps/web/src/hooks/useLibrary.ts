@@ -56,6 +56,7 @@ function mapApiContentToLibraryItem(c: Content): ContentItem {
     status,
     views: c.viewsCount ?? 0,
     likes: c.likesCount ?? 0,
+    commentsCount: (c as any).commentsCount ?? 0,
     createdAt: c.updatedAt ?? c.createdAt,
     tags: [],
   };

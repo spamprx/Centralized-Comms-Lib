@@ -10,6 +10,7 @@ export interface ContentItem {
   status: 'draft' | 'review' | 'published';
   views: number;
   likes?: number;
+  commentsCount?: number;
   createdAt: string;
   thumbnail?: string;
   tags: string[];

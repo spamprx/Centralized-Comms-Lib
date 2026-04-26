@@ -91,7 +91,15 @@ export type ContentComment = {
   createdAt: string;
   updatedAt: string;
   contentId: string;
+  parentId: string | null;
   author: { id: string; displayName: string; email: string };
+  replies?: ContentComment[];
+};
+
+export type ReactionEmoji = 'LIKE' | 'LOVE' | 'CLAP' | 'INSIGHTFUL' | 'LAUGH' | 'CELEBRATE';
+export type ReactionSummary = {
+  counts: Array<{ emoji: ReactionEmoji; count: number }>;
+  myReaction: ReactionEmoji | null;
 };
 
 export type ContentEngagement = {
@@ -99,6 +107,20 @@ export type ContentEngagement = {
   likes: number;
   comments: number;
   likedByMe: boolean;
+};
+
+export type ReadingProgressStatus = 'NOT_STARTED' | 'READING' | 'DONE';
+export type ReadingProgress = {
+  percent: number;
+  status: ReadingProgressStatus;
+  updatedAt: string | null;
+  throttled?: boolean;
+};
+
+export type CopyAttributionPolicy = {
+  enabled: boolean;
+  template: string;
+  footer: string | null;
 };
 
 type ListFilters = {
@@ -307,6 +329,10 @@ export const contentService = {
     return request(`/content/${id}`);
   },
 
+  getCopyPolicy: async (id: string): Promise<CopyAttributionPolicy> => {
+    return request<CopyAttributionPolicy>(`/content/${id}/copy-policy`);
+  },
+
   assignTag: async (contentId: string, tagId: string): Promise<{ message: string }> => {
     return request<{ message: string }>(`/content/${contentId}/tags`, {
       method: 'POST',
@@ -383,6 +409,20 @@ export const contentService = {
     return request<ContentEngagement>(`/content/${contentId}/engagement`);
   },
 
+  getReadingProgress: async (contentId: string): Promise<ReadingProgress> => {
+    return request<ReadingProgress>(`/content/${contentId}/progress`);
+  },
+
+  patchReadingProgress: async (
+    contentId: string,
+    payload: { percent?: number; status?: ReadingProgressStatus },
+  ): Promise<ReadingProgress> => {
+    return request<ReadingProgress>(`/content/${contentId}/progress`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
   recordView: async (contentId: string, sessionId: string): Promise<{ views: number }> => {
     return request<{ views: number }>(`/content/${contentId}/view`, {
       method: 'POST',
@@ -406,10 +446,28 @@ export const contentService = {
     return request<ContentComment[]>(`/content/${contentId}/comments`);
   },
 
-  addComment: async (contentId: string, body: string): Promise<ContentComment> => {
+  addComment: async (
+    contentId: string,
+    body: string,
+    parentId?: string | null,
+  ): Promise<ContentComment> => {
     return request<ContentComment>(`/content/${contentId}/comments`, {
       method: 'POST',
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({
+        body,
+        ...(parentId ? { parentId } : {}),
+      }),
+    });
+  },
+
+  getReactions: async (contentId: string): Promise<ReactionSummary> => {
+    return request<ReactionSummary>(`/content/${contentId}/reactions`);
+  },
+
+  toggleReaction: async (contentId: string, emoji: ReactionEmoji): Promise<ReactionSummary> => {
+    return request<ReactionSummary>(`/content/${contentId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
     });
   },
 

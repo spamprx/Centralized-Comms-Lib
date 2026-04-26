@@ -50,6 +50,7 @@ export interface SystemMetric {
   unit?: string;
   trend?: 'up' | 'down' | 'stable';
   changePercent?: number;
+  details?: Record<string, unknown>;
 }
 
 export interface ActivityLog {

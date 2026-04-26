@@ -32,6 +32,26 @@ export type ProfileBookmarkItem = {
   title: string;
   contentType: 'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT';
   savedAt: string;
+  folderId: string | null;
+  folderName: string | null;
+};
+
+export type ProfileBookmarkFolder = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  bookmarkCount: number;
+};
+
+export type ProfileBookmarkNotification = {
+  id: string;
+  contentId: string;
+  contentTitle: string;
+  type: 'BODY_UPDATED' | 'PUBLISHED';
+  message: string;
+  createdAt: string;
+  readAt: string | null;
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -69,7 +89,72 @@ export const profileService = {
     return data.items;
   },
 
-  listBookmarks: async (query?: string): Promise<ProfileBookmarkItem[]> => {
+  listBookmarks: async (
+    query?: string,
+    folderId?: string | 'default',
+  ): Promise<ProfileBookmarkItem[]> => {
+    const params = new URLSearchParams();
+    if (query?.trim()) params.set('q', query.trim());
+    if (folderId) params.set('folderId', folderId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const data = await request<{ items: ProfileBookmarkItem[] }>(`/profile/me/bookmarks${qs}`);
+    return data.items;
+  },
+
+  listBookmarkFolders: async (): Promise<ProfileBookmarkFolder[]> => {
+    const data = await request<{ items: ProfileBookmarkFolder[] }>('/profile/bookmarks/folders');
+    return data.items;
+  },
+
+  createBookmarkFolder: async (name: string): Promise<ProfileBookmarkFolder> => {
+    return request<ProfileBookmarkFolder>('/profile/bookmarks/folders', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  renameBookmarkFolder: async (folderId: string, name: string): Promise<ProfileBookmarkFolder> => {
+    return request<ProfileBookmarkFolder>(`/profile/bookmarks/folders/${folderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  deleteBookmarkFolder: async (folderId: string): Promise<void> => {
+    await request<void>(`/profile/bookmarks/folders/${folderId}`, { method: 'DELETE' });
+  },
+
+  moveBookmarkToFolder: async (
+    bookmarkId: string,
+    folderId: string | null,
+  ): Promise<{ id: string; folderId: string | null; folderName: string | null }> => {
+    return request(`/profile/bookmarks/${bookmarkId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ folderId }),
+    });
+  },
+
+  listBookmarkNotifications: async (
+    unreadOnly = false,
+  ): Promise<ProfileBookmarkNotification[]> => {
+    const qs = unreadOnly ? '?unreadOnly=true' : '';
+    const data = await request<{ items: ProfileBookmarkNotification[] }>(
+      `/profile/bookmarks/notifications${qs}`,
+    );
+    return data.items;
+  },
+
+  markBookmarkNotificationRead: async (id: string): Promise<void> => {
+    await request<void>(`/profile/bookmarks/notifications/${id}/read`, { method: 'PATCH' });
+  },
+
+  markAllBookmarkNotificationsRead: async (): Promise<{ updated: number }> => {
+    return request<{ updated: number }>('/profile/bookmarks/notifications/read-all', {
+      method: 'POST',
+    });
+  },
+
+  listBookmarksLegacy: async (query?: string): Promise<ProfileBookmarkItem[]> => {
     const qs = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
     const data = await request<{ items: ProfileBookmarkItem[] }>(`/profile/me/bookmarks${qs}`);
     return data.items;

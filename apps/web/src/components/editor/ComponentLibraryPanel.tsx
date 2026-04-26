@@ -6,6 +6,8 @@ import { componentService, type ComponentLibraryEntry } from '../../services/com
 import { mockEditorComponents } from '../../data/mockEditorComponents';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
+const COMPONENT_CATALOG_CACHE_KEY = 'component-library:api-catalog:v1';
+
 function filterMockCatalog(q: string): ComponentLibraryEntry[] {
   const s = q.trim().toLowerCase();
   if (!s) return mockEditorComponents;
@@ -15,6 +17,38 @@ function filterMockCatalog(q: string): ComponentLibraryEntry[] {
       c.name.toLowerCase().includes(s) ||
       (c.description?.toLowerCase().includes(s) ?? false),
   );
+}
+
+function filterCatalog(items: ComponentLibraryEntry[], q: string): ComponentLibraryEntry[] {
+  const s = q.trim().toLowerCase();
+  if (!s) return items;
+  return items.filter(
+    (c) =>
+      c.key.toLowerCase().includes(s) ||
+      c.name.toLowerCase().includes(s) ||
+      (c.description?.toLowerCase().includes(s) ?? false),
+  );
+}
+
+function readCachedCatalog(): ComponentLibraryEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(COMPONENT_CATALOG_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as ComponentLibraryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedCatalog(items: ComponentLibraryEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(COMPONENT_CATALOG_CACHE_KEY, JSON.stringify(items));
+  } catch {
+    // ignore storage failures
+  }
 }
 
 function isInsertableTipTapDoc(json: unknown): json is JSONContent {
@@ -52,9 +86,8 @@ function deepCloneJson<T>(v: T): T {
 }
 
 /**
- * **Snapshot** — embed a frozen copy of the component version’s TipTap document (no live link).
- * **Linked** — insert a `componentReference` node that stores `componentVersionId`; on save the API
- * replaces it with the latest canonical blocks from the registry.
+ * **Snapshot** — insert a frozen copy of the selected version's body; edits here never update the library.
+ * **Linked** — insert a live reference (`componentVersionId`); propagation updates all linked usages safely.
  */
 function insertFromLibrary(
   editor: Editor | null,
@@ -118,12 +151,20 @@ export default function ComponentLibraryPanel({
     try {
       const data = q ? await componentService.search(q) : await componentService.list();
       setItems(data);
+      if (!q) writeCachedCatalog(data);
       onCatalogSourceChange?.('api');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load components';
       setLoadError(msg);
-      setItems(filterMockCatalog(debouncedQuery));
-      onCatalogSourceChange?.('demo');
+      const cached = readCachedCatalog();
+      if (cached.length > 0) {
+        setItems(filterCatalog(cached, debouncedQuery));
+        onCatalogSourceChange?.('api');
+      } else {
+        // Last-resort demo fallback when API is unavailable and no cache exists.
+        setItems(filterMockCatalog(debouncedQuery));
+        onCatalogSourceChange?.('demo');
+      }
     } finally {
       setLoading(false);
     }
@@ -163,9 +204,16 @@ export default function ComponentLibraryPanel({
 
       {loadError ? (
         <p className="m-0 rounded-[var(--editor-radius-input)] border border-amber-400/30 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-100/95">
-          API: {loadError}. Showing offline catalog.
+          API: {loadError}. Showing cached/demo catalog.
         </p>
       ) : null}
+
+      <p className="m-0 rounded-[var(--editor-radius-input)] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[11px] leading-snug text-[var(--editor-muted)]">
+        <span className="font-semibold text-[var(--editor-doc-text)]">Linked</span> keeps a live reference
+        to the component version and receives safe propagation updates.{' '}
+        <span className="font-semibold text-[var(--editor-doc-text)]">Snapshot</span> inserts a detached copy
+        for one-off edits.
+      </p>
 
       {loading ? (
         <p className="m-0 text-[11px] text-[var(--editor-faint)]">Loading components…</p>
@@ -199,7 +247,7 @@ export default function ComponentLibraryPanel({
                     disabled={!editor}
                     onClick={() => insertFromLibrary(editor, 'linked', comp)}
                     className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border border-[var(--editor-primary)]/45 bg-[var(--editor-primary-muted)] px-2 py-1.5 text-[11px] font-semibold text-[var(--editor-primary)] transition-colors hover:bg-[var(--editor-primary-muted)] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Insert live link to this component version (body refreshes from the library on save)"
+                    title="Linked: live reference that receives propagation updates"
                   >
                     <Link2 size={12} strokeWidth={2.25} />
                     Linked
@@ -209,7 +257,7 @@ export default function ComponentLibraryPanel({
                     disabled={!editor}
                     onClick={() => insertFromLibrary(editor, 'detached', comp)}
                     className="flex flex-1 items-center justify-center gap-1 rounded-[var(--editor-radius-input)] border border-white/12 bg-gradient-to-r from-app-accent to-app-accent-2 px-2 py-1.5 text-[11px] font-semibold text-app-bg shadow-[0_0_16px_-6px_rgba(147,124,248,0.45)] transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Insert a frozen copy of this version (edits here do not change the library)"
+                    title="Snapshot: detached copy that will not change with library updates"
                   >
                     <Copy size={12} strokeWidth={2.25} />
                     Snapshot

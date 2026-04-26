@@ -19,6 +19,7 @@ export default function AnalyticsLayout() {
     contentTypeData,
     topContent,
     aiInsights,
+    reactionSummary,
     loading,
     error,
   } = useAnalytics(dateRange);
@@ -100,6 +101,7 @@ export default function AnalyticsLayout() {
       contentTypeData={contentTypeData}
       topContent={topContent}
       aiInsights={aiInsights}
+      reactionSummary={reactionSummary}
       exporting={exporting}
       exportError={exportError}
       onExportCsv={handleExportCsv}

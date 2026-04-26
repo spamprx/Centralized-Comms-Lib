@@ -390,6 +390,13 @@ export function useAdminMonitoring() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void fetchData();
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [fetchData]);
+
   return { metrics, logs, loading, error, refetch: fetchData };
 }
 
