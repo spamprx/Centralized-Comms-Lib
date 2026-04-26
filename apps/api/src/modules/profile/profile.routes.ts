@@ -97,12 +97,169 @@ router.get("/me/activity", async (req: AuthRequest, res: Response) => {
 router.get("/me/bookmarks", async (req: AuthRequest, res: Response) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
-    const items = await profileService.listBookmarks(req.user!.id, q);
+    const folderIdRaw =
+      typeof req.query.folderId === "string" ? req.query.folderId : undefined;
+    const folderId =
+      folderIdRaw === "default" ? null : folderIdRaw ? folderIdRaw : undefined;
+    const items = await profileService.listBookmarks(req.user!.id, q, folderId);
     res.status(200).json({ items });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
 });
+
+router.get("/bookmarks/folders", async (req: AuthRequest, res: Response) => {
+  try {
+    const items = await profileService.listBookmarkFolders(req.user!.id);
+    res.status(200).json({ items });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/bookmarks/folders", async (req: AuthRequest, res: Response) => {
+  try {
+    const name = (req.body as { name?: unknown })?.name;
+    if (typeof name !== "string" || !name.trim()) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    const folder = await profileService.createBookmarkFolder(req.user!.id, name);
+    res.status(201).json(folder);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch(
+  "/bookmarks/folders/:folderId",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const name = (req.body as { name?: unknown })?.name;
+      if (typeof name !== "string" || !name.trim()) {
+        res.status(400).json({ error: "name is required" });
+        return;
+      }
+      const folder = await profileService.renameBookmarkFolder(
+        req.user!.id,
+        req.params.folderId,
+        name,
+      );
+      if (!folder) {
+        res.status(404).json({ error: "Folder not found" });
+        return;
+      }
+      res.status(200).json(folder);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.delete(
+  "/bookmarks/folders/:folderId",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const ok = await profileService.deleteBookmarkFolder(
+        req.user!.id,
+        req.params.folderId,
+      );
+      if (!ok) {
+        res.status(404).json({ error: "Folder not found" });
+        return;
+      }
+      res.status(204).end();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.patch("/bookmarks/:bookmarkId", async (req: AuthRequest, res: Response) => {
+  try {
+    const folderIdRaw = (req.body as { folderId?: unknown }).folderId;
+    if (
+      folderIdRaw !== null &&
+      folderIdRaw !== undefined &&
+      typeof folderIdRaw !== "string"
+    ) {
+      res.status(400).json({ error: "folderId must be a string or null" });
+      return;
+    }
+    const moved = await profileService.moveBookmark(
+      req.user!.id,
+      req.params.bookmarkId,
+      typeof folderIdRaw === "string" && folderIdRaw.trim()
+        ? folderIdRaw.trim()
+        : null,
+    );
+    if (!moved) {
+      res.status(404).json({ error: "Bookmark or folder not found" });
+      return;
+    }
+    res.status(200).json(moved);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get(
+  "/bookmarks/notifications",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const unreadOnly =
+        String(req.query.unreadOnly ?? "").toLowerCase() === "true";
+      const items = await profileService.listBookmarkNotifications(
+        req.user!.id,
+        unreadOnly,
+      );
+      res.status(200).json({ items });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.patch(
+  "/bookmarks/notifications/:id/read",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const ok = await profileService.markBookmarkNotificationRead(
+        req.user!.id,
+        req.params.id,
+      );
+      if (!ok) {
+        res.status(404).json({ error: "Notification not found" });
+        return;
+      }
+      res.status(204).end();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
+
+router.post(
+  "/bookmarks/notifications/read-all",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const count = await profileService.markAllBookmarkNotificationsRead(
+        req.user!.id,
+      );
+      res.status(200).json({ updated: count });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 export default router;

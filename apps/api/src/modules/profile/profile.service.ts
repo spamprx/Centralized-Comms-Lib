@@ -1,6 +1,7 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 
 type ActivityType = "PUBLISHED" | "COMMENTED" | "CREATED";
+type BookmarkNotificationType = "BODY_UPDATED" | "PUBLISHED";
 
 export type ProfileActivityItem = {
   id: string;
@@ -8,6 +9,24 @@ export type ProfileActivityItem = {
   contentId: string;
   contentTitle: string;
   timestamp: Date;
+};
+
+export type ProfileBookmarkFolder = {
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  bookmarkCount: number;
+};
+
+export type ProfileBookmarkNotification = {
+  id: string;
+  contentId: string;
+  contentTitle: string;
+  type: BookmarkNotificationType;
+  message: string;
+  createdAt: Date;
+  readAt: Date | null;
 };
 
 export const profileService = {
@@ -195,6 +214,7 @@ export const profileService = {
   async listBookmarks(
     userId: string,
     query?: string,
+    folderId?: string | null,
   ): Promise<
     Array<{
       id: string;
@@ -202,6 +222,8 @@ export const profileService = {
       title: string;
       contentType: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
       savedAt: Date;
+      folderId: string | null;
+      folderName: string | null;
     }>
   > {
     const prisma = getPrismaClient();
@@ -209,6 +231,10 @@ export const profileService = {
     const items = await prisma.contentBookmark.findMany({
       where: {
         userId,
+        ...(folderId === null ? { folderId: null } : {}),
+        ...(typeof folderId === "string" && folderId.trim()
+          ? { folderId: folderId.trim() }
+          : {}),
         ...(q
           ? {
               content: {
@@ -222,6 +248,12 @@ export const profileService = {
       },
       orderBy: { createdAt: "desc" },
       include: {
+        folder: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         content: {
           select: {
             id: true,
@@ -241,13 +273,183 @@ export const profileService = {
           title: string;
           contentType: "ARTICLE" | "VIDEO" | "PODCAST" | "DOCUMENT";
         };
+        folder: { id: string; name: string } | null;
       }) => ({
         id: item.id,
         contentId: item.contentId,
         title: item.content.title,
         contentType: item.content.contentType,
         savedAt: item.createdAt,
+        folderId: item.folder?.id ?? null,
+        folderName: item.folder?.name ?? null,
       }),
     );
+  },
+
+  async listBookmarkFolders(userId: string): Promise<ProfileBookmarkFolder[]> {
+    const prisma = getPrismaClient();
+    const rows = await prisma.bookmarkFolder.findMany({
+      where: { userId },
+      orderBy: [{ updatedAt: "desc" }, { name: "asc" }],
+      include: {
+        _count: {
+          select: { bookmarks: true },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      bookmarkCount: row._count.bookmarks,
+    }));
+  },
+
+  async createBookmarkFolder(
+    userId: string,
+    name: string,
+  ): Promise<ProfileBookmarkFolder> {
+    const prisma = getPrismaClient();
+    const row = await prisma.bookmarkFolder.create({
+      data: { userId, name: name.trim() },
+      include: { _count: { select: { bookmarks: true } } },
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      bookmarkCount: row._count.bookmarks,
+    };
+  },
+
+  async renameBookmarkFolder(
+    userId: string,
+    folderId: string,
+    name: string,
+  ): Promise<ProfileBookmarkFolder | null> {
+    const prisma = getPrismaClient();
+    const existing = await prisma.bookmarkFolder.findFirst({
+      where: { id: folderId, userId },
+      select: { id: true },
+    });
+    if (!existing) return null;
+    const row = await prisma.bookmarkFolder.update({
+      where: { id: folderId },
+      data: { name: name.trim() },
+      include: { _count: { select: { bookmarks: true } } },
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      bookmarkCount: row._count.bookmarks,
+    };
+  },
+
+  async deleteBookmarkFolder(userId: string, folderId: string): Promise<boolean> {
+    const prisma = getPrismaClient();
+    const existing = await prisma.bookmarkFolder.findFirst({
+      where: { id: folderId, userId },
+      select: { id: true },
+    });
+    if (!existing) return false;
+    await prisma.contentBookmark.updateMany({
+      where: { userId, folderId },
+      data: { folderId: null },
+    });
+    await prisma.bookmarkFolder.delete({ where: { id: folderId } });
+    return true;
+  },
+
+  async moveBookmark(
+    userId: string,
+    bookmarkId: string,
+    folderId: string | null,
+  ): Promise<{
+    id: string;
+    folderId: string | null;
+    folderName: string | null;
+  } | null> {
+    const prisma = getPrismaClient();
+    const bookmark = await prisma.contentBookmark.findFirst({
+      where: { id: bookmarkId, userId },
+      select: { id: true },
+    });
+    if (!bookmark) return null;
+    if (folderId) {
+      const folder = await prisma.bookmarkFolder.findFirst({
+        where: { id: folderId, userId },
+        select: { id: true },
+      });
+      if (!folder) return null;
+    }
+    const updated = await prisma.contentBookmark.update({
+      where: { id: bookmarkId },
+      data: { folderId: folderId ?? null },
+      include: {
+        folder: { select: { id: true, name: true } },
+      },
+    });
+    return {
+      id: updated.id,
+      folderId: updated.folder?.id ?? null,
+      folderName: updated.folder?.name ?? null,
+    };
+  },
+
+  async listBookmarkNotifications(
+    userId: string,
+    unreadOnly = false,
+  ): Promise<ProfileBookmarkNotification[]> {
+    const prisma = getPrismaClient();
+    const rows = await prisma.contentBookmarkNotification.findMany({
+      where: {
+        userId,
+        ...(unreadOnly ? { readAt: null } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        content: { select: { id: true, title: true } },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      contentId: row.content.id,
+      contentTitle: row.content.title,
+      type: row.type as BookmarkNotificationType,
+      message: row.message,
+      createdAt: row.createdAt,
+      readAt: row.readAt,
+    }));
+  },
+
+  async markBookmarkNotificationRead(
+    userId: string,
+    notificationId: string,
+  ): Promise<boolean> {
+    const prisma = getPrismaClient();
+    const row = await prisma.contentBookmarkNotification.findFirst({
+      where: { id: notificationId, userId },
+      select: { id: true },
+    });
+    if (!row) return false;
+    await prisma.contentBookmarkNotification.update({
+      where: { id: notificationId },
+      data: { readAt: new Date() },
+    });
+    return true;
+  },
+
+  async markAllBookmarkNotificationsRead(userId: string): Promise<number> {
+    const prisma = getPrismaClient();
+    const out = await prisma.contentBookmarkNotification.updateMany({
+      where: { userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return out.count;
   },
 };
