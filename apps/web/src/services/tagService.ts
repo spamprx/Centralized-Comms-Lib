@@ -16,25 +16,11 @@ export interface TemplateTag {
   id: string;
   templateId: string;
   tagId: string;
+  assignedAt?: string;
   tag: Tag;
 }
 
-// API availability cache
-const API_AVAILABILITY_KEY = 'tag_api_available';
-
-async function isApiAvailable(): Promise<boolean> {
-  const cached = localStorage.getItem(API_AVAILABILITY_KEY);
-  if (cached !== null) return cached === 'true';
-
-  try {
-    await request<Tag[]>('/tags', { method: 'GET' });
-    localStorage.setItem(API_AVAILABILITY_KEY, 'true');
-    return true;
-  } catch (error) {
-    localStorage.setItem(API_AVAILABILITY_KEY, 'false');
-    return false;
-  }
-}
+const ENABLE_LOCAL_FALLBACK = String(import.meta.env.VITE_ENABLE_TAG_LOCAL_FALLBACK ?? 'false') === 'true';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
@@ -57,7 +43,6 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return res.json();
 }
 
-// localStorage fallback functions
 function getTagsFromStorage(): Tag[] {
   try {
     const saved = localStorage.getItem('tags');
@@ -70,23 +55,6 @@ function getTagsFromStorage(): Tag[] {
 function saveTagsToStorage(tags: Tag[]): void {
   try {
     localStorage.setItem('tags', JSON.stringify(tags));
-  } catch {
-    // Handle localStorage errors silently
-  }
-}
-
-function getTemplateTagsFromStorage(templateId: string): TemplateTag[] {
-  try {
-    const saved = localStorage.getItem(`templateTags_${templateId}`);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTemplateTagsToStorage(templateId: string, templateTags: TemplateTag[]): void {
-  try {
-    localStorage.setItem(`templateTags_${templateId}`, JSON.stringify(templateTags));
   } catch {
     // Handle localStorage errors silently
   }
@@ -120,29 +88,20 @@ async function apiDelete(tagId: string): Promise<void> {
 }
 
 async function apiGetTemplateTags(_templateId: string): Promise<TemplateTag[]> {
-  // Since there's no direct endpoint for template tags, we'll return empty array
-  // The template-tag association should be handled by the template service
-  return [];
+  return request<TemplateTag[]>(`/templates/${_templateId}/tags`);
 }
 
 async function apiAddTagToTemplate(templateId: string, tagId: string): Promise<TemplateTag> {
-  // Since there's no direct endpoint for template-tag association,
-  // we'll create a mock TemplateTag object
-  // The actual association should be handled by the template service
-  const tag = await request<Tag>(`/tags/${tagId}`);
-  return {
-    id: `tt_${templateId}_${tagId}`,
-    templateId,
-    tagId,
-    tag,
-  };
+  return request<TemplateTag>(`/templates/${templateId}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ tagId }),
+  });
 }
 
-async function apiRemoveTagFromTemplate(_templateId: string, _tagId: string): Promise<void> {
-  // Since there's no direct endpoint for template-tag association,
-  // we'll just return success
-  // The actual removal should be handled by the template service
-  return;
+async function apiRemoveTagFromTemplate(templateId: string, tagId: string): Promise<void> {
+  return request<void>(`/templates/${templateId}/tags/${tagId}`, {
+    method: 'DELETE',
+  });
 }
 
 // localStorage methods
@@ -173,12 +132,7 @@ function localStorageDelete(tagId: string): boolean {
   return true;
 }
 
-function localStorageGetTemplateTags(templateId: string): TemplateTag[] {
-  return getTemplateTagsFromStorage(templateId);
-}
-
 function localStorageAddTagToTemplate(templateId: string, tagId: string, tag?: Tag): TemplateTag {
-  const templateTags = getTemplateTagsFromStorage(templateId);
   const tags = getTagsFromStorage();
 
   // First try to find tag in localStorage, then use the provided tag
@@ -194,107 +148,64 @@ function localStorageAddTagToTemplate(templateId: string, tagId: string, tag?: T
 
   if (!foundTag) throw new Error('Tag not found');
 
-  const existingRelation = templateTags.find((tt) => tt.tagId === tagId);
-  if (existingRelation) return existingRelation;
-
-  const newTemplateTag: TemplateTag = {
-    id: `templateTag_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    templateId,
-    tagId,
-    tag: foundTag,
-  };
-
-  const updated = [...templateTags, newTemplateTag];
-  saveTemplateTagsToStorage(templateId, updated);
-  return newTemplateTag;
+  return { id: `local_${templateId}_${tagId}`, templateId, tagId, tag: foundTag };
 }
 
 function localStorageRemoveTagFromTemplate(templateId: string, tagId: string): boolean {
-  const templateTags = getTemplateTagsFromStorage(templateId);
-  const filtered = templateTags.filter((tt) => tt.tagId !== tagId);
-
-  if (filtered.length === templateTags.length) return false;
-
-  saveTemplateTagsToStorage(templateId, filtered);
+  void templateId;
+  void tagId;
   return true;
 }
 
-// Main service with hybrid strategy
 export const tagService = {
   list: async (): Promise<Tag[]> => {
-    console.log('TAG SERVICE: Checking API availability...');
-    if (await isApiAvailable()) {
-      console.log('TAG SERVICE: API is available, trying API call');
-      try {
-        return await apiList();
-      } catch (error) {
-        console.log('TAG SERVICE: API call failed, falling back to localStorage');
-        return localStorageList();
-      }
+    try {
+      return await apiList();
+    } catch (error) {
+      if (ENABLE_LOCAL_FALLBACK) return localStorageList();
+      throw error;
     }
-    console.log('TAG SERVICE: API not available, using localStorage');
-    return localStorageList();
   },
 
   create: async (tag: CreateTagRequest): Promise<Tag> => {
-    if (await isApiAvailable()) {
-      try {
-        return await apiCreate(tag);
-      } catch (error) {
-        return localStorageCreate(tag);
-      }
+    try {
+      return await apiCreate(tag);
+    } catch (error) {
+      if (ENABLE_LOCAL_FALLBACK) return localStorageCreate(tag);
+      throw error;
     }
-    return localStorageCreate(tag);
   },
 
   delete: async (tagId: string): Promise<boolean> => {
-    if (await isApiAvailable()) {
-      try {
-        await apiDelete(tagId);
-        return true;
-      } catch (error) {
-        return localStorageDelete(tagId);
-      }
+    try {
+      await apiDelete(tagId);
+      return true;
+    } catch (error) {
+      if (ENABLE_LOCAL_FALLBACK) return localStorageDelete(tagId);
+      throw error;
     }
-    return localStorageDelete(tagId);
   },
 
   getTemplateTags: async (templateId: string): Promise<TemplateTag[]> => {
-    if (await isApiAvailable()) {
-      try {
-        return await apiGetTemplateTags(templateId);
-      } catch (error) {
-        return localStorageGetTemplateTags(templateId);
-      }
-    }
-    return localStorageGetTemplateTags(templateId);
+    return apiGetTemplateTags(templateId);
   },
 
   addTagToTemplate: async (templateId: string, tagId: string, tag?: Tag): Promise<TemplateTag> => {
-    if (await isApiAvailable()) {
-      try {
-        return await apiAddTagToTemplate(templateId, tagId);
-      } catch (error) {
-        return localStorageAddTagToTemplate(templateId, tagId, tag);
-      }
+    try {
+      return await apiAddTagToTemplate(templateId, tagId);
+    } catch (error) {
+      if (ENABLE_LOCAL_FALLBACK) return localStorageAddTagToTemplate(templateId, tagId, tag);
+      throw error;
     }
-    return localStorageAddTagToTemplate(templateId, tagId, tag);
   },
 
   removeTagFromTemplate: async (templateId: string, tagId: string): Promise<boolean> => {
-    if (await isApiAvailable()) {
-      try {
-        await apiRemoveTagFromTemplate(templateId, tagId);
-        return true;
-      } catch (error) {
-        return localStorageRemoveTagFromTemplate(templateId, tagId);
-      }
+    try {
+      await apiRemoveTagFromTemplate(templateId, tagId);
+      return true;
+    } catch (error) {
+      if (ENABLE_LOCAL_FALLBACK) return localStorageRemoveTagFromTemplate(templateId, tagId);
+      throw error;
     }
-    return localStorageRemoveTagFromTemplate(templateId, tagId);
-  },
-
-  // Utility method to reset API availability cache (for testing)
-  resetApiCache: (): void => {
-    localStorage.removeItem(API_AVAILABILITY_KEY);
   },
 };

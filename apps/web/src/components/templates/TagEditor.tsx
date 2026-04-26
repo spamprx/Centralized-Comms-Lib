@@ -51,6 +51,22 @@ export default function TagEditor({
     loadTags();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadTemplateTags = async () => {
+      try {
+        const linked = await tagService.getTemplateTags(templateId);
+        if (!cancelled) setTemplateTags(linked);
+      } catch {
+        if (!cancelled) setTemplateTags([]);
+      }
+    };
+    void loadTemplateTags();
+    return () => {
+      cancelled = true;
+    };
+  }, [templateId]);
+
   // Filter suggestions based on input
   useEffect(() => {
     if (newTagName.trim()) {
@@ -81,39 +97,13 @@ export default function TagEditor({
 
       // Create new tag if it doesn't exist
       if (!tag) {
-        try {
-          tag = await tagService.create({ name: newTagName.trim() });
-          setAvailableTags((prev) => [...prev, tag!]);
-        } catch (createErr) {
-          console.error('Failed to create tag:', createErr);
-          // Create a temporary tag object for localStorage fallback
-          tag = {
-            id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            name: newTagName.trim(),
-            slug: newTagName
-              .trim()
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-'),
-          };
-        }
+        tag = await tagService.create({ name: newTagName.trim() });
+        setAvailableTags((prev) => [...prev, tag!]);
       }
 
       // Add tag to template
-      try {
-        const templateTag = await tagService.addTagToTemplate(templateId, tag.id, tag);
-        setTemplateTags((prev) => [...prev, templateTag]);
-      } catch (addErr) {
-        console.error('Failed to add tag to template:', addErr);
-        // Create a temporary template tag for localStorage fallback
-        const templateTag = {
-          id: `temp_tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          templateId,
-          tagId: tag.id,
-          tag,
-        };
-        setTemplateTags((prev) => [...prev, templateTag]);
-      }
+      const templateTag = await tagService.addTagToTemplate(templateId, tag.id, tag);
+      setTemplateTags((prev) => [...prev, templateTag]);
 
       // Update tags list
       const updatedTags = [...tags, tag];
@@ -133,18 +123,9 @@ export default function TagEditor({
       setLoading(true);
       setError(null);
 
-      try {
-        await tagService.removeTagFromTemplate(templateId, tagId);
-
-        // Update template tags
-        const updatedTemplateTags = templateTags.filter((tt) => tt.tagId !== tagId);
-        setTemplateTags(updatedTemplateTags);
-      } catch (removeErr) {
-        console.error('Failed to remove tag from template:', removeErr);
-        // Fallback: just update local state
-        const updatedTemplateTags = templateTags.filter((tt) => tt.tagId !== tagId);
-        setTemplateTags(updatedTemplateTags);
-      }
+      await tagService.removeTagFromTemplate(templateId, tagId);
+      const updatedTemplateTags = templateTags.filter((tt) => tt.tagId !== tagId);
+      setTemplateTags(updatedTemplateTags);
 
       // Update tags list
       const updatedTags = tags.filter((t) => t.id !== tagId);
