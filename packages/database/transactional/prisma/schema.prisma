@@ -47,8 +47,11 @@ model User {
   contentSnapshots  ContentSnapshot[]
   contentAnnotations ContentAnnotation[] @relation("ContentAnnotationAuthor")
   contentBookmarks  ContentBookmark[] @relation("ContentBookmarkUser")
+  bookmarkFolders   BookmarkFolder[]
+  bookmarkNotifications ContentBookmarkNotification[]
   contentComments   ContentComment[] @relation("ContentCommentAuthor")
   contentLikes      ContentLike[] @relation("ContentLikeUser")
+  contentReactions  ContentReaction[] @relation("ContentReactionUser")
   contentViews      ContentView[] @relation("ContentViewUser")
   contentReadingProgresses ContentReadingProgress[]
 
@@ -280,6 +283,20 @@ enum ReadingProgressStatus {
   DONE
 }
 
+enum BookmarkNotificationType {
+  BODY_UPDATED
+  PUBLISHED
+}
+
+enum ReactionEmoji {
+  LIKE
+  LOVE
+  CLAP
+  INSIGHTFUL
+  LAUGH
+  CELEBRATE
+}
+
 // ── Workspace ───────────────────────────────────────────────────────────────
 // Isolation boundary for template name/slug uniqueness and future tenancy.
 
@@ -291,6 +308,7 @@ model Workspace {
   updatedAt DateTime @updatedAt
 
   templates Template[]
+  templateClusters TemplateCluster[]
 
   @@map("workspaces")
 }
@@ -344,13 +362,32 @@ model Template {
   translations TemplateTranslation[]
   layoutSections TemplateLayoutSection[]
   formattingRule TemplateFormattingRule?
+  tags         TemplateTag[]
+  clusterId    String?
+  cluster      TemplateCluster? @relation(fields: [clusterId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, slug])
   @@unique([workspaceId, name])
   @@index([workspaceId, status])
   @@index([workspaceId, updatedAt])
   @@index([authorId])
+  @@index([clusterId])
   @@map("templates")
+}
+
+model TemplateCluster {
+  id          String   @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  templates   Template[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, updatedAt])
+  @@map("template_clusters")
 }
 
 // Normalized translations (indexed by template + locale). JSON i18n on Template remains for cache/legacy.
@@ -489,8 +526,10 @@ model Content {
   readingProgresses ContentReadingProgress[]
   annotations   ContentAnnotation[] @relation("ContentAnnotations")
   bookmarks     ContentBookmark[] @relation("ContentBookmarks")
+  bookmarkNotifications ContentBookmarkNotification[]
   comments      ContentComment[] @relation("ContentComments")
   likes         ContentLike[] @relation("ContentLikes")
+  reactions     ContentReaction[] @relation("ContentReactions")
   views         ContentView[] @relation("ContentViews")
 
   @@index([authorId])
@@ -707,10 +746,45 @@ model ContentBookmark {
   userId String
   user   User @relation("ContentBookmarkUser", fields: [userId], references: [id], onDelete: Cascade)
 
+  folderId String?
+  folder   BookmarkFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   @@unique([contentId, userId])
   @@index([userId, createdAt])
   @@index([contentId, createdAt])
+  @@index([folderId, createdAt])
   @@map("content_bookmarks")
+}
+
+model BookmarkFolder {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  bookmarks ContentBookmark[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+  @@map("bookmark_folders")
+}
+
+model ContentBookmarkNotification {
+  id        String                   @id @default(uuid())
+  userId    String
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content                  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  type      BookmarkNotificationType
+  message   String
+  readAt    DateTime?
+  createdAt DateTime                 @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt, createdAt])
+  @@index([contentId, createdAt])
+  @@map("content_bookmark_notifications")
 }
 
 // ── ContentComment ──────────────────────────────────────────────────────────
@@ -727,8 +801,13 @@ model ContentComment {
   authorId String
   author   User @relation("ContentCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
+  parentId String?
+  parent   ContentComment?  @relation("ContentCommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  ContentComment[] @relation("ContentCommentThread")
+
   @@index([contentId, createdAt])
   @@index([authorId, createdAt])
+  @@index([parentId, createdAt])
   @@map("content_comments")
 }
 
@@ -748,6 +827,26 @@ model ContentLike {
   @@index([userId, createdAt])
   @@index([contentId, createdAt])
   @@map("content_likes")
+}
+
+// ── ContentReaction ──────────────────────────────────────────────────────────
+// Multi-emoji reactions per user; one row per (content, user), latest emoji wins.
+model ContentReaction {
+  id        String        @id @default(uuid())
+  emoji     ReactionEmoji
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  contentId String
+  content   Content @relation("ContentReactions", fields: [contentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation("ContentReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([contentId, emoji, createdAt])
+  @@index([userId, createdAt])
+  @@map("content_reactions")
 }
 
 // ── ContentView ─────────────────────────────────────────────────────────────
@@ -783,6 +882,7 @@ model Tag {
   createdAt DateTime @default(now())
 
   contents ContentTag[]
+  templates TemplateTag[]
 
   @@map("tags")
 }
@@ -799,6 +899,21 @@ model ContentTag {
 
   @@unique([contentId, tagId])
   @@map("content_tags")
+}
+
+model TemplateTag {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, tagId])
+  @@index([tagId, assignedAt])
+  @@map("template_tags")
 }
 
 // ── ReviewRequest ───────────────────────────────────────────────────────────
