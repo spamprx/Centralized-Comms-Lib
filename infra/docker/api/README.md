@@ -87,6 +87,41 @@ curl http://localhost:8000/health
 # Should return {"status":"ok"}
 ```
 
+### Prometheus scrape verification
+
+```bash
+# When METRICS_ENABLED is not set (or true), this must return Prometheus text format.
+curl -i http://localhost:8000/metrics
+
+# When METRICS_ENABLED=false, this endpoint must return 404.
+METRICS_ENABLED=false curl -i http://localhost:8000/metrics
+```
+
+Prometheus scrape config example:
+
+```yaml
+scrape_configs:
+  - job_name: "comms-api"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["comms-api:8000"]
+```
+
+Grafana panel JSON (example bar chart on request rate):
+
+```json
+{
+  "title": "API Request Rate",
+  "type": "timeseries",
+  "targets": [
+    {
+      "expr": "sum(rate(http_requests_total[5m])) by (route)",
+      "legendFormat": "{{route}}"
+    }
+  ]
+}
+```
+
 ---
 
 ## Environment variables
