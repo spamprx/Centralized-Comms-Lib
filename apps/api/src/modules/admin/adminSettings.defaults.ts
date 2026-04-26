@@ -26,6 +26,11 @@ export type AdminSettingsState = {
     allowedFileTypes: string[];
     storageProvider: "local" | "s3" | "gcs";
   };
+  attribution: {
+    enabled: boolean;
+    template: string;
+    disabledContentIds: string[];
+  };
 };
 
 const defaults = (): AdminSettingsState => ({
@@ -53,6 +58,12 @@ const defaults = (): AdminSettingsState => ({
     maxFileSizeMb: 25,
     allowedFileTypes: ["pdf", "png", "jpg", "jpeg", "webp"],
     storageProvider: "local",
+  },
+  attribution: {
+    enabled: true,
+    template:
+      "Shared from {appName}: \"{title}\" by {authorName}. Read the full article: {url}",
+    disabledContentIds: [],
   },
 });
 

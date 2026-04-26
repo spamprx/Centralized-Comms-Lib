@@ -27,6 +27,11 @@ import {
   refreshLinkedNodesInDocument,
 } from "../component/libraryComponent";
 import { requiredQuorumFromPolicies } from "../review/reviewPolicy.enforcement";
+import {
+  getRedisClient,
+  redisGet,
+  redisSet,
+} from "../../shared/cache/redisClient";
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
@@ -35,6 +40,44 @@ const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   PUBLISHED: ["ARCHIVED", "IN_REVIEW", "DRAFT"],
   ARCHIVED: ["DRAFT"],
 };
+
+const CONTENT_DETAIL_CACHE_TTL_SEC = Math.min(
+  300,
+  Math.max(15, Number(process.env.CONTENT_DETAIL_CACHE_TTL_SEC) || 60),
+);
+
+function contentDetailCacheKey(contentId: string): string {
+  return `content:${contentId}`;
+}
+
+async function clearContentDetailCache(contentId: string): Promise<void> {
+  const r = getRedisClient();
+  if (!r) return;
+  try {
+    if (r.status !== "ready") await r.connect().catch(() => undefined);
+    await r.del(contentDetailCacheKey(contentId));
+  } catch {
+    /* ignore cache invalidation errors */
+  }
+}
+
+function isPublishedAudienceReadAllowed(params: {
+  requester: { id: string; isAdmin?: boolean } | null;
+  content: Content;
+  isCoAuthor: boolean;
+  isReviewer: boolean;
+}): boolean {
+  const { requester, content, isCoAuthor, isReviewer } = params;
+  const isAdmin = !!requester?.isAdmin;
+  const isAuthor = !!requester && content.authorId === requester.id;
+  return (
+    isAdmin ||
+    isAuthor ||
+    isCoAuthor ||
+    isReviewer ||
+    content.lifecycleState === "PUBLISHED"
+  );
+}
 
 function canViewContent(
   content: Content,
@@ -341,30 +384,34 @@ export const contentService = {
   async getById(
     id: string,
     requester: { id: string; isAdmin?: boolean } | null = null,
-  ): Promise<{
-    content: Content;
-    tags: Array<{ id: string; name: string; slug: string }>;
-    versions: ContentVersion[];
-    coAuthors: Array<{ id: string; displayName: string; email: string }>;
-    reviewPolicy?: {
-      requiredQuorum: number | null;
-      isSatisfied: boolean | null;
-    };
-    /**
-     * Convenience for the editor UI: the channel bound to this content's template (if any).
-     * Returned as a minimal Channel shape.
-     */
-    channel?: {
-      id: string;
-      name: string;
-      key: string;
-      description: string | null;
-      priority: number;
-      compatibility: unknown;
-      createdAt: Date;
-      updatedAt: Date;
-    } | null;
-  } | null> {
+  ): Promise<
+    | {
+        content: Content;
+        tags: Array<{ id: string; name: string; slug: string }>;
+        versions: ContentVersion[];
+        coAuthors: Array<{ id: string; displayName: string; email: string }>;
+        reviewPolicy?: {
+          requiredQuorum: number | null;
+          isSatisfied: boolean | null;
+        };
+        /**
+         * Convenience for the editor UI: the channel bound to this content's template (if any).
+         * Returned as a minimal Channel shape.
+         */
+        channel?: {
+          id: string;
+          name: string;
+          key: string;
+          description: string | null;
+          priority: number;
+          compatibility: unknown;
+          createdAt: Date;
+          updatedAt: Date;
+        } | null;
+      }
+    | { forbidden: true }
+    | null
+  > {
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
     const repos = uow.repos();
@@ -430,10 +477,47 @@ export const contentService = {
       ? await repos.userRole.listGroupsForUser(requester.id)
       : [];
     if (
+      !isPublishedAudienceReadAllowed({
+        requester,
+        content,
+        isCoAuthor,
+        isReviewer,
+      }) ||
       !isReviewer &&
       !canViewContent(content, requester, groups, isCoAuthor)
     ) {
-      return null;
+      return { forbidden: true };
+    }
+
+    const shouldUsePublishedCache = content.lifecycleState === "PUBLISHED";
+    if (shouldUsePublishedCache) {
+      const cached = await redisGet(contentDetailCacheKey(content.id));
+      if (cached) {
+        try {
+          return JSON.parse(cached) as {
+            content: Content;
+            tags: Array<{ id: string; name: string; slug: string }>;
+            versions: ContentVersion[];
+            coAuthors: Array<{ id: string; displayName: string; email: string }>;
+            reviewPolicy?: {
+              requiredQuorum: number | null;
+              isSatisfied: boolean | null;
+            };
+            channel?: {
+              id: string;
+              name: string;
+              key: string;
+              description: string | null;
+              priority: number;
+              compatibility: unknown;
+              createdAt: Date;
+              updatedAt: Date;
+            } | null;
+          };
+        } catch {
+          // fall through on corrupted cache payload
+        }
+      }
     }
 
     const tags = await repos.tag.listForContent(content.id);
@@ -483,7 +567,7 @@ export const contentService = {
       select: { id: true, displayName: true, email: true },
     });
 
-    return {
+    const response = {
       content: { ...content, author },
       tags,
       versions,
@@ -494,6 +578,14 @@ export const contentService = {
       },
       channel: directChannel,
     };
+    if (shouldUsePublishedCache) {
+      await redisSet(
+        contentDetailCacheKey(content.id),
+        JSON.stringify(response),
+        CONTENT_DETAIL_CACHE_TTL_SEC,
+      );
+    }
+    return response;
   },
 
   async delete(
@@ -713,6 +805,7 @@ export const contentService = {
     });
     if ("version" in result) {
       void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+      void clearContentDetailCache(contentId);
     }
     return result;
   },
@@ -820,6 +913,7 @@ export const contentService = {
     });
     if ("version" in result) {
       void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+      void clearContentDetailCache(contentId);
     }
     return result;
   },
@@ -950,6 +1044,7 @@ export const contentService = {
     });
     if ("content" in result) {
       void syncContentIndexFromDb(prisma, contentId).catch(() => undefined);
+      void clearContentDetailCache(contentId);
     }
     return result;
   },
@@ -1290,7 +1385,7 @@ export const contentService = {
     | { badRequest: true; error: string }
   > {
     const detail = await this.getById(contentId, requester);
-    if (!detail) {
+    if (!detail || "forbidden" in detail) {
       return { notFound: true } as const;
     }
 
@@ -1331,4 +1426,9 @@ export const contentService = {
       ...core,
     };
   },
+};
+
+export const __private__ = {
+  canViewContent,
+  isPublishedAudienceReadAllowed,
 };

@@ -1199,4 +1199,36 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * GET /analytics/reactions
+ * Returns aggregated emoji reaction counts across all content (optionally filtered by range).
+ * Response: Array<{ emoji: string; count: number }>
+ */
+router.get("/reactions", authorize(), async (req: AuthRequest, res: Response) => {
+  try {
+    const prisma = getPrismaClient();
+    const rangeStr = queryParamString(req.query.range, "30d");
+    const days = parseRangeDays(rangeStr);
+    const { from } = rangeWindowFromDays(days);
+
+    const rows = await prisma.contentReaction.groupBy({
+      by: ["emoji"],
+      _count: { emoji: true },
+      where: {
+        createdAt: { gte: from },
+      },
+      orderBy: { _count: { emoji: "desc" } },
+    });
+
+    const result = rows.map((r) => ({
+      emoji: r.emoji as string,
+      count: r._count.emoji,
+    }));
+
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;

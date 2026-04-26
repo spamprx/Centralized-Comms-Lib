@@ -5,6 +5,8 @@ import { templateService } from "../../service";
 import type { AuditContext } from "../../shared/context";
 import type { AuthRequest } from "../../middlewares/auth.middleware";
 import { formattingRuleService } from "./formattingRule.service";
+import { getPrismaClient } from "../../repository";
+import { workspaceService } from "../workspace/workspace.service";
 
 const router = Router();
 
@@ -33,6 +35,61 @@ async function templateJsonWithBindingsForId(id: string) {
   return {
     ...templateService.templateToJSON(t),
     bindings: t.bindings.map(bindingJson),
+  };
+}
+
+async function listTemplateTags(templateId: string) {
+  const prisma = getPrismaClient();
+  return prisma.templateTag.findMany({
+    where: { templateId },
+    include: { tag: true },
+    orderBy: { assignedAt: "asc" },
+  });
+}
+
+function templateTagJson(row: Awaited<ReturnType<typeof listTemplateTags>>[number]) {
+  return {
+    id: row.id,
+    templateId: row.templateId,
+    tagId: row.tagId,
+    assignedAt: row.assignedAt.toISOString(),
+    tag: {
+      id: row.tag.id,
+      name: row.tag.name,
+      slug: row.tag.slug,
+      parentId: row.tag.parentId,
+      createdAt: row.tag.createdAt.toISOString(),
+    },
+  };
+}
+
+function templateBaseJson(t: {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: string;
+  draftLayout: unknown;
+  activeLayout: unknown;
+  i18n: unknown;
+  authorId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: t.id,
+    workspaceId: t.workspaceId,
+    name: t.name,
+    slug: t.slug,
+    description: t.description,
+    status: t.status,
+    draftLayout: t.draftLayout,
+    activeLayout: t.activeLayout,
+    i18n: t.i18n ?? {},
+    authorId: t.authorId,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
   };
 }
 
@@ -116,10 +173,52 @@ router.post("/", async (req: AuthRequest, res: Response) => {
  *       200:
  *         description: Array of templates
  */
-router.get("/", async (_req: AuthRequest, res: Response) => {
+router.get("/", async (req: AuthRequest, res: Response) => {
   try {
-    const list = await templateService.list();
-    res.status(200).json(list.map((t) => templateService.templateToJSON(t)));
+    const tag = typeof req.query.tag === "string" ? req.query.tag.trim() : "";
+    const clusterId =
+      typeof req.query.clusterId === "string" ? req.query.clusterId.trim() : "";
+    const prisma = getPrismaClient();
+    const list = await prisma.template.findMany({
+      where: {
+        ...(clusterId ? { clusterId } : {}),
+        ...(tag
+          ? {
+              tags: {
+                some: {
+                  tag: {
+                    OR: [{ id: tag }, { slug: tag }, { name: { equals: tag, mode: "insensitive" } }],
+                  },
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        tags: {
+          include: { tag: true },
+          orderBy: { assignedAt: "asc" },
+        },
+        cluster: true,
+      },
+      orderBy: [{ updatedAt: "desc" }],
+    });
+    res.status(200).json(
+      list.map((t) => ({
+        ...templateBaseJson(t),
+        tags: t.tags.map(templateTagJson),
+        cluster: t.cluster
+          ? {
+              id: t.cluster.id,
+              workspaceId: t.cluster.workspaceId,
+              name: t.cluster.name,
+              description: t.cluster.description,
+              createdAt: t.cluster.createdAt.toISOString(),
+              updatedAt: t.cluster.updatedAt.toISOString(),
+            }
+          : null,
+      })),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -475,6 +574,156 @@ router.delete(
   },
 );
 
+router.get("/:id/tags", async (req: AuthRequest, res: Response) => {
+  try {
+    const prisma = getPrismaClient();
+    const template = await prisma.template.findUnique({ where: { id: req.params.id } });
+    if (!template) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    const rows = await listTemplateTags(req.params.id);
+    res.status(200).json(rows.map(templateTagJson));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/:id/tags", async (req: AuthRequest, res: Response) => {
+  try {
+    const tagId = typeof req.body?.tagId === "string" ? req.body.tagId.trim() : "";
+    if (!tagId) {
+      res.status(400).json({ error: "tagId is required" });
+      return;
+    }
+    const prisma = getPrismaClient();
+    const [template, tag] = await Promise.all([
+      prisma.template.findUnique({ where: { id: req.params.id } }),
+      prisma.tag.findUnique({ where: { id: tagId } }),
+    ]);
+    if (!template || !tag) {
+      res.status(404).json({ error: "Template or tag not found" });
+      return;
+    }
+    const row = await prisma.templateTag.upsert({
+      where: { templateId_tagId: { templateId: req.params.id, tagId } },
+      update: {},
+      create: { templateId: req.params.id, tagId },
+      include: { tag: true },
+    });
+    res.status(201).json(templateTagJson(row));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/:id/tags/:tagId", async (req: AuthRequest, res: Response) => {
+  try {
+    const prisma = getPrismaClient();
+    await prisma.templateTag.deleteMany({
+      where: {
+        templateId: req.params.id,
+        tagId: req.params.tagId,
+      },
+    });
+    res.status(200).json({ message: "Template tag removed" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/clusters/all", async (_req: AuthRequest, res: Response) => {
+  try {
+    const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
+    const prisma = getPrismaClient();
+    const clusters = await prisma.templateCluster.findMany({
+      where: { workspaceId },
+      orderBy: [{ updatedAt: "desc" }],
+      include: { _count: { select: { templates: true } } },
+    });
+    res.status(200).json(
+      clusters.map((cluster) => ({
+        id: cluster.id,
+        workspaceId: cluster.workspaceId,
+        name: cluster.name,
+        description: cluster.description,
+        createdAt: cluster.createdAt.toISOString(),
+        updatedAt: cluster.updatedAt.toISOString(),
+        templateCount: cluster._count.templates,
+      })),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/clusters", async (req: AuthRequest, res: Response) => {
+  try {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const description =
+      typeof req.body?.description === "string" ? req.body.description.trim() : null;
+    if (!name) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
+    const prisma = getPrismaClient();
+    const created = await prisma.templateCluster.create({
+      data: { workspaceId, name, description },
+    });
+    res.status(201).json({
+      id: created.id,
+      workspaceId: created.workspaceId,
+      name: created.name,
+      description: created.description,
+      createdAt: created.createdAt.toISOString(),
+      updatedAt: created.updatedAt.toISOString(),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("Unique constraint")) {
+      res.status(409).json({ error: "Cluster name already exists in workspace" });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/:id/cluster", async (req: AuthRequest, res: Response) => {
+  try {
+    const clusterId = typeof req.body?.clusterId === "string" ? req.body.clusterId.trim() : null;
+    const prisma = getPrismaClient();
+    const template = await prisma.template.findUnique({ where: { id: req.params.id } });
+    if (!template) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if (clusterId) {
+      const cluster = await prisma.templateCluster.findUnique({ where: { id: clusterId } });
+      if (!cluster) {
+        res.status(404).json({ error: "Cluster not found" });
+        return;
+      }
+      if (cluster.workspaceId !== template.workspaceId) {
+        res.status(400).json({ error: "Cluster must be in template workspace" });
+        return;
+      }
+    }
+    const updated = await prisma.template.update({
+      where: { id: req.params.id },
+      data: { clusterId },
+    });
+    res.status(200).json({ id: updated.id, clusterId: updated.clusterId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 /**
  * @openapi
  * /api/v1/templates/{id}/formatting-rules:
@@ -702,14 +951,33 @@ router.delete(
  */
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const t = await templateService.getByIdWithBindings(req.params.id);
+    const prisma = getPrismaClient();
+    const t = await prisma.template.findUnique({
+      where: { id: req.params.id },
+      include: {
+        bindings: true,
+        tags: { include: { tag: true }, orderBy: { assignedAt: "asc" } },
+        cluster: true,
+      },
+    });
     if (!t) {
       res.status(404).json({ error: "Template not found" });
       return;
     }
     res.status(200).json({
-      ...templateService.templateToJSON(t),
+      ...templateBaseJson(t),
       bindings: t.bindings.map(bindingJson),
+      tags: t.tags.map(templateTagJson),
+      cluster: t.cluster
+        ? {
+            id: t.cluster.id,
+            workspaceId: t.cluster.workspaceId,
+            name: t.cluster.name,
+            description: t.cluster.description,
+            createdAt: t.cluster.createdAt.toISOString(),
+            updatedAt: t.cluster.updatedAt.toISOString(),
+          }
+        : null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

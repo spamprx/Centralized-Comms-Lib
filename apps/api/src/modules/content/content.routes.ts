@@ -10,8 +10,79 @@ import {
   userMayJoinEditorPresence,
 } from "../../realtime/editorPresenceStore";
 import { broadcastToContentRoom } from "../../realtime/wsServer";
+import { getCopyAttributionPolicy } from "./contentCopyAttribution";
 
 const router = Router();
+
+function isForbiddenResult(result: unknown): result is { forbidden: true } {
+  return !!result && typeof result === "object" && "forbidden" in result;
+}
+
+const REACTION_EMOJIS = [
+  "LIKE",
+  "LOVE",
+  "CLAP",
+  "INSIGHTFUL",
+  "LAUGH",
+  "CELEBRATE",
+] as const;
+
+type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+const READING_PROGRESS_STATUSES = ["NOT_STARTED", "READING", "DONE"] as const;
+type ReadingProgressStatus = (typeof READING_PROGRESS_STATUSES)[number];
+const READING_PROGRESS_THROTTLE_MS = 5000;
+const progressThrottleByUserContent = new Map<string, number>();
+
+function clampPercent(raw: unknown): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+function isReadingProgressStatus(
+  value: unknown,
+): value is ReadingProgressStatus {
+  return (
+    typeof value === "string" &&
+    READING_PROGRESS_STATUSES.includes(value as ReadingProgressStatus)
+  );
+}
+
+function autoStatusFromPercent(percent: number): ReadingProgressStatus {
+  if (percent >= 100) return "DONE";
+  if (percent <= 0) return "NOT_STARTED";
+  return "READING";
+}
+
+function mergeReadingProgress(params: {
+  existing: { percent: number; status: ReadingProgressStatus } | null;
+  incomingPercent: number | null;
+  incomingStatus: ReadingProgressStatus | null;
+}): { percent: number; status: ReadingProgressStatus } {
+  const existingPercent = params.existing?.percent ?? 0;
+  const existingStatus = params.existing?.status ?? "NOT_STARTED";
+
+  // Manual status overrides are authoritative and can intentionally reset progress.
+  if (params.incomingStatus) {
+    if (params.incomingStatus === "DONE") {
+      return { percent: 100, status: "DONE" };
+    }
+    if (params.incomingStatus === "NOT_STARTED") {
+      return { percent: 0, status: "NOT_STARTED" };
+    }
+    const mergedPercent = Math.max(
+      1,
+      params.incomingPercent ?? existingPercent ?? 1,
+    );
+    return { percent: Math.min(99, mergedPercent), status: "READING" };
+  }
+
+  // Scroll updates never regress progress and never demote DONE.
+  const nextPercent = Math.max(existingPercent, params.incomingPercent ?? 0);
+  if (existingStatus === "DONE") {
+    return { percent: 100, status: "DONE" };
+  }
+  return { percent: nextPercent, status: autoStatusFromPercent(nextPercent) };
+}
 
 function auditContext(req: AuthRequest): AuditContext {
   return {
@@ -26,6 +97,34 @@ function isValidTipTapDocument(obj: unknown): obj is Record<string, unknown> {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
   const doc = obj as Record<string, unknown>;
   return doc.type === "doc" && Array.isArray(doc.content);
+}
+
+async function notifyBookmarkedUsersOnContentUpdate(params: {
+  actorId: string;
+  contentId: string;
+  title?: string | null;
+  type: "BODY_UPDATED" | "PUBLISHED";
+}): Promise<void> {
+  const prisma = getPrismaClient();
+  const bookmarks = await prisma.contentBookmark.findMany({
+    where: { contentId: params.contentId, userId: { not: params.actorId } },
+    select: { userId: true },
+    take: 500,
+  });
+  if (!bookmarks.length) return;
+  const title = params.title?.trim() || "Untitled";
+  const message =
+    params.type === "PUBLISHED"
+      ? `\"${title}\" was published.`
+      : `\"${title}\" has meaningful updates.`;
+  await prisma.contentBookmarkNotification.createMany({
+    data: bookmarks.map((b) => ({
+      userId: b.userId,
+      contentId: params.contentId,
+      type: params.type,
+      message,
+    })),
+  });
 }
 
 /**
@@ -673,6 +772,8 @@ router.post(
  *     responses:
  *       200:
  *         description: Content item with tags and versions
+ *       403:
+ *         description: Forbidden for audience due to lifecycle/visibility
  *       404:
  *         description: Content not found
  *       500:
@@ -684,11 +785,55 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
+    if (isForbiddenResult(result)) {
+      res.status(403).json({
+        error:
+          "Forbidden: this content is not accessible for your role or visibility group",
+      });
+      return;
+    }
     if (!result) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
     res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * Copy-with-attribution policy for the reader UI.
+ * Audience clients call this before writing clipboard text.
+ */
+router.get("/:id/copy-policy", async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (isForbiddenResult(result)) {
+      res.status(403).json({
+        error:
+          "Forbidden: this content is not accessible for your role or visibility group",
+      });
+      return;
+    }
+    if (!result) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const policy = getCopyAttributionPolicy({
+      contentId: result.content.id,
+      title: result.content.title ?? "Untitled",
+      slug: result.content.slug ?? "",
+      authorName:
+        result.content.author?.displayName ||
+        result.content.author?.email ||
+        "Unknown author",
+    });
+    res.status(200).json(policy);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -862,7 +1007,15 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       });
       return;
     }
-    if ("version" in result) res.status(200).json(result.version);
+    if ("version" in result) {
+      void notifyBookmarkedUsersOnContentUpdate({
+        actorId: req.user!.id,
+        contentId: req.params.id,
+        title: result.version.title,
+        type: "BODY_UPDATED",
+      }).catch(() => undefined);
+      res.status(200).json(result.version);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -951,7 +1104,17 @@ router.post(
         });
         return;
       }
-      if ("content" in result) res.status(200).json(result.content);
+      if ("content" in result) {
+        if (result.content.lifecycleState === "PUBLISHED") {
+          void notifyBookmarkedUsersOnContentUpdate({
+            actorId: req.user!.id,
+            contentId: result.content.id,
+            title: result.content.title,
+            type: "PUBLISHED",
+          }).catch(() => undefined);
+        }
+        res.status(200).json(result.content);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });
@@ -1026,7 +1189,7 @@ router.get("/:id/annotations", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1076,7 +1239,7 @@ router.post("/:id/annotations", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1180,7 +1343,7 @@ router.get("/:id/bookmark", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1204,7 +1367,7 @@ router.post("/:id/bookmark", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1229,7 +1392,7 @@ router.delete("/:id/bookmark", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1273,7 +1436,7 @@ router.get("/:id/engagement", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1296,6 +1459,177 @@ router.get("/:id/engagement", async (req: AuthRequest, res: Response) => {
       likes,
       comments,
       likedByMe: !!likedByMe,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/content/{id}/progress:
+ *   get:
+ *     summary: Get reading progress for current user
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current reading progress
+ *       404:
+ *         description: Content not found
+ *   patch:
+ *     summary: Upsert reading progress (debounced client updates + manual override)
+ *     description: Server applies authoritative merge rules and throttles rapid updates per user/content.
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               percent:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *               status:
+ *                 type: string
+ *                 enum: [NOT_STARTED, READING, DONE]
+ *     responses:
+ *       200:
+ *         description: Updated (or current throttled) reading progress
+ *       400:
+ *         description: Invalid payload
+ *       404:
+ *         description: Content not found
+ */
+router.get("/:id/progress", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail || isForbiddenResult(detail)) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const row = await prisma.contentReadingProgress.findUnique({
+      where: {
+        userId_contentId: { userId: req.user!.id, contentId: req.params.id },
+      },
+      select: { percent: true, status: true, updatedAt: true },
+    });
+
+    res.status(200).json({
+      percent: row?.percent ?? 0,
+      status: (row?.status ?? "NOT_STARTED") as ReadingProgressStatus,
+      updatedAt: row?.updatedAt ?? null,
+      throttled: false,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/:id/progress", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail || isForbiddenResult(detail)) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const incomingPercent = clampPercent((req.body as { percent?: unknown }).percent);
+    const rawStatus = (req.body as { status?: unknown }).status;
+    const incomingStatus = rawStatus == null ? null : rawStatus;
+    const hasPercent = "percent" in (req.body ?? {});
+    const hasStatus = "status" in (req.body ?? {});
+    if (!hasPercent && !hasStatus) {
+      res.status(400).json({ error: "At least one of percent or status is required" });
+      return;
+    }
+    if (hasPercent && incomingPercent === null) {
+      res.status(400).json({ error: "percent must be a finite number between 0 and 100" });
+      return;
+    }
+    if (hasStatus && !isReadingProgressStatus(incomingStatus)) {
+      res.status(400).json({
+        error: `status must be one of: ${READING_PROGRESS_STATUSES.join(", ")}`,
+      });
+      return;
+    }
+
+    const throttleKey = `${req.user!.id}:${req.params.id}`;
+    const now = Date.now();
+    const lastAt = progressThrottleByUserContent.get(throttleKey) ?? 0;
+    const prisma = getPrismaClient();
+    if (now - lastAt < READING_PROGRESS_THROTTLE_MS) {
+      const current = await prisma.contentReadingProgress.findUnique({
+        where: {
+          userId_contentId: { userId: req.user!.id, contentId: req.params.id },
+        },
+        select: { percent: true, status: true, updatedAt: true },
+      });
+      res.status(200).json({
+        percent: current?.percent ?? 0,
+        status: (current?.status ?? "NOT_STARTED") as ReadingProgressStatus,
+        updatedAt: current?.updatedAt ?? null,
+        throttled: true,
+      });
+      return;
+    }
+
+    const existing = await prisma.contentReadingProgress.findUnique({
+      where: {
+        userId_contentId: { userId: req.user!.id, contentId: req.params.id },
+      },
+      select: { percent: true, status: true },
+    });
+    const merged = mergeReadingProgress({
+      existing: existing
+        ? {
+            percent: existing.percent,
+            status: existing.status as ReadingProgressStatus,
+          }
+        : null,
+      incomingPercent,
+      incomingStatus: (incomingStatus as ReadingProgressStatus | null) ?? null,
+    });
+
+    const upserted = await prisma.contentReadingProgress.upsert({
+      where: {
+        userId_contentId: { userId: req.user!.id, contentId: req.params.id },
+      },
+      create: {
+        userId: req.user!.id,
+        contentId: req.params.id,
+        percent: merged.percent,
+        status: merged.status,
+      },
+      update: {
+        percent: merged.percent,
+        status: merged.status,
+      },
+      select: { percent: true, status: true, updatedAt: true },
+    });
+    progressThrottleByUserContent.set(throttleKey, now);
+    res.status(200).json({
+      percent: upserted.percent,
+      status: upserted.status,
+      updatedAt: upserted.updatedAt,
+      throttled: false,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1351,7 +1685,7 @@ router.post("/:id/view", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1430,7 +1764,7 @@ router.post("/:id/like", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1459,7 +1793,7 @@ router.delete("/:id/like", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1480,9 +1814,175 @@ router.delete("/:id/like", async (req: AuthRequest, res: Response) => {
 
 /**
  * @openapi
+ * /api/v1/content/{id}/reactions:
+ *   get:
+ *     summary: Get reaction aggregates and current user's reaction
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Reaction summary
+ *       404:
+ *         description: Content not found
+ *   post:
+ *     summary: Toggle or set a reaction emoji
+ *     tags:
+ *       - Content
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emoji
+ *             properties:
+ *               emoji:
+ *                 type: string
+ *                 enum: [LIKE, LOVE, CLAP, INSIGHTFUL, LAUGH, CELEBRATE]
+ *     responses:
+ *       200:
+ *         description: Updated reaction summary
+ *       400:
+ *         description: Invalid emoji
+ *       404:
+ *         description: Content not found
+ */
+router.get("/:id/reactions", async (req: AuthRequest, res: Response) => {
+  try {
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail || isForbiddenResult(detail)) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const [countsRows, mine] = await Promise.all([
+      prisma.contentReaction.groupBy({
+        by: ["emoji"],
+        where: { contentId: req.params.id },
+        _count: { _all: true },
+      }),
+      prisma.contentReaction.findUnique({
+        where: {
+          contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+        },
+        select: { emoji: true },
+      }),
+    ]);
+
+    const counts = REACTION_EMOJIS.map((emoji) => ({
+      emoji,
+      count: countsRows.find((r) => r.emoji === emoji)?._count._all ?? 0,
+    }));
+    res.status(200).json({
+      counts,
+      myReaction: mine?.emoji ?? null,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/:id/reactions", async (req: AuthRequest, res: Response) => {
+  try {
+    const rawEmoji = (req.body as { emoji?: unknown }).emoji;
+    if (typeof rawEmoji !== "string") {
+      res.status(400).json({ error: "emoji is required" });
+      return;
+    }
+    const emoji = rawEmoji.toUpperCase() as ReactionEmoji;
+    if (!REACTION_EMOJIS.includes(emoji)) {
+      res.status(400).json({
+        error: `emoji must be one of: ${REACTION_EMOJIS.join(", ")}`,
+      });
+      return;
+    }
+
+    const detail = await contentService.getById(req.params.id, {
+      id: req.user!.id,
+      isAdmin: req.user!.role === "ADMIN",
+    });
+    if (!detail || isForbiddenResult(detail)) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+
+    const prisma = getPrismaClient();
+    const existing = await prisma.contentReaction.findUnique({
+      where: {
+        contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+      },
+      select: { emoji: true },
+    });
+
+    // Toggle behavior: same emoji removes reaction, different emoji updates it.
+    if (existing?.emoji === emoji) {
+      await prisma.contentReaction.deleteMany({
+        where: { contentId: req.params.id, userId: req.user!.id },
+      });
+    } else {
+      await prisma.contentReaction.upsert({
+        where: {
+          contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+        },
+        create: { contentId: req.params.id, userId: req.user!.id, emoji },
+        update: { emoji },
+      });
+    }
+
+    const [countsRows, mine] = await Promise.all([
+      prisma.contentReaction.groupBy({
+        by: ["emoji"],
+        where: { contentId: req.params.id },
+        _count: { _all: true },
+      }),
+      prisma.contentReaction.findUnique({
+        where: {
+          contentId_userId: { contentId: req.params.id, userId: req.user!.id },
+        },
+        select: { emoji: true },
+      }),
+    ]);
+    const counts = REACTION_EMOJIS.map((e) => ({
+      emoji: e,
+      count: countsRows.find((r) => r.emoji === e)?._count._all ?? 0,
+    }));
+    res.status(200).json({
+      counts,
+      myReaction: mine?.emoji ?? null,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * @openapi
  * /api/v1/content/{id}/comments:
  *   get:
- *     summary: List comments for a content item
+ *     summary: List threaded comments (max depth 2) for a content item
  *     tags:
  *       - Content
  *     security:
@@ -1501,7 +2001,7 @@ router.delete("/:id/like", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  *   post:
- *     summary: Add a comment to a content item
+ *     summary: Add a comment or one-level reply (max depth 2)
  *     tags:
  *       - Content
  *     security:
@@ -1523,6 +2023,9 @@ router.delete("/:id/like", async (req: AuthRequest, res: Response) => {
  *             properties:
  *               body:
  *                 type: string
+ *               parentId:
+ *                 type: string
+ *                 nullable: true
  *     responses:
  *       201:
  *         description: Created comment
@@ -1539,7 +2042,7 @@ router.get("/:id/comments", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
@@ -1551,6 +2054,7 @@ router.get("/:id/comments", async (req: AuthRequest, res: Response) => {
       createdAt: Date;
       updatedAt: Date;
       contentId: string;
+      parentId: string | null;
       author: { id: string; displayName: string; email: string };
     };
     const rows = (await prisma.contentComment.findMany({
@@ -1562,16 +2066,26 @@ router.get("/:id/comments", async (req: AuthRequest, res: Response) => {
       },
     })) as CommentRow[];
 
-    res.status(200).json(
-      rows.map((c) => ({
-        id: c.id,
-        body: c.body,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        contentId: c.contentId,
-        author: c.author,
-      })),
-    );
+    const normalized = rows.map((c) => ({
+      id: c.id,
+      body: c.body,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      contentId: c.contentId,
+      parentId: c.parentId,
+      author: c.author,
+    }));
+    const byParent = new Map<string | null, typeof normalized>();
+    for (const c of normalized) {
+      const arr = byParent.get(c.parentId) ?? [];
+      arr.push(c);
+      byParent.set(c.parentId, arr);
+    }
+    const topLevel = (byParent.get(null) ?? []).map((p) => ({
+      ...p,
+      replies: (byParent.get(p.id) ?? []).map((r) => ({ ...r, replies: [] })),
+    }));
+    res.status(200).json(topLevel);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -1580,9 +2094,13 @@ router.get("/:id/comments", async (req: AuthRequest, res: Response) => {
 
 router.post("/:id/comments", async (req: AuthRequest, res: Response) => {
   try {
-    const { body } = req.body as { body?: unknown };
+    const { body, parentId } = req.body as { body?: unknown; parentId?: unknown };
     if (typeof body !== "string" || body.trim() === "") {
       res.status(400).json({ error: "body is required" });
+      return;
+    }
+    if (parentId !== undefined && parentId !== null && typeof parentId !== "string") {
+      res.status(400).json({ error: "parentId must be a string when provided" });
       return;
     }
 
@@ -1590,17 +2108,37 @@ router.post("/:id/comments", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!detail) {
+    if (!detail || isForbiddenResult(detail)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }
 
     const prisma = getPrismaClient();
+    let parentRef: { id: string; parentId: string | null; contentId: string } | null = null;
+    if (typeof parentId === "string" && parentId.trim() !== "") {
+      parentRef = await prisma.contentComment.findUnique({
+        where: { id: parentId },
+        select: { id: true, parentId: true, contentId: true },
+      });
+      if (!parentRef || parentRef.contentId !== req.params.id) {
+        res.status(400).json({ error: "parentId is not a comment for this content" });
+        return;
+      }
+      // Enforce max depth 2: reply can only target top-level comments.
+      if (parentRef.parentId !== null) {
+        res.status(422).json({
+          error: "Thread depth limit reached. Maximum allowed depth is 2.",
+        });
+        return;
+      }
+    }
+
     const created = await prisma.contentComment.create({
       data: {
         contentId: req.params.id,
         authorId: req.user!.id,
         body: body.trim(),
+        parentId: parentRef?.id ?? null,
       },
       include: {
         author: { select: { id: true, displayName: true, email: true } },
@@ -1613,7 +2151,9 @@ router.post("/:id/comments", async (req: AuthRequest, res: Response) => {
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
       contentId: created.contentId,
+      parentId: created.parentId,
       author: created.author,
+      replies: [],
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1892,7 +2432,7 @@ router.get("/:id/versions", async (req: AuthRequest, res: Response) => {
       id: req.user!.id,
       isAdmin: req.user!.role === "ADMIN",
     });
-    if (!result) {
+    if (!result || isForbiddenResult(result)) {
       res.status(404).json({ error: "Content not found" });
       return;
     }

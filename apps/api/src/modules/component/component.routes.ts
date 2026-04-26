@@ -527,6 +527,82 @@ router.post(
 
 /**
  * @openapi
+ * /api/v1/components/templates/{templateId}/sections:
+ *   get:
+ *     summary: List template layout sections with linked component version metadata
+ *     tags:
+ *       - Components
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: templateId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: phase
+ *         schema:
+ *           type: string
+ *           enum: [DRAFT, ACTIVE]
+ *     responses:
+ *       200:
+ *         description: Section list
+ */
+router.get(
+  "/templates/:templateId/sections",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const phaseRaw = req.query.phase;
+      const phase =
+        phaseRaw === "DRAFT" || phaseRaw === "ACTIVE"
+          ? (phaseRaw as LayoutPhase)
+          : undefined;
+      const prisma = getPrismaClient();
+      const sections = await prisma.templateLayoutSection.findMany({
+        where: {
+          templateId: req.params.templateId,
+          ...(phase ? { phase } : {}),
+        },
+        orderBy: [{ phase: "asc" }, { sortOrder: "asc" }],
+        include: {
+          componentVersion: {
+            select: {
+              id: true,
+              version: true,
+              component: {
+                select: { id: true, key: true, name: true },
+              },
+            },
+          },
+        },
+      });
+      res.status(200).json(
+        sections.map((s) => ({
+          id: s.id,
+          templateId: s.templateId,
+          phase: s.phase,
+          sortOrder: s.sortOrder,
+          props: s.props,
+          componentVersion: s.componentVersion
+            ? {
+                id: s.componentVersion.id,
+                version: s.componentVersion.version,
+                component: s.componentVersion.component,
+              }
+            : null,
+        })),
+      );
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
+
+/**
+ * @openapi
  * /api/v1/components/content/{contentId}/insert:
  *   post:
  *     summary: Append a component placeholder paragraph to content body (TipTap)
@@ -666,6 +742,10 @@ router.post(
       });
       if (!detail) {
         res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      if ("forbidden" in detail) {
+        res.status(403).json({ error: "Content is not accessible" });
         return;
       }
       const latest = detail.versions[0];
