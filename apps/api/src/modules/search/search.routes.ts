@@ -8,8 +8,48 @@ import {
 } from "./contentSearch.service";
 import { parseContentSearchFilters } from "./search.filters";
 import { assertValidQueryVector, type RankBlendWeights } from "./rankBlend";
+import { filterReadableContent, checkResourceAccess } from "../../shared/authorization";
 
 const router = Router();
+
+type SearchAuthRow = {
+  id: string;
+  authorId: string;
+  lifecycleState: string;
+  visibility: string;
+  visibilityGroupId: string | null;
+  channelId: string | null;
+};
+
+function hitToAuthRow(
+  hit: { contentId: string; source: Record<string, unknown> },
+): SearchAuthRow | null {
+  const src = hit.source;
+  if (
+    typeof src.authorId !== "string" ||
+    typeof src.lifecycleState !== "string" ||
+    typeof src.visibility !== "string"
+  ) {
+    return null;
+  }
+  const visibilityGroupId =
+    typeof src.visibilityGroupId === "string" ? src.visibilityGroupId : null;
+  const rawChannel =
+    typeof src.contentChannelId === "string"
+      ? src.contentChannelId
+      : typeof src.channelId === "string"
+        ? src.channelId
+        : null;
+  const channelId = rawChannel?.trim() ? rawChannel : null;
+  return {
+    id: hit.contentId,
+    authorId: src.authorId,
+    lifecycleState: src.lifecycleState,
+    visibility: src.visibility,
+    visibilityGroupId,
+    channelId,
+  };
+}
 
 function parseWeights(
   raw: string | undefined,
@@ -188,7 +228,25 @@ router.get("/content", async (req: AuthRequest, res: Response) => {
       });
       return;
     }
-    res.status(200).json(raw);
+    const authRows = raw.hits
+      .map((h) =>
+        hitToAuthRow({
+          contentId: h.contentId,
+          source: h.source as Record<string, unknown>,
+        }),
+      )
+      .filter((v): v is SearchAuthRow => v !== null);
+    const readable = await filterReadableContent(
+      { id: req.user!.id, isAdmin: req.user?.role === "ADMIN" },
+      authRows,
+    );
+    const readableIds = new Set(readable.map((r) => r.id));
+    const filteredHits = raw.hits.filter((h) => readableIds.has(h.contentId));
+    res.status(200).json({
+      ...raw,
+      total: filteredHits.length,
+      hits: filteredHits,
+    });
   } catch (err) {
     res
       .status(500)
@@ -307,6 +365,17 @@ router.get("/content-check", async (req: AuthRequest, res: Response) => {
       : undefined;
 
     if (contentId) {
+      const seedAccess = await checkResourceAccess(
+        req.user!.id,
+        "content",
+        contentId,
+        "read",
+        { isAdmin: req.user?.role === "ADMIN" },
+      );
+      if (!seedAccess.allowed) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
       const raw = await searchContentCheck({
         contentId,
         filters,
@@ -319,7 +388,21 @@ router.get("/content-check", async (req: AuthRequest, res: Response) => {
         res.status(503).json({ error: "Search index unavailable" });
         return;
       }
-      res.status(200).json(raw);
+      const authRows = raw.hits
+        .map((h) =>
+          hitToAuthRow({
+            contentId: h.contentId,
+            source: h.source as Record<string, unknown>,
+          }),
+        )
+        .filter((v): v is SearchAuthRow => v !== null);
+      const readable = await filterReadableContent(
+        { id: req.user!.id, isAdmin: req.user?.role === "ADMIN" },
+        authRows,
+      );
+      const readableIds = new Set(readable.map((r) => r.id));
+      const filteredHits = raw.hits.filter((h) => readableIds.has(h.contentId));
+      res.status(200).json({ ...raw, total: filteredHits.length, hits: filteredHits });
       return;
     }
 
@@ -337,7 +420,21 @@ router.get("/content-check", async (req: AuthRequest, res: Response) => {
       res.status(503).json({ error: "Search index unavailable" });
       return;
     }
-    res.status(200).json(raw);
+    const authRows = raw.hits
+      .map((h) =>
+        hitToAuthRow({
+          contentId: h.contentId,
+          source: h.source as Record<string, unknown>,
+        }),
+      )
+      .filter((v): v is SearchAuthRow => v !== null);
+    const readable = await filterReadableContent(
+      { id: req.user!.id, isAdmin: req.user?.role === "ADMIN" },
+      authRows,
+    );
+    const readableIds = new Set(readable.map((r) => r.id));
+    const filteredHits = raw.hits.filter((h) => readableIds.has(h.contentId));
+    res.status(200).json({ ...raw, total: filteredHits.length, hits: filteredHits });
   } catch (err) {
     res
       .status(500)

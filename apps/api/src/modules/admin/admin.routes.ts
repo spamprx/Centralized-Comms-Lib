@@ -32,7 +32,10 @@ function auditContext(req: AuthRequest): AuditContext {
  *       500:
  *         description: Server error
  */
-router.get("/roles", async (req: AuthRequest, res: Response) => {
+router.get(
+  "/roles",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
   try {
     const roles = await adminService.listRoles();
     res.status(200).json(roles);
@@ -40,7 +43,8 @@ router.get("/roles", async (req: AuthRequest, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
-});
+  },
+);
 
 /**
  * @openapi
@@ -236,6 +240,7 @@ router.delete(
  */
 router.get(
   "/roles/:id/permissions",
+  authorize("ADMIN"),
   async (req: AuthRequest, res: Response) => {
     try {
       const permissions = await adminService.listPermissionsForRole(
@@ -603,7 +608,10 @@ router.delete(
  *       500:
  *         description: Server error
  */
-router.get("/users", async (req: AuthRequest, res: Response) => {
+router.get(
+  "/users",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
   try {
     const users = await adminService.listUsersWithAssociations();
     res.status(200).json(users);
@@ -611,7 +619,8 @@ router.get("/users", async (req: AuthRequest, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
-});
+  },
+);
 
 /**
  * Server-sent events: `{ type: 'user_last_active', userId, lastActiveAt?, presencePingAt? }`
@@ -674,7 +683,10 @@ router.get(
  *       500:
  *         description: Server error
  */
-router.get("/users/:id", async (req: AuthRequest, res: Response) => {
+router.get(
+  "/users/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
   try {
     const user = await adminService.getUserById(req.params.id);
     if (!user) {
@@ -686,7 +698,8 @@ router.get("/users/:id", async (req: AuthRequest, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
-});
+  },
+);
 
 router.post(
   "/users",
@@ -1059,15 +1072,19 @@ router.delete(
  *       500:
  *         description: Server error
  */
-router.get("/groups", async (req: AuthRequest, res: Response) => {
-  try {
-    const groups = await adminService.listGroups();
-    res.status(200).json(groups);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+router.get(
+  "/groups",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const groups = await adminService.listGroups();
+      res.status(200).json(groups);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -1145,19 +1162,23 @@ router.post(
  *       500:
  *         description: Server error
  */
-router.get("/groups/:id", async (req: AuthRequest, res: Response) => {
-  try {
-    const group = await adminService.getGroupById(req.params.id);
-    if (!group) {
-      res.status(404).json({ error: "Group not found" });
-      return;
+router.get(
+  "/groups/:id",
+  authorize("ADMIN"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const group = await adminService.getGroupById(req.params.id);
+      if (!group) {
+        res.status(404).json({ error: "Group not found" });
+        return;
+      }
+      res.status(200).json(group);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    res.status(200).json(group);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi

@@ -17,3 +17,4 @@ export { channelService } from "../modules/channel/channel.service";
 export { templateService } from "../modules/template/template.service";
 export { formattingRuleService } from "../modules/template/formattingRule.service";
 export { workspaceService } from "../modules/workspace/workspace.service";
+export { whatsappSendService } from "../modules/whatsapp-send/whatsappSend.service";

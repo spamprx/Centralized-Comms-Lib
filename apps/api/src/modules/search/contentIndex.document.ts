@@ -8,6 +8,8 @@ export interface ContentIndexDocument {
   visibility: string;
   authorId: string;
   templateId: string | null;
+  /** Content row channel FK (library excludes channel-bound published items). */
+  contentChannelId: string | null;
   channelIds: string[];
   tagIds: string[];
   tagSlugs: string[];
@@ -114,6 +116,7 @@ export async function buildContentIndexDocument(
     visibility: content.visibility,
     authorId: content.authorId,
     templateId: content.templateId,
+    contentChannelId: content.channelId ?? null,
     channelIds,
     tagIds,
     tagSlugs,

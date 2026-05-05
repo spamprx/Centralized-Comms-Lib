@@ -5,32 +5,20 @@ import {
   TITLE_EMBEDDING_DIMS,
 } from "@comms-lib/db-elasticsearch";
 import { buildContentIndexDocument } from "./contentIndex.document";
+import { embedText } from "../../intelligence/syncAi";
 
 /**
- * Optional HTTP embedding service: `EMBEDDING_SERVICE_URL` base URL, POST JSON `{ "text": "..." }`
- * returning `{ "embedding": number[] }` with length `TITLE_EMBEDDING_DIMS` (384).
+ * Generate a vector embedding for the given text via the Intelligence Layer
+ * (SRS §3.4.7 — Sync AI fast path).  Falls back to null when the embedding
+ * service is not configured or returns an unexpected dimension.
  */
 export async function embedTextForIndex(
   text: string,
 ): Promise<number[] | null> {
-  const base = process.env.EMBEDDING_SERVICE_URL?.trim();
-  if (!base) return null;
-  const path = process.env.EMBEDDING_SERVICE_PATH?.trim() || "/embed";
-  const url = `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, 8000) }),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { embedding?: number[] };
-    const emb = data.embedding;
-    if (!Array.isArray(emb) || emb.length !== TITLE_EMBEDDING_DIMS) return null;
-    return emb;
-  } catch {
-    return null;
-  }
+  const result = await embedText(text);
+  if (!result || !result.ok) return null;
+  if (result.embedding.length !== TITLE_EMBEDDING_DIMS) return null;
+  return result.embedding;
 }
 
 export async function refreshTitleEmbeddingForContent(

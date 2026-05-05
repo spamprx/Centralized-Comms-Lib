@@ -15,6 +15,25 @@ function auditContext(req: AuthRequest): AuditContext {
 
 const router = Router();
 
+function isAdmin(req: AuthRequest): boolean {
+  return req.user?.role === "ADMIN";
+}
+
+async function ensureContentAnalyticsAccess(
+  req: AuthRequest,
+  contentId: string,
+): Promise<{ ok: true } | { status: number; error: string }> {
+  if (isAdmin(req)) return { ok: true };
+  const content = await getPrismaClient().content.findUnique({
+    where: { id: contentId },
+    select: { authorId: true },
+  });
+  if (!content || content.authorId !== req.user!.id) {
+    return { status: 403, error: "Forbidden" };
+  }
+  return { ok: true };
+}
+
 function queryParamString(q: unknown, fallback: string): string {
   if (typeof q === "string") return q;
   if (Array.isArray(q) && typeof q[0] === "string") return q[0];
@@ -125,6 +144,11 @@ router.post("/track", async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "Content not found" });
       return;
     }
+    const access = await ensureContentAnalyticsAccess(req, content.id);
+    if (!("ok" in access)) {
+      res.status(access.status).json({ error: access.error });
+      return;
+    }
     await prisma.contentAnalyticsEvent.create({
       data: {
         contentId: content.id,
@@ -199,6 +223,11 @@ router.get(
         return;
       }
       const prisma = getPrismaClient();
+      const access = await ensureContentAnalyticsAccess(req, req.params.contentId);
+      if (!("ok" in access)) {
+        res.status(access.status).json({ error: access.error });
+        return;
+      }
       const rows = await prisma.contentAnalyticsEvent.groupBy({
         by: ["eventType"],
         where: {
@@ -265,14 +294,36 @@ router.get(
         return;
       }
       const prisma = getPrismaClient();
+      const ownContentIds = isAdmin(req)
+        ? null
+        : (
+            await prisma.content.findMany({
+              where: { authorId: req.user!.id },
+              select: { id: true },
+            })
+          ).map((c) => c.id);
+      if (ownContentIds && ownContentIds.length === 0) {
+        res.status(200).json({
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+          totalEvents: 0,
+          distinctContentCount: 0,
+          byEventType: [],
+        });
+        return;
+      }
+      const scopedWhere = {
+        createdAt: { gte: range.from, lte: range.to },
+        ...(ownContentIds ? { contentId: { in: ownContentIds } } : {}),
+      };
       const [byType, distinctContent] = await Promise.all([
         prisma.contentAnalyticsEvent.groupBy({
           by: ["eventType"],
-          where: { createdAt: { gte: range.from, lte: range.to } },
+          where: scopedWhere,
           _count: { _all: true },
         }),
         prisma.contentAnalyticsEvent.findMany({
-          where: { createdAt: { gte: range.from, lte: range.to } },
+          where: scopedWhere,
           distinct: ["contentId"],
           select: { contentId: true },
         }),
@@ -329,37 +380,53 @@ router.get(
       const uow = new PrismaUnitOfWork(prisma);
       const repos = uow.repos();
 
-      const [
-        userCount,
-        publishedInRange,
-        viewEvents,
-        interactionEvents,
-        distinctUsers,
-      ] = await Promise.all([
-        repos.userRole.listUsers().then((u: unknown[]) => u.length),
-        prisma.content.count({
-          where: {
-            lifecycleState: "PUBLISHED",
-            createdAt: { gte: window.from, lte: window.to },
-          },
-        }),
-        prisma.contentAnalyticsEvent.count({
-          where: {
-            createdAt: { gte: window.from, lte: window.to },
-            eventType: "view",
-          },
-        }),
-        prisma.contentAnalyticsEvent.count({
-          where: {
-            createdAt: { gte: window.from, lte: window.to },
-            eventType: { in: ["like", "share", "bookmark", "comment"] },
-          },
-        }),
-        prisma.contentAnalyticsEvent.findMany({
-          where: { createdAt: { gte: window.from, lte: window.to } },
-          select: { metadata: true },
-        }),
-      ]);
+      const ownContentIds = isAdmin(req)
+        ? null
+        : (
+            await prisma.content.findMany({
+              where: { authorId: req.user!.id },
+              select: { id: true },
+            })
+          ).map((c) => c.id);
+      const contentScope = ownContentIds ? { id: { in: ownContentIds } } : {};
+      const eventScope =
+        ownContentIds && ownContentIds.length === 0
+          ? { contentId: { in: ["__none__"] } }
+          : ownContentIds
+            ? { contentId: { in: ownContentIds } }
+            : {};
+      const [userCount, publishedInRange, viewEvents, interactionEvents, distinctUsers] =
+        await Promise.all([
+          isAdmin(req) ? repos.userRole.listUsers().then((u: unknown[]) => u.length) : 1,
+          prisma.content.count({
+            where: {
+              lifecycleState: "PUBLISHED",
+              createdAt: { gte: window.from, lte: window.to },
+              ...contentScope,
+            },
+          }),
+          prisma.contentAnalyticsEvent.count({
+            where: {
+              createdAt: { gte: window.from, lte: window.to },
+              eventType: "view",
+              ...eventScope,
+            },
+          }),
+          prisma.contentAnalyticsEvent.count({
+            where: {
+              createdAt: { gte: window.from, lte: window.to },
+              eventType: { in: ["like", "share", "bookmark", "comment"] },
+              ...eventScope,
+            },
+          }),
+          prisma.contentAnalyticsEvent.findMany({
+            where: {
+              createdAt: { gte: window.from, lte: window.to },
+              ...eventScope,
+            },
+            select: { metadata: true },
+          }),
+        ]);
 
       const uniqueUserIds = new Set<string>();
       for (const row of distinctUsers) {
@@ -432,16 +499,29 @@ router.get(
       const window = rangeWindowFromDays(days);
 
       type Row = { day: string; count: bigint | number };
-      const rows = await prisma.$queryRaw<Row[]>`
-        SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
-               COUNT(*)::bigint as count
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" = 'view'
-        GROUP BY 1
-        ORDER BY 1 ASC
-      `;
+      const rows = isAdmin(req)
+        ? await prisma.$queryRaw<Row[]>`
+            SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" = 'view'
+            GROUP BY 1
+            ORDER BY 1 ASC
+          `
+        : await prisma.$queryRaw<Row[]>`
+            SELECT to_char(date_trunc('day', cae."createdAt"), 'YYYY-MM-DD') as day,
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" = 'view'
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1
+            ORDER BY 1 ASC
+          `;
       const byDay = new Map<string, number>();
       for (const r of rows) {
         const n =
@@ -495,17 +575,31 @@ router.get(
       const window = rangeWindowFromDays(days);
 
       type Row = { day: string; eventType: string; count: bigint | number };
-      const rows = await prisma.$queryRaw<Row[]>`
-        SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
-               "eventType" as "eventType",
-               COUNT(*)::bigint as count
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" IN ('view','like','share','comment')
-        GROUP BY 1, 2
-        ORDER BY 1 ASC
-      `;
+      const rows = isAdmin(req)
+        ? await prisma.$queryRaw<Row[]>`
+            SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as day,
+                   "eventType" as "eventType",
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" IN ('view','like','share','comment')
+            GROUP BY 1, 2
+            ORDER BY 1 ASC
+          `
+        : await prisma.$queryRaw<Row[]>`
+            SELECT to_char(date_trunc('day', cae."createdAt"), 'YYYY-MM-DD') as day,
+                   cae."eventType" as "eventType",
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" IN ('view','like','share','comment')
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1, 2
+            ORDER BY 1 ASC
+          `;
 
       const baseDays = eachDay(window.from, window.to);
       const byDay = new Map<
@@ -586,10 +680,23 @@ router.get(
       const days = parseRangeDays(queryParamString(req.query.range, "30d"));
       const window = rangeWindowFromDays(days);
 
+      const ownContentIds = isAdmin(req)
+        ? null
+        : (
+            await prisma.content.findMany({
+              where: { authorId: req.user!.id },
+              select: { id: true },
+            })
+          ).map((c) => c.id);
       const rows = await prisma.contentAnalyticsEvent.findMany({
         where: {
           createdAt: { gte: window.from, lte: window.to },
           eventType: "reading_time",
+          ...(ownContentIds
+            ? ownContentIds.length > 0
+              ? { contentId: { in: ownContentIds } }
+              : { contentId: { in: ["__none__"] } }
+            : {}),
         },
         select: { metadata: true },
       });
@@ -650,10 +757,23 @@ router.get(
       const window = rangeWindowFromDays(days);
 
       // Determine "pieces" based on content that actually received views in the range.
+      const ownContentIds = isAdmin(req)
+        ? null
+        : (
+            await prisma.content.findMany({
+              where: { authorId: req.user!.id },
+              select: { id: true },
+            })
+          ).map((c) => c.id);
       const viewed = await prisma.contentAnalyticsEvent.findMany({
         where: {
           createdAt: { gte: window.from, lte: window.to },
           eventType: "view",
+          ...(ownContentIds
+            ? ownContentIds.length > 0
+              ? { contentId: { in: ownContentIds } }
+              : { contentId: { in: ["__none__"] } }
+            : {}),
         },
         distinct: ["contentId"],
         select: { contentId: true },
@@ -739,17 +859,31 @@ router.get(
       const window = rangeWindowFromDays(days);
 
       type Row = { contentId: string; views: bigint | number };
-      const viewRows = await prisma.$queryRaw<Row[]>`
-        SELECT "contentId" as "contentId",
-               COUNT(*)::bigint as views
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" = 'view'
-        GROUP BY 1
-        ORDER BY views DESC
-        LIMIT ${limit}
-      `;
+      const viewRows = isAdmin(req)
+        ? await prisma.$queryRaw<Row[]>`
+            SELECT "contentId" as "contentId",
+                   COUNT(*)::bigint as views
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" = 'view'
+            GROUP BY 1
+            ORDER BY views DESC
+            LIMIT ${limit}
+          `
+        : await prisma.$queryRaw<Row[]>`
+            SELECT cae."contentId" as "contentId",
+                   COUNT(*)::bigint as views
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" = 'view'
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1
+            ORDER BY views DESC
+            LIMIT ${limit}
+          `;
 
       const ids = viewRows.map((r) => r.contentId);
       if (ids.length === 0) {
@@ -764,16 +898,29 @@ router.get(
       const contentById = new Map(contents.map((c) => [c.id, c]));
 
       type ReadRow = { contentId: string; avgSeconds: number | null };
-      const readRows = await prisma.$queryRaw<ReadRow[]>`
-        SELECT "contentId" as "contentId",
-               AVG( (metadata->>'seconds')::float ) as "avgSeconds"
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" = 'reading_time'
-          AND (metadata->>'seconds') IS NOT NULL
-        GROUP BY 1
-      `;
+      const readRows = isAdmin(req)
+        ? await prisma.$queryRaw<ReadRow[]>`
+            SELECT "contentId" as "contentId",
+                   AVG( (metadata->>'seconds')::float ) as "avgSeconds"
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" = 'reading_time'
+              AND (metadata->>'seconds') IS NOT NULL
+            GROUP BY 1
+          `
+        : await prisma.$queryRaw<ReadRow[]>`
+            SELECT cae."contentId" as "contentId",
+                   AVG( (cae.metadata->>'seconds')::float ) as "avgSeconds"
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" = 'reading_time'
+              AND (cae.metadata->>'seconds') IS NOT NULL
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1
+          `;
       const avgReadById = new Map<string, number>();
       for (const r of readRows) {
         if (typeof r.avgSeconds === "number" && Number.isFinite(r.avgSeconds)) {
@@ -782,15 +929,27 @@ router.get(
       }
 
       type InterRow = { contentId: string; interactions: bigint | number };
-      const interRows = await prisma.$queryRaw<InterRow[]>`
-        SELECT "contentId" as "contentId",
-               COUNT(*)::bigint as interactions
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" IN ('like','share','bookmark','comment')
-        GROUP BY 1
-      `;
+      const interRows = isAdmin(req)
+        ? await prisma.$queryRaw<InterRow[]>`
+            SELECT "contentId" as "contentId",
+                   COUNT(*)::bigint as interactions
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" IN ('like','share','bookmark','comment')
+            GROUP BY 1
+          `
+        : await prisma.$queryRaw<InterRow[]>`
+            SELECT cae."contentId" as "contentId",
+                   COUNT(*)::bigint as interactions
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" IN ('like','share','bookmark','comment')
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1
+          `;
       const interById = new Map<string, number>();
       for (const r of interRows) {
         const n =
@@ -864,26 +1023,54 @@ router.get(
       const days = parseRangeDays(queryParamString(req.query.range, "30d"));
       const window = rangeWindowFromDays(days);
 
+      const ownContentIds = isAdmin(req)
+        ? null
+        : (
+            await prisma.content.findMany({
+              where: { authorId: req.user!.id },
+              select: { id: true },
+            })
+          ).map((c) => c.id);
+      const scopedViewWhere = {
+        createdAt: { gte: window.from, lte: window.to },
+        eventType: "view" as const,
+        ...(ownContentIds
+          ? ownContentIds.length > 0
+            ? { contentId: { in: ownContentIds } }
+            : { contentId: { in: ["__none__"] } }
+          : {}),
+      };
       const totalViews = await prisma.contentAnalyticsEvent.count({
-        where: {
-          createdAt: { gte: window.from, lte: window.to },
-          eventType: "view",
-        },
+        where: scopedViewWhere,
       });
 
       // Peak hour (by views)
       type HourRow = { hour: number; count: bigint | number };
-      const hourRows = await prisma.$queryRaw<HourRow[]>`
-        SELECT EXTRACT(HOUR FROM "createdAt")::int as hour,
-               COUNT(*)::bigint as count
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" = 'view'
-        GROUP BY 1
-        ORDER BY count DESC
-        LIMIT 1
-      `;
+      const hourRows = isAdmin(req)
+        ? await prisma.$queryRaw<HourRow[]>`
+            SELECT EXTRACT(HOUR FROM "createdAt")::int as hour,
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" = 'view'
+            GROUP BY 1
+            ORDER BY count DESC
+            LIMIT 1
+          `
+        : await prisma.$queryRaw<HourRow[]>`
+            SELECT EXTRACT(HOUR FROM cae."createdAt")::int as hour,
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" = 'view'
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1
+            ORDER BY count DESC
+            LIMIT 1
+          `;
       const peakHour = hourRows[0]?.hour;
       const peakCountRaw = hourRows[0]?.count ?? 0;
       const peakCount =
@@ -895,15 +1082,27 @@ router.get(
 
       // Weekend vs weekday views
       type DRow = { dow: number; count: bigint | number };
-      const dowRows = await prisma.$queryRaw<DRow[]>`
-        SELECT EXTRACT(DOW FROM "createdAt")::int as dow,
-               COUNT(*)::bigint as count
-        FROM content_analytics_events
-        WHERE "createdAt" >= ${window.from}
-          AND "createdAt" <= ${window.to}
-          AND "eventType" = 'view'
-        GROUP BY 1
-      `;
+      const dowRows = isAdmin(req)
+        ? await prisma.$queryRaw<DRow[]>`
+            SELECT EXTRACT(DOW FROM "createdAt")::int as dow,
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events
+            WHERE "createdAt" >= ${window.from}
+              AND "createdAt" <= ${window.to}
+              AND "eventType" = 'view'
+            GROUP BY 1
+          `
+        : await prisma.$queryRaw<DRow[]>`
+            SELECT EXTRACT(DOW FROM cae."createdAt")::int as dow,
+                   COUNT(*)::bigint as count
+            FROM content_analytics_events cae
+            JOIN contents c ON c.id = cae."contentId"
+            WHERE cae."createdAt" >= ${window.from}
+              AND cae."createdAt" <= ${window.to}
+              AND cae."eventType" = 'view'
+              AND c."authorId" = ${req.user!.id}
+            GROUP BY 1
+          `;
       let weekend = 0;
       let weekday = 0;
       for (const r of dowRows) {
@@ -927,6 +1126,11 @@ router.get(
         where: {
           createdAt: { gte: window.from, lte: window.to },
           eventType: { in: ["like", "share", "bookmark", "comment"] },
+          ...(ownContentIds
+            ? ownContentIds.length > 0
+              ? { contentId: { in: ownContentIds } }
+              : { contentId: { in: ["__none__"] } }
+            : {}),
         },
       });
       const interactionRate =
@@ -1047,22 +1251,41 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
 
     let events: RawEvent[];
     if (req.query.contentId) {
+      const contentId = String(req.query.contentId);
+      const access = await ensureContentAnalyticsAccess(req, contentId);
+      if (!("ok" in access)) {
+        res.status(access.status).json({ error: access.error });
+        return;
+      }
       events = await prisma.$queryRawUnsafe<RawEvent[]>(
         `SELECT "contentId", "eventType", metadata
          FROM content_analytics_events
          WHERE "createdAt" >= $1 AND "createdAt" <= $2 AND "contentId" = $3`,
         range.from,
         range.to,
-        String(req.query.contentId),
+        contentId,
       );
     } else {
-      events = await prisma.$queryRawUnsafe<RawEvent[]>(
-        `SELECT "contentId", "eventType", metadata
-         FROM content_analytics_events
-         WHERE "createdAt" >= $1 AND "createdAt" <= $2`,
-        range.from,
-        range.to,
-      );
+      if (isAdmin(req)) {
+        events = await prisma.$queryRawUnsafe<RawEvent[]>(
+          `SELECT "contentId", "eventType", metadata
+           FROM content_analytics_events
+           WHERE "createdAt" >= $1 AND "createdAt" <= $2`,
+          range.from,
+          range.to,
+        );
+      } else {
+        events = await prisma.$queryRawUnsafe<RawEvent[]>(
+          `SELECT cae."contentId", cae."eventType", cae.metadata
+           FROM content_analytics_events cae
+           JOIN contents c ON c.id = cae."contentId"
+           WHERE cae."createdAt" >= $1 AND cae."createdAt" <= $2
+             AND c."authorId" = $3`,
+          range.from,
+          range.to,
+          req.user!.id,
+        );
+      }
     }
 
     const contentIdSet = new Set(events.map((e) => e.contentId));
@@ -1204,18 +1427,31 @@ router.get("/export/csv", async (req: AuthRequest, res: Response) => {
  * Returns aggregated emoji reaction counts across all content (optionally filtered by range).
  * Response: Array<{ emoji: string; count: number }>
  */
-router.get("/reactions", authorize(), async (req: AuthRequest, res: Response) => {
+router.get("/reactions", authorize("USER", "ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
     const rangeStr = queryParamString(req.query.range, "30d");
     const days = parseRangeDays(rangeStr);
     const { from } = rangeWindowFromDays(days);
 
+    const ownContentIds = isAdmin(req)
+      ? null
+      : (
+          await prisma.content.findMany({
+            where: { authorId: req.user!.id },
+            select: { id: true },
+          })
+        ).map((c) => c.id);
     const rows = await prisma.contentReaction.groupBy({
       by: ["emoji"],
       _count: { emoji: true },
       where: {
         createdAt: { gte: from },
+        ...(ownContentIds
+          ? ownContentIds.length > 0
+            ? { contentId: { in: ownContentIds } }
+            : { contentId: { in: ["__none__"] } }
+          : {}),
       },
       orderBy: { _count: { emoji: "desc" } },
     });

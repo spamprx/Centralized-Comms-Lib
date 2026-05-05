@@ -1,6 +1,7 @@
 import http from "node:http";
 import jwt from "jsonwebtoken";
 import { WebSocketServer, type WebSocket } from "ws";
+import { AUTH_TOKEN_COOKIE } from "../shared/authCookies";
 import { getPrismaClient, PrismaUnitOfWork } from "../repository";
 import { emitAdminUserActivity } from "./adminActivityHub";
 import {
@@ -53,6 +54,27 @@ function isJwtPayload(x: unknown): x is JwtPayload {
   );
 }
 
+function readCookieHeader(
+  cookieHeader: string | undefined,
+  name: string,
+): string | null {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(";");
+  for (const part of parts) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const k = part.slice(0, idx).trim();
+    if (k !== name) continue;
+    const v = part.slice(idx + 1).trim();
+    try {
+      return decodeURIComponent(v);
+    } catch {
+      return v;
+    }
+  }
+  return null;
+}
+
 function send(ws: WebSocket, msg: ServerMsg): void {
   if (ws.readyState !== ws.OPEN) return;
   ws.send(JSON.stringify(msg));
@@ -71,7 +93,7 @@ function broadcast(
 
 /**
  * Phase 1: WebSocket presence for editor Activity panel.
- * Auth: `ws://.../ws?token=JWT`
+ * Auth: HttpOnly `auth_token` cookie on the upgrade request (or legacy `?token=` for compatibility).
  */
 export function attachWebsocketServer(server: http.Server): void {
   const wss = new WebSocketServer({ server, path: "/ws" });
@@ -116,7 +138,10 @@ export function attachWebsocketServer(server: http.Server): void {
 
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url ?? "", "http://localhost");
-    const token = url.searchParams.get("token") ?? "";
+    const fromQuery = url.searchParams.get("token")?.trim() ?? "";
+    const fromCookie =
+      readCookieHeader(req.headers.cookie, AUTH_TOKEN_COOKIE)?.trim() ?? "";
+    const token = fromCookie || fromQuery;
     let payload: JwtPayload | null = null;
     try {
       const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
