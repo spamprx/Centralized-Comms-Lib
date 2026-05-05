@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authService } from '../services/authService';
 import { profileService } from '../services/profileService';
-import { setAuthToken, decodeTokenPayload } from '../services/tokenStore';
+import { clearSession, setCachedUser } from '../services/tokenStore';
 
 type AuthUser = {
   id: string;
@@ -20,29 +20,47 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/** Derive an AuthUser from the JWT payload stored in the cookie */
-function getUserFromToken(): AuthUser | null {
-  const payload = decodeTokenPayload();
-  if (!payload) return null;
-  return { id: payload.id, email: payload.email, role: payload.role };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // On mount: check cookie for an existing token and derive the user from it
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getUserFromToken());
-  const [isAuthReady] = useState(true);
-  const [user, setUser] = useState<AuthUser | null>(() => getUserFromToken());
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    void authService
+      .me()
+      .then((data) => {
+        if (!data.user) {
+          clearSession();
+          setUser(null);
+          setIsAuthenticated(false);
+          return;
+        }
+        const u: AuthUser = {
+          ...data.user,
+          role: data.role ?? undefined,
+        };
+        setCachedUser(u);
+        setUser(u);
+        setIsAuthenticated(true);
+      })
+      .catch(() => {
+        clearSession();
+        setUser(null);
+        setIsAuthenticated(false);
+      })
+      .finally(() => {
+        setIsAuthReady(true);
+      });
+  }, []);
 
   const login = async (email: string, password: string) => {
     const res = await authService.login(email, password);
-    // Store token in cookie via tokenStore (also kept in memory)
-    setAuthToken(res.token);
-    // Role is only guaranteed on the JWT — merge so admin UI can gate immediately
-    const payload = decodeTokenPayload();
-    setUser({
+    const u: AuthUser = {
       ...res.user,
-      role: payload?.role ?? res.user.role,
-    });
+      role: res.role ?? 'USER',
+    };
+    setCachedUser(u);
+    setUser(u);
     setIsAuthenticated(true);
   };
 
@@ -56,9 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await authService.logout();
       } catch {
-        /* /auth/logout may be unimplemented */
+        /* ignore */
       }
-      setAuthToken(null);
+      clearSession();
       setUser(null);
       setIsAuthenticated(false);
     })();

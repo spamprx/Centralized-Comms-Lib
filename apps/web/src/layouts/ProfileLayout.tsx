@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowRight,
   Bell,
   Bookmark,
@@ -13,12 +14,13 @@ import {
   Mail,
   MapPin,
   MessageCircle,
-  Pencil,
   Play,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
 import {
   profileService,
@@ -26,9 +28,11 @@ import {
   type ProfileBookmarkFolder,
   type ProfileBookmarkItem,
   type ProfileBookmarkNotification,
+  type ProfilePushNotification,
 } from '../services/profileService';
+import { pushNotificationService } from '../services/pushNotificationService';
 
-type TabId = 'personal' | 'activity' | 'bookmarks';
+type TabId = 'personal' | 'activity' | 'bookmarks' | 'notifications';
 type ProfileForm = {
   displayName: string;
   email: string;
@@ -41,12 +45,20 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'personal', label: 'Personal' },
   { id: 'activity', label: 'Activity' },
   { id: 'bookmarks', label: 'Bookmarks' },
+  { id: 'notifications', label: 'Notifications' },
 ];
 
 const glassCard =
   'relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.08] to-white/[0.02] shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/45';
 const ease =
   'duration-[var(--duration-app-slow)] ease-[var(--ease-app-out)] motion-reduce:transition-none';
+
+type ProfileInlineAlert = {
+  title?: string;
+  message: string;
+  detail?: string;
+  onRetry?: () => void;
+};
 
 export default function ProfileLayout() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,10 +69,12 @@ export default function ProfileLayout() {
       ? 'bookmarks'
       : tabFromUrl === 'activity'
         ? 'activity'
+        : tabFromUrl === 'notifications'
+          ? 'notifications'
         : 'personal';
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [inlineAlert, setInlineAlert] = useState<ProfileInlineAlert | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [bookmarks, setBookmarks] = useState<ProfileBookmarkItem[]>([]);
@@ -70,6 +84,11 @@ export default function ProfileLayout() {
   const [notifications, setNotifications] = useState<ProfileBookmarkNotification[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [activity, setActivity] = useState<ProfileActivityItem[]>([]);
+  const [pushNotifications, setPushNotifications] = useState<ProfilePushNotification[]>([]);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [markingPushReadId, setMarkingPushReadId] = useState<string | null>(null);
+  const [markingAllPushRead, setMarkingAllPushRead] = useState(false);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
   const [stats, setStats] = useState({ contentCreated: 0, totalViews: 0, following: 0 });
   const [form, setForm] = useState<ProfileForm>({
     displayName: '',
@@ -82,6 +101,10 @@ export default function ProfileLayout() {
   const unreadNotificationCount = useMemo(
     () => notifications.filter((n) => !n.readAt).length,
     [notifications],
+  );
+  const unreadPushNotificationCount = useMemo(
+    () => pushNotifications.filter((n) => !n.readAt).length,
+    [pushNotifications],
   );
 
   const isDirty = useMemo(
@@ -119,14 +142,22 @@ export default function ProfileLayout() {
     const run = async () => {
       try {
         setLoading(true);
-        setError(null);
-        const [me, activityItems, bookmarkItems, folderItems, bookmarkNotifications] =
+        setInlineAlert(null);
+        const [
+          me,
+          activityItems,
+          bookmarkItems,
+          folderItems,
+          bookmarkNotifications,
+          inboxNotifications,
+        ] =
           await Promise.all([
           profileService.me(),
           profileService.listActivity(),
           profileService.listBookmarks(),
           profileService.listBookmarkFolders(),
           profileService.listBookmarkNotifications(),
+          profileService.listPushNotifications(),
         ]);
         const nextForm: ProfileForm = {
           displayName: me.displayName,
@@ -142,8 +173,13 @@ export default function ProfileLayout() {
         setBookmarks(bookmarkItems);
         setFolders(folderItems);
         setNotifications(bookmarkNotifications);
+        setPushNotifications(inboxNotifications);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load profile');
+        setInlineAlert({
+          title: 'Could not load profile',
+          message: err instanceof Error ? err.message : 'Failed to load profile',
+          detail: 'Check that you are signed in and the API is reachable, then refresh the page.',
+        });
       } finally {
         setLoading(false);
       }
@@ -164,11 +200,30 @@ export default function ProfileLayout() {
         setFolders(folderItems);
         setNotifications(bookmarkNotifications);
       } catch {
-        setError('Failed to load bookmarks');
+        setInlineAlert({
+          message: 'Failed to load bookmarks',
+          detail: 'Try again in a moment or adjust your search.',
+        });
       }
     }, 220);
     return () => clearTimeout(t);
   }, [activeTab, search, activeFolder]);
+
+  useEffect(() => {
+    if (activeTab !== 'notifications') return;
+    const t = setTimeout(async () => {
+      try {
+        const rows = await profileService.listPushNotifications();
+        setPushNotifications(rows);
+      } catch {
+        setInlineAlert({
+          message: 'Failed to load notifications',
+          detail: 'Refresh the page or try again shortly.',
+        });
+      }
+    }, 180);
+    return () => clearTimeout(t);
+  }, [activeTab]);
 
   const save = async () => {
     try {
@@ -176,9 +231,64 @@ export default function ProfileLayout() {
       await profileService.updateMe({ displayName: form.displayName, email: form.email });
       setInitialForm(form);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save profile');
+      setInlineAlert({
+        title: 'Profile not saved',
+        message: err instanceof Error ? err.message : 'Failed to save profile',
+        onRetry: () => void save(),
+      });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const enablePushForThisDevice = async () => {
+    try {
+      setPushBusy(true);
+      setPushStatus(null);
+      await pushNotificationService.enableForCurrentDevice();
+      setPushStatus('Push notifications are enabled on this device.');
+    } catch (err) {
+      setPushStatus(err instanceof Error ? err.message : 'Failed to enable push notifications');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const markPushNotificationRead = async (id: string) => {
+    setInlineAlert(null);
+    setMarkingPushReadId(id);
+    try {
+      await profileService.markPushNotificationRead(id);
+      const rows = await profileService.listPushNotifications();
+      setPushNotifications(rows);
+    } catch (err) {
+      setInlineAlert({
+        title: 'Failed to mark notification as read',
+        message: err instanceof Error ? err.message : 'Request failed',
+        detail: 'The server may be temporarily unavailable. You can try again or refresh the page.',
+        onRetry: () => void markPushNotificationRead(id),
+      });
+    } finally {
+      setMarkingPushReadId(null);
+    }
+  };
+
+  const markAllPushNotificationsRead = async () => {
+    setInlineAlert(null);
+    setMarkingAllPushRead(true);
+    try {
+      await profileService.markAllPushNotificationsRead();
+      const rows = await profileService.listPushNotifications();
+      setPushNotifications(rows);
+    } catch (err) {
+      setInlineAlert({
+        title: 'Failed to mark all as read',
+        message: err instanceof Error ? err.message : 'Request failed',
+        detail: 'Try again in a few seconds. If this persists, reload the profile page.',
+        onRetry: () => void markAllPushNotificationsRead(),
+      });
+    } finally {
+      setMarkingAllPushRead(false);
     }
   };
 
@@ -191,7 +301,7 @@ export default function ProfileLayout() {
       const folderItems = await profileService.listBookmarkFolders();
       setFolders(folderItems);
     } catch {
-      setError('Failed to create folder');
+      setInlineAlert({ message: 'Failed to create folder', detail: 'Check the folder name and try again.' });
     }
   };
 
@@ -206,7 +316,7 @@ export default function ProfileLayout() {
       setFolders(folderItems);
       setBookmarks(items);
     } catch {
-      setError('Failed to delete folder');
+      setInlineAlert({ message: 'Failed to delete folder', detail: 'Try again or refresh bookmarks.' });
     }
   };
 
@@ -220,7 +330,7 @@ export default function ProfileLayout() {
       setBookmarks(items);
       setFolders(folderItems);
     } catch {
-      setError('Failed to move bookmark');
+      setInlineAlert({ message: 'Failed to move bookmark', detail: 'Try again or pick another folder.' });
     }
   };
 
@@ -249,12 +359,6 @@ export default function ProfileLayout() {
           className="absolute inset-0 bg-gradient-to-t from-app-bg via-transparent to-transparent"
           aria-hidden
         />
-        <button
-          type="button"
-          className={`absolute right-5 top-4 z-[1] rounded-app-md border border-white/[0.12] bg-app-bg/40 px-3 py-1.5 text-[11px] font-medium text-app-muted shadow-sm backdrop-blur-md transition-[border-color,background-color,color] hover:border-white/[0.18] hover:bg-white/[0.06] hover:text-app-text ${ease}`}
-        >
-          Edit cover
-        </button>
       </div>
 
       <div className="relative z-[1] mx-auto max-w-5xl px-4 pb-10 sm:px-6">
@@ -298,14 +402,6 @@ export default function ProfileLayout() {
                   </div>
                 </div>
               </div>
-
-              <button
-                type="button"
-                className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-app-md border border-white/[0.12] bg-white/[0.04] px-4 text-[13px] font-semibold text-app-text shadow-sm backdrop-blur-sm transition-[border-color,background-color,transform,box-shadow] hover:border-white/[0.18] hover:bg-white/[0.08] active:scale-[0.98] motion-reduce:active:scale-100 sm:self-center ${ease}`}
-              >
-                <Pencil size={15} strokeWidth={2} className="text-app-muted" />
-                Edit profile
-              </button>
             </div>
           </div>
 
@@ -356,19 +452,61 @@ export default function ProfileLayout() {
                     aria-hidden
                   />
                 ) : null}
-                <span className="relative">{tab.label}</span>
+                <span className="relative inline-flex items-center gap-1.5">
+                  {tab.label}
+                  {tab.id === 'notifications' && unreadPushNotificationCount > 0 ? (
+                    <span className="rounded-full bg-app-accent px-1.5 py-0.5 text-[10px] font-bold text-app-bg">
+                      {unreadPushNotificationCount}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             ))}
           </div>
         </div>
 
         <div className="mt-6 space-y-6 sm:mt-8">
-          {error ? (
+          {inlineAlert ? (
             <div
-              className={`${glassCard} border-red-500/25 bg-gradient-to-b from-red-500/10 to-red-500/[0.03] p-4 text-[13px] text-red-300`}
+              className={`${glassCard} border-red-500/30 bg-gradient-to-b from-red-500/[0.12] to-red-950/[0.08] p-4 sm:p-5`}
               role="alert"
             >
-              {error}
+              <div className="flex gap-3">
+                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-app-md bg-red-500/15 text-red-300 ring-1 ring-red-400/25">
+                  <AlertTriangle size={18} strokeWidth={2} aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[13px] font-semibold text-red-200">
+                        {inlineAlert.title ?? 'Something went wrong'}
+                      </p>
+                      <p className="mt-1 text-[13px] leading-relaxed text-red-100/90">{inlineAlert.message}</p>
+                      {inlineAlert.detail ? (
+                        <p className="mt-2 text-[12px] leading-relaxed text-red-200/65">{inlineAlert.detail}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInlineAlert(null)}
+                      className="inline-flex size-8 shrink-0 items-center justify-center rounded-app-sm text-red-200/70 transition-colors hover:bg-red-950/40 hover:text-red-100"
+                      aria-label="Dismiss alert"
+                    >
+                      <X size={16} strokeWidth={2} />
+                    </button>
+                  </div>
+                  {inlineAlert.onRetry ? (
+                    <button
+                      type="button"
+                      onClick={() => inlineAlert.onRetry?.()}
+                      className="inline-flex items-center gap-2 rounded-app-md border border-red-400/35 bg-red-950/30 px-3 py-1.5 text-[12px] font-semibold text-red-100 transition-colors hover:border-red-300/40 hover:bg-red-950/50"
+                    >
+                      <RefreshCw size={14} strokeWidth={2} aria-hidden />
+                      Try again
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -452,6 +590,32 @@ export default function ProfileLayout() {
                       {saving ? 'Saving...' : 'Save changes'}
                     </button>
                   </div>
+                </div>
+              </section>
+
+              <section className={glassCard}>
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                  <div className="min-w-0">
+                    <h3 className="text-[13px] font-semibold text-app-text">
+                      Push notifications
+                    </h3>
+                    <p className="mt-1.5 max-w-xl text-[12px] leading-relaxed text-app-muted">
+                      Generate and securely store an FCM token for this logged-in device.
+                    </p>
+                    {pushStatus ? (
+                      <p className="mt-2 text-[12px] text-app-muted">{pushStatus}</p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void enablePushForThisDevice()}
+                    disabled={pushBusy}
+                    className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-app-md border border-white/[0.12] bg-white/[0.04] px-4 text-[13px] font-semibold text-app-text transition-[border-color,background-color,color,opacity] hover:border-white/[0.18] hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60 ${ease}`}
+                  >
+                    <Bell size={15} strokeWidth={2} className="text-app-muted" />
+                    {pushBusy ? 'Enabling...' : 'Enable on this device'}
+                  </button>
                 </div>
               </section>
 
@@ -540,6 +704,95 @@ export default function ProfileLayout() {
                       </a>
                     );
                   })}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {!loading && activeTab === 'notifications' ? (
+            <section className={glassCard}>
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+              <div className="p-6 sm:p-8">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div className="inline-flex items-center gap-2">
+                    <h2 className="text-base font-semibold tracking-tight text-app-text sm:text-lg">
+                      Push notifications
+                    </h2>
+                    {unreadPushNotificationCount > 0 ? (
+                      <span className="rounded-full border border-app-accent/30 bg-app-accent/15 px-2 py-0.5 text-[11px] font-semibold text-app-accent">
+                        {unreadPushNotificationCount} unread
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void markAllPushNotificationsRead()}
+                    disabled={markingAllPushRead || unreadPushNotificationCount === 0}
+                    className={`text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${markingAllPushRead ? 'text-app-muted' : `text-app-muted hover:text-app-accent ${ease}`}`}
+                  >
+                    {markingAllPushRead ? 'Marking…' : 'Mark all read'}
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {pushNotifications.length === 0 ? (
+                    <div className="rounded-app-md border border-white/[0.08] bg-white/[0.03] px-5 py-6 text-[13px] text-app-faint">
+                      No push notifications yet.
+                    </div>
+                  ) : (
+                    pushNotifications.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`flex flex-col gap-4 rounded-app-lg border px-5 py-5 sm:flex-row sm:items-stretch sm:gap-5 sm:px-6 sm:py-6 ${
+                          item.readAt
+                            ? 'border-white/[0.08] bg-white/[0.03]'
+                            : 'border-app-accent/35 bg-gradient-to-br from-app-accent/12 to-white/[0.03] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-3">
+                            {!item.readAt ? (
+                              <span
+                                className="mt-1.5 size-2 shrink-0 rounded-full bg-app-accent shadow-[0_0_10px_rgba(110,90,255,0.45)]"
+                                title="Unread"
+                                aria-hidden
+                              />
+                            ) : null}
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-[15px] font-semibold leading-snug text-app-text">
+                                {item.title}
+                              </h3>
+                              <p className="mt-2 text-[13px] leading-relaxed text-app-muted">{item.body}</p>
+                              <p className="mt-3 text-[11px] font-medium tabular-nums text-app-faint">
+                                {new Date(item.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-row items-center justify-end gap-2 border-t border-white/[0.06] pt-4 sm:flex-col sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+                          {item.readAt ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                              <Check size={12} strokeWidth={2} aria-hidden />
+                              Read
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void markPushNotificationRead(item.id)}
+                              disabled={markingPushReadId === item.id}
+                              className={`inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-app-md border border-app-accent/40 bg-app-accent/20 px-3.5 py-2 text-[12px] font-semibold text-app-accent transition-[background-color,border-color,opacity] hover:bg-app-accent/28 disabled:cursor-not-allowed disabled:opacity-60 ${ease}`}
+                            >
+                              {markingPushReadId === item.id ? (
+                                <Loader2 className="size-4 animate-spin" aria-hidden />
+                              ) : (
+                                'Mark as read'
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </section>
@@ -684,7 +937,10 @@ export default function ProfileLayout() {
                                 : 'text-app-muted hover:bg-white/[0.05] hover:text-app-text'
                             }`}
                           >
-                            <span className="truncate">{folder.name}</span>
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <Folder size={12} className="shrink-0 text-app-faint" />
+                              <span className="truncate">{folder.name}</span>
+                            </span>
                             <span className="ml-2 tabular-nums text-[10px] text-app-faint">
                               {folder.bookmarkCount}
                             </span>

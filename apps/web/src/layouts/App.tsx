@@ -1,5 +1,6 @@
 import { AppRoutes } from '../routes';
 import Sidebar from '../components/Sidebar';
+import PushToastHub from '../components/PushToastHub';
 import { useAuth } from '../context/AuthContext';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
       >
         <AppRoutes />
       </main>
+      {isAuthenticated ? <PushToastHub /> : null}
     </div>
   );
 }
