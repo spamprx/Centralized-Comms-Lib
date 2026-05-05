@@ -3,6 +3,8 @@
 #   - Postgres: localhost:5432
 #   - MongoDB:    localhost:27017 — drivers in packages/database/mongo
 #   - Elasticsearch: localhost:9200 — index mapping in packages/database/elasticsearch
+#   - MinIO S3 API: localhost:9000 — object storage for assets/blobs
+#   - MinIO Console: localhost:9001
 #   - API:      http://localhost:8000
 #   - Frontend: http://localhost:3000
 # Optional: copy apps/api/env.example to apps/api/.env and add to backend env_file for overrides.
@@ -38,6 +40,49 @@ services:
     volumes:
       - comms_esdata:/usr/share/elasticsearch/data
 
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: comms-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: StrongPassword@123
+      MINIO_SITE_NAME: my-object-store
+      MINIO_REGION: us-east-1
+      MINIO_COMPRESSION_ENABLE: "on"
+      MINIO_COMPRESSION_ALLOW_ENCRYPTION: "off"
+      MINIO_COMPRESSION_EXTENSIONS: ".txt,.log,.csv,.json,.xml,.html,.pdf,.docx,.xlsx"
+      MINIO_COMPRESSION_MIME_TYPES: "text/*,application/json,application/xml,application/pdf"
+      MINIO_SCANNER_SPEED: "default"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - comms_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio-mc:
+    image: quay.io/minio/mc:latest
+    container_name: comms-minio-mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: StrongPassword@123
+      MINIO_APP_USER: app-user
+      MINIO_APP_PASSWORD: AppUserSecret@456
+      MINIO_PUBLIC_IMAGES: "false"
+    volumes:
+      - ./infra/minio/scripts:/scripts
+    entrypoint: ["/bin/sh", "/scripts/init-buckets.sh"]
+    restart: "no"
+
   postgres:
     image: postgres:16-alpine
     container_name: comms-postgres
@@ -70,6 +115,8 @@ services:
         condition: service_started
       redis:
         condition: service_started
+      minio:
+        condition: service_started
     environment:
       NODE_ENV: development
       PORT: "8000"
@@ -85,11 +132,48 @@ services:
       JWT_SECRET: your-super-secret-key-change-in-production
       JWT_ISSUER: your-app-name
       JWT_AUDIENCE: your-app-client
+      # Include loopback variants so cookies + CORS match how you open the app (localhost vs 127.0.0.1).
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002,http://localhost:3003,http://127.0.0.1:3003,http://localhost:3004,http://127.0.0.1:3004,http://localhost:3005,http://127.0.0.1:3005,http://localhost:3006,http://127.0.0.1:3006,http://localhost:3007,http://127.0.0.1:3007,http://localhost:3008,http://127.0.0.1:3008,http://localhost:3009,http://127.0.0.1:3009,http://localhost:3010,http://127.0.0.1:3010
+      ADMIN_DEV_TOKEN: ""
+      BCRYPT_COST: "12"
+      COOKIE_SECURE: "false"
       REDIS_URL: redis://redis:6379
       AI_DAILY_QUOTA: "50"
       AI_QUOTA_WINDOW_MS: "86400000"
+      ENABLE_OUTBOX_WORKER: "true"
+      OUTBOX_POLL_INTERVAL_MS: "10000"
+      OUTBOX_BATCH_SIZE: "50"
+      ENABLE_ASSET_LINK_SCAN: "true"
+      ASSET_LINK_SCAN_INTERVAL_MS: "300000"
+      LINK_SCAN_BATCH_SIZE: "100"
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: StrongPassword@123
+      MINIO_REGION: us-east-1
+      MINIO_BUCKET_IMAGES: images
+      MINIO_BUCKET_DOCUMENTS: documents
+      MINIO_BUCKET_VIDEOS: videos
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
+      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
+      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID}
+      FIREBASE_WEB_PUSH_VAPID_KEY: ${FIREBASE_WEB_PUSH_VAPID_KEY}
+      FIREBASE_SERVICE_ACCOUNT_PROJECT_ID: ${FIREBASE_SERVICE_ACCOUNT_PROJECT_ID}
+      FIREBASE_SERVICE_ACCOUNT_CLIENT_EMAIL: ${FIREBASE_SERVICE_ACCOUNT_CLIENT_EMAIL}
+      FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY: ${FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY:-}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      FIREBASE_SERVICE_ACCOUNT_JSON_PATH: ${FIREBASE_SERVICE_ACCOUNT_JSON_PATH:-/run/secrets/firebase-admin.json}
+      NOTIFY_SERVER_URL: "http://143.110.244.195:8000/notify"
+      NOTIFY_CLIENT_ID: "bc345830096c6b7abde55e4c555dcc4c"
+      NOTIFY_API_KEY: "nf_ee584514212a0a8771f15c372a8c1960d57ad2c5349c836171e9566f1fea44d6"
     ports:
       - "8000:8000"
+    volumes:
+      - ./commslibpush-firebase-adminsdk-fbsvc-bcfffd19da.json:/run/secrets/firebase-admin.json:ro
     restart: unless-stopped
 
   frontend:
@@ -107,3 +191,4 @@ volumes:
   comms_pgdata:
   comms_mongo:
   comms_esdata:
+  comms_minio_data:
