@@ -353,6 +353,8 @@ async function seedChannels() {
           "paragraph",
           "bold",
           "italic",
+          "strike",
+          "code",
           "underline",
           "bullet_list",
           "ordered_list",
@@ -373,16 +375,14 @@ async function seedChannels() {
       priority: 80,
       compatibility: {
         fieldTypes: [
-          "heading1",
-          "heading2",
           "paragraph",
           "bold",
           "italic",
+          "strike",
+          "code",
           "bullet_list",
           "ordered_list",
           "link",
-          "citation",
-          "image",
           "richText",
           "media",
           "field",
@@ -419,7 +419,19 @@ async function seedChannels() {
       description: "Mobile and browser push notifications",
       priority: 70,
       compatibility: {
-        fieldTypes: ["heading1", "paragraph", "link", "image", "richText", "media", "field"],
+        fieldTypes: [
+          "heading1",
+          "paragraph",
+          "bold",
+          "italic",
+          "strike",
+          "code",
+          "link",
+          "image",
+          "richText",
+          "media",
+          "field",
+        ],
         restrictions: {
           maxCharacters: 180,
           maxRows: 1,
@@ -1301,13 +1313,23 @@ async function seedContentAnalyticsEvents() {
     { contentId: contentIds.welcomePost, eventType: "reading_time", metadata: { userId: userIds.bob, seconds: 200 } },
     { contentId: contentIds.engineeringUpdate, eventType: "view", metadata: { userId: userIds.bob, source: "web" } },
     { contentId: contentIds.engineeringUpdate, eventType: "view", metadata: { userId: userIds.carol, source: "web" } },
-    { contentId: contentIds.engineeringUpdate, eventType: "view", metadata: { userId: userIds.alice, source: "web" } },
     { contentId: contentIds.engineeringUpdate, eventType: "like", metadata: { userId: userIds.bob } },
     { contentId: contentIds.engineeringUpdate, eventType: "bookmark", metadata: { userId: userIds.carol } },
     { contentId: contentIds.engineeringUpdate, eventType: "reading_time", metadata: { userId: userIds.bob, seconds: 340 } },
     { contentId: contentIds.releaseNotes, eventType: "view", metadata: { userId: userIds.dave, source: "email" } },
     { contentId: contentIds.releaseNotes, eventType: "view", metadata: { userId: userIds.alice, source: "web" } },
   ];
+
+  // Ensure idempotency: clear prior seeded analytics rows for these seeded content ids.
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM content_analytics_events
+     WHERE "contentId" = ANY($1::text[])`,
+    [
+      contentIds.welcomePost,
+      contentIds.engineeringUpdate,
+      contentIds.releaseNotes,
+    ],
+  );
 
   // contentAnalyticsEvent may not be in generated client yet; use raw insert
   for (const e of events) {
@@ -1492,6 +1514,20 @@ async function seedAuditLogs() {
     },
   ];
 
+  // Ensure idempotency: remove prior seeded rows before inserting fixed seed logs.
+  await prisma.auditLog.deleteMany({
+    where: {
+      OR: [
+        { resource: "USER", resourceId: userIds.alice },
+        { resource: "CONTENT", resourceId: contentIds.welcomePost },
+        { resource: "CONTENT", resourceId: contentIds.engineeringUpdate },
+        { resource: "REVIEW", resourceId: reviewRequestIds.welcomeReview },
+        { resource: "ROLE", resourceId: roleIds.Audience },
+        { resource: "TEMPLATE", resourceId: templateIds.blogPost },
+        { resource: "TEMPLATE", resourceId: templateIds.announcement },
+      ],
+    },
+  });
   await prisma.auditLog.createMany({ data: logs });
   console.log(`  ✔ ${logs.length} audit logs`);
 }
@@ -1525,6 +1561,33 @@ async function seedOutboxEvents() {
     },
   ];
 
+  // Ensure idempotency: remove prior seeded outbox rows for same aggregates/events.
+  await prisma.outboxEvent.deleteMany({
+    where: {
+      OR: [
+        {
+          aggregateType: "Content",
+          aggregateId: contentIds.welcomePost,
+          eventType: "content.published",
+        },
+        {
+          aggregateType: "Content",
+          aggregateId: contentIds.engineeringUpdate,
+          eventType: "content.published",
+        },
+        {
+          aggregateType: "Review",
+          aggregateId: reviewRequestIds.frontendReview,
+          eventType: "review.requested",
+        },
+        {
+          aggregateType: "User",
+          aggregateId: userIds.eve,
+          eventType: "user.deactivated",
+        },
+      ],
+    },
+  });
   await prisma.outboxEvent.createMany({ data: events });
   console.log(`  ✔ ${events.length} outbox events`);
 }

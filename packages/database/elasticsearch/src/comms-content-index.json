@@ -54,6 +54,7 @@
       "authorId": { "type": "keyword" },
       "templateId": { "type": "keyword" },
       "channelIds": { "type": "keyword" },
+      "contentChannelId": { "type": "keyword" },
       "tagIds": { "type": "keyword" },
       "tagSlugs": { "type": "keyword" },
       "aiGenerated": { "type": "boolean" },

@@ -49,11 +49,16 @@ model User {
   contentBookmarks  ContentBookmark[] @relation("ContentBookmarkUser")
   bookmarkFolders   BookmarkFolder[]
   bookmarkNotifications ContentBookmarkNotification[]
+  deviceFcmTokens  UserDeviceFcmToken[]
+  pushNotifications UserPushNotification[]
   contentComments   ContentComment[] @relation("ContentCommentAuthor")
   contentLikes      ContentLike[] @relation("ContentLikeUser")
   contentReactions  ContentReaction[] @relation("ContentReactionUser")
   contentViews      ContentView[] @relation("ContentViewUser")
   contentReadingProgresses ContentReadingProgress[]
+
+  assetsOwned Asset[] @relation("AssetOwner")
+  whatsAppSendRequests WhatsAppSendRequest[] @relation("WhatsAppSendRequester")
 
   @@map("users")
 }
@@ -248,6 +253,14 @@ enum LayoutPhase {
   ACTIVE
 }
 
+enum ComponentCategory {
+  CONTENT
+  MEDIA
+  CTA
+  LEGAL
+  OTHER
+}
+
 enum SmsDeliveryStatus {
   QUEUED
   SENT
@@ -288,6 +301,10 @@ enum BookmarkNotificationType {
   PUBLISHED
 }
 
+enum UserPushNotificationType {
+  PUSH_SENT
+}
+
 enum ReactionEmoji {
   LIKE
   LOVE
@@ -309,6 +326,7 @@ model Workspace {
 
   templates Template[]
   templateClusters TemplateCluster[]
+  assets        Asset[]
 
   @@map("workspaces")
 }
@@ -332,6 +350,7 @@ model Channel {
   smsDeliveries    SmsDeliveryLog[]
   whatsAppTemplates WhatsAppTemplateRegistry[]
   whatsAppMessages  WhatsAppMessageLog[]
+  whatsAppSendRequests WhatsAppSendRequest[]
 
   @@map("channels")
 }
@@ -414,6 +433,7 @@ model Component {
   key         String   @unique
   name        String
   description String?
+  category    ComponentCategory @default(OTHER)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -666,6 +686,35 @@ model WhatsAppMessageLog {
   @@map("whatsapp_message_logs")
 }
 
+// ── WhatsAppSendRequest ─────────────────────────────────────────────────────
+// Logs each TipTap-to-notification conversion request for auditing and replay.
+
+enum WhatsAppSendRequestStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model WhatsAppSendRequest {
+  id              String                     @id @default(uuid())
+  channelId       String?
+  channel         Channel?                   @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  requestedById   String
+  requestedBy     User                       @relation("WhatsAppSendRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  eventType       String
+  recipients      Json
+  tiptapPayload   Json
+  notifyPayload   Json
+  status          WhatsAppSendRequestStatus  @default(PENDING)
+  failureMessage  String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([requestedById, createdAt])
+  @@index([status, createdAt])
+  @@map("whatsapp_send_requests")
+}
+
 // ── ContentReadingProgress ──────────────────────────────────────────────────
 // Per-user reading progress for cross-device sync.
 model ContentReadingProgress {
@@ -785,6 +834,39 @@ model ContentBookmarkNotification {
   @@index([userId, readAt, createdAt])
   @@index([contentId, createdAt])
   @@map("content_bookmark_notifications")
+}
+
+model UserDeviceFcmToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId  String
+  token     String   @unique
+  userAgent String?
+  lastSeenAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId, updatedAt])
+  @@index([deviceId])
+  @@map("user_device_fcm_tokens")
+}
+
+model UserPushNotification {
+  id        String                   @id @default(uuid())
+  userId    String
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      UserPushNotificationType
+  title     String
+  body      String
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime                 @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt, createdAt])
+  @@map("user_push_notifications")
 }
 
 // ── ContentComment ──────────────────────────────────────────────────────────
@@ -1046,4 +1128,97 @@ model ContentCoAuthor {
 
   @@unique([contentId, userId])
   @@map("content_coauthors")
+}
+
+// ── Asset storage (metadata in Postgres; bytes in S3-compatible object storage) ─
+
+enum AssetPlacement {
+  MY_ASSETS
+  LIBRARY
+}
+
+enum AssetStatus {
+  PENDING_UPLOAD
+  READY
+  FAILED
+  DELETED
+}
+
+enum AssetLinkStatus {
+  PENDING
+  VALID
+  BROKEN
+}
+
+enum AssetUsageTargetType {
+  CONTENT
+  TEMPLATE
+  OTHER
+}
+
+model Asset {
+  id               String   @id @default(uuid())
+  ownerUserId      String
+  owner            User     @relation("AssetOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  workspaceId      String?
+  workspace        Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  placement        AssetPlacement @default(MY_ASSETS)
+  /// Logical category: image | video | document | audio | other (drives bucket + validation).
+  category         String
+
+  bucket           String
+  objectKey        String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        BigInt?
+  etag             String?
+  sha256           String?
+
+  status           AssetStatus @default(PENDING_UPLOAD)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  usages           AssetUsage[]
+  linkChecks       AssetLinkCheck[]
+
+  @@unique([bucket, objectKey])
+  @@index([ownerUserId, placement, createdAt])
+  @@index([placement, createdAt])
+  @@map("assets")
+}
+
+model AssetUsage {
+  id          String               @id @default(uuid())
+  assetId     String
+  asset       Asset                @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  targetType  AssetUsageTargetType
+  targetId    String
+  fieldPath   String?
+
+  createdAt   DateTime             @default(now())
+
+  @@index([assetId])
+  @@index([targetType, targetId])
+  @@map("asset_usages")
+}
+
+model AssetLinkCheck {
+  id             String          @id @default(uuid())
+  assetId        String
+  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  url            String
+  status         AssetLinkStatus @default(PENDING)
+  httpStatusCode Int?
+  errorMessage   String?
+  checkedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([assetId, updatedAt])
+  @@index([status, updatedAt])
+  @@unique([assetId, url])
+  @@map("asset_link_checks")
 }
