@@ -63,6 +63,7 @@ function mapApiContentToLibraryItem(c: Content): ContentItem {
 }
 
 export function useLibrary() {
+  const supportsChannelFilter = USE_MOCK_DATA;
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => parseLibrarySearchParams(searchParams), [searchParams]);
 
@@ -145,7 +146,12 @@ export function useLibrary() {
         }
         setRemoteSearchUnavailable(false);
         const list = res.hits ?? [];
-        const publishedHits = list.filter((h) => h?.source?.lifecycleState === 'PUBLISHED');
+        const publishedHits = list.filter((h) => {
+          if (h?.source?.lifecycleState !== 'PUBLISHED') return false;
+          const ch = h.source?.contentChannelId as string | null | undefined;
+          if (ch != null && String(ch).length > 0) return false;
+          return true;
+        });
         // Search can include non-published items; library should only show PUBLISHED.
         // Since we don't have a server-side "published-only" search query yet, keep totals consistent
         // with what we actually display.
@@ -203,6 +209,7 @@ export function useLibrary() {
       try {
         const rows = await contentService.list({
           lifecycleState: 'PUBLISHED',
+          omitChannelBound: true,
           limit: 200,
           offset: 0,
         });
@@ -355,6 +362,7 @@ export function useLibrary() {
     tagSlugFromMockName,
     authors,
     channels,
+    supportsChannelFilter,
     loading,
     filters,
     effectiveFilters,

@@ -1,5 +1,5 @@
 import { joinApiV1Path } from '../lib/apiBase';
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 
 export type ContentCheckHit = {
   contentId: string;
@@ -38,11 +38,10 @@ export async function fetchSimilarByContentId(
   if (opts?.size != null) params.set('size', String(opts.size));
   if (opts?.minScore != null) params.set('minScore', String(opts.minScore));
 
-  const token = getAuthToken();
   const res = await fetch(joinApiV1Path(`/search/content-check?${params}`), {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader('GET'),
     },
     credentials: 'include',
   });
@@ -72,11 +71,10 @@ export async function searchContent(
   if (opts?.includeSnippets) params.set('includeSnippets', 'true');
   params.set('includeFacets', 'false');
 
-  const token = getAuthToken();
   const res = await fetch(joinApiV1Path(`/search/content?${params}`), {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader('GET'),
     },
     credentials: 'include',
   });

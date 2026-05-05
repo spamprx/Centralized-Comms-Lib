@@ -23,6 +23,7 @@ export type LibraryFilterBarProps = {
   onToggleTag: (tagSlug: string) => void;
   authors: string[];
   channels: string[];
+  supportsChannelFilter?: boolean;
   /** When false, hide facets that aren't supported by the backend yet. */
   enableAdvancedFacets?: boolean;
   pageSize: number;
@@ -45,6 +46,7 @@ export function LibraryFilterBar({
   onToggleTag,
   authors,
   channels,
+  supportsChannelFilter = true,
   enableAdvancedFacets = true,
   pageSize,
   onPageSizeChange,
@@ -118,7 +120,12 @@ export function LibraryFilterBar({
                 value={appliedFacetValues.channel}
                 onChange={(e) => onChannelChange(e.target.value)}
                 aria-label="Filter by channel"
-                title="Filter by channel"
+                title={
+                  supportsChannelFilter
+                    ? 'Filter by channel'
+                    : 'Channel filter is not supported for DB-backed library yet'
+                }
+                disabled={!supportsChannelFilter}
                 className={`${formSelectClass} box-border py-2.5 text-[13px]`}
               >
                 <option value="">All channels</option>

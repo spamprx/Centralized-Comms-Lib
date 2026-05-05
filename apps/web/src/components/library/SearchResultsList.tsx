@@ -7,6 +7,7 @@ import {
   snippetHtmlFromHit,
   titleHtmlFromHit,
 } from '../../lib/searchHitDisplay';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { Pagination } from './Pagination';
 
 const snippetMarkClass =
@@ -139,7 +140,7 @@ export function SearchResultsList({
                         {titleHtml ? (
                           <span
                             className={snippetMarkClass}
-                            dangerouslySetInnerHTML={{ __html: titleHtml }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(titleHtml) }}
                           />
                         ) : (
                           titlePlain
@@ -153,7 +154,7 @@ export function SearchResultsList({
                       {snippetHtml ? (
                         <div
                           className={`mt-2 line-clamp-3 text-[12px] leading-relaxed text-app-muted ${snippetMarkClass}`}
-                          dangerouslySetInnerHTML={{ __html: snippetHtml }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(snippetHtml) }}
                         />
                       ) : (
                         <div className="mt-2 text-[12px] text-app-faint">No snippet available.</div>
