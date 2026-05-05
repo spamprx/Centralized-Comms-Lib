@@ -18,8 +18,10 @@ out/
 
 # ─── Environment Variables ────────────────────────────────────────────────────
 .env
+.env.local
+.env.production
 .env.*
-!.env.example
+serviceAccountKey.json
 
 # ─── Logs ─────────────────────────────────────────────────────────────────────
 logs/
@@ -53,7 +55,7 @@ Desktop.ini
 *.local
 
 # ─── Binary / generated docs ──────────────────────────────────────────────────
-*.pdf
+# *.pdf
 
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 *.local
