@@ -1,6 +1,6 @@
 import { resolveApiV1Base } from '../lib/apiBase';
 const API_BASE = resolveApiV1Base();
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 
 export interface Tag {
   id: string;
@@ -24,11 +24,11 @@ const ENABLE_LOCAL_FALLBACK = String(import.meta.env.VITE_ENABLE_TAG_LOCAL_FALLB
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',

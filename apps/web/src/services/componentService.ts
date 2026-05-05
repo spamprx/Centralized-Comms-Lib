@@ -1,5 +1,5 @@
 import { resolveApiV1Base } from '../lib/apiBase';
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 
 const API_BASE = resolveApiV1Base();
 
@@ -7,6 +7,7 @@ type CreateComponentPayload = {
   key: string;
   name: string;
   description?: string | null;
+  category?: 'CONTENT' | 'MEDIA' | 'CTA' | 'LEGAL' | 'OTHER';
 };
 
 type CreateComponentResponse = {
@@ -21,6 +22,7 @@ export type ComponentRecord = {
   key: string;
   name: string;
   description: string | null;
+  category: 'CONTENT' | 'MEDIA' | 'CTA' | 'LEGAL' | 'OTHER';
   createdAt: string;
   updatedAt: string;
 };
@@ -49,12 +51,12 @@ function joinApiUrl(endpoint: string): string {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const url = joinApiUrl(endpoint);
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',
@@ -69,10 +71,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         : typeof err.message === 'string'
           ? err.message
           : `HTTP ${res.status}`;
-    const method = (options.method ?? 'GET').toUpperCase();
+    const methodUpper = (options.method ?? 'GET').toUpperCase();
     const withUrl =
       baseMsg === 'Route not found' || import.meta.env.DEV
-        ? `${baseMsg} — ${method} ${url}`
+        ? `${baseMsg} — ${methodUpper} ${url}`
         : baseMsg;
     throw new Error(withUrl);
   }
@@ -88,14 +90,16 @@ export const componentService = {
     });
   },
 
-  list: async (): Promise<ComponentLibraryEntry[]> => {
-    return request<ComponentLibraryEntry[]>('/components');
+  list: async (category?: ComponentRecord['category']): Promise<ComponentLibraryEntry[]> => {
+    const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+    return request<ComponentLibraryEntry[]>(`/components${qs}`);
   },
 
   /** Server-side filter on key, name, and description (substring). Empty query returns all. */
-  search: async (q: string): Promise<ComponentLibraryEntry[]> => {
+  search: async (q: string, category?: ComponentRecord['category']): Promise<ComponentLibraryEntry[]> => {
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
+    if (category) params.set('category', category);
     const suffix = params.toString();
     return request<ComponentLibraryEntry[]>(
       suffix ? `/components/search?${suffix}` : '/components/search',

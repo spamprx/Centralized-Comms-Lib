@@ -5,7 +5,9 @@
 export function resolveApiV1Base(): string {
   const raw = import.meta.env.VITE_API_URL?.trim();
   if (!raw) {
-    return import.meta.env.DEV ? '/api/v1' : 'http://127.0.0.1:8000/api/v1';
+    // Use localhost (not 127.0.0.1) so browser cookies align with the dev server
+    // and SameSite cookies work consistently with the Vite proxy target.
+    return import.meta.env.DEV ? '/api/v1' : 'http://localhost:8000/api/v1';
   }
   const base = raw.replace(/\/$/, '');
   if (/\/api\/v\d+$/i.test(base)) return base;

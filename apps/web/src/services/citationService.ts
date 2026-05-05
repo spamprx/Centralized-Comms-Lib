@@ -1,7 +1,7 @@
 import { isLiveCitationSearchMode } from '../config/citationSearch';
 import { filterMockCitationHits } from '../data/mockCitationSearchHits';
 import { joinApiV1Path } from '../lib/apiBase';
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 import { searchContent, type ContentSearchHit } from './searchService';
 
 export type CitationStyle = 'APA' | 'IEEE' | 'MLA';
@@ -23,12 +23,12 @@ export type ReferenceSearchResult = {
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const url = joinApiV1Path(endpoint);
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',

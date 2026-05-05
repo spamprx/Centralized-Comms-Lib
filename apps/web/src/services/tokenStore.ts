@@ -1,62 +1,59 @@
-// Token store using sessionStorage for persistence and in-memory cache for fast access.
-// This keeps the session intact across refreshes, but clears on tab/browser close.
-// The JWT payload contains user info (id, email, role), so no separate user storage is needed.
+/**
+ * In-memory user cache after /auth/me (JWT stays in HttpOnly cookie only).
+ */
 
-let _token: string | null = null;
+type CachedUser = {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  role?: string;
+};
 
-const STORAGE_KEY = 'auth_token';
+let _cachedUser: CachedUser | null = null;
 
-function canUseSessionStorage(): boolean {
-  try {
-    return !!globalThis.window?.sessionStorage;
-  } catch {
-    return false;
-  }
+export function setCachedUser(user: CachedUser | null) {
+  _cachedUser = user;
 }
 
-/** Store the token in sessionStorage and in-memory cache */
-export function setAuthToken(token: string | null) {
-  _token = token;
-  if (canUseSessionStorage()) {
-    try {
-      if (token) globalThis.window!.sessionStorage.setItem(STORAGE_KEY, token);
-      else globalThis.window!.sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore (storage disabled)
-    }
-  }
-
-  // Backward-compat cleanup: if an older build set a cookie, clear it.
-  if (token === null) {
-    document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
-  }
+export function getCachedUser(): CachedUser | null {
+  return _cachedUser;
 }
 
-/** Get the token — from memory first, then fall back to sessionStorage */
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(
+    new RegExp('(?:^|;\\s*)' + name.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&') + '=([^;]*)'),
+  );
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/** Double-submit CSRF header for mutating API calls. */
+export function csrfHeader(method: string): Record<string, string> {
+  const m = (method || 'GET').toUpperCase();
+  if (['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(m)) return {};
+  const csrf = readCookie('csrf_token');
+  return csrf ? { 'X-CSRF-Token': csrf } : {};
+}
+
+/** @deprecated No JWT in JS — use cookie auth + csrfHeader */
 export function getAuthToken(): string | null {
-  if (_token) return _token;
-  if (canUseSessionStorage()) {
-    try {
-      const stored = globalThis.window!.sessionStorage.getItem(STORAGE_KEY);
-      if (stored) _token = stored;
-    } catch {
-      // ignore
-    }
-  }
-  return _token;
+  return null;
 }
 
-/** Decode the JWT payload to extract user info (id, email, role).
- *  Does NOT verify the signature — that's the server's job.  */
-export function decodeTokenPayload(): { id: string; email: string; role: string } | null {
-  const token = getAuthToken();
-  if (!token) return null;
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return { id: payload.id, email: payload.email, role: payload.role };
-  } catch {
-    return null;
+/** @deprecated Token is HttpOnly — use setCachedUser / clearSession */
+export function setAuthToken(_token: string | null) {
+  if (_token === null) {
+    _cachedUser = null;
   }
+}
+
+export function clearSession() {
+  _cachedUser = null;
+}
+
+/** @deprecated Use /auth/me + setCachedUser */
+export function decodeTokenPayload(): { id: string; email: string; role: string } | null {
+  const u = _cachedUser;
+  if (!u) return null;
+  return { id: u.id, email: u.email, role: u.role ?? 'USER' };
 }

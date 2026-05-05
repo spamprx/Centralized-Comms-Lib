@@ -1,5 +1,5 @@
 import { resolveApiV1Base } from '../lib/apiBase';
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 
 const API_BASE = resolveApiV1Base();
 
@@ -12,11 +12,11 @@ export type ApiUserGroup = {
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',

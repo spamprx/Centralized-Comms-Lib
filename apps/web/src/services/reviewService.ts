@@ -32,14 +32,14 @@ export type ReviewAssignment = {
   };
 };
 
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',
@@ -75,6 +75,21 @@ export const reviewService = {
 
   listForContent: async (contentId: string): Promise<ReviewRequest[]> => {
     return request<ReviewRequest[]>(`/reviews/content/${contentId}`);
+  },
+
+  listAssignableReviewers: async (
+    contentId: string,
+  ): Promise<Array<{ id: string; displayName?: string | null; email: string }>> => {
+    return request(`/reviews/content/${contentId}/assignable-reviewers`);
+  },
+
+  lookupUserDisplayNames: async (
+    userIds: string[],
+  ): Promise<Array<{ id: string; displayName?: string | null; email: string }>> => {
+    return request('/reviews/users/display-names', {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    });
   },
 
   listMyAssignments: async (): Promise<ReviewAssignment[]> => {

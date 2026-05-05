@@ -1,6 +1,6 @@
 import { resolveApiV1Base } from '../lib/apiBase';
 const API_BASE = resolveApiV1Base();
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 
 export type LifecycleState = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
 export type Visibility = 'PUBLIC' | 'PRIVATE_TO_GROUP';
@@ -23,6 +23,7 @@ export type Content = {
   author?: ContentAuthor | null;
   visibilityGroupId: string | null;
   templateId?: string | null;
+  channelId?: string | null;
   /** Aggregated engagement counts (present in list responses). */
   viewsCount?: number;
   likesCount?: number;
@@ -128,16 +129,18 @@ type ListFilters = {
   lifecycleState?: LifecycleState;
   visibility?: Visibility;
   contentType?: Content['contentType'];
+  /** Server: only `channelId` null (library / unchannelled catalog). */
+  omitChannelBound?: boolean;
   limit?: number;
   offset?: number;
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',
@@ -156,11 +159,11 @@ async function fetchOptionalJson<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<{ ok: true; data: T } | { ok: false; status: number }> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',
@@ -205,6 +208,7 @@ export const contentService = {
     if (filters.lifecycleState) params.set('lifecycleState', filters.lifecycleState);
     if (filters.visibility) params.set('visibility', filters.visibility);
     if (filters.contentType) params.set('contentType', filters.contentType);
+    if (filters.omitChannelBound === true) params.set('omitChannelBound', 'true');
     if (typeof filters.limit === 'number') params.set('limit', String(filters.limit));
     if (typeof filters.offset === 'number') params.set('offset', String(filters.offset));
     const query = params.toString();
@@ -250,12 +254,11 @@ export const contentService = {
       channelId?: string | null;
     },
   ): Promise<ContentVersion> => {
-    const token = getAuthToken();
     const res = await fetch(`${API_BASE}/content/${id}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...csrfHeader('POST'),
       },
       credentials: 'include',
       body: JSON.stringify(data),
@@ -283,10 +286,19 @@ export const contentService = {
     await request<void>(`/content/${id}`, { method: 'DELETE' });
   },
 
-  transitionState: async (id: string, lifecycleState: LifecycleState): Promise<Content> => {
+  transitionState: async (
+    id: string,
+    lifecycleState: LifecycleState,
+    opts?: { bypassReviewQuorumForChannelPublish?: boolean },
+  ): Promise<Content> => {
     return request<Content>(`/content/${id}/STATE_TRANSITION`, {
       method: 'POST',
-      body: JSON.stringify({ lifecycleState }),
+      body: JSON.stringify({
+        lifecycleState,
+        ...(opts?.bypassReviewQuorumForChannelPublish
+          ? { bypassReviewQuorumForChannelPublish: true }
+          : {}),
+      }),
     });
   },
 
@@ -397,8 +409,14 @@ export const contentService = {
     return request<{ bookmarked: boolean }>(`/content/${contentId}/bookmark`);
   },
 
-  bookmark: async (contentId: string): Promise<{ bookmarked: boolean }> => {
-    return request<{ bookmarked: boolean }>(`/content/${contentId}/bookmark`, { method: 'POST' });
+  bookmark: async (
+    contentId: string,
+    folderId?: string | null,
+  ): Promise<{ bookmarked: boolean }> => {
+    return request<{ bookmarked: boolean }>(`/content/${contentId}/bookmark`, {
+      method: 'POST',
+      body: JSON.stringify({ folderId: folderId ?? null }),
+    });
   },
 
   unbookmark: async (contentId: string): Promise<void> => {
@@ -526,12 +544,11 @@ export const contentService = {
     versionId: string,
     opts?: { baseVersionNumber?: number },
   ): Promise<unknown> => {
-    const token = getAuthToken();
     const res = await fetch(`${API_BASE}/content/${contentId}/versions/${versionId}/restore`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...csrfHeader('POST'),
       },
       credentials: 'include',
       body: JSON.stringify(

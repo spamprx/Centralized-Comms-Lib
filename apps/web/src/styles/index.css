@@ -1206,6 +1206,15 @@
   }
 }
 
+@keyframes push-toast-dismiss-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 #root {
   @apply min-h-screen w-full;
 }

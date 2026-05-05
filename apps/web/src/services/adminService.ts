@@ -15,7 +15,7 @@ import type {
   ApiRoleRow,
   ApiUserRow,
 } from '../lib/adminApi';
-import { getAuthToken } from './tokenStore';
+import { csrfHeader, getCachedUser } from './tokenStore';
 
 export type AdminUserActivityEvent = {
   type: 'user_last_active';
@@ -26,13 +26,12 @@ export type AdminUserActivityEvent = {
 
 /**
  * Long-lived fetch to the admin SSE endpoint. Call the returned function to abort.
- * No-op if there is no auth token.
+ * No-op if there is no signed-in user (cookie session).
  */
 export function subscribeAdminUsersActivity(
   onEvent: (e: AdminUserActivityEvent) => void,
 ): () => void {
-  const token = getAuthToken();
-  if (!token) return () => {};
+  if (!getCachedUser()) return () => {};
 
   const url = joinApiV1Path('/admin/users/activity-stream');
   const ac = new AbortController();
@@ -40,7 +39,7 @@ export function subscribeAdminUsersActivity(
   void (async () => {
     try {
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         signal: ac.signal,
       });
       if (!res.ok || !res.body) return;
@@ -75,12 +74,12 @@ export function subscribeAdminUsersActivity(
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const url = joinApiV1Path(path);
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',

@@ -1,4 +1,6 @@
 import { resolveApiV1Base } from '../lib/apiBase';
+import { csrfHeader } from './tokenStore';
+
 const API_BASE = resolveApiV1Base();
 
 export type LoginResponse = {
@@ -8,21 +10,23 @@ export type LoginResponse = {
     displayName?: string | null;
     createdAt?: string;
     updatedAt?: string;
-    /** Present when the API includes it; otherwise derive from JWT after login. */
     role?: string;
   };
-  token: string;
+  role?: string;
+  /** Legacy: API no longer returns JWT in JSON (HttpOnly cookie only). */
+  token?: string;
 };
 
-import { getAuthToken } from './tokenStore';
-
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
+      ...csrfHeader(method),
+      ...(options.headers as Record<string, string>),
     },
     credentials: 'include',
     ...options,
@@ -57,7 +61,10 @@ export const authService = {
   logout: async (): Promise<void> => {
     await request('/auth/logout', { method: 'POST' });
   },
-  me: async (): Promise<LoginResponse> => {
-    return request<LoginResponse>('/auth/me');
+  me: async (): Promise<{
+    user: LoginResponse['user'] | null;
+    role: string | null;
+  }> => {
+    return request('/auth/me');
   },
 };

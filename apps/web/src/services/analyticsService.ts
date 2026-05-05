@@ -9,18 +9,19 @@ import type {
 } from '../types/analytics';
 import type { DateRange } from '../lib/dateUtils';
 import { resolveApiV1Base } from '../lib/apiBase';
+import { csrfHeader } from './tokenStore';
 
 const API_BASE = resolveApiV1Base();
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const { getAuthToken } = await import('./tokenStore');
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
+    credentials: 'include',
     ...options,
   });
 

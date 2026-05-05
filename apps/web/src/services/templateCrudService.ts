@@ -1,4 +1,4 @@
-import { getAuthToken } from './tokenStore';
+import { csrfHeader } from './tokenStore';
 import { resolveApiV1Base } from '../lib/apiBase';
 
 const API_BASE = resolveApiV1Base();
@@ -19,11 +19,25 @@ export type TemplateRecord = {
   createdAt: string;
   updatedAt: string;
   bindings?: Array<{ id: string; channelId: string; createdAt: string }>;
+  tags?: Array<{ tagId: string; tag: { id: string; name: string; slug: string } }>;
+  cluster?: { id: string; name: string; description: string | null } | null;
 };
 
 type ListFilters = {
   search?: string;
   status?: TemplateStatus | 'ALL';
+  tag?: string;
+  clusterId?: string;
+};
+
+export type TemplateClusterRecord = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string | null;
+  templateCount?: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CreateTemplateInput = {
@@ -113,11 +127,11 @@ export type TemplateBindingRecord = {
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeader(method),
       ...options.headers,
     },
     credentials: 'include',
@@ -145,7 +159,12 @@ function matchesFilters(t: TemplateRecord, filters?: ListFilters): boolean {
 
 export const templateCrudService = {
   async list(filters?: ListFilters): Promise<TemplateRecord[]> {
-    const rows = await request<TemplateRecord[]>('/templates');
+    const params = new URLSearchParams();
+    if (filters?.tag) params.set('tag', filters.tag);
+    if (filters?.clusterId) params.set('clusterId', filters.clusterId);
+    const rows = await request<TemplateRecord[]>(
+      `/templates${params.toString() ? `?${params.toString()}` : ''}`,
+    );
     return rows.filter((t) => matchesFilters(t, filters));
   },
 
@@ -263,6 +282,30 @@ export const templateCrudService = {
   async activateTemplate(templateId: string): Promise<TemplateRecord> {
     return request<TemplateRecord>(`/templates/${templateId}/activate`, {
       method: 'POST',
+    });
+  },
+
+  async listClusters(): Promise<TemplateClusterRecord[]> {
+    return request<TemplateClusterRecord[]>('/templates/clusters/all');
+  },
+
+  async createCluster(input: {
+    name: string;
+    description?: string;
+  }): Promise<TemplateClusterRecord> {
+    return request<TemplateClusterRecord>('/templates/clusters', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  async assignCluster(
+    templateId: string,
+    clusterId: string | null,
+  ): Promise<{ id: string; clusterId: string | null }> {
+    return request(`/templates/${templateId}/cluster`, {
+      method: 'PATCH',
+      body: JSON.stringify({ clusterId }),
     });
   },
 };
