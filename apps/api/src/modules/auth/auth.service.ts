@@ -122,4 +122,45 @@ export const authService = {
       role: isAdmin ? "ADMIN" : "USER",
     };
   },
+
+  async getMe(userId: string): Promise<{
+    user: {
+      id: string;
+      email: string;
+      displayName: string;
+      avatarUrl: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    role: "ADMIN" | "USER";
+  } | null> {
+    const prisma = getPrismaClient();
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        createdAt: true,
+        updatedAt: true,
+        isActive: true,
+      },
+    });
+    if (!user || !user.isActive) return null;
+    const uow = new PrismaUnitOfWork(prisma);
+    const roles = await uow.repos().userRole.listRolesForUser(userId);
+    const isAdmin = roles.some((r) => r.name.toUpperCase() === "ADMIN");
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      role: isAdmin ? "ADMIN" : "USER",
+    };
+  },
 };

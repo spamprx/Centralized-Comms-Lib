@@ -1,7 +1,16 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import type { UserRole } from "../../middlewares/auth.middleware";
+import {
+  optionalAuthenticate,
+  type AuthRequest,
+  type UserRole,
+} from "../../middlewares/auth.middleware";
+import { authStrictLimiter } from "../../middlewares/rateLimit.middleware";
 import { authService } from "../../service";
+import { validatePayload } from "../../shared/validation";
+import { AppError } from "../../shared/errors/appError";
+import { clearAuthCookies, setAuthCookies } from "../../shared/authCookies";
+import { loginBodySchema, registerBodySchema } from "./auth.schema";
 
 const router = Router();
 
@@ -29,63 +38,45 @@ function signToken(payload: {
  *     summary: Register a new user account
  *     tags:
  *       - Auth
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - displayName
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               displayName:
- *                 type: string
- *               password:
- *                 type: string
- *                 format: password
- *     responses:
- *       201:
- *         description: User created successfully
- *       400:
- *         description: Missing required fields
- *       409:
- *         description: Email already registered
- *       500:
- *         description: Server error
  */
-router.post("/register", async (req: Request, res: Response) => {
-  try {
-    const { email, displayName, password } = req.body;
-    if (!email || !displayName || !password) {
-      res
-        .status(400)
-        .json({ error: "email, displayName, and password are required" });
-      return;
+router.post(
+  "/register",
+  authStrictLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const { email, displayName, password } = validatePayload(
+        registerBodySchema,
+        req.body,
+      );
+      const result = await authService.register(
+        { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
+        { email, displayName, password },
+      );
+      if (result.conflict) {
+        res.status(409).json({ error: "Email already registered" });
+        return;
+      }
+      const token = signToken({
+        id: result.user.id,
+        email: result.user.email,
+        role: "USER",
+      });
+      setAuthCookies(res, token);
+      res.status(201).json({ user: result.user, role: "USER" as const });
+    } catch (err) {
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({
+          error: err.message,
+          ...(err.code ? { code: err.code } : {}),
+          ...(err.details !== undefined ? { details: err.details } : {}),
+        });
+        return;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
     }
-    const result = await authService.register(
-      { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
-      { email, displayName, password },
-    );
-    if (result.conflict) {
-      res.status(409).json({ error: "Email already registered" });
-      return;
-    }
-    const token = signToken({
-      id: result.user.id,
-      email: result.user.email,
-      role: "USER",
-    });
-    res.status(201).json({ user: result.user, token });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
+  },
+);
 
 /**
  * @openapi
@@ -94,39 +85,10 @@ router.post("/register", async (req: Request, res: Response) => {
  *     summary: Log in with email and password
  *     tags:
  *       - Auth
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
- *     responses:
- *       200:
- *         description: Successful login; returns user and JWT
- *       400:
- *         description: Missing required fields
- *       401:
- *         description: Invalid credentials
- *       500:
- *         description: Server error
  */
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", authStrictLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({ error: "email and password are required" });
-      return;
-    }
+    const { email, password } = validatePayload(loginBodySchema, req.body);
     const result = await authService.login(
       { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
       { email, password },
@@ -145,15 +107,47 @@ router.post("/login", async (req: Request, res: Response) => {
     }
     const { user, role } = result;
     const token = signToken({ id: user.id, email: user.email, role });
-    res.status(200).json({ user, token });
+    setAuthCookies(res, token);
+    res.status(200).json({ user, role });
+  } catch (err) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({
+        error: err.message,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.details !== undefined ? { details: err.details } : {}),
+      });
+      return;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * Session probe (cookie or Bearer). Returns 200 with `user: null` when not signed in,
+ * so the SPA does not treat every visit as a 401 "No token provided".
+ */
+router.get("/me", optionalAuthenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      res.status(200).json({ user: null, role: null });
+      return;
+    }
+    const data = await authService.getMe(req.user.id);
+    if (!data) {
+      res.status(401).json({ error: "Session invalid" });
+      return;
+    }
+    res.status(200).json({ user: data.user, role: data.role });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
 });
 
-/** Stateless JWT logout — client clears credentials; optional hook for future token blocklists. */
+/** Clear HttpOnly auth + CSRF cookies. */
 router.post("/logout", (_req: Request, res: Response) => {
+  clearAuthCookies(res);
   res.status(204).end();
 });
 

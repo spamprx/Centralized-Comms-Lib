@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { getPrismaClient } from "../repository";
+import { AUTH_TOKEN_COOKIE } from "../shared/authCookies";
 
 // Global roles only — carried in the JWT.
 // FUTURE: Content-scoped roles (AUTHOR, CO_AUTHOR, REVIEWER) live on the content record in the DB and are enforced in Service Layer (Object-Level Authorization).
@@ -33,6 +34,10 @@ if (!JWT_SECRET) {
 }
 
 function extractToken(req: Request): string | null {
+  const fromCookie = req.cookies?.[AUTH_TOKEN_COOKIE];
+  if (typeof fromCookie === "string" && fromCookie.trim().length > 0) {
+    return fromCookie.trim();
+  }
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith(BEARER_PREFIX)) {
     return authHeader.slice(BEARER_PREFIX.length).trim();
