@@ -48,6 +48,11 @@ export default function Sidebar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
 
+  /** Close flyout menus when the route changes so the sidebar does not stay “stuck” open. */
+  useEffect(() => {
+    setOpenDropdown(null);
+  }, [pathname]);
+
   if (!isAuthenticated) {
     return null;
   }
@@ -117,7 +122,12 @@ export default function Sidebar() {
           }
 
           return (
-            <div key={cat.label} className="relative">
+            <div
+              key={cat.label}
+              className="relative"
+              onMouseEnter={() => setOpenDropdown(cat.label)}
+              onMouseLeave={() => setOpenDropdown(null)}
+            >
               <button
                 type="button"
                 aria-expanded={isOpen}
@@ -134,15 +144,12 @@ export default function Sidebar() {
                 </span>
               </button>
               {isOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30 md:left-16"
-                    aria-hidden
-                    onClick={() => setOpenDropdown(null)}
-                  />
+                <div className="absolute left-full top-0 z-40 flex max-h-[min(24rem,calc(100vh-4rem))] min-h-[2.75rem] items-stretch">
+                  {/* Invisible bridge so the cursor can cross the gap without closing the menu */}
+                  <span className="w-2 shrink-0" aria-hidden />
                   <div
                     role="menu"
-                    className="animate-fade-in absolute left-full top-0 z-40 ml-2 min-w-[13.5rem] overflow-hidden rounded-2xl border border-white/10 bg-app-bg/70 py-1.5 shadow-[0_28px_72px_-16px_rgba(0,0,0,0.55),0_0_0_1px_rgba(147,124,248,0.1),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-2xl motion-reduce:animate-none"
+                    className="animate-fade-in min-w-[13.5rem] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-app-bg/70 py-1.5 shadow-[0_28px_72px_-16px_rgba(0,0,0,0.55),0_0_0_1px_rgba(147,124,248,0.1),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-2xl motion-reduce:animate-none"
                   >
                     {cat.items.map((item) => {
                       const active = isActivePath(pathname, item.path);
@@ -163,7 +170,7 @@ export default function Sidebar() {
                       );
                     })}
                   </div>
-                </>
+                </div>
               )}
             </div>
           );

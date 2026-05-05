@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { X, Search, UserPlus, Loader2, Check, Users } from 'lucide-react';
-import { adminUserService } from '../services/adminService';
 import { contentService } from '../services/contentService';
 import { reviewService } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';
+import { collectPlaceholderKeysFromBlocks } from '../lib/waPlaceholderManifest';
 
 type SimpleUser = {
   id: string;
@@ -38,18 +38,23 @@ export default function ManageReviewersModal({
     requiredQuorum: number | null;
     isSatisfied: boolean | null;
   } | null>(null);
+  const [pendingTokenKeys, setPendingTokenKeys] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const [usersRes, reqsRes, detailsRes] = await Promise.all([
-          adminUserService.getUsers(),
+        const [reviewerRows, reqsRes, detailsRes] = await Promise.all([
+          reviewService.listAssignableReviewers(contentId).catch(() => []),
           reviewService.listForContent(contentId).catch(() => []),
           contentService.getById(contentId).catch(() => null),
         ]);
 
-        const rawUsers = usersRes.data as unknown as SimpleUser[];
+        const rawUsers: SimpleUser[] = reviewerRows.map((u) => ({
+          id: u.id,
+          displayName: u.displayName ?? undefined,
+          email: u.email,
+        }));
         setUsers(rawUsers);
 
         if (detailsRes && typeof detailsRes === 'object' && 'reviewPolicy' in detailsRes) {
@@ -66,6 +71,27 @@ export default function ManageReviewersModal({
           );
         } else {
           setReviewPolicyRequirement(null);
+        }
+        if (detailsRes && typeof detailsRes === 'object' && 'versions' in detailsRes) {
+          const versions = (detailsRes as { versions?: Array<{ versionNumber: number; body?: unknown }> })
+            .versions;
+          if (Array.isArray(versions) && versions.length > 0) {
+            const latestVersion = versions.reduce((prev, curr) =>
+              curr.versionNumber > prev.versionNumber ? curr : prev,
+            );
+            const unresolved = collectPlaceholderKeysFromBlocks([
+              {
+                id: '__body__',
+                type: 'richText',
+                props: { doc: (latestVersion.body ?? { type: 'doc', content: [] }) as never },
+              } as never,
+            ] as never).requiredRowKeys;
+            setPendingTokenKeys(unresolved);
+          } else {
+            setPendingTokenKeys([]);
+          }
+        } else {
+          setPendingTokenKeys([]);
         }
 
         // Find the active review request (OPEN) for this content and load current assignments.
@@ -142,6 +168,20 @@ export default function ManageReviewersModal({
       const latestVersion = versions.reduce((prev, curr) =>
         curr.versionNumber > prev.versionNumber ? curr : prev,
       );
+      const unresolvedTokens = collectPlaceholderKeysFromBlocks([
+        {
+          id: '__body__',
+          type: 'richText',
+          props: { doc: (latestVersion.body ?? { type: 'doc', content: [] }) as never },
+        } as never,
+      ] as never).requiredRowKeys;
+      if (unresolvedTokens.length > 0) {
+        setError(
+          `Replace all template tokens before sending for review: ${unresolvedTokens.join(', ')}`,
+        );
+        setAssigning(false);
+        return;
+      }
 
       const reviewRequest = await reviewService.createRequest(
         contentId,
@@ -235,6 +275,11 @@ export default function ManageReviewersModal({
                 <span className="tabular-nums">
                   {reviewPolicyRequirement?.isSatisfied ? 'Met' : 'Needs'} {requiredQuorum}
                 </span>
+              </div>
+            ) : null}
+            {pendingTokenKeys.length > 0 ? (
+              <div className="mt-2 inline-flex items-center rounded-full border border-amber-400/25 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-100">
+                Pending tokens: {pendingTokenKeys.join(', ')}
               </div>
             ) : null}
           </div>
@@ -391,7 +436,13 @@ export default function ManageReviewersModal({
             <button
               type="button"
               onClick={handleAssign}
-              disabled={selectedIds.size === 0 || assigning || success || selectionTooSmall}
+              disabled={
+                selectedIds.size === 0 ||
+                assigning ||
+                success ||
+                selectionTooSmall ||
+                pendingTokenKeys.length > 0
+              }
               className={`flex items-center gap-1.5 rounded-app-md border border-white/12 px-5 py-2.5 text-[13px] font-semibold text-app-bg shadow-[0_0_22px_-8px_rgba(147,124,248,0.45)] ring-1 ring-white/10 transition-[filter,opacity] ${
                 success
                   ? 'cursor-not-allowed bg-gradient-to-r from-emerald-500 to-app-accent-2 opacity-95'
@@ -407,6 +458,10 @@ export default function ManageReviewersModal({
               ) : success ? (
                 <>
                   <Check size={14} strokeWidth={2.5} /> Assigned!
+                </>
+              ) : pendingTokenKeys.length > 0 ? (
+                <>
+                  <UserPlus size={14} strokeWidth={2} /> Pending tokens — fill first
                 </>
               ) : (
                 <>

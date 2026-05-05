@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Users, CheckCircle, Clock, Loader2, MessageCircle } from 'lucide-react';
 import { reviewService, type ReviewRequest } from '../services/reviewService';
-import { adminUserService } from '../services/adminService';
 import { useReviewStore } from '../store/reviewStore';
 
 type ReviewFeedbackInfo = {
@@ -44,27 +43,39 @@ export default function ReviewFeedbackModal({
       try {
         setLoading(true);
 
+        const requests: ReviewRequest[] = await reviewService.listForContent(contentId);
+
+        const idSet = new Set<string>();
+        const fullRequests: Awaited<ReturnType<typeof reviewService.getRequestById>>[] = [];
+        for (const req of requests) {
+          try {
+            const fullRequest = await reviewService.getRequestById(req.id);
+            fullRequests.push(fullRequest);
+            idSet.add(fullRequest.requestedById);
+            for (const a of fullRequest.assignments || []) {
+              idSet.add(a.reviewerId);
+            }
+          } catch {
+            // Skip failed requests
+          }
+        }
+
         const userMap: Record<string, { displayName: string; email: string }> = {};
         try {
-          const usersRes = await adminUserService.getUsers();
-          const rawUsers = usersRes.data as unknown as Array<{
-            id: string;
-            displayName?: string;
-            email: string;
-          }>;
-          for (const u of rawUsers) {
-            userMap[u.id] = { displayName: u.displayName || u.email, email: u.email };
+          const rows = await reviewService.lookupUserDisplayNames([...idSet]);
+          for (const u of rows) {
+            userMap[u.id] = {
+              displayName: (u.displayName && String(u.displayName)) || u.email,
+              email: u.email,
+            };
           }
         } catch {
           // Non-critical
         }
 
-        const requests: ReviewRequest[] = await reviewService.listForContent(contentId);
-
         const feedbacks: ReviewFeedbackInfo[] = [];
-        for (const req of requests) {
+        for (const fullRequest of fullRequests) {
           try {
-            const fullRequest = await reviewService.getRequestById(req.id);
             const assignments = await Promise.all(
               (fullRequest.assignments || []).map(async (a) => {
                 const reviewer = userMap[a.reviewerId];
@@ -96,12 +107,12 @@ export default function ReviewFeedbackModal({
             );
 
             feedbacks.push({
-              requestId: req.id,
-              status: req.status,
+              requestId: fullRequest.id,
+              status: fullRequest.status,
               createdAt:
-                typeof req.createdAt === 'string'
-                  ? req.createdAt
-                  : new Date(req.createdAt).toISOString(),
+                typeof fullRequest.createdAt === 'string'
+                  ? fullRequest.createdAt
+                  : new Date(fullRequest.createdAt).toISOString(),
               assignments,
             });
           } catch {

@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { reviewService, type ReviewAssignment } from '../services/reviewService';
 import { contentService } from '../services/contentService';
-import { adminUserService } from '../services/adminService';
 import { useReviewStore } from '../store/reviewStore';
 import { Surface } from '../components/ui/Surface';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
@@ -104,27 +103,17 @@ export default function ReviewLayout() {
         return;
       }
 
-      // Step 2: Fetch all users up front (to look up requestedBy names)
-      const userMap: Record<string, { displayName: string; email: string }> = {};
-      try {
-        const usersRes = await adminUserService.getUsers();
-        const rawUsers = usersRes.data as unknown as Array<{
-          id: string;
-          displayName?: string;
-          email: string;
-        }>;
-        for (const u of rawUsers) {
-          userMap[u.id] = { displayName: u.displayName || u.email, email: u.email };
-        }
-      } catch {
-        // Non-critical — we just won't show the requestedBy name
-      }
-
-      // Step 3: For each assignment, fetch the review request to get contentId + requester
-      const items: ReviewItem[] = [];
+      // Step 2: Collect user ids, then resolve display names (scoped API — not full directory)
+      const idSet = new Set<string>();
+      type PendingRow = Omit<ReviewItem, 'author' | 'authorEmail' | 'requestedBy'> & {
+        authorId: string | null;
+        requestedById: string;
+      };
+      const pending: PendingRow[] = [];
       for (const assignment of assignments) {
         try {
           const reviewReq = await reviewService.getRequestById(assignment.reviewRequestId);
+          idSet.add(reviewReq.requestedById);
           const contentId = reviewReq.contentId;
           const contentVersionId = reviewReq.contentVersionId;
           const verdict =
@@ -135,29 +124,23 @@ export default function ReviewLayout() {
               : undefined;
           const savedComment = assignment.decision?.comment ?? undefined;
 
-          // Step 4: Fetch content details via getById (backend now allows reviewers)
           let title = 'Untitled';
-          let authorName = 'Unknown';
-          let authorEmail = '';
+          let authorId: string | null = null;
           try {
             const contentDetails = await contentService.getById(contentId);
             title = contentDetails.content.title || 'Untitled';
-            const authorUser = userMap[contentDetails.content.authorId];
-            if (authorUser) {
-              authorName = authorUser.displayName;
-              authorEmail = authorUser.email;
-            }
+            authorId = contentDetails.content.authorId;
+            idSet.add(authorId);
           } catch {
             // Content fetch may fail — use fallback
           }
 
-          const requestedByUser = userMap[reviewReq.requestedById];
-          items.push({
+          pending.push({
             id: assignment.reviewRequestId,
             assignmentId: assignment.id,
             title,
-            author: authorName,
-            authorEmail,
+            authorId,
+            requestedById: reviewReq.requestedById,
             submittedAt: new Date(assignment.assignedAt).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
@@ -166,7 +149,6 @@ export default function ReviewLayout() {
             status: assignment.status,
             contentId,
             contentVersionId,
-            requestedBy: requestedByUser?.displayName || 'Unknown',
             verdict,
             savedComment,
           });
@@ -174,6 +156,38 @@ export default function ReviewLayout() {
           // Skip assignments we can't fully resolve
         }
       }
+
+      const userMap: Record<string, { displayName: string; email: string }> = {};
+      try {
+        const rows = await reviewService.lookupUserDisplayNames([...idSet]);
+        for (const u of rows) {
+          userMap[u.id] = {
+            displayName: (u.displayName && String(u.displayName)) || u.email,
+            email: u.email,
+          };
+        }
+      } catch {
+        // Non-critical — fall back to Unknown / empty
+      }
+
+      const items: ReviewItem[] = pending.map((p) => {
+        const authorUser = p.authorId ? userMap[p.authorId] : undefined;
+        const requestedByUser = userMap[p.requestedById];
+        return {
+          id: p.id,
+          assignmentId: p.assignmentId,
+          title: p.title,
+          author: authorUser?.displayName || 'Unknown',
+          authorEmail: authorUser?.email || '',
+          submittedAt: p.submittedAt,
+          status: p.status,
+          contentId: p.contentId,
+          contentVersionId: p.contentVersionId,
+          requestedBy: requestedByUser?.displayName || 'Unknown',
+          verdict: p.verdict,
+          savedComment: p.savedComment,
+        };
+      });
 
       setReviewItems(items);
       if (items.length > 0) {
