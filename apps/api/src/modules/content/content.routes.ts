@@ -11,6 +11,9 @@ import {
 } from "../../realtime/editorPresenceStore";
 import { broadcastToContentRoom } from "../../realtime/wsServer";
 import { getCopyAttributionPolicy } from "./contentCopyAttribution";
+import { validatePayload } from "../../shared/validation";
+import { AppError } from "../../shared/errors/appError";
+import { createContentDraftBodySchema } from "./content.schema";
 
 const router = Router();
 
@@ -399,26 +402,14 @@ router.post(
  */
 router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
   try {
-    const { title, body, aiGenerated, templateId, channelId, contentType } =
-      req.body;
-    if (!title) {
-      res.status(400).json({ error: "title is required" });
-      return;
-    }
-    if (body !== undefined && body !== null && !isValidTipTapDocument(body)) {
-      res.status(400).json({
-        error:
-          "body must be a valid TipTap document (type: 'doc', content: array)",
-      });
-      return;
-    }
+    const parsed = validatePayload(createContentDraftBodySchema, req.body);
     const result = await contentService.createDraft(auditContext(req), {
-      title,
-      body: body ?? undefined,
-      aiGenerated,
-      templateId: templateId ?? undefined,
-      channelId: typeof channelId === "string" ? channelId : undefined,
-      contentType: contentType ?? undefined,
+      title: parsed.title,
+      body: parsed.body ?? undefined,
+      aiGenerated: parsed.aiGenerated,
+      templateId: parsed.templateId ?? undefined,
+      channelId: parsed.channelId ?? undefined,
+      contentType: parsed.contentType,
     });
     if ("invalidFormatting" in result && result.invalidFormatting) {
       res.status(422).json({
@@ -427,8 +418,20 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
       });
       return;
     }
+    if ("invalidChannelBinding" in result && result.invalidChannelBinding) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
     res.status(201).json(result);
   } catch (err) {
+    if (err instanceof AppError && err.statusCode < 500) {
+      res.status(err.statusCode).json({
+        error: err.message,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.details !== undefined ? { details: err.details } : {}),
+      });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
@@ -464,6 +467,11 @@ router.post("/", aiDraftQuotaGate, async (req: AuthRequest, res: Response) => {
  *         name: offset
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: omitChannelBound
+ *         description: When true, only content with no channelId. Non-admin global lists force this.
+ *         schema:
+ *           type: boolean
  *     responses:
  *       200:
  *         description: List of content items
@@ -477,6 +485,11 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const requestedAuthorId = req.query.authorId as string | undefined;
     const isOwnListRequest =
       !!requestedAuthorId && requestedAuthorId === requesterId;
+    const omitChannelBoundQuery =
+      req.query.omitChannelBound === "true" || req.query.omitChannelBound === "1";
+    // Public browse list (non-admin, not scoped to own authorId): only unchannelled published rows.
+    const omitChannelBound =
+      omitChannelBoundQuery || (!isAdmin && !isOwnListRequest);
     const filters = {
       authorId: requestedAuthorId,
       // Security: non-admins can only list non-published content for themselves.
@@ -486,6 +499,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
           : ("PUBLISHED" as LifecycleState),
       visibility: req.query.visibility as Visibility | undefined,
       contentType: req.query.contentType as any,
+      omitChannelBound,
       limit: req.query.limit
         ? Number.parseInt(req.query.limit as string)
         : undefined,
@@ -1007,6 +1021,10 @@ router.post("/:id", async (req: AuthRequest, res: Response) => {
       });
       return;
     }
+    if ("invalidChannelBinding" in result && result.invalidChannelBinding) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
     if ("version" in result) {
       void notifyBookmarkedUsersOnContentUpdate({
         actorId: req.user!.id,
@@ -1066,7 +1084,11 @@ router.post(
   "/:id/STATE_TRANSITION",
   async (req: AuthRequest, res: Response) => {
     try {
-      const raw = (req.body as { lifecycleState?: unknown })?.lifecycleState;
+      const body = req.body as {
+        lifecycleState?: unknown;
+        bypassReviewQuorumForChannelPublish?: unknown;
+      };
+      const raw = body?.lifecycleState;
       const lifecycleState =
         typeof raw === "string"
           ? (raw.toUpperCase() as LifecycleState)
@@ -1075,10 +1097,13 @@ router.post(
         res.status(400).json({ error: "lifecycleState is required" });
         return;
       }
+      const bypassReviewQuorumForChannelPublish =
+        body?.bypassReviewQuorumForChannelPublish === true;
       const result = await contentService.transitionState(
         auditContext(req),
         req.params.id,
         lifecycleState,
+        { bypassReviewQuorumForChannelPublish },
       );
       if ("notFound" in result && result.notFound) {
         res.status(404).json({ error: "Content not found" });
@@ -1093,6 +1118,14 @@ router.post(
       if ("invalidTransition" in result && result.invalidTransition) {
         res.status(422).json({
           error: `Invalid state transition from ${result.current} to ${lifecycleState}`,
+        });
+        return;
+      }
+      if ("unfilledPlaceholders" in result && result.unfilledPlaceholders) {
+        res.status(422).json({
+          error: `Replace merge tokens with actual values before changing lifecycle state (${result.keys.join(", ")}).`,
+          code: "UNFILLED_PLACEHOLDERS",
+          keys: result.keys,
         });
         return;
       }
@@ -1372,12 +1405,27 @@ router.post("/:id/bookmark", async (req: AuthRequest, res: Response) => {
       return;
     }
     const prisma = getPrismaClient();
+    const folderIdRaw = (req.body as { folderId?: unknown })?.folderId;
+    const folderId =
+      typeof folderIdRaw === "string" && folderIdRaw.trim()
+        ? folderIdRaw.trim()
+        : null;
+    if (folderId) {
+      const folder = await prisma.bookmarkFolder.findFirst({
+        where: { id: folderId, userId: req.user!.id },
+        select: { id: true },
+      });
+      if (!folder) {
+        res.status(404).json({ error: "Bookmark folder not found" });
+        return;
+      }
+    }
     await prisma.contentBookmark.upsert({
       where: {
         contentId_userId: { contentId: req.params.id, userId: req.user!.id },
       },
-      create: { contentId: req.params.id, userId: req.user!.id },
-      update: {},
+      create: { contentId: req.params.id, userId: req.user!.id, folderId },
+      update: { folderId },
     });
     res.status(201).json({ bookmarked: true });
   } catch (err) {

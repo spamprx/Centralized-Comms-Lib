@@ -87,6 +87,20 @@ router.post("/requests", async (req: AuthRequest, res: Response) => {
       });
       return;
     }
+    if ("contentVersionNotFound" in result && result.contentVersionNotFound) {
+      res.status(404).json({
+        error: "Content version not found for this document",
+      });
+      return;
+    }
+    if ("unfilledPlaceholders" in result && result.unfilledPlaceholders) {
+      res.status(422).json({
+        error: `Replace merge tokens with actual values before creating a review request (${result.keys.join(", ")}).`,
+        code: "UNFILLED_PLACEHOLDERS",
+        keys: result.keys,
+      });
+      return;
+    }
     res.status(201).json(result.request);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -139,6 +153,40 @@ router.get("/requests/:id", async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: message });
   }
 });
+
+/**
+ * Content author or admin: users eligible to be assigned as reviewers for this content.
+ * Must be registered before GET /content/:contentId so "assignable-reviewers" is not parsed as a content id.
+ */
+router.get(
+  "/content/:contentId/assignable-reviewers",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await reviewService.listAssignableReviewersForContent(
+        auditContext(req),
+        req.params.contentId,
+      );
+      if ("users" in result) {
+        res.status(200).json(result.users);
+        return;
+      }
+      if ("notFound" in result && result.notFound) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      if ("forbidden" in result && result.forbidden) {
+        res.status(403).json({
+          error: "Only the content author or an admin can list assignable reviewers",
+        });
+        return;
+      }
+      res.status(500).json({ error: "Unexpected assignable-reviewers response" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  },
+);
 
 /**
  * @openapi
@@ -467,6 +515,28 @@ router.post(
     }
   },
 );
+
+/**
+ * Resolve display names for user IDs visible to the caller through review flows
+ * (assigned reviewer, content author on their documents, or admin).
+ */
+router.post("/users/display-names", async (req: AuthRequest, res: Response) => {
+  try {
+    const body = req.body as { userIds?: unknown };
+    const raw = body.userIds;
+    const userIds = Array.isArray(raw)
+      ? raw.filter((id): id is string => typeof id === "string")
+      : [];
+    const rows = await reviewService.listUserDisplayNamesForReviewContext(
+      auditContext(req),
+      userIds,
+    );
+    res.status(200).json(rows);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
 
 /**
  * @openapi

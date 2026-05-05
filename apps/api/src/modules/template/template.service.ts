@@ -21,6 +21,7 @@ import {
   type StructuralRestrictions,
 } from "../../shared/validation/layoutConfig";
 import { workspaceService } from "../workspace/workspace.service";
+import { checkResourceAccess } from "../../shared/authorization";
 
 function slugify(name: string): string {
   return name
@@ -191,6 +192,19 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const current = await repos.template.getById(id);
       if (!current) return { notFound: true } as const;
+      const access = await checkResourceAccess(
+        ctx.actorId,
+        "template",
+        id,
+        "write",
+        { isAdmin: ctx.isAdmin },
+      );
+      if (!access.allowed) {
+        return {
+          invalid: true,
+          message: "Only the template owner/admin can edit. Clone to modify.",
+        } as const;
+      }
 
       const patch: {
         name?: string;
@@ -291,6 +305,20 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const current = await repos.template.getById(id);
       if (!current) return { notFound: true } as const;
+      const access = await checkResourceAccess(
+        ctx.actorId,
+        "template",
+        id,
+        "delete",
+        { isAdmin: ctx.isAdmin },
+      );
+      if (!access.allowed) {
+        return {
+          inUse: true,
+          reason:
+            "Only the template owner/admin can delete. Clone if you need your own editable copy.",
+        } as const;
+      }
       if (current.status === "ACTIVE") {
         return {
           inUse: true,
@@ -324,6 +352,17 @@ export const templateService = {
   ): Promise<
     { ok: true; template: TemplateWithBindings } | { notFound: true }
   > {
+    const access = await checkResourceAccess(
+      ctx.actorId,
+      "template",
+      sourceId,
+      "read",
+      { isAdmin: ctx.isAdmin },
+    );
+    if (!access.allowed) {
+      return { notFound: true } as const;
+    }
+
     const workspaceId = await workspaceService.resolveDefaultWorkspaceId();
     const prisma = getPrismaClient();
     const uow = new PrismaUnitOfWork(prisma);
@@ -424,6 +463,19 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const withBindings = await repos.template.getByIdWithBindings(id);
       if (!withBindings) return { notFound: true } as const;
+      const access = await checkResourceAccess(
+        ctx.actorId,
+        "template",
+        id,
+        "write",
+        { isAdmin: ctx.isAdmin },
+      );
+      if (!access.allowed) {
+        return {
+          invalid: true,
+          message: "Only the template owner/admin can edit draft layout",
+        } as const;
+      }
 
       let strictestMax: number | null = null;
       for (const b of withBindings.bindings) {
@@ -618,6 +670,19 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const current = await repos.template.getByIdWithBindings(id);
       if (!current) return { notFound: true } as const;
+      const access = await checkResourceAccess(
+        ctx.actorId,
+        "template",
+        id,
+        "write",
+        { isAdmin: ctx.isAdmin },
+      );
+      if (!access.allowed) {
+        return {
+          invalid: true,
+          message: "Only the template owner/admin can activate template",
+        } as const;
+      }
       if (current.draftLayout == null) {
         return {
           invalid: true,
@@ -686,6 +751,19 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const template = await repos.template.getById(templateId);
       if (!template) return { notFound: true } as const;
+      const access = await checkResourceAccess(
+        ctx.actorId,
+        "template",
+        templateId,
+        "write",
+        { isAdmin: ctx.isAdmin },
+      );
+      if (!access.allowed) {
+        return {
+          invalid: true,
+          message: "Only the template owner/admin can modify channel bindings",
+        } as const;
+      }
       const channel = await repos.channel.getById(channelId);
       if (!channel) return { notFound: true } as const;
 
@@ -732,6 +810,14 @@ export const templateService = {
     return uow.withTransaction(async (repos) => {
       const b = await repos.template.getBinding(templateId, bindingId);
       if (!b) return { notFound: true } as const;
+      const access = await checkResourceAccess(
+        ctx.actorId,
+        "template",
+        templateId,
+        "write",
+        { isAdmin: ctx.isAdmin },
+      );
+      if (!access.allowed) return { notFound: true } as const;
       await repos.template.deleteBinding(templateId, bindingId);
       await repos.audit.append({
         action: "DELETE",

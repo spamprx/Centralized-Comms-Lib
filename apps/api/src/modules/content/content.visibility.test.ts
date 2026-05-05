@@ -63,6 +63,23 @@ describe("content visibility guards", () => {
     ).toBe(false);
   });
 
+  it("denies broad audience read for published channel-bound content", () => {
+    const content = buildContent({
+      channelId: "ch_1",
+      lifecycleState: "PUBLISHED",
+      visibility: "PUBLIC",
+    });
+
+    expect(
+      __private__.isPublishedAudienceReadAllowed({
+        requester: { id: "reader_1", isAdmin: false },
+        content,
+        isCoAuthor: false,
+        isReviewer: false,
+      }),
+    ).toBe(false);
+  });
+
   it("allows privileged readers to access non-published content", () => {
     const content = buildContent({
       lifecycleState: "IN_REVIEW",

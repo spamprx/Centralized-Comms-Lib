@@ -54,6 +54,16 @@ router.get("/me", async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.get("/push-recipients", async (_req: AuthRequest, res: Response) => {
+  try {
+    const items = await profileService.listPushRecipientCandidates();
+    res.status(200).json({ items });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
 router.patch("/me", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
@@ -78,6 +88,46 @@ router.patch("/me", async (req: AuthRequest, res: Response) => {
       return;
     }
     res.status(200).json(updated);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/me/fcm-token", async (req: AuthRequest, res: Response) => {
+  try {
+    const { token, deviceId } = req.body as {
+      token?: unknown;
+      deviceId?: unknown;
+    };
+    if (typeof token !== "string" || typeof deviceId !== "string") {
+      res.status(400).json({ error: "token and deviceId are required strings" });
+      return;
+    }
+    const saved = await profileService.saveDeviceFcmToken(req.user!.id, {
+      token,
+      deviceId,
+      userAgent: req.get("user-agent") ?? null,
+    });
+    res.status(200).json(saved);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.startsWith("Invalid FCM token")) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/me/fcm-token/:deviceId", async (req: AuthRequest, res: Response) => {
+  try {
+    const out = await profileService.deleteDeviceFcmToken(req.user!.id, req.params.deviceId);
+    if (!out.deleted) {
+      res.status(404).json({ error: "Device token not found" });
+      return;
+    }
+    res.status(204).end();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
@@ -261,5 +311,40 @@ router.post(
     }
   },
 );
+
+router.get("/me/push-notifications", async (req: AuthRequest, res: Response) => {
+  try {
+    const unreadOnly = String(req.query.unreadOnly ?? "").toLowerCase() === "true";
+    const items = await profileService.listPushNotifications(req.user!.id, unreadOnly);
+    res.status(200).json({ items });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.patch("/me/push-notifications/:id/read", async (req: AuthRequest, res: Response) => {
+  try {
+    const ok = await profileService.markPushNotificationRead(req.user!.id, req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: "Notification not found" });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/me/push-notifications/read-all", async (req: AuthRequest, res: Response) => {
+  try {
+    const updated = await profileService.markAllPushNotificationsRead(req.user!.id);
+    res.status(200).json({ updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
 
 export default router;

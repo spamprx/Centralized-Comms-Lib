@@ -1,7 +1,9 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
+import { Prisma } from "@prisma/client";
 
 type ActivityType = "PUBLISHED" | "COMMENTED" | "CREATED";
 type BookmarkNotificationType = "BODY_UPDATED" | "PUBLISHED";
+type UserPushNotificationType = "PUSH_SENT";
 
 export type ProfileActivityItem = {
   id: string;
@@ -28,6 +30,29 @@ export type ProfileBookmarkNotification = {
   createdAt: Date;
   readAt: Date | null;
 };
+
+export type ProfilePushNotification = {
+  id: string;
+  type: UserPushNotificationType;
+  title: string;
+  body: string;
+  createdAt: Date;
+  readAt: Date | null;
+};
+
+const FCM_TOKEN_MIN_LENGTH = 20;
+const FCM_TOKEN_MAX_LENGTH = 4096;
+
+function normalizeAndValidateFcmToken(raw: string): string {
+  const token = raw.trim();
+  if (token.length < FCM_TOKEN_MIN_LENGTH || token.length > FCM_TOKEN_MAX_LENGTH) {
+    throw new Error("Invalid FCM token: length is outside allowed bounds");
+  }
+  if (!/^[A-Za-z0-9:_.-]+$/.test(token)) {
+    throw new Error("Invalid FCM token: unsupported characters");
+  }
+  return token;
+}
 
 export const profileService = {
   /**
@@ -103,6 +128,24 @@ export const profileService = {
         following,
       },
     };
+  },
+
+  async listPushRecipientCandidates(): Promise<
+    Array<{ id: string; displayName: string; email: string; isActive: boolean }>
+  > {
+    const prisma = getPrismaClient();
+    const rows = await prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: [{ displayName: "asc" }, { email: "asc" }],
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        isActive: true,
+      },
+      take: 500,
+    });
+    return rows;
   },
 
   async updateMe(
@@ -451,5 +494,127 @@ export const profileService = {
       data: { readAt: new Date() },
     });
     return out.count;
+  },
+
+  async listPushNotifications(
+    userId: string,
+    unreadOnly = false,
+  ): Promise<ProfilePushNotification[]> {
+    const prisma = getPrismaClient();
+    const rows = await prisma.userPushNotification.findMany({
+      where: {
+        userId,
+        ...(unreadOnly ? { readAt: null } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      type: row.type as UserPushNotificationType,
+      title: row.title,
+      body: row.body,
+      createdAt: row.createdAt,
+      readAt: row.readAt,
+    }));
+  },
+
+  async markPushNotificationRead(userId: string, notificationId: string): Promise<boolean> {
+    const prisma = getPrismaClient();
+    const row = await prisma.userPushNotification.findFirst({
+      where: { id: notificationId, userId },
+      select: { id: true },
+    });
+    if (!row) return false;
+    await prisma.userPushNotification.update({
+      where: { id: notificationId },
+      data: { readAt: new Date() },
+    });
+    return true;
+  },
+
+  async markAllPushNotificationsRead(userId: string): Promise<number> {
+    const prisma = getPrismaClient();
+    const out = await prisma.userPushNotification.updateMany({
+      where: { userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return out.count;
+  },
+
+  async saveDeviceFcmToken(
+    userId: string,
+    input: { token: string; deviceId: string; userAgent?: string | null },
+  ): Promise<{ id: string; deviceId: string; updatedAt: Date }> {
+    const prisma = getPrismaClient();
+    const token = normalizeAndValidateFcmToken(input.token);
+    const deviceId = input.deviceId.trim();
+    if (!deviceId) {
+      throw new Error("Invalid FCM token: deviceId is required");
+    }
+    try {
+      const row = await prisma.userDeviceFcmToken.upsert({
+        where: {
+          userId_deviceId: {
+            userId,
+            deviceId,
+          },
+        },
+        create: {
+          userId,
+          deviceId,
+          token,
+          userAgent: input.userAgent ?? null,
+        },
+        update: {
+          token,
+          userAgent: input.userAgent ?? null,
+          lastSeenAt: new Date(),
+        },
+        select: {
+          id: true,
+          deviceId: true,
+          updatedAt: true,
+        },
+      });
+      return row;
+    } catch (err) {
+      // Token can already exist for a prior device/user mapping.
+      // Rebind it to the current authenticated user/device.
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
+        throw err;
+      }
+      const row = await prisma.userDeviceFcmToken.update({
+        where: { token },
+        data: {
+          userId,
+          deviceId,
+          userAgent: input.userAgent ?? null,
+          lastSeenAt: new Date(),
+        },
+        select: {
+          id: true,
+          deviceId: true,
+          updatedAt: true,
+        },
+      });
+      return row;
+    }
+  },
+
+  async deleteDeviceFcmToken(
+    userId: string,
+    deviceId: string,
+  ): Promise<{ deleted: boolean }> {
+    const prisma = getPrismaClient();
+    const normalizedDeviceId = deviceId.trim();
+    if (!normalizedDeviceId) return { deleted: false };
+    const out = await prisma.userDeviceFcmToken.deleteMany({
+      where: {
+        userId,
+        deviceId: normalizedDeviceId,
+      },
+    });
+    return { deleted: out.count > 0 };
   },
 };

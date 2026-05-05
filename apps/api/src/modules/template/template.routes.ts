@@ -7,6 +7,12 @@ import type { AuthRequest } from "../../middlewares/auth.middleware";
 import { formattingRuleService } from "./formattingRule.service";
 import { getPrismaClient } from "../../repository";
 import { workspaceService } from "../workspace/workspace.service";
+import { bumpSearchCacheEpoch } from "../../shared/cache/redisClient";
+import {
+  checkResourceAccess,
+  filterReadableTemplates,
+} from "../../shared/authorization";
+import { publishEventStandalone } from "../../integration";
 
 const router = Router();
 
@@ -91,6 +97,18 @@ function templateBaseJson(t: {
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
   };
+}
+
+async function canReadTemplate(req: AuthRequest, templateId: string) {
+  return checkResourceAccess(req.user!.id, "template", templateId, "read", {
+    isAdmin: req.user?.role === "ADMIN",
+  });
+}
+
+async function canWriteTemplate(req: AuthRequest, templateId: string) {
+  return checkResourceAccess(req.user!.id, "template", templateId, "write", {
+    isAdmin: req.user?.role === "ADMIN",
+  });
 }
 
 /**
@@ -203,8 +221,12 @@ router.get("/", async (req: AuthRequest, res: Response) => {
       },
       orderBy: [{ updatedAt: "desc" }],
     });
+    const filtered = filterReadableTemplates<typeof list[number]>(
+      { id: req.user!.id, isAdmin: req.user?.role === "ADMIN" },
+      list,
+    );
     res.status(200).json(
-      list.map((t) => ({
+      filtered.map((t) => ({
         ...templateBaseJson(t),
         tags: t.tags.map(templateTagJson),
         cluster: t.cluster
@@ -582,6 +604,11 @@ router.get("/:id/tags", async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "Template not found" });
       return;
     }
+    const access = await canReadTemplate(req, req.params.id);
+    if (!access.allowed) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
     const rows = await listTemplateTags(req.params.id);
     res.status(200).json(rows.map(templateTagJson));
   } catch (err) {
@@ -606,12 +633,24 @@ router.post("/:id/tags", async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "Template or tag not found" });
       return;
     }
+    const access = await canWriteTemplate(req, req.params.id);
+    if (!access.allowed) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
     const row = await prisma.templateTag.upsert({
       where: { templateId_tagId: { templateId: req.params.id, tagId } },
       update: {},
       create: { templateId: req.params.id, tagId },
       include: { tag: true },
     });
+    await publishEventStandalone({
+      aggregateType: "TEMPLATE",
+      aggregateId: req.params.id,
+      eventType: "TEMPLATE.METADATA_CHANGED",
+      payload: { reason: "TAG_ASSIGNED", templateId: req.params.id, tagId },
+    });
+    await bumpSearchCacheEpoch();
     res.status(201).json(templateTagJson(row));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -622,12 +661,29 @@ router.post("/:id/tags", async (req: AuthRequest, res: Response) => {
 router.delete("/:id/tags/:tagId", async (req: AuthRequest, res: Response) => {
   try {
     const prisma = getPrismaClient();
+    const template = await prisma.template.findUnique({ where: { id: req.params.id } });
+    if (!template) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    const access = await canWriteTemplate(req, req.params.id);
+    if (!access.allowed) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
     await prisma.templateTag.deleteMany({
       where: {
         templateId: req.params.id,
         tagId: req.params.tagId,
       },
     });
+    await publishEventStandalone({
+      aggregateType: "TEMPLATE",
+      aggregateId: req.params.id,
+      eventType: "TEMPLATE.METADATA_CHANGED",
+      payload: { reason: "TAG_REMOVED", templateId: req.params.id, tagId: req.params.tagId },
+    });
+    await bumpSearchCacheEpoch();
     res.status(200).json({ message: "Template tag removed" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -663,6 +719,10 @@ router.get("/clusters/all", async (_req: AuthRequest, res: Response) => {
 
 router.post("/clusters", async (req: AuthRequest, res: Response) => {
   try {
+    if (req.user?.role !== "ADMIN") {
+      res.status(403).json({ error: "Only admins can create clusters" });
+      return;
+    }
     const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
     const description =
       typeof req.body?.description === "string" ? req.body.description.trim() : null;
@@ -702,6 +762,11 @@ router.patch("/:id/cluster", async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "Template not found" });
       return;
     }
+    const access = await canWriteTemplate(req, req.params.id);
+    if (!access.allowed) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
     if (clusterId) {
       const cluster = await prisma.templateCluster.findUnique({ where: { id: clusterId } });
       if (!cluster) {
@@ -717,6 +782,13 @@ router.patch("/:id/cluster", async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       data: { clusterId },
     });
+    await publishEventStandalone({
+      aggregateType: "TEMPLATE",
+      aggregateId: req.params.id,
+      eventType: "TEMPLATE.METADATA_CHANGED",
+      payload: { reason: "CLUSTER_UPDATED", templateId: req.params.id, clusterId },
+    });
+    await bumpSearchCacheEpoch();
     res.status(200).json({ id: updated.id, clusterId: updated.clusterId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -806,6 +878,11 @@ router.patch("/:id/cluster", async (req: AuthRequest, res: Response) => {
  */
 router.get("/:id/formatting-rules", async (req: AuthRequest, res: Response) => {
   try {
+    const access = await canReadTemplate(req, req.params.id);
+    if (!access.allowed) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
     const row = await formattingRuleService.getForTemplate(req.params.id);
     res.status(200).json({
       id: row?.id ?? null,
@@ -962,6 +1039,17 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     });
     if (!t) {
       res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    const access = await checkResourceAccess(
+      req.user!.id,
+      "template",
+      req.params.id,
+      "read",
+      { isAdmin: req.user?.role === "ADMIN" },
+    );
+    if (!access.allowed) {
+      res.status(403).json({ error: "Forbidden" });
       return;
     }
     res.status(200).json({

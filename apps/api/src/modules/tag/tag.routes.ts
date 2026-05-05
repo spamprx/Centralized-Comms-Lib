@@ -1,7 +1,10 @@
 import { Router, Response } from "express";
-import type { AuthRequest } from "../../middlewares/auth.middleware";
+import { authorize, type AuthRequest } from "../../middlewares/auth.middleware";
 import { tagService } from "../../service";
 import type { AuditContext } from "../../shared/context";
+import { validatePayload } from "../../shared/validation";
+import { AppError } from "../../shared/errors/appError";
+import { createTagBodySchema } from "./tag.schema";
 
 const router = Router();
 
@@ -46,13 +49,9 @@ function auditContext(req: AuthRequest): AuditContext {
  *       500:
  *         description: Server error
  */
-router.post("/", async (req: AuthRequest, res: Response) => {
+router.post("/", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, parentId } = req.body;
-    if (!name) {
-      res.status(400).json({ error: "name is required" });
-      return;
-    }
+    const { name, parentId } = validatePayload(createTagBodySchema, req.body);
     const result = await tagService.create(auditContext(req), {
       name,
       parentId: parentId ?? null,
@@ -63,6 +62,14 @@ router.post("/", async (req: AuthRequest, res: Response) => {
     }
     res.status(201).json(result.tag);
   } catch (err) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({
+        error: err.message,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.details !== undefined ? { details: err.details } : {}),
+      });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
@@ -151,7 +158,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.delete("/:id", async (req: AuthRequest, res: Response) => {
+router.delete("/:id", authorize("ADMIN"), async (req: AuthRequest, res: Response) => {
   try {
     await tagService.delete(auditContext(req), req.params.id);
     res.status(200).json({ message: "Tag deleted" });

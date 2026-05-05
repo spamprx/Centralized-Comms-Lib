@@ -1,5 +1,7 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
+import { bumpSearchCacheEpoch } from "../../shared/cache/redisClient";
+import { publishEvent } from "../../integration";
 
 function slugify(name: string): string {
   return name
@@ -21,6 +23,12 @@ export const tagService = {
     const result = await uow.withTransaction(async (repos) => {
       const existing = await repos.tag.getByName(input.name);
       if (existing) return { conflict: true, tag: existing } as const;
+      if (input.parentId) {
+        const parent = await repos.tag.getById(input.parentId);
+        if (!parent) {
+          throw new Error("Parent tag not found");
+        }
+      }
       const slug = slugify(input.name);
       const tag = await repos.tag.create({
         name: input.name,
@@ -36,8 +44,15 @@ export const tagService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
+      await publishEvent(repos.outbox, {
+        aggregateType: "TAG",
+        aggregateId: tag.id,
+        eventType: "TEMPLATE.METADATA_CHANGED",
+        payload: { reason: "TAG_CREATED", tagId: tag.id, slug: tag.slug },
+      });
       return { conflict: false, tag } as const;
     });
+    await bumpSearchCacheEpoch();
     return result;
   },
 
@@ -64,6 +79,13 @@ export const tagService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
+      await publishEvent(repos.outbox, {
+        aggregateType: "TAG",
+        aggregateId: tagId,
+        eventType: "TEMPLATE.METADATA_CHANGED",
+        payload: { reason: "TAG_DELETED", tagId },
+      });
     });
+    await bumpSearchCacheEpoch();
   },
 };

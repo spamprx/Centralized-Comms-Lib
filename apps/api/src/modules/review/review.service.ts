@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import type { ReviewComment } from "../../repository/types";
 import type { AuditContext } from "../../shared/context";
 import { requiredQuorumFromPolicies } from "./reviewPolicy.enforcement";
+import { publishEvent } from "../../integration";
+import { assertNoUnresolvedPlaceholdersForUnboundTemplate } from "../content/contentPlaceholderGate";
 
 type Verdict = "APPROVED" | "DENIED" | "ROLLBACK";
 
@@ -28,6 +30,22 @@ export const reviewService = {
       ) {
         return { invalidState: true, state: content.lifecycleState } as const;
       }
+
+      const versionRow = await prisma.contentVersion.findFirst({
+        where: { id: input.contentVersionId, contentId: input.contentId },
+        select: { body: true },
+      });
+      if (!versionRow) {
+        return { contentVersionNotFound: true } as const;
+      }
+      const gate = await assertNoUnresolvedPlaceholdersForUnboundTemplate(
+        content,
+        versionRow.body,
+      );
+      if ("unfilled" in gate && gate.unfilled) {
+        return { unfilledPlaceholders: true, keys: gate.keys } as const;
+      }
+
       if (content.lifecycleState === "DRAFT") {
         await repos.content.updateLifecycleState(input.contentId, "IN_REVIEW");
       }
@@ -88,7 +106,7 @@ export const reviewService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "REVIEW_REQUEST",
         aggregateId: request.id,
         eventType:
@@ -131,23 +149,33 @@ export const reviewService = {
     requester: { id: string; isAdmin: boolean },
   ) {
     const repos = new PrismaUnitOfWork(getPrismaClient()).repos();
-    if (!requester.isAdmin) {
-      // Check if the requester is the content author or an assigned reviewer for this content
-      const content = await repos.content.getById(contentId);
-      if (!content) return { notFound: true } as const;
-      if (content.authorId !== requester.id) {
-        const allRequests =
-          await repos.review.listRequestsForContent(contentId);
-        const allAssignments = await Promise.all(
-          allRequests.map((r) => repos.review.listAssignmentsForRequest(r.id)),
-        );
-        const isReviewer = allAssignments
-          .flat()
-          .some((a) => a.reviewerId === requester.id);
-        if (!isReviewer) return { forbidden: true } as const;
-      }
+    const requests = await repos.review.listRequestsForContent(contentId);
+    if (requester.isAdmin) return { requests };
+
+    const content = await repos.content.getById(contentId);
+    if (!content) return { notFound: true } as const;
+
+    // Author can see all requests for their content.
+    if (content.authorId === requester.id) {
+      return { requests };
     }
-    return { requests: await repos.review.listRequestsForContent(contentId) };
+
+    // Reviewer can only see requests where they are explicitly assigned.
+    const assignmentLists = await Promise.all(
+      requests.map((r) => repos.review.listAssignmentsForRequest(r.id)),
+    );
+    const allowedRequestIds = new Set(
+      requests
+        .filter((_, idx) =>
+          assignmentLists[idx].some((a) => a.reviewerId === requester.id),
+        )
+        .map((r) => r.id),
+    );
+    if (allowedRequestIds.size === 0) return { forbidden: true } as const;
+
+    return {
+      requests: requests.filter((r) => allowedRequestIds.has(r.id)),
+    };
   },
 
   async assignReviewer(
@@ -194,7 +222,7 @@ export const reviewService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "REVIEW_ASSIGNMENT",
         aggregateId: assignment.id,
         eventType: "REVIEWER.ASSIGNED",
@@ -289,7 +317,7 @@ export const reviewService = {
             },
           });
           await repos.review.updateRequestStatus(request.id, "OPEN");
-          await repos.outbox.add({
+          await publishEvent(repos.outbox, {
             aggregateType: "CONTENT",
             aggregateId: request.contentId,
             eventType: "CONTENT.ROLLBACK",
@@ -351,7 +379,7 @@ export const reviewService = {
               reviewAssignmentId: assignment.id,
             },
           });
-          await repos.outbox.add({
+          await publishEvent(repos.outbox, {
             aggregateType: "CONTENT",
             aggregateId: request.contentId,
             eventType: "CONTENT.PUBLISHED",
@@ -380,7 +408,7 @@ export const reviewService = {
           },
         });
         await repos.review.updateRequestStatus(request.id, "CLOSED");
-        await repos.outbox.add({
+        await publishEvent(repos.outbox, {
           aggregateType: "CONTENT",
           aggregateId: request.contentId,
           eventType: "CONTENT.DENIED",
@@ -412,7 +440,7 @@ export const reviewService = {
           },
         });
         await repos.review.updateRequestStatus(request.id, "OPEN");
-        await repos.outbox.add({
+        await publishEvent(repos.outbox, {
           aggregateType: "CONTENT",
           aggregateId: request.contentId,
           eventType: "CONTENT.ROLLBACK",
@@ -473,6 +501,105 @@ export const reviewService = {
       return { ok: true } as const;
     });
     return result;
+  },
+
+  /**
+   * Content author or admin: list active users that may be assigned as reviewers
+   * (replaces unauthenticated-wide directory exposure via admin routes).
+   */
+  async listAssignableReviewersForContent(
+    ctx: AuditContext,
+    contentId: string,
+  ): Promise<
+    | { users: Array<{ id: string; displayName: string | null; email: string }> }
+    | { notFound: true }
+    | { forbidden: true }
+  > {
+    const prisma = getPrismaClient();
+    const content = await prisma.content.findUnique({
+      where: { id: contentId },
+      select: { authorId: true },
+    });
+    if (!content) return { notFound: true };
+    if (content.authorId !== ctx.actorId && !ctx.isAdmin) {
+      return { forbidden: true };
+    }
+
+    const users = await prisma.user.findMany({
+      where: { isActive: true, id: { not: ctx.actorId } },
+      select: { id: true, displayName: true, email: true },
+      orderBy: [{ displayName: "asc" }, { email: "asc" }],
+    });
+    return { users };
+  },
+
+  /**
+   * Minimal user fields for display, only for users the caller may see via
+   * review participation (reviewer on an assignment, or author of reviewed content).
+   */
+  async listUserDisplayNamesForReviewContext(
+    ctx: AuditContext,
+    userIds: string[],
+  ): Promise<Array<{ id: string; displayName: string | null; email: string }>> {
+    const prisma = getPrismaClient();
+    const unique = [...new Set(userIds.filter((id) => typeof id === "string" && id.length > 0))].slice(
+      0,
+      200,
+    );
+    if (unique.length === 0) return [];
+
+    if (ctx.isAdmin) {
+      return prisma.user.findMany({
+        where: { id: { in: unique } },
+        select: { id: true, displayName: true, email: true },
+      });
+    }
+
+    const allowed = new Set<string>([ctx.actorId]);
+
+    const asReviewer = await prisma.reviewAssignment.findMany({
+      where: { reviewerId: ctx.actorId },
+      include: {
+        reviewRequest: {
+          select: {
+            requestedById: true,
+            content: { select: { authorId: true } },
+          },
+        },
+      },
+    });
+    for (const a of asReviewer) {
+      allowed.add(a.reviewRequest.requestedById);
+      allowed.add(a.reviewRequest.content.authorId);
+    }
+
+    const myContents = await prisma.content.findMany({
+      where: { authorId: ctx.actorId },
+      select: { id: true },
+    });
+    const myContentIds = myContents.map((c) => c.id);
+    if (myContentIds.length > 0) {
+      const reqs = await prisma.reviewRequest.findMany({
+        where: { contentId: { in: myContentIds } },
+        include: {
+          assignments: { select: { reviewerId: true } },
+        },
+      });
+      for (const r of reqs) {
+        allowed.add(r.requestedById);
+        for (const as of r.assignments) {
+          allowed.add(as.reviewerId);
+        }
+      }
+    }
+
+    const filtered = unique.filter((id) => allowed.has(id));
+    if (filtered.length === 0) return [];
+
+    return prisma.user.findMany({
+      where: { id: { in: filtered } },
+      select: { id: true, displayName: true, email: true },
+    });
   },
 
   async listAssignmentsForReviewer(reviewerId: string) {

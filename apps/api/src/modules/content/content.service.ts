@@ -32,6 +32,9 @@ import {
   redisGet,
   redisSet,
 } from "../../shared/cache/redisClient";
+import { filterReadableContent } from "../../shared/authorization";
+import { publishEvent } from "../../integration";
+import { assertNoUnresolvedPlaceholdersForUnboundTemplate } from "./contentPlaceholderGate";
 
 const VALID_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   DRAFT: ["IN_REVIEW", "ARCHIVED"],
@@ -70,13 +73,11 @@ function isPublishedAudienceReadAllowed(params: {
   const { requester, content, isCoAuthor, isReviewer } = params;
   const isAdmin = !!requester?.isAdmin;
   const isAuthor = !!requester && content.authorId === requester.id;
-  return (
-    isAdmin ||
-    isAuthor ||
-    isCoAuthor ||
-    isReviewer ||
-    content.lifecycleState === "PUBLISHED"
-  );
+  if (isAdmin || isAuthor || isCoAuthor || isReviewer) return true;
+  if (content.lifecycleState !== "PUBLISHED") return false;
+  // Channel-bound sends never use this helper as “open catalog” reads; visibility is enforced in authorization.
+  if (content.channelId) return false;
+  return true;
 }
 
 function canViewContent(
@@ -86,10 +87,15 @@ function canViewContent(
   isCoAuthor = false,
 ): boolean {
   const visibility = content.visibility as Visibility;
+  const channelBound = Boolean(content.channelId);
 
-  // Unauthenticated: only PUBLIC content is visible
+  // Unauthenticated: library catalog — standalone published public only (never channel sends).
   if (!requester) {
-    return visibility === "PUBLIC";
+    return (
+      !channelBound &&
+      content.lifecycleState === "PUBLISHED" &&
+      visibility === "PUBLIC"
+    );
   }
 
   // Admins, authors and accepted co-authors can always see
@@ -97,8 +103,13 @@ function canViewContent(
     return true;
   }
 
+  if (content.lifecycleState !== "PUBLISHED") {
+    return false;
+  }
+
   switch (visibility) {
     case "PUBLIC":
+      if (channelBound) return false;
       return true;
     case "PRIVATE_TO_GROUP": {
       if (!content.visibilityGroupId) return false;
@@ -120,6 +131,25 @@ function slugify(title: string): string {
   );
 }
 
+/** When both are set, channel must be one of the template's bindings (single-channel rule). */
+async function validateTemplateChannelBinding(
+  prisma: ReturnType<typeof getPrismaClient>,
+  templateId: string | null | undefined,
+  channelId: string | null | undefined,
+): Promise<string | null> {
+  if (!templateId || !channelId) return null;
+  const tpl = await prisma.template.findUnique({
+    where: { id: templateId },
+    select: { bindings: { select: { channelId: true } } },
+  });
+  const allowed = new Set((tpl?.bindings ?? []).map((b) => b.channelId));
+  if (allowed.size === 0) return null;
+  if (!allowed.has(channelId)) {
+    return "channelId must match one of the template's channel bindings";
+  }
+  return null;
+}
+
 export const contentService = {
   async createDraft(
     ctx: AuditContext,
@@ -135,7 +165,18 @@ export const contentService = {
   ): Promise<
     | { content: Content; version: ContentVersion }
     | { invalidFormatting: true; violations: FormattingViolation[] }
+    | { invalidChannelBinding: true; error: string }
   > {
+    const prismaPre = getPrismaClient();
+    const bindErr = await validateTemplateChannelBinding(
+      prismaPre,
+      input.templateId ?? null,
+      input.channelId ?? null,
+    );
+    if (bindErr) {
+      return { invalidChannelBinding: true, error: bindErr };
+    }
+
     const rules = await getFormattingRulesForTemplateId(
       input.templateId ?? undefined,
     );
@@ -193,24 +234,8 @@ export const contentService = {
     type AuthorRow = { id: string; displayName: string; email: string };
     const uow = new PrismaUnitOfWork(prisma);
     const repos = uow.repos();
-    const isOwnListRequest =
-      !!requester && !!filters.authorId && filters.authorId === requester.id;
-    const effectiveFilters: ContentListFilters =
-      requester && !requester.isAdmin && !isOwnListRequest
-        ? { ...filters, lifecycleState: "PUBLISHED" }
-        : filters;
-    const contents = await repos.content.list(effectiveFilters);
-
-    const visible = !requester
-      ? contents.filter((c) => canViewContent(c, null))
-      : (() => {
-          const groupsPromise = repos.userRole.listGroupsForUser(requester.id);
-          return groupsPromise.then((groups) =>
-            contents.filter((c) => canViewContent(c, requester, groups)),
-          );
-        })();
-
-    const visibleContents = await visible;
+    const contents = await repos.content.list(filters);
+    const visibleContents = await filterReadableContent(requester, contents);
     const authorIds = Array.from(
       new Set(visibleContents.map((c) => c.authorId).filter(Boolean)),
     );
@@ -224,9 +249,12 @@ export const contentService = {
 
     const contentIds = visibleContents.map((c) => c.id);
     const [viewsRows, likesRows] = await Promise.all([
-      prisma.contentView.groupBy({
+      prisma.contentAnalyticsEvent.groupBy({
         by: ["contentId"],
-        where: { contentId: { in: contentIds } },
+        where: {
+          contentId: { in: contentIds },
+          eventType: "view",
+        },
         _count: { _all: true },
       }),
       prisma.contentLike.groupBy({
@@ -340,9 +368,9 @@ export const contentService = {
 
     const [viewsRows, likesRows, coCountRows] = await Promise.all([
       contentIds.length
-        ? prisma.contentView.groupBy({
+        ? prisma.contentAnalyticsEvent.groupBy({
             by: ["contentId"],
-            where: { contentId: { in: contentIds } },
+            where: { contentId: { in: contentIds }, eventType: "view" },
             _count: { _all: true },
           })
         : Promise.resolve([]),
@@ -451,41 +479,8 @@ export const contentService = {
     };
     const directChannel = contentRow.channel ?? null;
 
-    // Check if requester is an accepted co-author for this content
-    let isCoAuthor = false;
-    if (requester) {
-      const co = await prisma.contentCoAuthor.findUnique({
-        where: { contentId_userId: { contentId: id, userId: requester.id } },
-        select: { status: true },
-      });
-      isCoAuthor = !!co && co.status === "ACCEPTED";
-    }
-
-    // Check if requester is an assigned reviewer on any review request for this content
-    let isReviewer = false;
-    if (requester) {
-      const reviewAssignment = await prisma.reviewAssignment.findFirst({
-        where: {
-          reviewerId: requester.id,
-          reviewRequest: { contentId: id },
-        },
-      });
-      isReviewer = !!reviewAssignment;
-    }
-
-    const groups = requester
-      ? await repos.userRole.listGroupsForUser(requester.id)
-      : [];
-    if (
-      !isPublishedAudienceReadAllowed({
-        requester,
-        content,
-        isCoAuthor,
-        isReviewer,
-      }) ||
-      !isReviewer &&
-      !canViewContent(content, requester, groups, isCoAuthor)
-    ) {
+    const visible = await filterReadableContent(requester, [content]);
+    if (visible.length === 0) {
       return { forbidden: true };
     }
 
@@ -676,6 +671,7 @@ export const contentService = {
     | { invalidState: true; state: LifecycleState }
     | { invalidFormatting: true; violations: FormattingViolation[] }
     | { conflict: true; currentVersionNumber: number }
+    | { invalidChannelBinding: true; error: string }
   > {
     const prisma = getPrismaClient();
 
@@ -707,6 +703,20 @@ export const contentService = {
     const result = await uow.withTransaction(async (repos) => {
       const content = await repos.content.getById(contentId);
       if (!content) return { notFound: true } as const;
+
+      const effectiveTemplateId =
+        input.templateId !== undefined ? input.templateId : content.templateId;
+      const effectiveChannelId =
+        input.channelId !== undefined ? input.channelId : content.channelId;
+      const bindErr = await validateTemplateChannelBinding(
+        prisma,
+        effectiveTemplateId,
+        effectiveChannelId,
+      );
+      if (bindErr) {
+        return { invalidChannelBinding: true, error: bindErr } as const;
+      }
+
       const isAuthor = content.authorId === ctx.actorId;
       const isAdmin = !!ctx.isAdmin;
       const isCoAuthor =
@@ -753,8 +763,6 @@ export const contentService = {
 
       // Load formatting rules using the *effective* templateId for this save to avoid the
       // pre-transaction race where rules were based on the old templateId.
-      const effectiveTemplateId =
-        input.templateId !== undefined ? input.templateId : content.templateId;
       const rules = await getFormattingRulesForTemplateId(
         effectiveTemplateId ?? undefined,
       );
@@ -791,7 +799,7 @@ export const contentService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "CONTENT",
         aggregateId: contentId,
         eventType: "CONTENT.BODY_SAVED",
@@ -898,7 +906,7 @@ export const contentService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "CONTENT",
         aggregateId: contentId,
         eventType: "CONTENT.BODY_SAVED",
@@ -922,11 +930,13 @@ export const contentService = {
     ctx: AuditContext,
     contentId: string,
     lifecycleState: LifecycleState,
+    opts?: { bypassReviewQuorumForChannelPublish?: boolean },
   ): Promise<
     | { content: Content }
     | { notFound: true }
     | { forbidden: true }
     | { invalidTransition: true; current: LifecycleState }
+    | { unfilledPlaceholders: true; keys: string[] }
     | {
         policyViolation: true;
         requiredQuorum: number;
@@ -945,12 +955,44 @@ export const contentService = {
       if (existing.lifecycleState === lifecycleState) {
         return { content: existing } as const;
       }
-      const allowed = VALID_TRANSITIONS[existing.lifecycleState] ?? [];
-      if (!allowed.includes(lifecycleState)) {
+
+      const channelBound =
+        existing.channelId != null || existing.templateId != null;
+      const allowDraftToPublishedForChannelPublish =
+        existing.lifecycleState === "DRAFT" &&
+        lifecycleState === "PUBLISHED" &&
+        opts?.bypassReviewQuorumForChannelPublish === true &&
+        channelBound;
+
+      if (
+        existing.lifecycleState === "DRAFT" &&
+        lifecycleState === "PUBLISHED" &&
+        opts?.bypassReviewQuorumForChannelPublish === true &&
+        !channelBound
+      ) {
         return {
           invalidTransition: true,
           current: existing.lifecycleState,
         } as const;
+      }
+
+      const allowed = VALID_TRANSITIONS[existing.lifecycleState] ?? [];
+      if (!allowDraftToPublishedForChannelPublish && !allowed.includes(lifecycleState)) {
+        return {
+          invalidTransition: true,
+          current: existing.lifecycleState,
+        } as const;
+      }
+
+      if (lifecycleState === "IN_REVIEW" || lifecycleState === "PUBLISHED") {
+        const latest = await repos.content.getLatestVersion(contentId);
+        const gate = await assertNoUnresolvedPlaceholdersForUnboundTemplate(
+          existing,
+          latest?.body ?? null,
+        );
+        if ("unfilled" in gate && gate.unfilled) {
+          return { unfilledPlaceholders: true, keys: gate.keys } as const;
+        }
       }
 
       if (lifecycleState === "PUBLISHED") {
@@ -970,30 +1012,35 @@ export const contentService = {
         });
 
         if (requiredQuorum != null) {
-          const latest = await repos.content.getLatestVersion(contentId);
-          if (!latest) {
-            return {
-              policyViolation: true,
-              requiredQuorum,
-              code: "REVIEW_POLICY_VIOLATION",
-              error:
-                "Publishing blocked by review policy: content has no versions to review.",
-            } as const;
-          }
-          const ok = await repos.review.hasClosedRequestMeetingQuorumForVersion(
-            {
-              contentId,
-              contentVersionId: latest.id,
-              requiredQuorum,
-            },
-          );
-          if (!ok) {
-            return {
-              policyViolation: true,
-              requiredQuorum,
-              code: "REVIEW_POLICY_VIOLATION",
-              error: `Publishing blocked by review policy: requires ${requiredQuorum} approval(s) for this content before publishing. Create a review request and collect approvals, then retry.`,
-            } as const;
+          const skipQuorum =
+            opts?.bypassReviewQuorumForChannelPublish === true && channelBound;
+
+          if (!skipQuorum) {
+            const latest = await repos.content.getLatestVersion(contentId);
+            if (!latest) {
+              return {
+                policyViolation: true,
+                requiredQuorum,
+                code: "REVIEW_POLICY_VIOLATION",
+                error:
+                  "Publishing blocked by review policy: content has no versions to review.",
+              } as const;
+            }
+            const ok = await repos.review.hasClosedRequestMeetingQuorumForVersion(
+              {
+                contentId,
+                contentVersionId: latest.id,
+                requiredQuorum,
+              },
+            );
+            if (!ok) {
+              return {
+                policyViolation: true,
+                requiredQuorum,
+                code: "REVIEW_POLICY_VIOLATION",
+                error: `Publishing blocked by review policy: requires ${requiredQuorum} approval(s) for this content before publishing. Create a review request and collect approvals, then retry.`,
+              } as const;
+            }
           }
         }
       }
@@ -1030,7 +1077,7 @@ export const contentService = {
         ipAddress: ctx.ipAddress,
         userAgent: ctx.userAgent,
       });
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "CONTENT",
         aggregateId: updated.id,
         eventType: `CONTENT.${lifecycleState}`,
@@ -1251,7 +1298,7 @@ export const contentService = {
         userAgent: ctx.userAgent,
       });
 
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "CONTENT",
         aggregateId: contentId,
         eventType: "CONTENT.COAUTHOR_REQUESTED",
@@ -1353,7 +1400,7 @@ export const contentService = {
         userAgent: ctx.userAgent,
       });
 
-      await repos.outbox.add({
+      await publishEvent(repos.outbox, {
         aggregateType: "CONTENT",
         aggregateId: contentId,
         eventType: accepted
