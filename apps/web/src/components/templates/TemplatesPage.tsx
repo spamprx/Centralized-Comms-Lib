@@ -109,15 +109,22 @@ export default function TemplatesPage() {
   const [cloneTarget, setCloneTarget] = useState<TemplateRecord | null>(null);
   const [cloneBanner, setCloneBanner] = useState<string | null>(null);
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
+  const [clusters, setClusters] = useState<Array<{ id: string; name: string }>>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [channelToast, setChannelToast] = useState<{
     type: 'error' | 'success';
     message: string;
   } | null>(null);
   const [copiedMeta, setCopiedMeta] = useState<string | null>(null);
+  const [clusterAssigning, setClusterAssigning] = useState(false);
+  const [showClusterModal, setShowClusterModal] = useState(false);
+  const [clusterNameInput, setClusterNameInput] = useState('');
+  const [clusterModalError, setClusterModalError] = useState<string | null>(null);
+  const [clusterModalSaving, setClusterModalSaving] = useState(false);
 
   const q = searchParams.get('q') ?? '';
   const status = (searchParams.get('status') as TemplateStatus | 'ALL' | null) ?? 'ALL';
+  const clusterId = searchParams.get('clusterId') ?? '';
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
   const pageSize = PAGE_SIZE_OPTIONS.includes(Number(searchParams.get('pageSize')))
     ? Number(searchParams.get('pageSize'))
@@ -210,7 +217,7 @@ export default function TemplatesPage() {
     setLoading(true);
     setError(null);
     templateCrudService
-      .list({ search: q, status })
+      .list({ search: q, status, clusterId: clusterId || undefined })
       .then((rows) => {
         if (cancelled) return;
         setItems(rows);
@@ -227,14 +234,19 @@ export default function TemplatesPage() {
     return () => {
       cancelled = true;
     };
-  }, [q, status]);
+  }, [q, status, clusterId]);
 
   useEffect(() => {
     if (!templateId) {
       setDetail(null);
       setDetailError(null);
+      setShowForm(false);
+      setFormServerError(null);
       return;
     }
+    /* Leaving list create/details modal when drilling into a template — avoids stale overlay state */
+    setShowForm(false);
+    setFormServerError(null);
 
     let cancelled = false;
     setDetailLoading(true);
@@ -282,6 +294,21 @@ export default function TemplatesPage() {
   useEffect(() => {
     return () => {
       if (layoutDraftSavedTimerRef.current) window.clearTimeout(layoutDraftSavedTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    templateCrudService
+      .listClusters()
+      .then((rows) => {
+        if (!cancelled) setClusters(rows.map((r) => ({ id: r.id, name: r.name })));
+      })
+      .catch(() => {
+        if (!cancelled) setClusters([]);
+      });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -546,6 +573,42 @@ export default function TemplatesPage() {
     }
   }, []);
 
+  const assignClusterForDetail = useCallback(
+    async (nextClusterId: string | null) => {
+      if (!detail) return;
+      setClusterAssigning(true);
+      try {
+        await templateCrudService.assignCluster(detail.id, nextClusterId);
+        const updated = await templateCrudService.getById(detail.id);
+        setDetail(updated);
+        setItems((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      } finally {
+        setClusterAssigning(false);
+      }
+    },
+    [detail],
+  );
+
+  const createClusterQuick = useCallback(async () => {
+    const trimmed = clusterNameInput.trim();
+    if (!trimmed) {
+      setClusterModalError('Cluster name is required');
+      return;
+    }
+    setClusterModalSaving(true);
+    setClusterModalError(null);
+    try {
+      const created = await templateCrudService.createCluster({ name: trimmed });
+      setClusters((prev) => [{ id: created.id, name: created.name }, ...prev]);
+      setShowClusterModal(false);
+      setClusterNameInput('');
+    } catch (e) {
+      setClusterModalError(e instanceof Error ? e.message : 'Failed to create cluster');
+    } finally {
+      setClusterModalSaving(false);
+    }
+  }, [clusterNameInput]);
+
   const layoutPreviewChannels = useMemo(() => {
     if (!detail?.bindings?.length) return [];
     return detail.bindings.map((b) => {
@@ -696,32 +759,34 @@ export default function TemplatesPage() {
                       )}
                       <span className="hidden sm:inline">Save draft</span>
                     </button>
-                    <button
-                      type="button"
-                      title={
-                        layoutToolbar.dirty
-                          ? 'Save draft changes before activating'
-                          : !layoutToolbar.canActivate
-                            ? 'Fix layout or channel requirements before activating'
-                            : 'Publish layout as active'
-                      }
-                      onClick={() => activateDraftRef.current?.()}
-                      disabled={layoutActivating || !layoutToolbar.canActivate}
-                      className={`flex items-center gap-1.5 rounded-app-md border px-3 py-1.5 text-[12px] font-semibold ${
-                        layoutActivating
-                          ? 'cursor-not-allowed border-emerald-500/20 bg-emerald-500/10 text-emerald-300/50 opacity-70'
-                          : !layoutToolbar.canActivate
-                            ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-50'
-                            : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20'
-                      }`}
-                    >
-                      {layoutActivating ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <CheckCircle size={14} />
-                      )}
-                      <span className="hidden sm:inline">Activate</span>
-                    </button>
+                    {detail.status !== 'ACTIVE' ? (
+                      <button
+                        type="button"
+                        title={
+                          layoutToolbar.dirty
+                            ? 'Save draft changes before activating'
+                            : !layoutToolbar.canActivate
+                              ? 'Fix layout or channel requirements before activating'
+                              : 'Publish layout as active'
+                        }
+                        onClick={() => activateDraftRef.current?.()}
+                        disabled={layoutActivating || !layoutToolbar.canActivate}
+                        className={`flex items-center gap-1.5 rounded-app-md border px-3 py-1.5 text-[12px] font-semibold ${
+                          layoutActivating
+                            ? 'cursor-not-allowed border-emerald-500/20 bg-emerald-500/10 text-emerald-300/50 opacity-70'
+                            : !layoutToolbar.canActivate
+                              ? 'cursor-not-allowed border-app-border/60 bg-app-bg/30 text-app-faint opacity-50'
+                              : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20'
+                        }`}
+                      >
+                        {layoutActivating ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <CheckCircle size={14} />
+                        )}
+                        <span className="hidden sm:inline">Activate</span>
+                      </button>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -760,7 +825,7 @@ export default function TemplatesPage() {
             <button
               type="button"
               role="tab"
-              aria-selected={mobileWorkspace === 'template'}
+              aria-selected={mobileWorkspace === 'template' ? 'true' : 'false'}
               aria-controls="template-meta-panel"
               id="tab-workspace-template"
               onClick={() => setMobileWorkspace('template')}
@@ -776,7 +841,7 @@ export default function TemplatesPage() {
             <button
               type="button"
               role="tab"
-              aria-selected={mobileWorkspace === 'layout'}
+              aria-selected={mobileWorkspace === 'layout' ? 'true' : 'false'}
               aria-controls="template-layout-panel"
               id="tab-workspace-layout"
               onClick={() => setMobileWorkspace('layout')}
@@ -925,6 +990,23 @@ export default function TemplatesPage() {
                               </div>
                             );
                           })()}
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-app-faint">Cluster</p>
+                          <select
+                            value={detail.cluster?.id ?? ''}
+                            onChange={(e) => void assignClusterForDetail(e.target.value || null)}
+                            title="Assign template cluster"
+                            className="mt-1 w-full rounded-md border border-app-border bg-app-bg-subtle px-2 py-1 text-[11px]"
+                            disabled={clusterAssigning}
+                          >
+                            <option value="">No cluster</option>
+                            {clusters.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1172,6 +1254,32 @@ export default function TemplatesPage() {
                       <option value="ARCHIVED">Archived</option>
                     </select>
                   </div>
+                  <div className="w-[min(100%,12rem)]">
+                    <label htmlFor="templates-cluster" className={formLabelClass}>
+                      Cluster
+                    </label>
+                    <select
+                      id="templates-cluster"
+                      value={clusterId}
+                      title="Filter templates by cluster"
+                      onChange={(e) =>
+                        setSearchParams((prev) => {
+                          if (e.target.value) prev.set('clusterId', e.target.value);
+                          else prev.delete('clusterId');
+                          prev.set('page', '1');
+                          return prev;
+                        })
+                      }
+                      className={`${formSelectClass} px-3 py-2.5 text-sm`}
+                    >
+                      <option value="">All clusters</option>
+                      {clusters.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="w-[min(100%,5.5rem)]">
                     <label htmlFor="templates-page-size" className={formLabelClass}>
                       Per page
@@ -1197,6 +1305,16 @@ export default function TemplatesPage() {
                     </select>
                   </div>
                   <div className="flex w-full min-w-0 flex-[1_1_100%] justify-end sm:w-auto sm:flex-[0_0_auto]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowClusterModal(true);
+                        setClusterModalError(null);
+                      }}
+                      className="mr-2 flex items-center justify-center gap-2 rounded-app-md border border-app-border px-3 py-2.5 text-sm font-medium text-app-muted hover:border-app-accent/35 hover:bg-app-accent-muted/20"
+                    >
+                      <Plus size={14} aria-hidden /> Cluster
+                    </button>
                     <button
                       type="button"
                       onClick={openCreateForm}
@@ -1635,6 +1753,72 @@ export default function TemplatesPage() {
                   className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm hover:bg-app-accent/20 disabled:opacity-50"
                 >
                   {mutating ? 'Saving…' : formMode === 'create' ? 'Create' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClusterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-app-xl border border-app-border bg-app-bg-subtle p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-app-text">Create Cluster</h3>
+              <button
+                type="button"
+                title="Close"
+                onClick={() => {
+                  setShowClusterModal(false);
+                  setClusterModalError(null);
+                  setClusterNameInput('');
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-app-faint hover:bg-app-surface-hover hover:text-app-muted"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {clusterModalError ? (
+                <div className="rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  {clusterModalError}
+                </div>
+              ) : null}
+              <div>
+                <label htmlFor="cluster-name" className="mb-1 block text-[12px] text-app-muted">
+                  Name
+                </label>
+                <input
+                  id="cluster-name"
+                  value={clusterNameInput}
+                  title="Cluster name"
+                  placeholder="Enter cluster name"
+                  onChange={(e) => {
+                    setClusterNameInput(e.target.value);
+                    if (clusterModalError) setClusterModalError(null);
+                  }}
+                  className="w-full rounded-lg border border-app-border bg-app-bg-subtle px-3 py-2 text-sm outline-none focus:border-app-accent/50"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowClusterModal(false);
+                    setClusterModalError(null);
+                    setClusterNameInput('');
+                  }}
+                  className="rounded-lg border border-app-border px-3.5 py-2 text-sm text-app-muted hover:bg-app-surface-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={clusterModalSaving}
+                  onClick={() => void createClusterQuick()}
+                  className="rounded-lg border border-app-accent/50 bg-app-accent-muted px-3.5 py-2 text-sm hover:bg-app-accent/20 disabled:opacity-50"
+                >
+                  {clusterModalSaving ? 'Creating…' : 'Create'}
                 </button>
               </div>
             </div>

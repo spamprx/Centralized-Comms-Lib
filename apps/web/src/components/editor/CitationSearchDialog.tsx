@@ -10,6 +10,7 @@ import {
 } from '../../services/citationService';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import type { CitationMarkerMode } from '../../lib/citationMarkers';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
 
 function hitTitle(hit: ContentSearchHit): string {
   const s = hit.source;
@@ -326,7 +327,9 @@ export default function CitationSearchDialog({
                           {hit.snippetHtml ? (
                             <div
                               className="citation-snippet mt-2 text-[12px] leading-relaxed text-app-muted [&_em]:text-cyan-300/80 [&_em]:not-italic"
-                              dangerouslySetInnerHTML={{ __html: hit.snippetHtml }}
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeHtml(hit.snippetHtml),
+                              }}
                             />
                           ) : (
                             <div className="mt-2 text-[12px] text-app-faint">

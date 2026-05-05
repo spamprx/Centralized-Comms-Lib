@@ -48,6 +48,8 @@ import {
   Save,
   Settings2,
   Smartphone,
+  Strikethrough,
+  Code2,
   Trash2,
   Underline as UnderlineIcon,
   X,
@@ -59,6 +61,7 @@ import {
   type TemplateLayoutRegion,
   type TemplateRecord,
 } from '../../services/templateCrudService';
+import { assetService } from '../../services/assetService';
 import {
   LAYOUT_VERSION,
   MIN_CELL_FLEX,
@@ -74,6 +77,7 @@ import {
   previewRowGridTemplateColumns,
   rowGridTemplateColumns,
 } from '../../lib/templateLayout/layoutConfig';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import {
   TextBlockModal,
   MediaBlockModal,
@@ -89,40 +93,83 @@ const REGION_TYPES = {
   field: 'field',
 } as const;
 
-/** Inline image uploads above this size are rejected (base64 would bloat the layout JSON). */
-const TEMPLATE_INLINE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
-
-/** Demo rows for “asset library” until the app wires a real assets API into the editor. */
-const TEMPLATE_LIBRARY_DEMO_IMAGES: { id: string; name: string; src: string }[] = [
-  {
-    id: 'tpl-lib-hero',
-    name: 'Gradient hero',
-    src:
-      'data:image/svg+xml,' +
-      encodeURIComponent(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="160"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)" rx="14"/><text x="50%" y="50%" fill="white" font-size="15" font-family="system-ui,sans-serif" text-anchor="middle" dy=".35em">Library · Hero</text></svg>',
-      ),
-  },
-  {
-    id: 'tpl-lib-banner',
-    name: 'Dark banner',
-    src:
-      'data:image/svg+xml,' +
-      encodeURIComponent(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="120"><rect width="100%" height="100%" fill="#0f172a" rx="10"/><text x="50%" y="50%" fill="#94a3b8" font-size="13" font-family="system-ui,sans-serif" text-anchor="middle" dy=".35em">Library · Banner</text></svg>',
-      ),
-  },
-];
+/** Client-side guard before upload (layout JSON stays lean via hosted URLs). */
+const TEMPLATE_INLINE_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
 
 function TemplateImageLibraryModal({
   open,
   onClose,
   onPick,
+  templateId,
+  activeRegionId,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (src: string) => void;
+  templateId: string;
+  activeRegionId: string | null;
 }) {
+  const [rows, setRows] = useState<
+    { id: string; name: string; previewUrl: string | null; hasBrokenLinks: boolean }[]
+  >([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { items } = await assetService.list({ limit: 40, category: 'image' });
+        const enriched = await Promise.all(
+          items.map(async (r) => {
+            const name =
+              r.originalFilename ?? r.objectKey.split('/').pop() ?? r.id;
+            try {
+              const v = await assetService.getViewLink(r.id, 1800);
+              const checks = await assetService.listLinkChecks(r.id).catch(() => []);
+              const hasBrokenLinks = checks.some((c) => c.status === 'BROKEN');
+              return { id: r.id, name, previewUrl: v.url, hasBrokenLinks };
+            } catch {
+              return { id: r.id, name, previewUrl: null, hasBrokenLinks: false };
+            }
+          }),
+        );
+        if (!cancelled) setRows(enriched);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load assets');
+          setRows([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const handlePick = async (assetId: string) => {
+    try {
+      const v = await assetService.getViewLink(assetId, 604800);
+      onPick(v.url);
+      try {
+        await assetService.registerUsage(assetId, {
+          targetType: 'TEMPLATE',
+          targetId: templateId,
+          fieldPath: activeRegionId ?? null,
+        });
+      } catch {
+        /* optional */
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open asset');
+    }
+  };
+
   if (!open) return null;
   return (
     <div
@@ -150,19 +197,46 @@ function TemplateImageLibraryModal({
           </button>
         </div>
         <div className="max-h-[min(60vh,380px)] space-y-2 overflow-y-auto p-3">
-          {TEMPLATE_LIBRARY_DEMO_IMAGES.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onPick(a.src)}
-              className="flex w-full items-center gap-3 rounded-xl border border-app-border bg-app-bg p-2 text-left hover:border-app-accent/40 hover:bg-app-accent-muted/20"
-            >
-              <img src={a.src} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
-              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-app-text">
-                {a.name}
-              </span>
-            </button>
-          ))}
+          {loading ? (
+            <div className="py-8 text-center text-[13px] text-app-muted">Loading assets…</div>
+          ) : error ? (
+            <div className="rounded-lg border border-red-400/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-100">
+              {error}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="py-8 text-center text-[13px] text-app-muted">
+              No images yet — upload from the asset library.
+            </div>
+          ) : (
+            rows.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => void handlePick(a.id)}
+                className="flex w-full items-center gap-3 rounded-xl border border-app-border bg-app-bg p-2 text-left hover:border-app-accent/40 hover:bg-app-accent-muted/20"
+              >
+                {a.previewUrl ? (
+                  <img
+                    src={a.previewUrl}
+                    alt=""
+                    className="h-14 w-24 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg-subtle text-[10px] text-app-faint">
+                    IMG
+                  </div>
+                )}
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-app-text">
+                  {a.name}
+                </span>
+                {a.hasBrokenLinks ? (
+                  <span className="rounded-full border border-red-400/35 bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-200">
+                    Broken link
+                  </span>
+                ) : null}
+              </button>
+            ))
+          )}
         </div>
         <div className="border-t border-app-border px-4 py-3 text-[11px] text-app-faint">
           <RouterLink
@@ -172,8 +246,7 @@ function TemplateImageLibraryModal({
           >
             Open full asset library
           </RouterLink>{' '}
-          to upload and manage files. Demo thumbnails above insert placeholder images into the
-          template.
+          to upload and manage files. Pick an image to insert a hosted URL into the template layout.
         </div>
       </div>
     </div>
@@ -215,6 +288,8 @@ type RichTextToolkitFlags = {
   heading2: boolean;
   bold: boolean;
   italic: boolean;
+  strike: boolean;
+  code: boolean;
   underline: boolean;
   bulletList: boolean;
   orderedList: boolean;
@@ -288,12 +363,14 @@ function SharedRichTextToolkitBar({
   activeRegionTitle,
   activeRegionId,
   getEditorByRegionId,
+  templateId,
 }: {
   toolkit: RichTextToolkitFlags;
   editor: Editor | null;
   activeRegionTitle: string | null;
   activeRegionId: string | null;
   getEditorByRegionId: (regionId: string) => Editor | null;
+  templateId: string;
 }) {
   const [, setToolbarRenderTick] = useState(0);
   useEffect(() => {
@@ -380,16 +457,31 @@ function SharedRichTextToolkitBar({
         );
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const r = reader.result;
-        if (typeof r === 'string') insertImageFromSrc(r);
-      };
-      reader.onerror = () => setImagePickMessage('Could not read that file.');
-      reader.readAsDataURL(file);
+      void (async () => {
+        try {
+          setImagePickMessage('Uploading…');
+          const { viewUrl, asset } = await assetService.uploadFile(file, {
+            placement: 'MY_ASSETS',
+            category: 'image',
+          });
+          insertImageFromSrc(viewUrl);
+          setImagePickMessage(null);
+          try {
+            await assetService.registerUsage(asset.id, {
+              targetType: 'TEMPLATE',
+              targetId: templateId,
+              fieldPath: activeRegionId ?? null,
+            });
+          } catch {
+            /* optional */
+          }
+        } catch (err) {
+          setImagePickMessage(err instanceof Error ? err.message : 'Upload failed.');
+        }
+      })();
       setShowImageMenu(false);
     },
-    [insertImageFromSrc],
+    [insertImageFromSrc, templateId, activeRegionId],
   );
 
   const fmtBtn = (active: boolean) =>
@@ -481,6 +573,30 @@ function SharedRichTextToolkitBar({
               <Italic size={13} />
             </button>
           ) : null}
+          {toolkit.strike ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleStrike().run()}
+              className={fmtBtn(Boolean(editor?.isActive('strike')))}
+              title="Strikethrough"
+            >
+              <Strikethrough size={13} />
+            </button>
+          ) : null}
+          {toolkit.code ? (
+            <button
+              type="button"
+              disabled={!hasEditor}
+              onMouseDown={toolbarControlMouseDown}
+              onClick={() => editor?.chain().focus().toggleCode().run()}
+              className={fmtBtn(Boolean(editor?.isActive('code')))}
+              title="Inline code"
+            >
+              <Code2 size={13} />
+            </button>
+          ) : null}
           {toolkit.underline ? (
             <button
               type="button"
@@ -550,6 +666,8 @@ function SharedRichTextToolkitBar({
                 ref={imageFileInputRef}
                 type="file"
                 accept="image/*"
+                title="Upload image from device"
+                aria-label="Upload image from device"
                 className="hidden"
                 onChange={onImageFileChange}
               />
@@ -817,6 +935,8 @@ function SharedRichTextToolkitBar({
       <TemplateImageLibraryModal
         open={showAssetLibrary}
         onClose={() => setShowAssetLibrary(false)}
+        templateId={templateId}
+        activeRegionId={activeRegionId}
         onPick={(src) => {
           insertImageFromSrc(src);
           setShowAssetLibrary(false);
@@ -1502,6 +1622,8 @@ export default function TemplateLayoutEditor({
       heading2: allows('heading2'),
       bold: allows('bold'),
       italic: allows('italic'),
+      strike: allows('strike'),
+      code: allows('code'),
       underline: allows('underline') && underlineRestrictionOk,
       bulletList: allows('bullet_list'),
       orderedList: allows('ordered_list'),
@@ -2390,6 +2512,7 @@ export default function TemplateLayoutEditor({
           activeRegionTitle={activeRichToolbarTitle}
           activeRegionId={focusedRichRegionId}
           getEditorByRegionId={(id) => richTextEditorsRef.current.get(id) ?? null}
+          templateId={templateId}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {hasMaxCharacters ? (
@@ -2667,6 +2790,8 @@ export default function TemplateLayoutEditor({
                         <select
                           value={previewBindingId}
                           onChange={(e) => setPreviewBindingId(e.target.value)}
+                          title="Select preview channel"
+                          aria-label="Select preview channel"
                           className="absolute inset-0 cursor-pointer opacity-0"
                           disabled={previewChannels.length < 1}
                         >
@@ -2714,7 +2839,9 @@ export default function TemplateLayoutEditor({
                     <pre
                       aria-hidden
                       className="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12px] leading-[1.6] text-white/30"
-                      dangerouslySetInnerHTML={{ __html: previewFieldJsonHighlighted }}
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizeHtml(previewFieldJsonHighlighted),
+                      }}
                     />
                     <textarea
                       value={previewFieldJson}

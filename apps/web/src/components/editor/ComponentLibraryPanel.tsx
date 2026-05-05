@@ -138,6 +138,9 @@ export default function ComponentLibraryPanel({
   onCatalogSourceChange,
 }: ComponentLibraryPanelProps) {
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<
+    'ALL' | 'CONTENT' | 'MEDIA' | 'CTA' | 'LEGAL' | 'OTHER'
+  >('ALL');
   const debouncedQuery = useDebouncedValue(query, 280);
   const [items, setItems] = useState<ComponentLibraryEntry[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -149,7 +152,10 @@ export default function ComponentLibraryPanel({
     setLoadError(null);
     const q = debouncedQuery.trim();
     try {
-      const data = q ? await componentService.search(q) : await componentService.list();
+      const categoryFilter = category === 'ALL' ? undefined : category;
+      const data = q
+        ? await componentService.search(q, categoryFilter)
+        : await componentService.list(categoryFilter);
       setItems(data);
       if (!q) writeCachedCatalog(data);
       onCatalogSourceChange?.('api');
@@ -168,7 +174,7 @@ export default function ComponentLibraryPanel({
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, onCatalogSourceChange]);
+  }, [debouncedQuery, category, onCatalogSourceChange]);
 
   useEffect(() => {
     void refresh();
@@ -201,6 +207,21 @@ export default function ComponentLibraryPanel({
           </button>
         ) : null}
       </div>
+      <select
+        value={category}
+        onChange={(e) =>
+          setCategory(e.target.value as 'ALL' | 'CONTENT' | 'MEDIA' | 'CTA' | 'LEGAL' | 'OTHER')
+        }
+        className="box-border w-full rounded-[var(--editor-radius-input)] border border-white/10 bg-white/[0.04] px-2 py-2 text-[12px] text-[var(--editor-doc-text)] outline-none"
+        aria-label="Filter components by category"
+      >
+        <option value="ALL">All categories</option>
+        <option value="CONTENT">Content</option>
+        <option value="MEDIA">Media</option>
+        <option value="CTA">CTA</option>
+        <option value="LEGAL">Legal</option>
+        <option value="OTHER">Other</option>
+      </select>
 
       {loadError ? (
         <p className="m-0 rounded-[var(--editor-radius-input)] border border-amber-400/30 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-100/95">
