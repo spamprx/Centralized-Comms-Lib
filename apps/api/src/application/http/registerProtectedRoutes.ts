@@ -19,4 +19,10 @@ export function registerProtectedRoutes(router: Router): void {
   router.use("/citations", applicationDomainRouters.citation);
   router.use("/profile", applicationDomainRouters.profile);
   router.use("/groups", applicationDomainRouters.group);
+  router.use("/assets", applicationDomainRouters.assets);
+  router.use("/library", applicationDomainRouters.library);
+  router.use("/workflows", applicationDomainRouters.workflow);
+  router.use("/whatsapp-send", applicationDomainRouters.whatsappSend);
+  router.use("/email-send", applicationDomainRouters.emailSend);
+  router.use("/push-send", applicationDomainRouters.pushSend);
 }
