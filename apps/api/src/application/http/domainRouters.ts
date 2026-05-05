@@ -11,6 +11,13 @@ import componentRouter from "../../modules/component/component.routes";
 import citationRouter from "../../modules/citation/citation.routes";
 import profileRouter from "../../modules/profile/profile.routes";
 import groupRouter from "../../modules/group/group.routes";
+import assetsRouter from "../../modules/assets/assets.routes";
+import libraryRouter from "../../modules/library/library.routes";
+import workflowRouter from "../../modules/workflow/workflow.routes";
+import whatsappSendRouter from "../../modules/whatsapp-send/whatsappSend.routes";
+import emailSendRouter from "../../modules/email-send/emailSend.routes";
+import firebasePublicRouter from "../../modules/firebase/firebasePublic.routes";
+import pushSendRouter from "../../modules/push-send/pushSend.routes";
 
 export const applicationDomainRouters = {
   auth: authRouter,
@@ -26,4 +33,11 @@ export const applicationDomainRouters = {
   citation: citationRouter,
   profile: profileRouter,
   group: groupRouter,
+  assets: assetsRouter,
+  library: libraryRouter,
+  workflow: workflowRouter,
+  whatsappSend: whatsappSendRouter,
+  emailSend: emailSendRouter,
+  firebasePublic: firebasePublicRouter,
+  pushSend: pushSendRouter,
 };

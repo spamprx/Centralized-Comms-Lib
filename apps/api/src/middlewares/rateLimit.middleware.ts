@@ -25,13 +25,18 @@ function rateLimitResponse(message: string, windowMs: number) {
  */
 const makeKeyGenerator =
   () =>
-  (req: Request): string =>
-    ipKeyGenerator(
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ??
-        req.ip ??
-        req.socket.remoteAddress ??
-        "unknown",
+  (req: Request): string => {
+    const xff = req.headers["x-forwarded-for"];
+    const firstForwarded =
+      typeof xff === "string"
+        ? xff.split(",")[0]?.trim()
+        : Array.isArray(xff)
+          ? xff[0]?.split(",")[0]?.trim()
+          : undefined;
+    return ipKeyGenerator(
+      firstForwarded || req.ip || req.socket.remoteAddress || "unknown",
     );
+  };
 
 const SKIP_PATHS = new Set(["/health"]);
 
@@ -39,12 +44,12 @@ const GENERAL_WINDOW_MS = 15 * 60 * 1000;
 
 /***
  * General API limiter
- * 100 requests per 15 minutes per IP, applied to all routes.
+ * 2000 requests per 15 minutes per IP, applied to all routes.
  * FUTURE: back with a shared Redis store for multi-instance support.
  ***/
 export const rateLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: GENERAL_WINDOW_MS,
-  max: 1000,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: makeKeyGenerator(),
@@ -59,12 +64,12 @@ const AUTH_WINDOW_MS = 15 * 60 * 1000;
 
 /***
  * Auth route limiter
- * 10 requests per 15 minutes per IP — brute-force protection for
+ * 30 requests per 15 minutes per IP — brute-force protection for
  * login / register / forgot-password endpoints.
  ***/
 export const authRateLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: AUTH_WINDOW_MS,
-  max: 10,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: makeKeyGenerator(),
@@ -74,21 +79,36 @@ export const authRateLimiter: RateLimitRequestHandler = rateLimit({
   ),
 });
 
-const AI_WINDOW_MS = 60 * 1000;
+const AUTH_STRICT_WINDOW_MS = 60 * 1000;
 
-/***
- * AI route limiter
- * 10 requests per minute per IP — controls burst usage on AI endpoints.
- * Works alongside aiQuota.middleware.ts which enforces per-user daily quota.
- ***/
-export const aiRateLimiter: RateLimitRequestHandler = rateLimit({
-  windowMs: AI_WINDOW_MS,
-  max: 10,
+/** Brute-force protection: max 12 login/register attempts per minute per IP (NFR-SEC-04). */
+export const authStrictLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: AUTH_STRICT_WINDOW_MS,
+  max: 12,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: makeKeyGenerator(),
   handler: rateLimitResponse(
-    "AI request limit reached. Maximum 10 requests per minute.",
+    "Too many authentication attempts. Please wait a minute and try again.",
+    AUTH_STRICT_WINDOW_MS,
+  ),
+});
+
+const AI_WINDOW_MS = 60 * 1000;
+
+/***
+ * AI route limiter
+ * 30 requests per minute per IP — controls burst usage on AI endpoints.
+ * Works alongside aiQuota.middleware.ts which enforces per-user daily quota.
+ ***/
+export const aiRateLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: AI_WINDOW_MS,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: makeKeyGenerator(),
+  handler: rateLimitResponse(
+    "AI request limit reached. Maximum 30 requests per minute.",
     AI_WINDOW_MS,
   ),
 });

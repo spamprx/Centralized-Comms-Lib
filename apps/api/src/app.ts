@@ -1,5 +1,7 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import apiRouter from "./routes";
 import { getPrismaClient, PrismaUnitOfWork } from "./repository";
@@ -17,15 +19,77 @@ const app: Application = express();
 // Required for express-rate-limit and req.ip to resolve the real client
 // address when running behind a proxy or load balancer.
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
 
+function parseAllowedOrigins(): string[] {
+  const raw = process.env.ALLOWED_ORIGINS?.trim();
+  if (raw) {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (process.env.NODE_ENV !== "production") {
+    const localOrigins: string[] = [];
+    for (let port = 3000; port <= 3010; port += 1) {
+      localOrigins.push(`http://localhost:${port}`);
+      localOrigins.push(`http://127.0.0.1:${port}`);
+    }
+    localOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
+    return localOrigins;
+  }
+  return [];
+}
+
+const allowedOrigins = parseAllowedOrigins();
+
+app.use(cookieParser());
 app.use(
   cors({
-    origin: true,
+    origin(origin, cb) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(new Error("CORS blocked"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
   }),
 );
+
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api-docs")) {
+    return helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    })(req, res, next);
+  }
+  return helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:", "blob:"],
+        "connect-src": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+      },
+    },
+    hsts:
+      process.env.NODE_ENV === "production"
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false,
+    referrerPolicy: { policy: "no-referrer" },
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-site" },
+  })(req, res, next);
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -126,8 +190,15 @@ app.get("/metrics", async (_req: Request, res: Response) => {
  *       503:
  *         description: Repository layer error
  */
+function devRouteAllowed(req: Request): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  const expected = process.env.ADMIN_DEV_TOKEN?.trim();
+  if (!expected) return false;
+  return req.get("X-Dev-Token") === expected;
+}
+
 app.get("/dev/repo-check", async (req: Request, res: Response) => {
-  if (process.env.NODE_ENV === "production") {
+  if (!devRouteAllowed(req)) {
     res.status(404).json({ error: "Not found" });
     return;
   }
@@ -161,8 +232,8 @@ app.get("/dev/repo-check", async (req: Request, res: Response) => {
  *       503:
  *         description: Elasticsearch not configured
  */
-app.post("/dev/reindex", async (_req: Request, res: Response) => {
-  if (process.env.NODE_ENV === "production") {
+app.post("/dev/reindex", async (req: Request, res: Response) => {
+  if (!devRouteAllowed(req)) {
     res.status(404).json({ error: "Not found" });
     return;
   }

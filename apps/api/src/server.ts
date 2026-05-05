@@ -2,6 +2,8 @@ import "dotenv/config";
 import app from "./app";
 import http from "node:http";
 import { attachWebsocketServer } from "./realtime/wsServer";
+import { processComponentAndAssetOutbox } from "./modules/component/componentEvents.consumer";
+import { runAssetLinkIntegrityScan } from "./jobs/assetLinkIntegrityScan";
 
 const PORT = process.env.PORT || 8000;
 
@@ -39,6 +41,26 @@ if (process.env.ENABLE_NIGHTLY_VECTOR_REINDEX === "true") {
     },
     Math.max(0, initialMs),
   ).unref();
+}
+
+if (process.env.ENABLE_OUTBOX_WORKER === "true") {
+  const pollMs = Number.parseInt(process.env.OUTBOX_POLL_INTERVAL_MS ?? "10000", 10);
+  const tick = (): void => {
+    void processComponentAndAssetOutbox(
+      Number.parseInt(process.env.OUTBOX_BATCH_SIZE ?? "50", 10),
+    ).catch(() => undefined);
+  };
+  setInterval(tick, Math.max(2000, pollMs)).unref();
+}
+
+if (process.env.ENABLE_ASSET_LINK_SCAN === "true") {
+  const intervalMs = Number.parseInt(process.env.ASSET_LINK_SCAN_INTERVAL_MS ?? "300000", 10);
+  const tick = (): void => {
+    void runAssetLinkIntegrityScan(
+      Number.parseInt(process.env.LINK_SCAN_BATCH_SIZE ?? "100", 10),
+    ).catch(() => undefined);
+  };
+  setInterval(tick, Math.max(30000, intervalMs)).unref();
 }
 
 process.on("SIGTERM", () => {
