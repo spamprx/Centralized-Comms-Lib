@@ -16,8 +16,20 @@ import {
   patchComponentVersionCanonicalBody,
   propagateLinkedComponentToContent,
 } from "./componentPropagation.service";
+import { publishEvent } from "../../integration";
 
 const router = Router();
+type ComponentCategory = "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
+
+function parseComponentCategory(v: unknown): ComponentCategory | undefined {
+  return v === "CONTENT" ||
+    v === "MEDIA" ||
+    v === "CTA" ||
+    v === "LEGAL" ||
+    v === "OTHER"
+    ? v
+    : undefined;
+}
 
 function auditContext(req: AuthRequest): AuditContext {
   return {
@@ -71,10 +83,11 @@ function auditContext(req: AuthRequest): AuditContext {
  */
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { key, name, description } = req.body as {
+    const { key, name, description, category } = req.body as {
       key?: string;
       name?: string;
       description?: string | null;
+      category?: ComponentCategory;
     };
     if (!key?.trim() || !name?.trim()) {
       res.status(400).json({ error: "key and name are required" });
@@ -87,6 +100,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
         key: key.trim(),
         name: name.trim(),
         description: description ?? null,
+        category: parseComponentCategory(category) ?? "OTHER",
       });
       await r.audit.append({
         action: "CREATE",
@@ -96,6 +110,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
           key: key.trim(),
           name: name.trim(),
           description: description ?? null,
+          category: parseComponentCategory(category) ?? "OTHER",
         },
         actorId: ctx.actorId,
         ipAddress: ctx.ipAddress,
@@ -117,10 +132,13 @@ router.post("/", async (req: AuthRequest, res: Response) => {
 /** List all registered components. */
 router.get("/", async (_req: AuthRequest, res: Response) => {
   try {
+    const category = parseComponentCategory(_req.query.category);
     const uow = new PrismaUnitOfWork(getPrismaClient());
     const list = await uow
       .repos()
-      .componentRegistry.listComponentsWithLatestVersion();
+      .componentRegistry.listComponentsWithLatestVersion(
+        category ? { category } : undefined,
+      );
     res.status(200).json(list);
   } catch (err) {
     res
@@ -151,10 +169,13 @@ router.get("/search", async (req: AuthRequest, res: Response) => {
   try {
     const q =
       typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+    const category = parseComponentCategory(req.query.category);
     const uow = new PrismaUnitOfWork(getPrismaClient());
     const list = await uow
       .repos()
-      .componentRegistry.listComponentsWithLatestVersion();
+      .componentRegistry.listComponentsWithLatestVersion(
+        category ? { category } : undefined,
+      );
     const filtered = q
       ? list.filter(
           (c) =>
@@ -258,6 +279,16 @@ router.post(
           ipAddress: ctx.ipAddress,
           userAgent: ctx.userAgent,
         });
+        await publishEvent(r.outbox, {
+          aggregateType: "COMPONENT_VERSION",
+          aggregateId: req.params.versionId,
+          eventType: "COMPONENT.VERSION_UPDATED",
+          payload: {
+            versionId: req.params.versionId,
+            propagate: true,
+            actorId: ctx.actorId,
+          },
+        });
       });
       res.status(200).json(result);
     } catch (err) {
@@ -322,6 +353,16 @@ router.patch(
           actorId: ctx.actorId,
           ipAddress: ctx.ipAddress,
           userAgent: ctx.userAgent,
+        });
+        await publishEvent(r.outbox, {
+          aggregateType: "COMPONENT_VERSION",
+          aggregateId: req.params.versionId,
+          eventType: "COMPONENT.VERSION_UPDATED",
+          payload: {
+            versionId: req.params.versionId,
+            propagate: shouldPropagate,
+            actorId: ctx.actorId,
+          },
         });
       });
       res.status(200).json(out);

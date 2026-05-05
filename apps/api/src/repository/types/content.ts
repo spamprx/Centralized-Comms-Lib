@@ -66,6 +66,8 @@ export interface ContentListFilters {
   lifecycleState?: LifecycleState;
   visibility?: Visibility;
   contentType?: ContentType;
+  /** When true, only rows with `channelId` null (e.g. library catalog without channel-bound sends). */
+  omitChannelBound?: boolean;
   limit?: number;
   offset?: number;
 }

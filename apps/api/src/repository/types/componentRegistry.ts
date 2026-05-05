@@ -3,6 +3,7 @@ export interface ComponentRecord {
   key: string;
   name: string;
   description: string | null;
+  category: "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
   createdAt: Date;
   updatedAt: Date;
 }

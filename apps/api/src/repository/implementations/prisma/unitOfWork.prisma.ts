@@ -1,6 +1,7 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 
 import type {
+  AssetRepository,
   AuditLogRepository,
   ChannelRepository,
   ComponentRegistryRepository,
@@ -18,6 +19,7 @@ import type {
   WorkspaceRepository,
 } from "../../interfaces";
 
+import { PrismaAssetRepository } from "./assetRepository.prisma";
 import { PrismaAuditLogRepository } from "./auditLogRepository.prisma";
 import { PrismaChannelRepository } from "./channelRepository.prisma";
 import { PrismaComponentRegistryRepository } from "./componentRegistryRepository.prisma";
@@ -51,6 +53,7 @@ export interface Repositories {
   templateLayoutSection: TemplateLayoutSectionRepository;
   contentCitation: ContentCitationRepository;
   contentSnapshot: ContentSnapshotRepository;
+  asset: AssetRepository;
 }
 
 export function createPrismaRepositories(
@@ -72,6 +75,7 @@ export function createPrismaRepositories(
     templateLayoutSection: new PrismaTemplateLayoutSectionRepository(db),
     contentCitation: new PrismaContentCitationRepository(db),
     contentSnapshot: new PrismaContentSnapshotRepository(db),
+    asset: new PrismaAssetRepository(db),
   };
 }
 

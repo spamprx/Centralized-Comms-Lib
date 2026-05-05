@@ -1,12 +1,56 @@
 import { getPrismaClient, PrismaUnitOfWork } from "../../repository";
 import type { AuditContext } from "../../shared/context";
 
+const WHATSAPP_SUPPORTED_FIELD_TYPES = new Set([
+  "paragraph",
+  "bold",
+  "italic",
+  "strike",
+  "code",
+  "bullet_list",
+  "ordered_list",
+  "link",
+  "richText",
+  "media",
+  "field",
+]);
+
 function slugifyKey(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function normalizeCompatibilityForChannel(
+  channelKey: string,
+  compatibility: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!compatibility) return {};
+  if (channelKey !== "whatsapp") return compatibility;
+
+  const out: Record<string, unknown> = { ...compatibility };
+  const rawFieldTypes = compatibility.fieldTypes;
+  if (Array.isArray(rawFieldTypes)) {
+    out.fieldTypes = rawFieldTypes
+      .map(String)
+      .filter((t) => WHATSAPP_SUPPORTED_FIELD_TYPES.has(t));
+  }
+
+  const restrictions = compatibility.restrictions;
+  if (
+    restrictions &&
+    typeof restrictions === "object" &&
+    !Array.isArray(restrictions)
+  ) {
+    const r = { ...(restrictions as Record<string, unknown>) };
+    // WhatsApp matrix does not support underline as a native format.
+    r.supportsUnderline = false;
+    out.restrictions = r;
+  }
+
+  return out;
 }
 
 export const channelService = {
@@ -55,7 +99,7 @@ export const channelService = {
         key,
         description: input.description ?? null,
         priority: Number.isFinite(input.priority) ? Number(input.priority) : 0,
-        compatibility: input.compatibility ?? {},
+        compatibility: normalizeCompatibilityForChannel(key, input.compatibility),
       });
       await repos.audit.append({
         action: "CREATE",
@@ -127,7 +171,10 @@ export const channelService = {
           priority: Number(input.priority) || 0,
         }),
         ...(input.compatibility !== undefined && {
-          compatibility: input.compatibility,
+          compatibility: normalizeCompatibilityForChannel(
+            (nextKey ?? existing.key).toLowerCase(),
+            input.compatibility,
+          ),
         }),
       });
 

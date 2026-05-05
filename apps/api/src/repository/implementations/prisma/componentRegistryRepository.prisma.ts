@@ -13,6 +13,7 @@ function toComponent(row: {
   key: string;
   name: string;
   description: string | null;
+  category: "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
   createdAt: Date;
   updatedAt: Date;
 }): ComponentRecord {
@@ -21,6 +22,7 @@ function toComponent(row: {
     key: row.key,
     name: row.name,
     description: row.description,
+    category: row.category,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -53,12 +55,14 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
     key: string;
     name: string;
     description?: string | null;
+    category?: "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
   }): Promise<ComponentRecord> {
     const row = await this.db.component.create({
       data: {
         key: input.key,
         name: input.name,
         description: input.description ?? null,
+        category: input.category ?? "OTHER",
       },
     });
     return toComponent(row);
@@ -79,8 +83,11 @@ export class PrismaComponentRegistryRepository implements ComponentRegistryRepos
     return rows.map(toComponent);
   }
 
-  async listComponentsWithLatestVersion(): Promise<ComponentLibraryRecord[]> {
+  async listComponentsWithLatestVersion(input?: {
+    category?: "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
+  }): Promise<ComponentLibraryRecord[]> {
     const rows = await this.db.component.findMany({
+      where: input?.category ? { category: input.category } : undefined,
       orderBy: { key: "asc" },
       include: {
         versions: { orderBy: { createdAt: "desc" }, take: 1 },

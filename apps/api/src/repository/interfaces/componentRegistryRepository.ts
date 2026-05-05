@@ -9,12 +9,15 @@ export interface ComponentRegistryRepository {
     key: string;
     name: string;
     description?: string | null;
+    category?: "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
   }): Promise<ComponentRecord>;
   getComponentById(id: string): Promise<ComponentRecord | null>;
   getComponentByKey(key: string): Promise<ComponentRecord | null>;
   listComponents(): Promise<ComponentRecord[]>;
   /** Same as list but each row includes the latest `ComponentVersion` (by `createdAt` desc). */
-  listComponentsWithLatestVersion(): Promise<ComponentLibraryRecord[]>;
+  listComponentsWithLatestVersion(input?: {
+    category?: "CONTENT" | "MEDIA" | "CTA" | "LEGAL" | "OTHER";
+  }): Promise<ComponentLibraryRecord[]>;
 
   createVersion(input: {
     componentId: string;

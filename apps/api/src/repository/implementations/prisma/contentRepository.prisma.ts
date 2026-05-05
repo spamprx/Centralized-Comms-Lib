@@ -111,6 +111,7 @@ export class PrismaContentRepository implements ContentRepository {
     if (filters?.lifecycleState) where.lifecycleState = filters.lifecycleState;
     if (filters?.visibility) where.visibility = filters.visibility;
     if (filters?.contentType) where.contentType = filters.contentType;
+    if (filters?.omitChannelBound) where.channelId = null;
 
     const rows = await this.db.content.findMany({
       where,
