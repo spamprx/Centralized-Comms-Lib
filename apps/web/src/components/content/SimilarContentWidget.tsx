@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, FileText, FileWarning, Loader2 } from 'lucide-react';
 import { contentService, type Content } from '../../services/contentService';
 import { fetchSimilarByContentId, type ContentCheckHit } from '../../services/searchService';
-import { decodeTokenPayload } from '../../services/tokenStore';
+import { useAuth } from '../../context/AuthContext';
 import { htmlToPlainText, rankLocalSimilarContent } from '../../lib/contentSimilarityLocal';
 
 type DisplayHit = {
@@ -56,6 +56,7 @@ export default function SimilarContentWidget({
   defaultExpanded = false,
   listMaxHeightClassName = 'max-h-[200px]',
 }: SimilarContentWidgetProps) {
+  const { user } = useAuth();
   const debouncedTitle = useDebounced(title, 450);
   const debouncedBody = useDebounced(bodyHtml, 450);
 
@@ -65,7 +66,7 @@ export default function SimilarContentWidget({
   const [hits, setHits] = useState<DisplayHit[]>([]);
   const [source, setSource] = useState<'api' | 'local' | 'none'>('none');
 
-  const authorId = useMemo(() => decodeTokenPayload()?.id ?? null, []);
+  const authorId = user?.id ?? null;
   const listCache = useRef<Content[] | null>(null);
 
   const loadAuthorList = useCallback(async (): Promise<Content[]> => {

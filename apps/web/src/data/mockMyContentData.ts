@@ -14,6 +14,8 @@ export interface MyContentItem {
   collaborators: number;
   workspaceRole: 'author' | 'co_author';
   primaryAuthor: { id: string; displayName: string; email: string } | null;
+  templateId?: string | null;
+  channelId?: string | null;
 }
 
 export interface ContentStats {

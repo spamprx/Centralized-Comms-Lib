@@ -93,6 +93,8 @@ export function useMyContent() {
             collaborators: c.acceptedCoAuthorCount ?? 0,
             workspaceRole: c.workspaceRole,
             primaryAuthor: c.author ?? null,
+            templateId: c.templateId ?? null,
+            channelId: c.channelId ?? null,
           };
         }),
       );

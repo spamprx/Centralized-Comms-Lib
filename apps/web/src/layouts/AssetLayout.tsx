@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import {
   ChevronDown,
   Download,
@@ -10,20 +11,29 @@ import {
   List,
   Music,
   Search,
+  Share2,
   Trash2,
   Upload,
   Video,
 } from 'lucide-react';
 import { Button, PageHeader, PageShell, Surface } from '../components/ui';
 import { componentService, type ComponentLibraryEntry } from '../services/componentService';
+import {
+  assetService,
+  type AssetCategoryApi,
+  type AssetPlacement,
+  type AssetRecord,
+} from '../services/assetService';
 
 type AssetType = 'image' | 'video' | 'audio' | 'document';
 
-type Asset = {
+type AssetRow = {
   id: string;
   name: string;
   extLabel: string;
   type: AssetType;
+  category: AssetCategoryApi;
+  placement: AssetPlacement;
   size: string;
   sizeBytes: number;
   uploadedAt: string;
@@ -44,44 +54,59 @@ const TYPE_COLOR = {
   document: 'text-blue-400',
 } as const;
 
-const EXT_BY_TYPE: Record<AssetType, string[]> = {
-  image: ['PNG', 'JPG', 'WEBP'],
-  video: ['MP4', 'MOV'],
-  audio: ['MP3', 'WAV'],
-  document: ['PDF', 'DOCX'],
-};
+function mapCategoryToAssetType(c: AssetCategoryApi): AssetType {
+  if (c === 'image') return 'image';
+  if (c === 'video') return 'video';
+  if (c === 'audio') return 'audio';
+  return 'document';
+}
 
-function buildMockAssets(): Asset[] {
-  const types: AssetType[] = ['image', 'image', 'document', 'video', 'audio'];
-  const base = Date.now() - 45 * 24 * 60 * 60 * 1000;
-  return Array.from({ length: 24 }, (_, i) => {
-    const type = types[i % types.length];
-    const extPool = EXT_BY_TYPE[type];
-    const extLabel = extPool[i % extPool.length];
-    const name = `campaign_${String(i + 1).padStart(2, '0')}.${extLabel.toLowerCase()}`;
-    const mb = 0.3 + (i % 7) * 0.4 + (i % 3) * 0.15;
-    const dateAdded = base + i * 36 * 60 * 60 * 1000;
-    return {
-      id: `asset-${i + 1}`,
-      name,
-      extLabel,
-      type,
-      size: `${mb.toFixed(1)} MB`,
-      sizeBytes: mb * 1024 * 1024,
-      uploadedAt: new Date(dateAdded).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-      dateAdded,
-    };
-  });
+function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  if (n < 1024) return `${Math.round(n)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fromRecord(r: AssetRecord): AssetRow {
+  let bytes = 0;
+  try {
+    bytes = r.sizeBytes ? Number(BigInt(r.sizeBytes)) : 0;
+  } catch {
+    bytes = 0;
+  }
+  const name = r.originalFilename ?? r.objectKey.split('/').pop() ?? r.id;
+  const ext = name.includes('.')
+    ? name.slice(name.lastIndexOf('.') + 1).toUpperCase().slice(0, 10)
+    : '—';
+  const dateMs = new Date(r.createdAt).getTime();
+  return {
+    id: r.id,
+    name,
+    extLabel: ext,
+    type: mapCategoryToAssetType(r.category),
+    category: r.category,
+    placement: r.placement,
+    size: formatBytes(bytes),
+    sizeBytes: bytes,
+    uploadedAt: new Date(r.createdAt).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    dateAdded: dateMs,
+  };
 }
 
 export default function AssetLayout() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainTab, setMainTab] = useState<'assets' | 'components'>('assets');
-  const [allAssets, setAllAssets] = useState<Asset[]>(() => buildMockAssets());
+  const [placementSegment, setPlacementSegment] = useState<AssetPlacement>('MY_ASSETS');
+  const [allAssets, setAllAssets] = useState<AssetRow[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [assetsUploadError, setAssetsUploadError] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | AssetType>('all');
   const [sortKey, setSortKey] = useState<'date' | 'name' | 'size'>('date');
@@ -94,11 +119,41 @@ export default function AssetLayout() {
   const [componentLoading, setComponentLoading] = useState(false);
   const [componentError, setComponentError] = useState<string | null>(null);
 
+  const refreshAssets = useCallback(async () => {
+    setAssetsLoading(true);
+    setAssetsError(null);
+    try {
+      const { items } = await assetService.list({
+        placement: placementSegment,
+        limit: 200,
+        offset: 0,
+      });
+      setAllAssets(items.map(fromRecord));
+    } catch (e) {
+      setAssetsError(e instanceof Error ? e.message : 'Failed to load assets');
+      setAllAssets([]);
+    } finally {
+      setAssetsLoading(false);
+    }
+  }, [placementSegment]);
+
+  useEffect(() => {
+    if (mainTab !== 'assets') return;
+    void refreshAssets();
+  }, [mainTab, placementSegment, refreshAssets]);
+
   const filteredAssets = useMemo(() => {
     let list = allAssets.filter((a) => {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch = !q || a.name.toLowerCase().includes(q);
-      const matchesType = filterType === 'all' || a.type === filterType;
+      let matchesType = filterType === 'all';
+      if (!matchesType) {
+        if (filterType === 'document') {
+          matchesType = a.category === 'document' || a.category === 'other';
+        } else {
+          matchesType = a.type === filterType;
+        }
+      }
       return matchesSearch && matchesType;
     });
     if (sortKey === 'date') list = [...list].sort((a, b) => b.dateAdded - a.dateAdded);
@@ -125,41 +180,57 @@ export default function AssetLayout() {
 
   const handleUploadClick = () => fileInputRef.current?.click();
 
-  const addPlaceholderFiles = useCallback(
-    (count: number) => {
-      const start = allAssets.length;
-      const types: AssetType[] = ['image', 'video', 'audio', 'document'];
-      const next: Asset[] = [...allAssets];
-      for (let i = 0; i < count; i++) {
-        const type = types[(start + i) % 4];
-        const ext = EXT_BY_TYPE[type][0];
-        next.push({
-          id: `upload-${Date.now()}-${i}`,
-          name: `upload_${start + i + 1}.${ext.toLowerCase()}`,
-          extLabel: ext,
-          type,
-          size: '0.2 MB',
-          sizeBytes: 0.2 * 1024 * 1024,
-          uploadedAt: new Date().toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          }),
-          dateAdded: Date.now(),
-        });
+  const handleFilesSelected = useCallback(
+    async (files: FileList | null) => {
+      const list = files ? Array.from(files).slice(0, 24) : [];
+      if (list.length === 0) return;
+      setIsUploading(true);
+      setAssetsUploadError(null);
+      try {
+        for (const file of list) {
+          await assetService.uploadFile(file, { placement: placementSegment });
+        }
+        await refreshAssets();
+      } catch (e) {
+        setAssetsUploadError(e instanceof Error ? e.message : 'Upload failed');
+      } finally {
+        setIsUploading(false);
       }
-      setAllAssets(next);
     },
-    [allAssets],
+    [placementSegment, refreshAssets],
   );
 
-  const deleteAssets = useCallback((ids: Set<string>) => {
-    setAllAssets((prev) => prev.filter((a) => !ids.has(a.id)));
-    setSelectedIds((prev) => {
-      const n = new Set(prev);
-      ids.forEach((id) => n.delete(id));
-      return n;
-    });
+  const deleteAssets = useCallback(
+    async (ids: Set<string>) => {
+      try {
+        for (const id of ids) {
+          await assetService.deleteAsset(id);
+        }
+        setSelectedIds((prev) => {
+          const n = new Set(prev);
+          ids.forEach((id) => n.delete(id));
+          return n;
+        });
+        await refreshAssets();
+      } catch (e) {
+        setAssetsError(e instanceof Error ? e.message : 'Delete failed');
+      }
+    },
+    [refreshAssets],
+  );
+
+  const openViewUrl = useCallback(async (assetId: string) => {
+    const v = await assetService.getViewLink(assetId, 3600);
+    window.open(v.url, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const copyShareLink = useCallback(async (assetId: string) => {
+    try {
+      const v = await assetService.shareLibraryLink(assetId, 86400);
+      await navigator.clipboard.writeText(v.url);
+    } catch (e) {
+      setAssetsError(e instanceof Error ? e.message : 'Could not create share link');
+    }
   }, []);
 
   const filterChips: { key: 'all' | AssetType; label: string; icon: typeof LayoutGrid }[] = [
@@ -187,6 +258,17 @@ export default function AssetLayout() {
     }
   }, [componentQuery]);
 
+  const downloadSelected = useCallback(async () => {
+    for (const id of selectedIds) {
+      try {
+        const v = await assetService.getViewLink(id, 3600);
+        window.open(v.url, '_blank', 'noopener,noreferrer');
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [selectedIds]);
+
   return (
     <PageShell wide className="app-main-canvas relative">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
@@ -201,11 +283,7 @@ export default function AssetLayout() {
         className="hidden"
         multiple
         onChange={(e) => {
-          const n = e.target.files?.length ?? 0;
-          if (!n) return;
-          setIsUploading(true);
-          addPlaceholderFiles(Math.min(n, 8));
-          setTimeout(() => setIsUploading(false), 550);
+          void handleFilesSelected(e.target.files);
           e.target.value = '';
         }}
       />
@@ -362,186 +440,252 @@ export default function AssetLayout() {
         ) : null}
 
         {mainTab === 'assets' ? (
-        <Surface
-          variant="glass"
-          padding="lg"
-          className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/35 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/25"
-        >
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-app-accent-2/25"
-            aria-hidden
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[220px] flex-1">
-              <Search
-                size={16}
-                strokeWidth={2}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-accent/70"
-              />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search assets..."
-                className="h-10 w-full rounded-app-md border border-white/10 bg-white/[0.04] pl-9 pr-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-[border-color,box-shadow] placeholder:text-app-faint focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <select
-                  value={sortKey}
-                  onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
-                  className="h-10 cursor-pointer appearance-none rounded-app-md border border-white/10 bg-white/[0.04] pl-3 pr-8 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-colors hover:border-white/16 focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
-                >
-                  <option value="date">Date added</option>
-                  <option value="name">Name</option>
-                  <option value="size">Size</option>
-                </select>
-                <ChevronDown
-                  size={16}
-                  strokeWidth={2}
-                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-app-faint"
-                />
-              </div>
-              <div className="inline-flex rounded-app-lg border border-white/10 bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <Surface
+            variant="glass"
+            padding="lg"
+            className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/35 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/25"
+          >
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-app-accent/40 to-app-accent-2/25"
+              aria-hidden
+            />
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-app-faint">
+                Scope
+              </span>
+              <div className="inline-flex rounded-app-lg border border-white/10 bg-white/[0.03] p-1">
                 <button
                   type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`flex size-9 items-center justify-center rounded-app-md transition-all duration-200 ${
-                    viewMode === 'grid'
-                      ? 'bg-app-accent/15 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-app-accent/25'
-                      : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
+                  onClick={() => setPlacementSegment('MY_ASSETS')}
+                  className={`rounded-app-md px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                    placementSegment === 'MY_ASSETS'
+                      ? 'bg-app-accent/15 text-app-accent ring-1 ring-app-accent/25'
+                      : 'text-app-muted hover:bg-white/[0.06]'
                   }`}
                 >
-                  <Grid3x3 size={16} strokeWidth={2} />
+                  My assets
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('list')}
-                  className={`flex size-9 items-center justify-center rounded-app-md transition-all duration-200 ${
-                    viewMode === 'list'
-                      ? 'bg-app-accent/15 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-app-accent/25'
-                      : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
+                  onClick={() => setPlacementSegment('LIBRARY')}
+                  className={`rounded-app-md px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                    placementSegment === 'LIBRARY'
+                      ? 'bg-app-accent/15 text-app-accent ring-1 ring-app-accent/25'
+                      : 'text-app-muted hover:bg-white/[0.06]'
                   }`}
                 >
-                  <List size={16} strokeWidth={2} />
+                  Library (shared)
                 </button>
               </div>
               <Button
                 type="button"
-                variant="primary"
-                onClick={handleUploadClick}
-                leftIcon={<Upload size={16} strokeWidth={2} />}
+                variant="secondary"
+                disabled={assetsLoading}
+                onClick={() => void refreshAssets()}
               >
-                Upload files
+                {assetsLoading ? 'Loading…' : 'Refresh'}
               </Button>
             </div>
-          </div>
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-5">
-            <div className="flex flex-wrap items-center gap-2">
-              {filterChips.map(({ key, label, icon: Icon }) => {
-                const active = filterType === key;
-                return (
+
+            {assetsError ? (
+              <div className="mb-4 rounded-app-lg border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-[13px] text-rose-100">
+                {assetsError}
+              </div>
+            ) : null}
+            {assetsUploadError ? (
+              <div className="mb-4 rounded-app-lg border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-[13px] text-amber-100">
+                {assetsUploadError}
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[220px] flex-1">
+                <Search
+                  size={16}
+                  strokeWidth={2}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-accent/70"
+                />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search assets..."
+                  className="h-10 w-full rounded-app-md border border-white/10 bg-white/[0.04] pl-9 pr-3 text-[13px] text-app-text shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-[border-color,box-shadow] placeholder:text-app-faint focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <select
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
+                    className="h-10 cursor-pointer appearance-none rounded-app-md border border-white/10 bg-white/[0.04] pl-3 pr-8 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-colors hover:border-white/16 focus:border-app-accent/40 focus:ring-2 focus:ring-app-accent/15"
+                  >
+                    <option value="date">Date added</option>
+                    <option value="name">Name</option>
+                    <option value="size">Size</option>
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    strokeWidth={2}
+                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-app-faint"
+                  />
+                </div>
+                <div className="inline-flex rounded-app-lg border border-white/10 bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <button
-                    key={key}
                     type="button"
-                    onClick={() => setFilterType(key)}
-                    className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-all duration-200 ${
-                      active
-                        ? 'border-app-accent/45 bg-app-accent/12 text-app-accent shadow-[0_0_20px_-10px_rgba(147,124,248,0.45)] ring-1 ring-app-accent/20'
-                        : 'border-white/[0.08] bg-white/[0.03] text-app-muted hover:border-white/14 hover:bg-white/[0.06] hover:text-app-text'
+                    onClick={() => setViewMode('grid')}
+                    className={`flex size-9 items-center justify-center rounded-app-md transition-all duration-200 ${
+                      viewMode === 'grid'
+                        ? 'bg-app-accent/15 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-app-accent/25'
+                        : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
                     }`}
                   >
-                    <Icon size={15} strokeWidth={2} />
-                    {label}
+                    <Grid3x3 size={16} strokeWidth={2} />
                   </button>
-                );
-              })}
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`flex size-9 items-center justify-center rounded-app-md transition-all duration-200 ${
+                      viewMode === 'list'
+                        ? 'bg-app-accent/15 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-app-accent/25'
+                        : 'text-app-muted hover:bg-white/[0.06] hover:text-app-text'
+                    }`}
+                  >
+                    <List size={16} strokeWidth={2} />
+                  </button>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleUploadClick}
+                  disabled={isUploading || assetsLoading}
+                  leftIcon={<Upload size={16} strokeWidth={2} />}
+                >
+                  Upload files
+                </Button>
+              </div>
             </div>
-            <div className="text-[12px] font-medium tabular-nums text-app-muted">
-              {filteredAssets.length} assets · {storageLabel}
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-5">
+              <div className="flex flex-wrap items-center gap-2">
+                {filterChips.map(({ key, label, icon: Icon }) => {
+                  const active = filterType === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setFilterType(key)}
+                      className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-all duration-200 ${
+                        active
+                          ? 'border-app-accent/45 bg-app-accent/12 text-app-accent shadow-[0_0_20px_-10px_rgba(147,124,248,0.45)] ring-1 ring-app-accent/20'
+                          : 'border-white/[0.08] bg-white/[0.03] text-app-muted hover:border-white/14 hover:bg-white/[0.06] hover:text-app-text'
+                      }`}
+                    >
+                      <Icon size={15} strokeWidth={2} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[12px] font-medium tabular-nums text-app-muted">
+                {filteredAssets.length} assets · {storageLabel}
+              </div>
             </div>
-          </div>
-        </Surface>
+          </Surface>
         ) : null}
 
         {mainTab === 'assets' && isUploading && (
           <div className="rounded-app-xl border border-app-accent/35 bg-app-accent/10 px-4 py-3 text-[13px] text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
-            Upload complete. Assets were added to your library.
+            Uploading to object storage…
           </div>
         )}
 
         {mainTab === 'assets' ? (
-        <Surface
-          variant="glass"
-          padding="lg"
-          className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/30 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/22"
-        >
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent"
-            aria-hidden
-          />
-          {allAssets.length === 0 && (
-            <div className="mb-5 rounded-app-lg border border-dashed border-white/12 bg-white/[0.02] px-4 py-3 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-              Drag files here or use <span className="font-medium text-app-text">Upload files</span>{' '}
-              to add to your library.
-            </div>
-          )}
-
-          {allAssets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-app-xl border border-app-accent/30 bg-app-accent/10 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <Upload size={36} strokeWidth={1.5} />
+          <Surface
+            variant="glass"
+            padding="lg"
+            className="relative overflow-hidden rounded-app-xl border border-white/[0.08] bg-app-bg/30 shadow-app-lift backdrop-blur-xl supports-backdrop-filter:bg-app-bg/22"
+          >
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent"
+              aria-hidden
+            />
+            {allAssets.length === 0 && !assetsLoading && (
+              <div className="mb-5 rounded-app-lg border border-dashed border-white/12 bg-white/[0.02] px-4 py-3 text-[13px] text-app-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                Drag files here or use <span className="font-medium text-app-text">Upload files</span>{' '}
+                to add to your library.
               </div>
-              <p className="mt-6 text-lg font-semibold tracking-tight text-app-text">
-                No assets yet
-              </p>
-              <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-app-muted">
-                Upload your first file to get started.
-              </p>
-              <Button
-                type="button"
-                variant="primary"
-                className="mt-6"
-                onClick={handleUploadClick}
-                leftIcon={<Upload size={16} strokeWidth={2} />}
-              >
-                Upload files
-              </Button>
-            </div>
-          ) : filteredAssets.length === 0 ? (
-            <div className="rounded-app-lg border border-dashed border-white/10 bg-white/[0.02] py-16 text-center text-[13px] text-app-muted">
-              No assets match your search or filters.
-            </div>
-          ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-6">
-              {filteredAssets.map((asset) => (
-                <AssetCard
-                  key={asset.id}
-                  asset={asset}
-                  selected={selectedIds.has(asset.id)}
-                  onToggleSelect={() => toggleSelect(asset.id)}
-                  onDelete={(e) => {
-                    e.stopPropagation();
-                    deleteAssets(new Set([asset.id]));
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {filteredAssets.map((asset) => (
-                <AssetListRow
-                  key={asset.id}
-                  asset={asset}
-                  selected={selectedIds.has(asset.id)}
-                  onToggleSelect={() => toggleSelect(asset.id)}
-                  onDelete={() => deleteAssets(new Set([asset.id]))}
-                />
-              ))}
-            </div>
-          )}
-        </Surface>
+            )}
+
+            {assetsLoading && allAssets.length === 0 ? (
+              <div className="py-16 text-center text-[13px] text-app-muted">Loading assets…</div>
+            ) : allAssets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-app-xl border border-app-accent/30 bg-app-accent/10 text-app-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <Upload size={36} strokeWidth={1.5} />
+                </div>
+                <p className="mt-6 text-lg font-semibold tracking-tight text-app-text">
+                  No assets yet
+                </p>
+                <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-app-muted">
+                  Upload your first file to get started.
+                </p>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="mt-6"
+                  onClick={handleUploadClick}
+                  disabled={isUploading}
+                  leftIcon={<Upload size={16} strokeWidth={2} />}
+                >
+                  Upload files
+                </Button>
+              </div>
+            ) : filteredAssets.length === 0 ? (
+              <div className="rounded-app-lg border border-dashed border-white/10 bg-white/[0.02] py-16 text-center text-[13px] text-app-muted">
+                No assets match your search or filters.
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-6">
+                {filteredAssets.map((asset) => (
+                  <AssetCard
+                    key={asset.id}
+                    asset={asset}
+                    selected={selectedIds.has(asset.id)}
+                    onToggleSelect={() => toggleSelect(asset.id)}
+                    onDelete={(e) => {
+                      e.stopPropagation();
+                      void deleteAssets(new Set([asset.id]));
+                    }}
+                    onPreview={() => void openViewUrl(asset.id)}
+                    onDownload={() => void openViewUrl(asset.id)}
+                    onShare={
+                      asset.placement === 'LIBRARY'
+                        ? () => void copyShareLink(asset.id)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {filteredAssets.map((asset) => (
+                  <AssetListRow
+                    key={asset.id}
+                    asset={asset}
+                    selected={selectedIds.has(asset.id)}
+                    onToggleSelect={() => toggleSelect(asset.id)}
+                    onDelete={() => void deleteAssets(new Set([asset.id]))}
+                    onDownload={() => void openViewUrl(asset.id)}
+                    onShare={
+                      asset.placement === 'LIBRARY'
+                        ? () => void copyShareLink(asset.id)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </Surface>
         ) : null}
 
         {mainTab === 'assets' ? (
@@ -557,12 +701,12 @@ export default function AssetLayout() {
                 {selectionCount} items selected
               </span>
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="secondary" onClick={() => void downloadSelected()}>
                   Download selected
                 </Button>
                 <button
                   type="button"
-                  onClick={() => deleteAssets(selectedIds)}
+                  onClick={() => void deleteAssets(selectedIds)}
                   className="h-9 rounded-app-lg border border-red-400/35 bg-red-500/[0.12] px-3.5 text-[13px] font-medium text-red-200 shadow-[0_0_18px_-10px_rgba(248,113,113,0.35)] transition-colors hover:bg-red-500/20"
                 >
                   Delete selected
@@ -581,11 +725,17 @@ function AssetCard({
   selected,
   onToggleSelect,
   onDelete,
+  onPreview,
+  onDownload,
+  onShare,
 }: {
-  asset: Asset;
+  asset: AssetRow;
   selected: boolean;
   onToggleSelect: () => void;
-  onDelete: (e: React.MouseEvent) => void;
+  onDelete: (e: MouseEvent) => void;
+  onPreview: () => void;
+  onDownload: () => void;
+  onShare?: () => void;
 }) {
   const Icon = TYPE_ICON[asset.type];
   const colorClass = TYPE_COLOR[asset.type];
@@ -627,6 +777,7 @@ function AssetCard({
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-gradient-to-t from-app-bg via-app-bg/88 to-transparent opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
           <button
             type="button"
+            onClick={onPreview}
             className="pointer-events-auto flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:border-white/25 hover:bg-white/20"
             aria-label="Preview"
           >
@@ -634,11 +785,23 @@ function AssetCard({
           </button>
           <button
             type="button"
+            onClick={onDownload}
             className="pointer-events-auto flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:border-white/25 hover:bg-white/20"
             aria-label="Download"
           >
             <Download size={16} strokeWidth={2} />
           </button>
+          {onShare ? (
+            <button
+              type="button"
+              onClick={onShare}
+              className="pointer-events-auto flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:border-white/25 hover:bg-white/20"
+              aria-label="Copy share link"
+              title="Copy signed share link"
+            >
+              <Share2 size={16} strokeWidth={2} />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onDelete}
@@ -666,11 +829,15 @@ function AssetListRow({
   selected,
   onToggleSelect,
   onDelete,
+  onDownload,
+  onShare,
 }: {
-  asset: Asset;
+  asset: AssetRow;
   selected: boolean;
   onToggleSelect: () => void;
   onDelete: () => void;
+  onDownload: () => void;
+  onShare?: () => void;
 }) {
   const Icon = TYPE_ICON[asset.type];
   const colorClass = TYPE_COLOR[asset.type];
@@ -699,10 +866,22 @@ function AssetListRow({
           {asset.size} · {asset.uploadedAt}
         </p>
       </div>
+      {onShare ? (
+        <button
+          type="button"
+          className="shrink-0 rounded-app-md p-2 text-app-muted transition-colors hover:bg-white/[0.06] hover:text-app-accent"
+          aria-label="Copy share link"
+          title="Copy signed share link"
+          onClick={onShare}
+        >
+          <Share2 size={16} strokeWidth={2} />
+        </button>
+      ) : null}
       <button
         type="button"
         className="shrink-0 rounded-app-md p-2 text-app-muted transition-colors hover:bg-white/[0.06] hover:text-app-accent"
-        aria-label="Download"
+        aria-label="Open"
+        onClick={onDownload}
       >
         <Download size={16} strokeWidth={2} />
       </button>
