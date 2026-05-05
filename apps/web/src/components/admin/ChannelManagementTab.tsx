@@ -8,6 +8,8 @@ const FIELD_TYPE_OPTIONS: Array<{ id: string; label: string }> = [
   { id: 'paragraph', label: 'Paragraph' },
   { id: 'bold', label: 'Bold' },
   { id: 'italic', label: 'Italic' },
+  { id: 'strike', label: 'Strike' },
+  { id: 'code', label: 'Code' },
   { id: 'underline', label: 'Underline' },
   { id: 'bullet_list', label: 'Bullet list' },
   { id: 'ordered_list', label: 'Ordered list' },
@@ -18,6 +20,20 @@ const FIELD_TYPE_OPTIONS: Array<{ id: string; label: string }> = [
   { id: 'media', label: 'Media block' },
   { id: 'field', label: 'Field block' },
 ];
+
+const WHATSAPP_SUPPORTED_FIELD_TYPES = new Set([
+  'paragraph',
+  'bold',
+  'italic',
+  'strike',
+  'code',
+  'bullet_list',
+  'ordered_list',
+  'link',
+  'richText',
+  'media',
+  'field',
+]);
 
 const CONTENT_MODEL_OPTIONS: Array<{ id: string; label: string; hint: string }> = [
   { id: '', label: 'None (full toolkit)', hint: 'No channel-specific content restrictions' },
@@ -135,6 +151,15 @@ export default function ChannelManagementTab() {
   const [showForm, setShowForm] = useState(false);
   const [dslHelpToastVisible, setDslHelpToastVisible] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const isWhatsappMatrix =
+    form.contentModel === 'whatsapp' || form.key.trim().toLowerCase() === 'whatsapp';
+  const visibleFieldTypeOptions = useMemo(
+    () =>
+      isWhatsappMatrix
+        ? FIELD_TYPE_OPTIONS.filter((opt) => WHATSAPP_SUPPORTED_FIELD_TYPES.has(opt.id))
+        : FIELD_TYPE_OPTIONS,
+    [isWhatsappMatrix],
+  );
 
   async function loadChannels() {
     setLoading(true);
@@ -152,7 +177,13 @@ export default function ChannelManagementTab() {
     void loadChannels();
   }, []);
 
-  const selectedCount = useMemo(() => form.fieldTypes.length, [form.fieldTypes.length]);
+  const selectedCount = useMemo(
+    () =>
+      isWhatsappMatrix
+        ? form.fieldTypes.filter((type) => WHATSAPP_SUPPORTED_FIELD_TYPES.has(type)).length
+        : form.fieldTypes.length,
+    [form.fieldTypes, isWhatsappMatrix],
+  );
 
   function openEdit(ch: ChannelRecord) {
     setEditing(ch);
@@ -283,18 +314,22 @@ export default function ChannelManagementTab() {
       if (parsedInvalidPatterns.length > 0)
         structuralRestrictions.invalidRegionSequencePatterns = parsedInvalidPatterns;
 
+      const normalizedFieldTypes = isWhatsappMatrix
+        ? form.fieldTypes.filter((type) => WHATSAPP_SUPPORTED_FIELD_TYPES.has(type))
+        : form.fieldTypes;
+
       const payload = {
         name: form.name.trim(),
         key: form.key.trim() || undefined,
         description: form.description.trim() || null,
         priority: Number(form.priority) || 0,
         compatibility: {
-          fieldTypes: form.fieldTypes,
+          fieldTypes: normalizedFieldTypes,
           restrictions: {
             ...(parsedMaxChars !== null ? { maxCharacters: parsedMaxChars } : {}),
             ...(form.contentModel ? { contentModel: form.contentModel } : {}),
             supportsMedia: form.supportsMedia,
-            supportsUnderline: form.fieldTypes.includes('underline'),
+            supportsUnderline: normalizedFieldTypes.includes('underline'),
             ...structuralRestrictions,
             disallowInlineImagesInRichText: form.disallowInlineImagesInRichText,
             inlineImagesAfterText: form.inlineImagesAfterText,
@@ -675,8 +710,14 @@ export default function ChannelManagementTab() {
                 <p className="mb-2 text-[12px] font-medium text-app-muted">
                   Compatibility matrix ({selectedCount} selected)
                 </p>
+                {isWhatsappMatrix ? (
+                  <p className="mb-2 text-[11px] text-app-faint">
+                    WhatsApp-native matrix: headings, citation, image, and underline are hidden
+                    because they are not natively supported by WhatsApp message formatting.
+                  </p>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                  {FIELD_TYPE_OPTIONS.map((opt) => (
+                  {visibleFieldTypeOptions.map((opt) => (
                     <label
                       key={opt.id}
                       className="flex cursor-pointer items-center gap-2 rounded-app-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-2 text-[12px] text-app-muted transition-[border-color,background-color] hover:border-white/[0.14] hover:bg-white/[0.05] has-[:checked]:border-app-accent/35 has-[:checked]:bg-app-accent-muted/25"

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Type,
   Languages,
+  Folder,
 } from 'lucide-react';
 import { Surface } from '../components/ui/Surface';
 import TipTapReadonly from '../components/editor/TipTapReadonly';
@@ -22,6 +23,7 @@ import {
 } from '../services/contentService';
 import { fetchSimilarByContentId } from '../services/searchService';
 import { tipTapJsonToPlainText } from '../lib/tipTapPlainText';
+import { profileService, type ProfileBookmarkFolder } from '../services/profileService';
 
 function contentTypeLabel(t: string | undefined): string {
   switch (t) {
@@ -109,6 +111,9 @@ export default function ReadingLayout() {
   const [fontSize, setFontSize] = useState(16);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [showBookmarkFolderPicker, setShowBookmarkFolderPicker] = useState(false);
+  const [bookmarkFolders, setBookmarkFolders] = useState<ProfileBookmarkFolder[]>([]);
+  const [bookmarkFolderId, setBookmarkFolderId] = useState<string>('default');
   const [copyBusy, setCopyBusy] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [viewsCount, setViewsCount] = useState(0);
@@ -219,6 +224,22 @@ export default function ReadingLayout() {
       cancelled = true;
     };
   }, [contentId]);
+
+  useEffect(() => {
+    if (!showBookmarkFolderPicker) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await profileService.listBookmarkFolders();
+        if (!cancelled) setBookmarkFolders(rows);
+      } catch {
+        if (!cancelled) setBookmarkFolders([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showBookmarkFolderPicker]);
 
   useEffect(() => {
     if (!contentId) return;
@@ -593,6 +614,7 @@ export default function ReadingLayout() {
           try {
             const pool = await contentService.list({
               lifecycleState: 'PUBLISHED',
+              omitChannelBound: true,
               contentType: currentType,
               limit: 30,
               offset: 0,
@@ -804,16 +826,16 @@ export default function ReadingLayout() {
             onClick={() => {
               if (!contentId) return;
               if (bookmarkBusy) return;
+              if (!bookmarked) {
+                setShowBookmarkFolderPicker((prev) => !prev);
+                return;
+              }
               setBookmarkBusy(true);
               void (async () => {
                 try {
-                  if (!bookmarked) {
-                    await contentService.bookmark(contentId);
-                    setBookmarked(true);
-                  } else {
-                    await contentService.unbookmark(contentId);
-                    setBookmarked(false);
-                  }
+                  await contentService.unbookmark(contentId);
+                  setBookmarked(false);
+                  setShowBookmarkFolderPicker(false);
                 } finally {
                   setBookmarkBusy(false);
                 }
@@ -833,6 +855,47 @@ export default function ReadingLayout() {
             />
             {bookmarkBusy ? 'Saving…' : bookmarked ? 'Saved' : 'Save'}
           </button>
+          {showBookmarkFolderPicker && !bookmarked ? (
+            <div className="flex items-center gap-1.5 rounded-app-md border border-white/10 bg-app-bg/85 px-2 py-1.5 text-[11px]">
+              <Folder size={14} className="text-app-faint" />
+              <select
+                value={bookmarkFolderId}
+                onChange={(e) => setBookmarkFolderId(e.target.value)}
+                className="rounded-app-sm border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] text-app-text"
+                title="Choose bookmark folder"
+              >
+                <option value="default">Default</option>
+                {bookmarkFolders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={bookmarkBusy || !contentId}
+                onClick={() => {
+                  if (!contentId || bookmarkBusy) return;
+                  setBookmarkBusy(true);
+                  void (async () => {
+                    try {
+                      await contentService.bookmark(
+                        contentId,
+                        bookmarkFolderId === 'default' ? null : bookmarkFolderId,
+                      );
+                      setBookmarked(true);
+                      setShowBookmarkFolderPicker(false);
+                    } finally {
+                      setBookmarkBusy(false);
+                    }
+                  })();
+                }}
+                className="rounded-app-sm border border-app-accent/40 bg-app-accent/15 px-2 py-1 text-[11px] font-semibold text-app-accent"
+              >
+                Save here
+              </button>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => void handleCopyWithAttribution()}

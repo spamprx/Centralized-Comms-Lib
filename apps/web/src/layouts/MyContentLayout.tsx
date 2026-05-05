@@ -14,6 +14,7 @@ import {
   History,
   Search,
   Users,
+  Megaphone,
 } from 'lucide-react';
 import { contentService } from '../services/contentService';
 import { groupService, type ApiUserGroup } from '../services/groupService';
@@ -21,6 +22,7 @@ import ManageReviewersModal from '../components/ManageReviewersModal';
 import ReviewFeedbackModal from '../components/ReviewFeedbackModal';
 import ManageCoAuthorsModal from '../components/content/ManageCoAuthorsModal';
 import CoAuthorInvitationsModal from '../components/content/CoAuthorInvitationsModal';
+import PublishChannelModalRouter from '../components/PublishChannelModalRouter';
 import { PageHeader, PageShell, Surface, formInputClass, formSelectClass } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 
@@ -74,6 +76,9 @@ export default function MyContentLayout() {
     title: string;
     canInvite: boolean;
   } | null>(null);
+  const [publishModalItem, setPublishModalItem] = useState<{ id: string; title: string } | null>(
+    null,
+  );
   const [coAuthorInvitesOpen, setCoAuthorInvitesOpen] = useState(false);
   const [pendingCoAuthorInvites, setPendingCoAuthorInvites] = useState<
     Array<{
@@ -602,7 +607,7 @@ export default function MyContentLayout() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex flex-wrap justify-end gap-1">
-                          {item.workspaceRole === 'author' ? (
+                          {item.workspaceRole === 'author' && !item.channelId ? (
                             <>
                               <select
                                 value={item.visibility}
@@ -672,6 +677,19 @@ export default function MyContentLayout() {
                             >
                               <Send size={12} aria-hidden />
                               {submittingId === item.id ? 'Submitting...' : 'Review'}
+                            </button>
+                          )}
+                          {(item.templateId || item.channelId) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPublishModalItem({ id: item.id, title: item.title })
+                              }
+                              className="flex cursor-pointer items-center gap-1 rounded-app-md border border-emerald-400/35 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[transform,background-color] duration-(--duration-app) ease-(--ease-app-material) hover:bg-emerald-500/22 active:scale-[0.98]"
+                              title="Publish via bound channel (e.g. WhatsApp)"
+                            >
+                              <Megaphone size={12} aria-hidden />
+                              Publish
                             </button>
                           )}
                           <button
@@ -793,6 +811,20 @@ export default function MyContentLayout() {
             }
           />
         ) : null}
+
+        {publishModalItem && (
+          <PublishChannelModalRouter
+            contentId={publishModalItem.id}
+            contentTitle={publishModalItem.title}
+            onClose={() => setPublishModalItem(null)}
+            onChooseReviewWorkflow={() => {
+              setReviewModalItem({
+                id: publishModalItem.id,
+                title: publishModalItem.title,
+              });
+            }}
+          />
+        )}
 
         {inviteToastVisible && pendingCoAuthorInvites.length > 0 ? (
           <div

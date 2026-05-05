@@ -61,6 +61,7 @@ export default function LibraryLayout() {
     tagSlugFromMockName,
     authors,
     channels,
+    supportsChannelFilter,
     loading,
     filters,
     effectiveFilters,
@@ -190,6 +191,7 @@ export default function LibraryLayout() {
           onToggleTag={toggleTag}
           authors={authors}
           channels={channels}
+          supportsChannelFilter={supportsChannelFilter}
         />
 
         {(hasActiveFilters || searchInput.trim() !== '') && (
