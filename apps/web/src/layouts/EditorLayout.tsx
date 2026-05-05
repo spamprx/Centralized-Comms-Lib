@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import {
   Save,
   Bold,
   Italic,
+  Strikethrough,
+  Code2,
   Underline as UnderlineIcon,
   List,
   ListOrdered,
@@ -19,6 +21,7 @@ import {
   LayoutTemplate,
   Users,
   Languages,
+  Paperclip,
 } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -26,11 +29,13 @@ import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
-import type { JSONContent } from '@tiptap/core';
+import { Extension, type JSONContent } from '@tiptap/core';
+import { Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { assetService } from '../services/assetService';
 import { contentService, ContentSaveConflictError } from '../services/contentService';
 import { componentService } from '../services/componentService';
 import { tagService, type Tag } from '../services/tagService';
-import { getAuthToken } from '../services/tokenStore';
 import {
   renderCitationWithFallback,
   toCitationWork,
@@ -60,6 +65,7 @@ import {
   type ChannelRecord,
   type TemplateRecord,
 } from '../services/templateCrudService';
+import { collectPlaceholderKeysFromBlocks } from '../lib/waPlaceholderManifest';
 
 type CitationItem = {
   marker: number;
@@ -142,11 +148,19 @@ function renumberCitationsInEditor(ed: any, orderedMarkers: number[]): boolean {
 }
 
 /** Inline image uploads above this size are rejected (base64 would bloat the HTML). */
-const EDITOR_INLINE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+/** Client-side guard before upload to object storage (API enforces category limits). */
+const EDITOR_INLINE_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const EDITOR_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
+const PENDING_UPLOAD_PREFIX = 'pending-upload://';
+
+type PendingUploadKind = 'image' | 'attachment';
+type PendingUploadEntry = { file: File; kind: PendingUploadKind };
 
 type EditorToolkitFlags = {
   bold: boolean;
   italic: boolean;
+  strike: boolean;
+  code: boolean;
   underline: boolean;
   heading1: boolean;
   heading2: boolean;
@@ -285,6 +299,70 @@ function firstMediaMarkerIndex(html: string): number | null {
   return best;
 }
 
+type TokenType = 'field' | 'media';
+
+function placeholderManifestFromDoc(doc: JSONContent): {
+  fieldTokens: Set<string>;
+  mediaTokens: Set<string>;
+} {
+  const m = collectPlaceholderKeysFromBlocks([
+    {
+      id: '__body__',
+      type: 'richText',
+      props: { doc: doc as never },
+    } as never,
+  ] as never);
+  return {
+    fieldTokens: new Set(m.fieldTokens),
+    mediaTokens: new Set(m.mediaTokens),
+  };
+}
+
+function unresolvedTokenNamesFromDoc(doc: JSONContent): string[] {
+  const m = placeholderManifestFromDoc(doc);
+  return [...new Set([...m.fieldTokens, ...m.mediaTokens])].sort((a, b) => a.localeCompare(b));
+}
+
+function tokenTypeFromDoc(doc: JSONContent, tokenName: string, fallback: TokenType): TokenType {
+  const m = placeholderManifestFromDoc(doc);
+  if (m.mediaTokens.has(tokenName)) return 'media';
+  if (m.fieldTokens.has(tokenName)) return 'field';
+  return fallback;
+}
+
+const TokenHighlightExtension = Extension.create({
+  name: 'tokenHighlight',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          decorations(state) {
+            const decos: Decoration[] = [];
+            state.doc.descendants((node, pos) => {
+              if (!node.isText || !node.text) return;
+              const text = node.text;
+              const re = /(\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}|<[a-zA-Z_][a-zA-Z0-9_]*>)/g;
+              let m: RegExpExecArray | null;
+              while ((m = re.exec(text)) !== null) {
+                const from = pos + m.index;
+                const to = from + m[0].length;
+                decos.push(
+                  Decoration.inline(from, to, {
+                    class:
+                      'rounded px-0.5 bg-amber-500/25 text-amber-200 border border-amber-400/30 select-none pointer-events-none',
+                    title: 'Token placeholder',
+                  }),
+                );
+              }
+            });
+            return DecorationSet.create(state.doc, decos);
+          },
+        },
+      }),
+    ];
+  },
+});
+
 function computeToolkitForChannel(channel: ChannelRecord | null): EditorToolkitFlags {
   const restrictions = channel?.compatibility?.restrictions ?? undefined;
   const model = restrictions?.contentModel;
@@ -295,6 +373,8 @@ function computeToolkitForChannel(channel: ChannelRecord | null): EditorToolkitF
   let base: EditorToolkitFlags = {
     bold: true,
     italic: true,
+    strike: true,
+    code: true,
     underline: underlineOk,
     heading1: true,
     heading2: true,
@@ -309,6 +389,8 @@ function computeToolkitForChannel(channel: ChannelRecord | null): EditorToolkitF
     base = {
       bold: false,
       italic: false,
+      strike: false,
+      code: false,
       underline: false,
       heading1: false,
       heading2: false,
@@ -486,7 +568,14 @@ export default function EditorLayout() {
   const [pendingChannelId, setPendingChannelId] = useState<string | null>(null);
   const [templateChannel, setTemplateChannel] = useState<ChannelRecord | null>(null);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const tokenMediaFileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentFileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
+  const pendingMediaTokenRef = useRef<{ tokenName: string } | null>(null);
+  const pendingUploadsRef = useRef<Map<string, PendingUploadEntry>>(new Map());
   const [imagePickMessage, setImagePickMessage] = useState<string | null>(null);
+  const [attachmentPickMessage, setAttachmentPickMessage] = useState<string | null>(null);
+  const [thumbnailLabel, setThumbnailLabel] = useState<string | null>(null);
   const [contentType, setContentType] = useState<'ARTICLE' | 'VIDEO' | 'PODCAST' | 'DOCUMENT'>(
     'ARTICLE',
   );
@@ -496,6 +585,8 @@ export default function EditorLayout() {
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [tagBusy, setTagBusy] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
+  const [currentVersionTokensResolved, setCurrentVersionTokensResolved] = useState(true);
+  const [tokenInputValues, setTokenInputValues] = useState<Record<string, string>>({});
   const [lifecycleState, setLifecycleState] = useState<
     'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'
   >('DRAFT');
@@ -580,13 +671,6 @@ export default function EditorLayout() {
       return;
     }
 
-    const token = getAuthToken();
-    if (!token) {
-      setPresenceStatus({ kind: 'error', status: 401 });
-      setEditorPresenceOthers([]);
-      return;
-    }
-
     let closed = false;
     let ws: WebSocket | null = null;
     let pingId: number | null = null;
@@ -596,7 +680,7 @@ export default function EditorLayout() {
       const u = new URL(api || globalThis.location.origin);
       u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
       u.pathname = '/ws';
-      u.searchParams.set('token', token);
+      // Auth: HttpOnly auth_token cookie (same-site with API host)
 
       ws = new WebSocket(u.toString());
 
@@ -725,6 +809,7 @@ export default function EditorLayout() {
           allowBase64: true,
           HTMLAttributes: { class: 'max-w-full rounded-lg border border-white/[0.08]' },
         }),
+        TokenHighlightExtension,
         Placeholder.configure({
           placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Press / to insert a block' : ''),
         }),
@@ -795,6 +880,96 @@ export default function EditorLayout() {
     [],
   );
 
+  const findTokenRanges = useCallback(
+    (tokenName: string): Array<{ from: number; to: number }> => {
+      if (!editor || !tokenName) return [];
+      const escaped = tokenName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(\\{\\{\\s*${escaped}\\s*\\}\\}|<${escaped}>)`, 'g');
+      const ranges: Array<{ from: number; to: number }> = [];
+      editor.state.doc.descendants((node, pos) => {
+        if (!node.isText || !node.text) return;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(node.text)) !== null) {
+          const from = pos + m.index;
+          ranges.push({ from, to: from + m[0].length });
+        }
+      });
+      return ranges.sort((a, b) => b.from - a.from);
+    },
+    [editor],
+  );
+
+  const applyFieldTokenValue = useCallback(
+    (tokenName: string) => {
+      if (!editor) return;
+      const value = (tokenInputValues[tokenName] ?? '').trim();
+      if (!value) {
+        setSaveError(`Enter a value for token "${tokenName}"`);
+        return;
+      }
+      const ranges = findTokenRanges(tokenName);
+      if (ranges.length === 0) return;
+      for (const r of ranges) {
+        editor.commands.insertContentAt({ from: r.from, to: r.to }, value);
+      }
+      setContent(editor.getHTML());
+      setSaveError(null);
+      setTokenInputValues((prev) => ({ ...prev, [tokenName]: '' }));
+    },
+    [editor, findTokenRanges, tokenInputValues],
+  );
+
+  useEffect(() => {
+    if (!editor) {
+      setCurrentVersionTokensResolved(true);
+      return;
+    }
+    const unresolved = unresolvedTokenNamesFromDoc(editor.getJSON() as JSONContent);
+    setCurrentVersionTokensResolved(unresolved.length === 0);
+    setTokenInputValues((prev) => {
+      const next: Record<string, string> = {};
+      for (const k of unresolved) next[k] = prev[k] ?? '';
+      return next;
+    });
+  }, [editor, content]);
+
+  const onTokenMediaFileSelected = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      const pending = pendingMediaTokenRef.current;
+      pendingMediaTokenRef.current = null;
+      if (!file || !pending || !editor) return;
+      try {
+        const { viewUrl } = await assetService.uploadFile(file, { placement: 'MY_ASSETS' });
+        const ranges = findTokenRanges(pending.tokenName);
+        for (const r of ranges) {
+          if (file.type.startsWith('image/')) {
+            editor.commands.insertContentAt(
+              { from: r.from, to: r.to },
+              {
+                type: 'image',
+                attrs: { src: viewUrl, alt: file.name },
+              },
+            );
+          } else {
+            const safeName = file.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const safeUrl = viewUrl.replace(/"/g, '&quot;');
+            editor.commands.insertContentAt(
+              { from: r.from, to: r.to },
+              `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeName}</a>`,
+            );
+          }
+        }
+        setContent(editor.getHTML());
+        setSaveError(null);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : 'Failed to upload media token file');
+      }
+    },
+    [editor, findTokenRanges],
+  );
+
   const openContentTranslate = useCallback(() => {
     if (!editor) return;
     if (mainTab === 'preview') {
@@ -817,6 +992,13 @@ export default function EditorLayout() {
     }
     setTranslateOpen(true);
   }, [editor, mainTab]);
+
+  const unresolvedTokenEntries = useMemo(() => {
+    if (!editor) return [] as Array<{ name: string; type: TokenType }>;
+    const doc = editor.getJSON() as JSONContent;
+    const names = unresolvedTokenNamesFromDoc(doc);
+    return names.map((name) => ({ name, type: tokenTypeFromDoc(doc, name, 'field') }));
+  }, [editor, content]);
 
   // When opening an existing content item (`/editor/:contentId`), hydrate the editor from the latest saved body.
   // Without this, the editor starts blank and a "Save Draft" would create a new content item, making it look
@@ -957,9 +1139,93 @@ export default function EditorLayout() {
     setSaving(true);
     setSaveError(null);
     setSaveConflictVersion(null);
+    const uploadedForThisSave: string[] = [];
+    const uploadedPendingIds = new Set<string>();
     try {
-      const bodyDoc =
+      const extractPendingUploadIdsLocal = (doc: JSONContent): string[] => {
+        const ids = new Set<string>();
+        const visit = (node: any) => {
+          if (!node || typeof node !== 'object') return;
+          if (node.type === 'image' && typeof node.attrs?.src === 'string') {
+            const src = node.attrs.src as string;
+            if (src.startsWith(PENDING_UPLOAD_PREFIX)) {
+              ids.add(src.slice(PENDING_UPLOAD_PREFIX.length));
+            }
+          }
+          if (Array.isArray(node.marks)) {
+            for (const m of node.marks) {
+              const href = m?.attrs?.href;
+              if (typeof href === 'string' && href.startsWith(PENDING_UPLOAD_PREFIX)) {
+                ids.add(href.slice(PENDING_UPLOAD_PREFIX.length));
+              }
+            }
+          }
+          if (Array.isArray(node.content)) {
+            for (const child of node.content) visit(child);
+          }
+        };
+        visit(doc);
+        return Array.from(ids);
+      };
+      const replacePendingUrlsInDocLocal = (
+        doc: JSONContent,
+        urlMap: Map<string, string>,
+      ): JSONContent => {
+        const clone = JSON.parse(JSON.stringify(doc)) as JSONContent;
+        const visit = (node: any) => {
+          if (!node || typeof node !== 'object') return;
+          if (node.type === 'image' && typeof node.attrs?.src === 'string') {
+            const src = node.attrs.src as string;
+            if (src.startsWith(PENDING_UPLOAD_PREFIX)) {
+              const id = src.slice(PENDING_UPLOAD_PREFIX.length);
+              const next = urlMap.get(id);
+              if (next) node.attrs.src = next;
+            }
+          }
+          if (Array.isArray(node.marks)) {
+            for (const m of node.marks) {
+              const href = m?.attrs?.href;
+              if (typeof href === 'string' && href.startsWith(PENDING_UPLOAD_PREFIX)) {
+                const id = href.slice(PENDING_UPLOAD_PREFIX.length);
+                const next = urlMap.get(id);
+                if (next) m.attrs.href = next;
+              }
+            }
+          }
+          if (Array.isArray(node.content)) {
+            for (const child of node.content) visit(child);
+          }
+        };
+        visit(clone);
+        return clone;
+      };
+
+      const rawBodyDoc =
         editor?.getJSON() ?? ({ type: 'doc', content: [{ type: 'paragraph' }] } as const);
+      const pendingIdsInDoc = extractPendingUploadIdsLocal(rawBodyDoc);
+      const pendingUrlMap = new Map<string, string>();
+      const uploadedAssetRefs: Array<{ pendingId: string; assetId: string }> = [];
+
+      for (const pendingId of pendingIdsInDoc) {
+        const pending = pendingUploadsRef.current.get(pendingId);
+        if (!pending) continue;
+        const upload = await assetService.uploadFile(pending.file, {
+          placement: 'MY_ASSETS',
+          ...(pending.kind === 'image' ? { category: 'image' as const } : {}),
+        });
+        pendingUrlMap.set(pendingId, upload.viewUrl);
+        uploadedAssetRefs.push({ pendingId, assetId: upload.asset.id });
+        uploadedForThisSave.push(upload.asset.id);
+        uploadedPendingIds.add(pendingId);
+      }
+
+      const bodyDoc = replacePendingUrlsInDocLocal(rawBodyDoc, pendingUrlMap);
+      if (editor && pendingUrlMap.size > 0) {
+        editor.commands.setContent(bodyDoc);
+        setContent(editor.getHTML());
+      }
+
+      let finalContentId = contentId;
 
       if (!contentId) {
         const result = await contentService.createDraft(title.trim(), bodyDoc, {
@@ -968,6 +1234,7 @@ export default function EditorLayout() {
           contentType,
         });
         setContentId(result.content.id);
+        finalContentId = result.content.id;
         setPendingTemplateId(null);
         setPendingChannelId(null);
         headVersionRef.current = result.version?.versionNumber ?? 1;
@@ -983,12 +1250,37 @@ export default function EditorLayout() {
         headVersionRef.current = saved.versionNumber;
         if (pendingTemplateId) setPendingTemplateId(null);
         if (pendingChannelId) setPendingChannelId(null);
+        finalContentId = contentId;
+      }
+
+      if (finalContentId) {
+        for (const ref of uploadedAssetRefs) {
+          try {
+            await assetService.registerUsage(ref.assetId, {
+              targetType: 'CONTENT',
+              targetId: finalContentId,
+              fieldPath: 'body',
+            });
+          } catch {
+            /* optional tracking */
+          }
+        }
+      }
+      for (const pid of uploadedPendingIds) {
+        pendingUploadsRef.current.delete(pid);
       }
       const t = title.trim();
       setSavedSnapshot({ title: t, content: editor?.getHTML() ?? content });
       setLastSaved(new Date());
       clearDraft();
     } catch (err) {
+      for (const assetId of uploadedForThisSave) {
+        try {
+          await assetService.deleteAsset(assetId);
+        } catch {
+          /* best-effort cleanup on save failure */
+        }
+      }
       if (err instanceof ContentSaveConflictError) {
         headVersionRef.current = err.currentVersionNumber;
         setSaveConflictVersion(err.currentVersionNumber);
@@ -1268,6 +1560,28 @@ export default function EditorLayout() {
     [editor],
   );
 
+  const insertFileReferenceCard = useCallback(
+    (fileName: string, fileUrl: string) => {
+      if (!editor || !fileUrl.trim()) return;
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'text',
+          text: fileName,
+          marks: [{ type: 'link', attrs: { href: fileUrl } }],
+        })
+        .run();
+    },
+    [editor],
+  );
+
+  const registerPendingUpload = useCallback((file: File, kind: PendingUploadKind): string => {
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    pendingUploadsRef.current.set(id, { file, kind });
+    return `${PENDING_UPLOAD_PREFIX}${id}`;
+  }, []);
+
   const onImageFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -1285,18 +1599,73 @@ export default function EditorLayout() {
         window.setTimeout(() => setImagePickMessage(null), 4200);
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const r = reader.result;
-        if (typeof r === 'string') insertImageFromSrc(r);
-      };
-      reader.onerror = () => {
-        setImagePickMessage('Could not read that file.');
-        window.setTimeout(() => setImagePickMessage(null), 4200);
-      };
-      reader.readAsDataURL(file);
+      const pendingUrl = registerPendingUpload(file, 'image');
+      insertImageFromSrc(pendingUrl);
+      setImagePickMessage('Image staged. It will upload on Save draft.');
+      window.setTimeout(() => setImagePickMessage(null), 3200);
     },
-    [insertImageFromSrc],
+    [insertImageFromSrc, registerPendingUpload],
+  );
+
+  const onAttachmentFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (file.size > EDITOR_ATTACHMENT_MAX_BYTES) {
+        setAttachmentPickMessage(
+          `File is too large (max ${Math.round(EDITOR_ATTACHMENT_MAX_BYTES / (1024 * 1024))} MB).`,
+        );
+        window.setTimeout(() => setAttachmentPickMessage(null), 4500);
+        return;
+      }
+      const pendingUrl = registerPendingUpload(file, 'attachment');
+      insertFileReferenceCard(file.name, pendingUrl);
+      setAttachmentPickMessage('File staged. It will upload on Save draft.');
+      window.setTimeout(() => setAttachmentPickMessage(null), 3200);
+    },
+    [insertFileReferenceCard, registerPendingUpload],
+  );
+
+  const onThumbnailFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (file.size > EDITOR_ATTACHMENT_MAX_BYTES) {
+        setAttachmentPickMessage(
+          `Thumbnail/file is too large (max ${Math.round(EDITOR_ATTACHMENT_MAX_BYTES / (1024 * 1024))} MB).`,
+        );
+        window.setTimeout(() => setAttachmentPickMessage(null), 4500);
+        return;
+      }
+      void (async () => {
+        try {
+          setAttachmentPickMessage('Uploading thumbnail/file…');
+          const { asset } = await assetService.uploadFile(file, {
+            placement: 'MY_ASSETS',
+          });
+          setThumbnailLabel(file.name);
+          setAttachmentPickMessage('Thumbnail/file uploaded to assets.');
+          if (persistedContentId) {
+            try {
+              await assetService.registerUsage(asset.id, {
+                targetType: 'CONTENT',
+                targetId: persistedContentId,
+                fieldPath: 'thumbnail',
+              });
+            } catch {
+              /* optional tracking */
+            }
+          }
+          window.setTimeout(() => setAttachmentPickMessage(null), 3200);
+        } catch (err) {
+          setAttachmentPickMessage(err instanceof Error ? err.message : 'Upload failed.');
+          window.setTimeout(() => setAttachmentPickMessage(null), 5200);
+        }
+      })();
+    },
+    [persistedContentId],
   );
 
   const fmtBtn = (active: boolean) =>
@@ -1538,6 +1907,28 @@ export default function EditorLayout() {
                 <Italic size={16} strokeWidth={2.25} />
               </button>
             ) : null}
+            {toolkit.strike ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleStrike().run()}
+                className={fmtBtn(!!editor?.isActive('strike'))}
+                title="Strikethrough"
+              >
+                <Strikethrough size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
+            {toolkit.code ? (
+              <button
+                type="button"
+                disabled={!editor || isPublished}
+                onClick={() => editor?.chain().focus().toggleCode().run()}
+                className={fmtBtn(!!editor?.isActive('code'))}
+                title="Inline code"
+              >
+                <Code2 size={16} strokeWidth={2.25} />
+              </button>
+            ) : null}
             {toolkit.underline ? (
               <button
                 type="button"
@@ -1622,6 +2013,18 @@ export default function EditorLayout() {
             <button
               type="button"
               disabled={!editor || isPublished}
+              onClick={() => {
+                setAttachmentPickMessage(null);
+                attachmentFileInputRef.current?.click();
+              }}
+              className={fmtBtn(false)}
+              title={attachmentPickMessage ? `Attach file · ${attachmentPickMessage}` : 'Attach file'}
+            >
+              <Paperclip size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              disabled={!editor || isPublished}
               onClick={openCitationDialog}
               className={fmtBtn(false)}
               title="Citation"
@@ -1634,6 +2037,19 @@ export default function EditorLayout() {
               accept="image/*"
               className="hidden"
               onChange={onImageFileChange}
+            />
+            <input
+              ref={tokenMediaFileInputRef}
+              type="file"
+              accept="image/*,video/*,audio/*,.pdf,application/pdf"
+              className="hidden"
+              onChange={(e) => void onTokenMediaFileSelected(e)}
+            />
+            <input
+              ref={attachmentFileInputRef}
+              type="file"
+              className="hidden"
+              onChange={onAttachmentFileChange}
             />
           </div>
           <span className="shrink-0 tabular-nums text-[13px] text-[var(--editor-faint)]">
@@ -1753,7 +2169,12 @@ export default function EditorLayout() {
 
         <div className="editor-canvas-area relative min-w-0 flex-1 overflow-auto bg-[var(--editor-canvas-bg)] px-6 py-6">
           <div
-            className="editor-doc-sheet mx-auto max-w-3xl rounded-[var(--editor-radius-card)] border border-[var(--editor-card-edge)] bg-[var(--editor-card-bg)] backdrop-blur-sm"
+            className={`mx-auto flex w-full items-start gap-6 ${
+              unresolvedTokenEntries.length > 0 ? 'max-w-[calc(48rem+248px+1.5rem)]' : 'max-w-3xl'
+            }`}
+          >
+          <div
+            className="editor-doc-sheet min-w-0 flex-1 rounded-[var(--editor-radius-card)] border border-[var(--editor-card-edge)] bg-[var(--editor-card-bg)] backdrop-blur-sm"
             style={{ minHeight: 'calc(100% - 8px)' }}
           >
             {mainTab === 'preview' ? (
@@ -1795,6 +2216,55 @@ export default function EditorLayout() {
                 </div>
               </>
             )}
+          </div>
+          {unresolvedTokenEntries.length > 0 ? (
+            <div className="w-[248px] shrink-0 rounded-md border border-amber-400/35 bg-black/40 p-2.5 shadow-lg backdrop-blur-sm">
+              <div className="mb-2 text-[11px] font-semibold text-amber-100">Unreplaced tokens</div>
+              <div className="space-y-2.5">
+                {unresolvedTokenEntries.map((t) => (
+                  <div key={t.name} className="rounded border border-amber-400/20 bg-amber-500/10 p-2">
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-[10px] text-amber-100">{t.name}</span>
+                      <span className="text-[9px] uppercase tracking-wide text-amber-200/85">
+                        {t.type}
+                      </span>
+                    </div>
+                    {t.type === 'field' ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={tokenInputValues[t.name] ?? ''}
+                          onChange={(e) =>
+                            setTokenInputValues((prev) => ({ ...prev, [t.name]: e.target.value }))
+                          }
+                          placeholder="value"
+                          className="min-w-0 flex-1 rounded border border-amber-400/20 bg-black/30 px-2 py-1.5 text-[10px] text-amber-50 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => applyFieldTokenValue(t.name)}
+                          className="rounded border border-amber-300/30 bg-amber-400/15 px-2 py-1.5 text-[10px] font-semibold text-amber-100 hover:bg-amber-400/25"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          pendingMediaTokenRef.current = { tokenName: t.name };
+                          tokenMediaFileInputRef.current?.click();
+                        }}
+                        className="w-full rounded border border-amber-300/30 bg-amber-400/15 px-2 py-1.5 text-[10px] font-semibold text-amber-100 hover:bg-amber-400/25"
+                      >
+                        Choose file
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           </div>
         </div>
 
@@ -1963,12 +2433,42 @@ export default function EditorLayout() {
                 </div>
                 <div>
                   <label className="mb-1 block font-medium text-[var(--editor-doc-text)]">
-                    Featured image
+                    Thumbnail / cover file
                   </label>
-                  <div className="flex h-[100px] cursor-pointer items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] border-dashed border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] text-[var(--editor-faint)]">
-                    Upload
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => thumbnailFileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        thumbnailFileInputRef.current?.click();
+                      }
+                    }}
+                    className="flex h-[100px] cursor-pointer flex-col items-center justify-center rounded-[var(--editor-radius-input)] border-[0.5px] border-dashed border-[var(--editor-border)] bg-[var(--editor-card-bg)] text-[11px] text-[var(--editor-faint)]"
+                  >
+                    <span>Upload thumbnail or file</span>
+                    {thumbnailLabel ? (
+                      <span className="mt-1 max-w-full truncate px-3 text-[10px] text-[var(--editor-doc-text)]">
+                        {thumbnailLabel}
+                      </span>
+                    ) : null}
                   </div>
+                  <input
+                    ref={thumbnailFileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={onThumbnailFileChange}
+                  />
+                  <p className="mt-1.5 text-[10px] leading-snug text-[var(--editor-faint)]">
+                    File is uploaded to assets and tracked as this draft's thumbnail reference.
+                  </p>
                 </div>
+                {attachmentPickMessage ? (
+                  <div className="rounded-[var(--editor-radius-input)] border-[0.5px] border-app-accent/35 bg-app-accent/10 px-2 py-1.5 text-[11px] text-app-accent">
+                    {attachmentPickMessage}
+                  </div>
+                ) : null}
                 <div className="border-t-[0.5px] border-[var(--editor-border)] pt-3">
                   <button
                     type="button"
@@ -2087,6 +2587,7 @@ export default function EditorLayout() {
         <span className="min-w-0 truncate">
           {autosaveLabel}
           {componentNotice ? ` · ${componentNotice}` : ''}
+          {currentVersionTokensResolved ? ' · tokens resolved' : ' · unresolved tokens present'}
         </span>
         <span className="shrink-0 tabular-nums">
           {wordCount} {wordCount === 1 ? 'word' : 'words'} · {versionLabel}
